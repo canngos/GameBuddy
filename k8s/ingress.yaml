@@ -1,0 +1,196 @@
+# The only public entry point to GameBuddy.
+#
+# Until now every service was a NodePort, so all five were independently reachable from
+# outside the cluster and each defended itself with its own copy of SecurityConfig —
+# copies that had already drifted (notif-service permitted everything, application-service
+# published /actuator/**). One ingress means one TLS certificate, one hostname, one place
+# to rate-limit, and a mistake in one service's filter chain is no longer directly
+# exploitable from the internet.
+#
+# Assumes ingress-nginx. Install on minikube with:
+#   minikube addons enable ingress
+#
+# Apply order:
+#   kubectl apply -f k8s/ingress.yaml
+#   kubectl apply -f GameBuddy-*/deploy-to-minikube.yml
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gamebuddy
+  annotations:
+    # --- TLS ---------------------------------------------------------------
+    # Redirect plain HTTP; the app sets forward-headers-strategy: framework so it
+    # sees the original scheme through X-Forwarded-Proto.
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+    # --- Rate limiting -----------------------------------------------------
+    # Per source IP, applied across every replica. The in-JVM RateLimiter stays as
+    # the per-account budget; it counts inside one pod, so with replicas: 2 the
+    # effective per-account limit is double what is configured. These two limits
+    # answer different questions and both are wanted.
+    nginx.ingress.kubernetes.io/limit-rps: "20"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "5"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+
+    # --- Body size ---------------------------------------------------------
+    # Posts and messages are text; nothing here accepts an upload.
+    nginx.ingress.kubernetes.io/proxy-body-size: "1m"
+
+    # --- Timeouts ----------------------------------------------------------
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "5"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+
+    # --- Response headers --------------------------------------------------
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-Frame-Options: DENY";
+      more_set_headers "Referrer-Policy: no-referrer";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.gamebuddy.example
+      secretName: gamebuddy-tls
+  rules:
+    - host: api.gamebuddy.example
+      http:
+        paths:
+          # --- auth-service ------------------------------------------------
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 4567
+          # /admin is deliberately absent here — see the admin Ingress below.
+
+          # --- application-service -----------------------------------------
+          - path: /application
+            pathType: Prefix
+            backend:
+              service:
+                name: application-service
+                port:
+                  number: 4568
+
+          # --- community-service -------------------------------------------
+          - path: /community
+            pathType: Prefix
+            backend:
+              service:
+                name: community-service
+                port:
+                  number: 4570
+
+          # --- match-service -----------------------------------------------
+          - path: /match
+            pathType: Prefix
+            backend:
+              service:
+                name: match-service
+                port:
+                  number: 4571
+          - path: /messages
+            pathType: Prefix
+            backend:
+              service:
+                name: match-service
+                port:
+                  number: 4571
+
+          # --- notif-service -----------------------------------------------
+          # Only the history endpoint is routed. /notif/token and /notif/topic are
+          # service-to-service — they push to a device and broadcast to every user —
+          # and are deliberately absent, so the ingress answers 404 for them. They
+          # remain reachable in-cluster, where InternalApiKeyFilter authenticates them.
+          - path: /notif/showall
+            pathType: Prefix
+            backend:
+              service:
+                name: notif-service
+                port:
+                  number: 4569
+---
+# The moderation API, on its own Ingress so it can be restricted by source address.
+#
+# These endpoints ban users, delete communities and remove reported messages. They
+# already require ROLE_ADMIN, but a role check is one credential away from being the only
+# thing between the internet and every account in the system; there is no reason for them
+# to be reachable from arbitrary addresses at all.
+#
+# IMPORTANT: set whitelist-source-range to your own network before applying. The default
+# below is the private RFC1918 ranges, which means "reachable from inside the VPN or the
+# office network, not from the internet". If you apply this without adjusting it and then
+# cannot reach /admin, that is this annotation working as intended — not a bug.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gamebuddy-admin
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+    # Moderation is low-volume; a lower ceiling here costs nothing and limits the damage
+    # an admin credential can do if it leaks.
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.gamebuddy.example
+      secretName: gamebuddy-tls
+  rules:
+    - host: api.gamebuddy.example
+      http:
+        paths:
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: auth-service
+                port:
+                  number: 4567
+---
+# The chat socket needs its own Ingress: WebSocket upgrades require a long read timeout
+# and session affinity, and applying those to the whole API would keep ordinary requests
+# open for an hour.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gamebuddy-websocket
+  annotations:
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+    # A chat socket stays open; the default 60s read timeout would drop it.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+
+    # The in-memory STOMP broker holds subscriptions in the pod that owns the socket,
+    # so a client has to keep reaching the same replica. Swap this for an external
+    # broker (Redis, RabbitMQ) if you ever need to scale the socket beyond affinity.
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: gamebuddy-ws
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.gamebuddy.example
+      secretName: gamebuddy-tls
+  rules:
+    - host: api.gamebuddy.example
+      http:
+        paths:
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: match-service
+                port:
+                  number: 4571

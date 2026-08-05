@@ -1,0 +1,157 @@
+package com.gamebuddy.common.enums;
+
+import lombok.Getter;
+import org.springframework.http.HttpStatus;
+
+/**
+ * The application-level error contract shared by every GameBuddy service.
+ *
+ * <p>Numeric ids are part of the public API consumed by the mobile client and are
+ * asserted directly by the service test-suites, so they must not be renumbered.
+ * The {@link HttpStatus} mapping, by contrast, is new: the previous implementation
+ * answered every failure with HTTP 500, which made it impossible for a client to
+ * distinguish "you sent a bad request" from "the server broke".
+ */
+@Getter
+public enum TransactionCode {
+
+    /** Application-level success. Historically surfaced as the string "100". */
+    DEFAULT_100(100, "Success", HttpStatus.OK),
+
+    // --- Registration / authentication -------------------------------------
+    EMAIL_EXISTS(101, "Email already registered", HttpStatus.CONFLICT),
+    EMAIL_SEND_FAILED(102, "Verification email could not be sent", HttpStatus.SERVICE_UNAVAILABLE),
+    USER_NOT_FOUND(103, "User not found", HttpStatus.NOT_FOUND),
+    VERIFICATION_CODE_NOT_FOUND(105, "Verification code is invalid", HttpStatus.BAD_REQUEST),
+    USER_NOT_VERIFIED(106, "Account not verified", HttpStatus.FORBIDDEN),
+    USERNAME_EXISTS(107, "Username already taken", HttpStatus.CONFLICT),
+    WRONG_PASSWORD(108, "Invalid credentials", HttpStatus.UNAUTHORIZED),
+    USER_NOT_COMPLETED(109, "Registration not finished", HttpStatus.FORBIDDEN),
+    TOKEN_INVALID(110, "Token is invalid or expired", HttpStatus.UNAUTHORIZED),
+    TOKEN_NOT_FOUND(111, "Token not found", HttpStatus.UNAUTHORIZED),
+    PASSWORD_SAME(112, "New password must differ from the current one", HttpStatus.BAD_REQUEST),
+    USER_BLOCKED(113, "Account is blocked", HttpStatus.FORBIDDEN),
+
+    // --- Notifications ------------------------------------------------------
+    NOTIF_SEND_FAILED(114, "Notification could not be sent", HttpStatus.SERVICE_UNAVAILABLE),
+
+    // --- Friends ------------------------------------------------------------
+    FRIEND_ALREADY_EXISTS(115, "Already friends", HttpStatus.CONFLICT),
+    FRIEND_NO_REQUEST(116, "No pending friend request", HttpStatus.NOT_FOUND),
+    FRIEND_NOT_FOUND(117, "Not in your friend list", HttpStatus.NOT_FOUND),
+    USER_ALREADY_BLOCKED(118, "User already blocked", HttpStatus.CONFLICT),
+    USER_NOT_BLOCKED(119, "User is not blocked", HttpStatus.CONFLICT),
+    ALREADY_SENT_REQUEST(120, "Friend request already sent", HttpStatus.CONFLICT),
+    USER_BLOCKED_YOU(121, "User has blocked you", HttpStatus.FORBIDDEN),
+    ALREADY_FRIENDS(122, "Already friends", HttpStatus.CONFLICT),
+
+    // --- Downstream services ------------------------------------------------
+    RECOMMENDER_SERVICE_ERROR(123, "Recommendation service unavailable", HttpStatus.SERVICE_UNAVAILABLE),
+
+    // --- Badges / marketplace ----------------------------------------------
+    // Achievements became badges: same three numbers, same three meanings, renamed with
+    // the feature. The numbers are the wire contract and do not move; the enum names and
+    // the messages are ours.
+    BADGE_NOT_FOUND(124, "Badge not found", HttpStatus.NOT_FOUND),
+    ALREADY_COLLECTED(125, "You already claimed this badge", HttpStatus.CONFLICT),
+    BADGE_NOT_EARNED(126, "You have not earned this badge yet", HttpStatus.CONFLICT),
+    AVATAR_NOT_FOUND(127, "Avatar not found", HttpStatus.NOT_FOUND),
+    // 128 was AVATAR_ALREADY_OWNED. Retired with paid avatars; see COSMETIC_ALREADY_OWNED.
+    // The number stays spent rather than being reused: these codes go over the wire, and an
+    // installed app that still knows 128 as an avatar message would render the wrong text
+    // for whatever took its place.
+    COIN_NOT_ENOUGH(129, "Not enough coins", HttpStatus.CONFLICT),
+
+    // --- Communities --------------------------------------------------------
+    COMMUNITY_NOT_FOUND(131, "Community not found", HttpStatus.NOT_FOUND),
+    NOT_MEMBER(132, "You are not a member of this community", HttpStatus.FORBIDDEN),
+    POST_NOT_FOUND(133, "Post not found", HttpStatus.NOT_FOUND),
+    NOT_OWNER(134, "You do not own this resource", HttpStatus.FORBIDDEN),
+    COMMENT_NOT_FOUND(135, "Comment not found", HttpStatus.NOT_FOUND),
+    ALREADY_MEMBER(136, "Already a member", HttpStatus.CONFLICT),
+    // 137 was AVATAR_NOT_BOUGHT. Retired with paid avatars; every catalogue avatar is now
+    // selectable by anyone. Number left spent for the reason given at 128.
+    USER_OWNER(138, "Owner cannot leave their own community", HttpStatus.CONFLICT),
+    ALREADY_LIKED(139, "Already liked", HttpStatus.CONFLICT),
+
+    // --- Administration -----------------------------------------------------
+    NOT_ADMIN(140, "Administrator role required", HttpStatus.FORBIDDEN),
+    MESSAGE_NOT_REPORTED(141, "Message is not reported", HttpStatus.NOT_FOUND),
+
+    // --- Chat ---------------------------------------------------------------
+    MESSAGE_NOT_FOUND(142, "Message not found", HttpStatus.NOT_FOUND),
+    RECEIVER_IS_DIFFERENT(143, "You are not the recipient of this message", HttpStatus.FORBIDDEN),
+
+    // --- Added during the 2026 hardening pass -------------------------------
+    /** Verification code exists but is past its validity window. */
+    VERIFICATION_CODE_EXPIRED(144, "Verification code has expired", HttpStatus.BAD_REQUEST),
+    /** Too many verification attempts; the code has been burned. */
+    TOO_MANY_ATTEMPTS(145, "Too many attempts, request a new code", HttpStatus.TOO_MANY_REQUESTS),
+    /** Caller exceeded the send-code / login rate limit. */
+    RATE_LIMITED(146, "Too many requests, please wait", HttpStatus.TOO_MANY_REQUESTS),
+    /** Password fails the minimum strength policy. */
+    WEAK_PASSWORD(147, "Password does not meet the minimum requirements", HttpStatus.BAD_REQUEST),
+    /** Malformed path variable or body field, e.g. an unparseable UUID. */
+    INVALID_REQUEST(148, "Request contains an invalid value", HttpStatus.BAD_REQUEST),
+    /** Authenticated, but not permitted to act on this resource. */
+    FORBIDDEN(149, "You are not allowed to perform this action", HttpStatus.FORBIDDEN),
+    /** Current password supplied during a change-password call did not match. */
+    CURRENT_PASSWORD_WRONG(150, "Current password is incorrect", HttpStatus.UNAUTHORIZED),
+    /** Catalogue lookup miss. Previously reported as DB_ERROR, i.e. an HTTP 500. */
+    GAME_NOT_FOUND(151, "Game not found", HttpStatus.NOT_FOUND),
+    /** A concurrent update won; the caller should retry. */
+    CONCURRENT_UPDATE(152, "The record changed while you were working on it", HttpStatus.CONFLICT),
+    /** Chat requires a mutual match. Nothing enforced this before. */
+    NOT_MATCHED(153, "You can only chat with a matched gamer", HttpStatus.FORBIDDEN),
+    /** Minors are never paired with adults. See {@link AgeBand}. */
+    AGE_BAND_MISMATCH(154, "This gamer is not in your age group", HttpStatus.FORBIDDEN),
+    /** A friend request may only be sent to someone you have already matched with. */
+    FRIEND_REQUIRES_MATCH(155, "You can only add a matched gamer as a friend", HttpStatus.FORBIDDEN),
+    /** The account has been deleted by its owner. */
+    ACCOUNT_DELETED(156, "This account no longer exists", HttpStatus.NOT_FOUND),
+    /** Reported content that has already been reported by the same gamer. */
+    ALREADY_REPORTED(157, "You have already reported this", HttpStatus.CONFLICT),
+
+    // --- Subscriptions and purchases ---------------------------------------
+    /**
+     * The free tier's daily allowance of accepts is spent. 429 so the client can show a
+     * timer. Declining is never rationed, so this can only come from an accept.
+     */
+    ACCEPT_LIMIT_REACHED(158, "Daily like limit reached", HttpStatus.TOO_MANY_REQUESTS),
+    /**
+     * The whole daily swipe budget is spent, so neither accepting nor declining is
+     * possible until it resets. Distinct from {@link #ACCEPT_LIMIT_REACHED}, which leaves
+     * the gamer able to keep browsing.
+     */
+    SWIPE_LIMIT_REACHED(163, "Daily swipe limit reached", HttpStatus.TOO_MANY_REQUESTS),
+    /** 402, so the client can route straight to the upgrade screen. */
+    SUBSCRIPTION_REQUIRED(159, "This feature requires GameBuddy Gold", HttpStatus.PAYMENT_REQUIRED),
+    PRODUCT_NOT_FOUND(160, "Unknown product", HttpStatus.NOT_FOUND),
+    /** The store receipt did not verify. Never grant an entitlement on this path. */
+    PURCHASE_VERIFICATION_FAILED(161, "Purchase could not be verified", HttpStatus.BAD_REQUEST),
+    /** Idempotent replay: the transaction was already credited. Not an error to the user. */
+    PURCHASE_ALREADY_PROCESSED(162, "Purchase already processed", HttpStatus.CONFLICT),
+
+    // --- Cosmetics ----------------------------------------------------------
+    COSMETIC_NOT_FOUND(164, "Frame or banner not found", HttpStatus.NOT_FOUND),
+    COSMETIC_ALREADY_OWNED(165, "You already own this", HttpStatus.CONFLICT),
+    /** Equipping something that was never bought. The store should not have offered it. */
+    COSMETIC_NOT_OWNED(166, "You do not own this yet", HttpStatus.FORBIDDEN),
+
+    // --- Badges -------------------------------------------------------------
+    /** More badges chosen for the showcase than a profile has slots for. */
+    SHOWCASE_FULL(167, "You can show at most three badges", HttpStatus.CONFLICT),
+
+    /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
+    DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);
+
+    private final int id;
+    private final String message;
+    private final HttpStatus httpStatus;
+
+    TransactionCode(int id, String message, HttpStatus httpStatus) {
+        this.id = id;
+        this.message = message;
+        this.httpStatus = httpStatus;
+    }
+}

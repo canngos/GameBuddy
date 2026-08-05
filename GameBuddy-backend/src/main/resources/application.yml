@@ -1,0 +1,207 @@
+spring:
+  application:
+    name: gamebuddy
+
+  servlet:
+    multipart:
+      # The first line of defence on an upload endpoint, and the cheapest: Spring refuses
+      # the request at the container before a byte reaches application code, so an
+      # oversized body costs no heap. ImageNormaliser bounds the *decoded* size separately
+      # — a small file can still declare an enormous canvas.
+      #
+      # 8MB is generous for a photograph that gets scaled to 512px square and re-encoded.
+      max-file-size: ${MAX_UPLOAD_SIZE:8MB}
+      max-request-size: ${MAX_UPLOAD_SIZE:8MB}
+
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/gamebuddydb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      # One pool now, where there were five. Five services each holding ten connections
+      # meant fifty against a database that was sized for far fewer, and most sat idle.
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      connection-timeout: 10000
+      # Sets the connection search path, which is what native queries resolve against.
+      # Hibernate's default_schema below only applies to entity mappings, so a @Query with
+      # nativeQuery = true looked for an unqualified "gamer" and got "relation does not
+      # exist" — taking out the who-liked-you screen and the exploration slots in the
+      # recommendation feed. Same variable as default_schema so the two cannot drift.
+      schema: ${DB_SCHEMA:gamebuddy}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${DDL_AUTO:update}
+    open-in-view: false
+    properties:
+      hibernate:
+        # One schema. The three namespaces isolated nothing — every service shared the
+        # same database — and they caused the avatars split, where the same table
+        # resolved differently depending on which service asked.
+        default_schema: ${DB_SCHEMA:gamebuddy}
+        jdbc:
+          time_zone: UTC
+        default_batch_fetch_size: 50
+        order_inserts: true
+        order_updates: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  mail:
+    # Verification codes at registration. Without a host configured Boot creates no
+    # JavaMailSender at all and the whole application refuses to start, so this stays even
+    # in environments that never send anything.
+    #
+    # To send nothing and print the code instead, set gamebuddy.mail.mode=log. See
+    # MailConfig — that is a local-only switch and it is not the default.
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${EMAIL:}
+    password: ${EMAIL_PWD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          # Bounded: an unresponsive SMTP server would otherwise hold the request thread
+          # for as long as it liked.
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+firebase:
+  # Push delivery. Turn off locally so the application starts without credentials.
+  enabled: ${FIREBASE_ENABLED:true}
+  config:
+    # A filesystem path (mount the service-account JSON as a secret) or, for local work, a
+    # classpath resource. Never commit the file itself.
+    path: ${FIREBASE_CONFIG_PATH:}
+
+gamebuddy:
+  mail:
+    # 'smtp' sends for real. 'log' prints the verification code and sends nothing, which is
+    # the only way to reach the signup screen without a mail server. Never 'log' in
+    # production: it would let anyone reading the logs verify any address.
+    mode: ${MAIL_MODE:smtp}
+
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: ${JWT_EXPIRATION:7d}
+    issuer: gamebuddy
+
+  chat:
+    # Message bodies are encrypted before they reach the database, so a leaked dump or a
+    # stolen disk yields nothing readable. Not end-to-end: the server can still decrypt,
+    # which is what lets a reported message actually be reviewed. Generate with:
+    #   openssl rand -base64 32
+    encryption-key: ${CHAT_ENCRYPTION_KEY}
+
+  storage:
+    # Where uploaded avatars and cosmetic assets live. An access key selects R2; without
+    # one the application writes to the local disk instead, so a fresh clone runs with no
+    # credentials at all. See StorageConfig — the choice is made in Java rather than by a
+    # profile, because an empty value here has to mean "not configured" and Spring's
+    # conditional annotations treat empty as present.
+    r2:
+      endpoint: ${R2_ENDPOINT:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      uploads-bucket: ${R2_UPLOADS_BUCKET:gamebuddy-uploads}
+      media-bucket: ${R2_MEDIA_BUCKET:gamebuddy-media}
+      public-url: ${R2_PUBLIC_URL:}
+    local:
+      directory: ${LOCAL_MEDIA_DIR:./.media}
+      # Points back at this application's own /media/** endpoint, so client code is
+      # identical in both environments: it is handed a URL and fetches it.
+      public-url: ${LOCAL_MEDIA_URL:http://localhost:8080/media}
+
+  moderation:
+    # The same Python service as the recommender, different endpoint. Its own timeouts:
+    # classifying an image takes hundreds of milliseconds against a recommendation's
+    # single digits, and sharing the recommender's read timeout would time out every
+    # upload while the deck stays tuned for speed.
+    url: ${PREDICT_SERVICE_URL:http://localhost:8000}
+    connect-timeout: 5s
+    read-timeout: 30s
+    api-key: ${INTERNAL_API_KEY}
+
+  predict:
+    # The only remaining out-of-process dependency: the Python model is a different
+    # runtime. Everything that used to be an HTTP call between services is a method call.
+    url: ${PREDICT_SERVICE_URL:http://localhost:8000}
+    connect-timeout: 5s
+    read-timeout: 15s
+    api-key: ${INTERNAL_API_KEY}
+
+  websocket:
+    allowed-origins: ${WS_ALLOWED_ORIGINS:http://localhost:3000}
+
+  cors:
+    # Which browser origins may call this API. Empty by default, which refuses all of
+    # them — mobile clients are not subject to CORS, so nothing legitimate needs this
+    # switched on in production unless a web client ships. Comma-separated patterns;
+    # see CorsConfig.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
+  impressions:
+    retention: ${IMPRESSION_RETENTION:P90D}
+    cleanup-cron: ${IMPRESSION_CLEANUP_CRON:0 30 3 * * *}
+
+  billing:
+    # Nothing is registered by default, and PurchaseService rejects any platform it has no
+    # verifier for. A deployment that has not been configured refuses to sell rather than
+    # giving product away.
+    google:
+      # Needs a service-account JSON with "View financial data" on the Play Console.
+      enabled: ${GOOGLE_BILLING_ENABLED:false}
+      package-name: ${GOOGLE_PACKAGE_NAME:}
+      service-account-file: ${GOOGLE_SERVICE_ACCOUNT_FILE:}
+    apple:
+      # Needs Apple's root certificates on disk; they are shipped with the deployment,
+      # never fetched at runtime.
+      enabled: ${APPLE_BILLING_ENABLED:false}
+      bundle-id: ${APPLE_BUNDLE_ID:}
+      root-certificate-dir: ${APPLE_ROOT_CERT_DIR:}
+    # Verifies NOTHING. Local development only — with this on, anyone who can reach the
+    # endpoint can grant themselves Gold and unlimited coins.
+    sandbox: ${BILLING_SANDBOX:false}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui
+  api-docs:
+    path: /api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    mail:
+      # Off deliberately. The indicator opens an SMTP connection, so an unreachable mail
+      # server made /actuator/health report DOWN for the whole application — which would
+      # pull it out of the load balancer over a feature that only affects registration.
+      # Failing to send a verification email is a degraded feature, not a dead process.
+      enabled: false
+
+logging:
+  level:
+    com.gamebuddy: ${LOG_LEVEL:INFO}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+  shutdown: graceful
+  forward-headers-strategy: framework

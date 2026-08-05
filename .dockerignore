@@ -1,0 +1,38 @@
+# The backend build context is the repository root, so without this Docker uploads the
+# whole workspace — including build output, the Android project and the model's data
+# directory — before the first instruction runs.
+
+.git
+.github
+.idea
+.claude
+.gradle
+
+# Build output. The image builds from source; copying a host-built jar in would produce an
+# image whose contents depend on what happened to be lying around.
+**/build
+**/out
+**/.gradle
+
+# Not part of the backend build. The model service builds from its own context
+# (./GameBuddy-Model) and so has its own .dockerignore; this only affects the backend.
+GameBuddy-Android
+GameBuddy-Model
+documentation
+k8s
+
+# Superseded by the modules inside GameBuddy-backend. settings.gradle does not include
+# them, and they are large.
+GameBuddy-*-service
+
+# Secrets, so a stray credential file cannot end up baked into a layer.
+.env
+*.env
+!.env.example
+*-service-account.json
+
+# Python
+**/__pycache__
+**/*.pyc
+**/.venv
+**/.pytest_cache

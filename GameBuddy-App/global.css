@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme tokens.
+ *
+ * Space-separated RGB channels rather than hex, because tailwind.config.js wraps them
+ * as `rgb(var(--token) / <alpha-value>)` — that is what makes `bg-surface/60` work.
+ *
+ * Dark lives under `.dark`, which NativeWind toggles from the active colour scheme.
+ * It is not an inversion: the dark canvas is the near-black the original Android app
+ * already used (#1A1B22 and below), surfaces lift *towards* the viewer rather than
+ * away, and the brand pink is untouched because it reads correctly on both.
+ */
+@layer base {
+  :root {
+    --canvas: 255 255 255;
+    --surface: 255 255 255;
+    --raised: 246 247 249;
+    --line: 228 229 234;
+    --content: 35 37 47;
+    --muted: 110 113 128;
+    --field: 240 241 244;
+    --field-focus: 255 241 243;
+    --danger: 217 48 37;
+    --success: 30 142 62;
+  }
+
+  .dark:root {
+    --canvas: 19 20 25;
+    --surface: 26 27 34;
+    --raised: 35 37 47;
+    --line: 50 52 64;
+    --content: 240 241 245;
+    --muted: 150 153 168;
+    --field: 35 37 47;
+    /* Warmer than the surface, so focus is obvious without a bright flash at night. */
+    --field-focus: 48 38 44;
+    /* Both lightened: the light-mode red and green are too dark to read on #131419. */
+    --danger: 255 107 97;
+    --success: 76 196 112;
+  }
+}

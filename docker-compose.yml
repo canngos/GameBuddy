@@ -1,0 +1,179 @@
+# GameBuddy, locally.
+#
+#   cp .env.example .env && docker compose up --build
+#
+# Brings up Postgres, the Python recommender and the backend, wired together. The schema is
+# created from db/schema-baseline.sql on first start and the backend runs with
+# ddl-auto=validate, so this is the same shape as production rather than a convenient
+# approximation of it. If an entity and the SQL disagree, the backend refuses to start here,
+# which is exactly where you want to find out.
+#
+# Differences from production, all deliberate and all listed in the README: mail is printed
+# instead of sent, Firebase is off, billing is off, and the secrets are throwaway.
+
+name: gamebuddy
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-gamebuddy}
+      POSTGRES_USER: ${DB_USER:-gamebuddy}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      # Exposed so you can psql in and inspect what the app did.
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory. Numbered so the baseline lands before the
+      # upgrades; anything added later needs a number above 02 to run in the right order.
+      #
+      # Note this only fires on a *fresh* volume. After changing the schema, either add an
+      # upgrade script and apply it by hand, or `docker compose down -v` and start over.
+      - ./GameBuddy-backend/src/main/resources/db/schema-baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
+      - ./GameBuddy-backend/src/main/resources/db/seed-local.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      # -d and -U matter: without them pg_isready checks the default database and reports
+      # healthy while the init scripts are still running, and the backend starts against a
+      # schema that does not exist yet.
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gamebuddy} -d ${DB_NAME:-gamebuddy}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  model:
+    build:
+      context: ./GameBuddy-Model
+      dockerfile: Dockerfile
+    environment:
+      # Must match the backend's. A mismatch is not a loud failure: the model answers 503
+      # and the feed surfaces a generic "Recommendation service unavailable", which looks
+      # like the model being down rather than a wrong secret.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env}
+
+      # Where the image classifier draws its two lines. These are a moderation policy
+      # expressed as numbers, not a model detail: raising REJECT lets more through and
+      # leans on the human queue, lowering it refuses more ordinary photographs. Retune
+      # them against what the queue actually receives rather than guessing twice.
+      NSFW_REJECT_THRESHOLD: ${NSFW_REJECT_THRESHOLD:-0.85}
+      NSFW_APPROVE_THRESHOLD: ${NSFW_APPROVE_THRESHOLD:-0.20}
+    ports:
+      - "${MODEL_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: .
+      dockerfile: GameBuddy-backend/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      model:
+        # Waits for the model to actually load its artefact. Without this the backend comes
+        # up first and the first few recommendation requests fail for no visible reason.
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-gamebuddy}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-gamebuddy}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      DB_SCHEMA: gamebuddy
+
+      # The schema is owned by SQL. 'validate' means a mismatch stops the application
+      # instead of Hibernate quietly reshaping the database underneath you.
+      DDL_AUTO: validate
+
+      PREDICT_SERVICE_URL: http://model:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+
+      # Object storage for uploaded avatars. Empty R2_ACCESS_KEY_ID — which is what an
+      # unconfigured .env gives — selects the local-disk implementation instead, so the
+      # stack comes up and avatars work with no Cloudflare account at all. See
+      # StorageConfig.
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_UPLOADS_BUCKET: ${R2_UPLOADS_BUCKET:-gamebuddy-uploads}
+      R2_MEDIA_BUCKET: ${R2_MEDIA_BUCKET:-gamebuddy-media}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+
+      # Only used when the above is empty. Inside the container the media directory has to
+      # be a volume or every restart loses the uploads; the host URL is what a phone on the
+      # same network can actually reach, which is not "localhost" from the app's side.
+      LOCAL_MEDIA_DIR: /app/.media
+      LOCAL_MEDIA_URL: ${LOCAL_MEDIA_URL:-http://10.0.2.2:8080/media}
+
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env}
+
+      # Prints verification codes to `docker compose logs backend` instead of sending them.
+      # Without this, registration rolls its transaction back when SMTP is unreachable and
+      # no account can be created at all.
+      MAIL_MODE: log
+      # Still required even in log mode: with no host configured Boot creates no
+      # JavaMailSender and the application will not start.
+      MAIL_HOST: localhost
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+
+      # Push delivery. On, because the service-account key is now mounted below.
+      #
+      # FIREBASE_ENABLED=false is still the right setting for anyone without the key:
+      # the application fails to start rather than degrading, which is deliberate — a
+      # backend that silently swallows every notification is worse than one that refuses
+      # to boot and says why.
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-true}
+      FIREBASE_CONFIG_PATH: /run/secrets/firebase-service-account.json
+
+      # Lets the Expo web build call the API from a browser. Native builds ignore CORS
+      # entirely, so this is only for `npx expo start --web`. Port is a wildcard because
+      # Metro moves off 8081 when it is busy; the LAN pattern covers opening the dev
+      # server from another machine. Both are development origins — production sets
+      # CORS_ALLOWED_ORIGINS to a real domain, or leaves it empty.
+      CORS_ALLOWED_ORIGINS: "http://localhost:[*],http://127.0.0.1:[*],http://192.168.*:[*]"
+
+      # The chat socket checks origins separately from CORS — it is a handshake, not a
+      # cross-origin fetch, and Spring guards it with its own list. The default is
+      # localhost:3000, which is nobody here. Native clients send no Origin at all and
+      # are unaffected; this is for the web build and the Expo dev server.
+      WS_ALLOWED_ORIGINS: "http://localhost:[*],http://127.0.0.1:[*],http://192.168.*:[*]"
+
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      # The Firebase service-account key, read-only.
+      #
+      # A bind mount rather than an image layer or an environment variable: it is a
+      # private key, it must never end up in a built image or in `docker inspect`, and it
+      # is git-ignored on the host. FIREBASE_SERVICE_ACCOUNT lets a deployment point at
+      # its own copy; the default is the path used locally.
+      - ${FIREBASE_SERVICE_ACCOUNT:-./secret/gamebuddy-a4205-firebase-adminsdk-fbsvc-13e51ed01f.json}:/run/secrets/firebase-service-account.json:ro
+      # Only used when R2 is not configured — otherwise nothing is written here at
+      # all. Named rather than a bind mount so it behaves the same on every host, and
+      # present so that running without credentials does not lose every upload on the
+      # next `docker compose up`.
+      - media-data:/app/.media
+
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+
+volumes:
+  postgres-data:
+  # Only used when R2 is not configured. Named rather than a bind mount so it behaves the
+  # same on Windows, macOS and Linux.
+  media-data:

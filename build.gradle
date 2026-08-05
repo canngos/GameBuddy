@@ -1,0 +1,153 @@
+plugins {
+    alias(libs.plugins.spotless) apply false
+    alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.sonarqube)
+}
+
+allprojects {
+    group = 'com.gamebuddy'
+    version = '1.0.0'
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'jacoco'
+    apply plugin: 'com.diffplug.spotless'
+
+    java {
+        toolchain {
+            // Java 25 LTS — supported until 2033, which is what a published app needs.
+            languageVersion = JavaLanguageVersion.of(libs.versions.javaToolchain.get() as int)
+        }
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        // Emit Java 25 bytecode explicitly so a newer local JDK cannot leak newer APIs in.
+        options.release = libs.versions.javaRelease.get() as int
+        options.encoding = 'UTF-8'
+        options.compilerArgs << '-Xlint:all,-processing,-serial'
+    }
+
+    configurations {
+        compileOnly {
+            extendsFrom annotationProcessor
+        }
+    }
+
+    dependencies {
+        implementation platform(libs.spring.boot.bom)
+        annotationProcessor platform(libs.spring.boot.bom)
+        testImplementation platform(libs.spring.boot.bom)
+
+        // Pinned above the Boot BOM's managed version for current-JDK support.
+        compileOnly libs.lombok
+        annotationProcessor libs.lombok
+        testCompileOnly libs.lombok
+        testAnnotationProcessor libs.lombok
+
+        // Declared after Lombok on purpose: the binding has to see Lombok's generated
+        // accessors before MapStruct's processor reads the bean.
+        implementation libs.mapstruct
+        annotationProcessor libs.lombok.mapstruct.binding
+        annotationProcessor libs.mapstruct.processor
+        testAnnotationProcessor libs.lombok.mapstruct.binding
+        testAnnotationProcessor libs.mapstruct.processor
+
+        testImplementation libs.spring.boot.starter.test
+        testRuntimeOnly libs.junit.platform.launcher
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs += [
+            // Fail the build when a target property has no source — a silently
+            // unmapped field is exactly the class of bug hand-written mappers hide.
+            '-Amapstruct.unmappedTargetPolicy=ERROR',
+            // NOT 'mapstruct.componentModel'. That is the @Mapper attribute name, not a
+            // processor option, and javac ignores unknown -A options without complaint —
+            // so the mappers were generated as plain classes with no @Component and were
+            // never registered as beans. Nothing caught it because every test constructs
+            // the generated impl directly (new GamerMapperImpl()), and the services were
+            // only ever tested, never started.
+            '-Amapstruct.defaultComponentModel=spring',
+        ]
+    }
+
+    tasks.withType(Test).configureEach {
+        useJUnitPlatform()
+        // Analysis hook: `-PexcludeTest=<pattern>` drops one test from the run without
+        // touching a source file, so a leave-one-out coverage comparison needs no
+        // recompile. Unused by normal builds and by CI.
+        if (project.hasProperty('excludeTest')) {
+            filter {
+                excludeTestsMatching project.property('excludeTest').toString()
+                failOnNoMatchingTests = false
+            }
+        }
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            exceptionFormat 'full'
+        }
+    }
+
+    tasks.named('test') {
+        finalizedBy tasks.named('jacocoTestReport')
+    }
+
+    tasks.named('jacocoTestReport') {
+        dependsOn tasks.named('test')
+        reports {
+            xml.required = true
+            html.required = true
+            csv.required = false
+        }
+    }
+
+    spotless {
+        java {
+            target 'src/*/java/**/*.java'
+            toggleOffOn()
+            palantirJavaFormat()
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
+}
+
+// Run against a local server (see docker-compose.sonar.yml):
+//   docker compose -f docker-compose.sonar.yml up -d
+//   ./gradlew build sonar -Dsonar.token=<token generated in the UI>
+// SonarLint in the IDE applies the same Java rule set; binding the IDE to this
+// server keeps the two in sync.
+sonar {
+    properties {
+        property 'sonar.projectKey', 'gamebuddy'
+        property 'sonar.projectName', 'GameBuddy'
+        property 'sonar.host.url', System.getenv('SONAR_HOST_URL') ?: 'http://localhost:9000'
+        // The root project has no sources of its own. Without this the analyser walks
+        // the whole workspace, finds the modules' .java files with no matching
+        // binaries, and aborts.
+        property 'sonar.sources', ''
+        // Boilerplate that only wires beans or declares an entry point: real coverage
+        // there would mean testing Spring, not GameBuddy.
+        property 'sonar.coverage.exclusions',
+                '**/config/**,**/Main.java,**/interfaces/request/**,**/interfaces/response/**,**/interfaces/dto/**'
+    }
+}
+
+// Every module is refactored and analysed. Add a name here only to park a module that
+// temporarily does not compile — the analyser aborts the whole run on sources with no
+// matching binaries.
+def sonarPending = []
+
+subprojects {
+    sonar {
+        // `skipProject` is a plugin extension flag, not a `sonar.*` analysis property.
+        skipProject = project.name in sonarPending
+        properties {
+            property 'sonar.java.source', libs.versions.javaRelease.get()
+            property 'sonar.coverage.jacoco.xmlReportPaths',
+                    "${layout.buildDirectory.get()}/reports/jacoco/test/jacocoTestReport.xml"
+        }
+    }
+}

@@ -1,0 +1,83 @@
+# Central version catalog for every GameBuddy module.
+# Versions verified against Maven Central / Gradle Plugin Portal, July 2026.
+
+[versions]
+# Java 25 is the current LTS: both the toolchain and the bytecode target.
+javaRelease = "25"
+javaToolchain = "25"
+
+springBoot = "4.1.0"
+springdoc = "3.0.3"
+jjwt = "0.13.0"
+firebaseAdmin = "9.10.0"
+# S3-compatible client for Cloudflare R2. The BOM keeps the SDK's own modules in step;
+# only s3 and the Apache HTTP client are pulled in, not the ~400 service clients.
+awsSdk = "2.35.7"
+lombok = "1.18.46"
+# 1.7.0 is still Beta2; stay on the current stable for a shipping app.
+mapstruct = "1.6.3"
+lombokMapstructBinding = "0.2.0"
+
+spotless = "8.9.0"
+sonarqube = "7.3.1.8318"
+
+# Enforces the monolith's module boundaries. A boundary nobody verifies is a comment,
+# and the whole argument for consolidating rests on the modules staying separable.
+archunit = "1.4.1"
+
+[libraries]
+# Spring Boot's BOM drives every org.springframework.boot:* version below.
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
+
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-data-mongodb = { module = "org.springframework.boot:spring-boot-starter-data-mongodb" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
+spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+# Boot 4 split the slice-test annotations out of spring-boot-test-autoconfigure:
+# @WebMvcTest now lives in spring-boot-starter-webmvc-test.
+spring-boot-starter-webmvc-test = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
+spring-boot-starter-security-test = { module = "org.springframework.boot:spring-boot-starter-security-test" }
+
+# Bucket4j-free, dependency-free rate limiting is done in :common, so no extra dep.
+springdoc-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+
+jjwt-api = { module = "io.jsonwebtoken:jjwt-api", version.ref = "jjwt" }
+jjwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
+jjwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
+
+firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebaseAdmin" }
+
+aws-sdk-bom = { module = "software.amazon.awssdk:bom", version.ref = "awsSdk" }
+aws-sdk-s3 = { module = "software.amazon.awssdk:s3" }
+# The SDK defaults to Netty for async. This service does synchronous puts of small
+# objects, and dragging in a second event-loop runtime for that is not a trade worth
+# making — apache-client is the sync HTTP implementation.
+aws-sdk-apache-client = { module = "software.amazon.awssdk:apache-client" }
+
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+
+mapstruct = { module = "org.mapstruct:mapstruct", version.ref = "mapstruct" }
+mapstruct-processor = { module = "org.mapstruct:mapstruct-processor", version.ref = "mapstruct" }
+# Without this, Lombok and MapStruct each run in their own annotation-processing
+# round and MapStruct generates mappers against fields whose accessors do not exist yet.
+lombok-mapstruct-binding = { module = "org.projectlombok:lombok-mapstruct-binding", version.ref = "lombokMapstructBinding" }
+
+postgresql = { module = "org.postgresql:postgresql" }
+
+# Gradle 9 requires the launcher on the test runtime classpath explicitly; the
+# Spring Boot plugin used to pull it in, so only non-Boot modules noticed.
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+
+[bundles]
+jjwt-runtime = ["jjwt-impl", "jjwt-jackson"]
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "springBoot" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }

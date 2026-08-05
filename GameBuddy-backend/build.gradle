@@ -1,0 +1,37 @@
+plugins {
+    alias(libs.plugins.spring.boot)
+}
+
+description = 'GameBuddy, as a single deployable modular monolith.'
+
+dependencies {
+    implementation project(':common')
+
+    // Object storage for user-uploaded avatars and cosmetic assets. R2 speaks S3, so
+    // this is the S3 client pointed at a different endpoint — see ObjectStorage.
+    implementation platform(libs.aws.sdk.bom)
+    implementation libs.aws.sdk.s3
+    implementation libs.aws.sdk.apache.client
+
+    implementation libs.spring.boot.starter.data.jpa
+    implementation libs.spring.boot.starter.websocket
+    implementation libs.spring.boot.starter.actuator
+    implementation libs.spring.boot.starter.mail
+    implementation libs.springdoc.webmvc.ui
+
+    // Push notifications. The only remaining outbound integration besides the model.
+    implementation libs.firebase.admin
+
+    runtimeOnly libs.postgresql
+
+    // No spring-boot-starter-data-mongodb. Chat moved to Postgres: the two documents it
+    // held were fully relational, and dropping Mongo removes the most expensive
+    // component of any managed deployment.
+
+    testImplementation libs.spring.boot.starter.webmvc.test
+    testImplementation libs.spring.boot.starter.security.test
+
+    // The module boundaries are the whole argument for consolidating into one process
+    // rather than one class. Verified, not documented.
+    testImplementation libs.archunit.junit5
+}

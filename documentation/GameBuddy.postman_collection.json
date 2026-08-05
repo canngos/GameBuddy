@@ -1,0 +1,911 @@
+{
+  "info": {
+    "_postman_id": "9f2c1a4e-6b3d-4c8a-9e21-7d5b0a1c3e88",
+    "name": "GameBuddy Backend",
+    "description": "Every HTTP endpoint the monolith exposes, generated from the controllers.\n\n## Getting started\n\n1. Select the **GameBuddy Local** environment (or set `baseUrl` yourself).\n2. Run **Auth > Register**, then **Auth > Send verification code**, then **Auth > Verify** with the code from the email.\n3. Run **Auth > Login**. It stores the token automatically — every other request picks it up from collection auth, so you never paste a bearer token by hand.\n\n## Notes\n\n- `POST /auth/register` returns a token, but the account cannot do much until it is verified and has completed `/auth/details`.\n- Requests under **Admin** need `ROLE_ADMIN`. Promote an account directly in the database: `UPDATE gamebuddy.gamer SET role = 'ADMIN' WHERE email = '...';`\n- Chat messages are sent over **STOMP/WebSocket**, not HTTP, so they are not in this collection. Connect to `{{wsUrl}}` with an `Authorization: Bearer` header on CONNECT and send to `/app/chat`. The HTTP endpoints here read history and report messages.\n- `POST /billing/redeem` only works when `BILLING_SANDBOX=true`. In any other configuration no receipt verifier is registered and every purchase is rejected — deliberately, so a misconfigured environment refuses to sell rather than giving product away.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "wsUrl", "value": "ws://localhost:8080/ws" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "email", "value": "gamer1@example.com" },
+    { "key": "password", "value": "Str0ng!Passw0rd" },
+    { "key": "otherUserId", "value": "" },
+    { "key": "gameId", "value": "" },
+    { "key": "communityId", "value": "" },
+    { "key": "postId", "value": "" },
+    { "key": "commentId", "value": "" },
+    { "key": "messageId", "value": "" },
+    { "key": "avatarId", "value": "" },
+    { "key": "badgeCode", "value": "first-contact" },
+    { "key": "cosmeticId", "value": "" },
+    { "key": "reportId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Registration, verification, login and account management.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Registration returns a token straight away. Stored so the follow-up",
+                  "// calls work without a manual copy-paste.",
+                  "const body = pm.response.json();",
+                  "const data = body.body && body.body.data;",
+                  "if (data && data.accessToken) { pm.collectionVariables.set('token', data.accessToken); }",
+                  "if (data && data.userId) { pm.collectionVariables.set('userId', data.userId); }",
+                  "pm.test('registered', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"fcmToken\": \"postman-device-token\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Public. Password must satisfy the policy in `PasswordPolicy` — length plus mixed character classes; a weak one comes back as 147 WEAK_PASSWORD."
+          }
+        },
+        {
+          "name": "Send verification code",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"isRegister\": true\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/sendCode", "host": ["{{baseUrl}}"], "path": ["auth", "sendCode"] },
+            "description": "Public, and rate limited (3 per 15 minutes per address) so it cannot be used to mail-bomb anyone. Set `isRegister` false for a password reset."
+          }
+        },
+        {
+          "name": "Verify code",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"verificationCode\": 123456\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/verify", "host": ["{{baseUrl}}"], "path": ["auth", "verify"] },
+            "description": "Public, rate limited (10 per 15 minutes). Without that limit the six-digit space is walkable."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const data = body.body && body.body.data;",
+                  "if (data && data.accessToken) { pm.collectionVariables.set('token', data.accessToken); }",
+                  "if (data && data.userId) { pm.collectionVariables.set('userId', data.userId); }",
+                  "pm.test('logged in', () => pm.response.code === 200);",
+                  "pm.test('token stored', () => !!pm.collectionVariables.get('token'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usernameOrEmail\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Public. An unknown address and a wrong password return the same error on purpose, so this cannot be used to discover which addresses are registered."
+          }
+        },
+        {
+          "name": "Validate token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/validateToken", "host": ["{{baseUrl}}"], "path": ["auth", "validateToken"] },
+            "description": "Also returns false for a token that was valid but has since been revoked — password change, ban, or account deletion all move `tokensValidFrom` forward."
+          }
+        },
+        {
+          "name": "Set username",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"username\": \"gamer_one\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/username", "host": ["{{baseUrl}}"], "path": ["auth", "username"] }
+          }
+        },
+        {
+          "name": "Complete profile details",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"age\": 24,\n  \"country\": \"Turkey\",\n  \"avatar\": \"{{avatarId}}\",\n  \"gender\": \"Male\",\n  \"favoriteGames\": [\"{{gameId}}\"],\n  \"keywords\": []\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/details", "host": ["{{baseUrl}}"], "path": ["auth", "details"] },
+            "description": "Onboarding. `age` decides the age band, and a gamer is only ever matched or chatted with inside their own band."
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{password}}\",\n  \"password\": \"An0ther!Passw0rd\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/change/pwd", "host": ["{{baseUrl}}"], "path": ["auth", "change", "pwd"] },
+            "description": "Revokes every token issued before now — the point of changing a password is usually that you think one was stolen. Log in again afterwards."
+          }
+        },
+        {
+          "name": "Change avatar",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"avatarId\": \"{{avatarId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/change/avatar", "host": ["{{baseUrl}}"], "path": ["auth", "change", "avatar"] },
+            "description": "A paid avatar has to have been bought first; selecting one you do not own is refused."
+          }
+        },
+        {
+          "name": "Change age",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"age\": 25\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/change/age", "host": ["{{baseUrl}}"], "path": ["auth", "change", "age"] },
+            "description": "Crossing the majority line changes which pool you match in, and takes effect immediately on conversations already open."
+          }
+        },
+        {
+          "name": "Change games",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"gamesOrKeywordsList\": [\"{{gameId}}\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/change/games", "host": ["{{baseUrl}}"], "path": ["auth", "change", "games"] }
+          }
+        },
+        {
+          "name": "Change keywords",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"gamesOrKeywordsList\": []\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/change/keywords", "host": ["{{baseUrl}}"], "path": ["auth", "change", "keywords"] }
+          }
+        },
+        {
+          "name": "Update FCM token",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"fcmToken\": \"new-device-token\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/fcm-token", "host": ["{{baseUrl}}"], "path": ["auth", "fcm-token"] },
+            "description": "Claiming a token detaches it from every other account. A token identifies a device, so exactly one account may hold it — otherwise a reinstall or a shared phone sends one person's notifications to another."
+          }
+        },
+        {
+          "name": "Delete account",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"{{password}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/auth/account", "host": ["{{baseUrl}}"], "path": ["auth", "account"] },
+            "description": "Anonymises rather than deletes the row, because posts, comments and messages reference it. The account stops authenticating everywhere immediately."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "description": "Profiles, catalogue, cosmetics, badges and friends.",
+      "item": [
+        {
+          "name": "My profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/get/user/info", "host": ["{{baseUrl}}"], "path": ["application", "get", "user", "info"] }
+          }
+        },
+        {
+          "name": "Another gamer's profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/get/user/info/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["application", "get", "user", "info", "{{otherUserId}}"] },
+            "description": "Returns strictly less than your own profile: no email, no coin balance, no friend list."
+          }
+        },
+        {
+          "name": "Keywords",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/keywords", "host": ["{{baseUrl}}"], "path": ["application", "get", "keywords"] } }
+        },
+        {
+          "name": "Games",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Grab a game id so the onboarding and match requests have one to use.",
+                  "const body = pm.response.json();",
+                  "const games = body.body && body.body.data && body.body.data.games;",
+                  "if (games && games.length) { pm.collectionVariables.set('gameId', games[0].gameId); }"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/games", "host": ["{{baseUrl}}"], "path": ["application", "get", "games"] } }
+        },
+        {
+          "name": "Game by id",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/game/{{gameId}}", "host": ["{{baseUrl}}"], "path": ["application", "get", "game", "{{gameId}}"] } }
+        },
+        {
+          "name": "Popular games",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/popular/games", "host": ["{{baseUrl}}"], "path": ["application", "get", "popular", "games"] } }
+        },
+        {
+          "name": "Avatars",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const avatars = body.body && body.body.data && body.body.data.avatars;",
+                  "if (avatars && avatars.length) { pm.collectionVariables.set('avatarId', avatars[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/avatars", "host": ["{{baseUrl}}"], "path": ["application", "get", "avatars"] } }
+        },
+        {
+          "name": "Badges",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/badges", "host": ["{{baseUrl}}"], "path": ["application", "badges"] },
+            "description": "Every mission with this gamer's progress. Not a pure read: the server evaluates the missions while answering, so calling this is what turns a finished one into an earned badge."
+          }
+        },
+        {
+          "name": "Collect badge",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/badges/{{badgeCode}}/collect", "host": ["{{baseUrl}}"], "path": ["application", "badges", "{{badgeCode}}", "collect"] },
+            "description": "Credits the reward. Guarded by an optimistic lock, so two concurrent collects cannot pay out twice. Answers with the whole board."
+          }
+        },
+        {
+          "name": "Set badge showcase",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ \"codes\": [\"first-contact\", \"icebreaker\"] }" },
+            "url": { "raw": "{{baseUrl}}/application/badges/showcase", "host": ["{{baseUrl}}"], "path": ["application", "badges", "showcase"] },
+            "description": "Replaces the whole selection, in order, up to three. An empty array takes everything off."
+          }
+        },
+        {
+          "name": "Cosmetics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/cosmetics", "host": ["{{baseUrl}}"], "path": ["application", "cosmetics"] },
+            "description": "Frames and banners, split by kind, with the owned and equipped flags for this gamer."
+          }
+        },
+        {
+          "name": "Buy cosmetic",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/cosmetics/{{cosmeticId}}/buy", "host": ["{{baseUrl}}"], "path": ["application", "cosmetics", "{{cosmeticId}}", "buy"] },
+            "description": "Spends coins. Read-check-write under the gamer's version, so a double tap cannot buy twice."
+          }
+        },
+        {
+          "name": "Equip cosmetic",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/cosmetics/{{cosmeticId}}/equip", "host": ["{{baseUrl}}"], "path": ["application", "cosmetics", "{{cosmeticId}}", "equip"] }
+          }
+        },
+        {
+          "name": "Unequip cosmetic",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/cosmetics/equipped/FRAME", "host": ["{{baseUrl}}"], "path": ["application", "cosmetics", "equipped", "FRAME"] },
+            "description": "By kind rather than by id: \"take off my frame\" does not require knowing what is on."
+          }
+        },
+        {
+          "name": "Friends",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/friends", "host": ["{{baseUrl}}"], "path": ["application", "get", "friends"] } }
+        },
+        {
+          "name": "Incoming friend requests",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/requests/friends", "host": ["{{baseUrl}}"], "path": ["application", "get", "requests", "friends"] } }
+        },
+        {
+          "name": "Sent friend requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/application/get/sent/friends", "host": ["{{baseUrl}}"], "path": ["application", "get", "sent", "friends"] },
+            "description": "Requests this gamer sent that nobody has answered. The mirror of /get/requests/friends, which returns the ones received."
+          }
+        },
+        {
+          "name": "Blocked gamers",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/application/get/blocked/friends", "host": ["{{baseUrl}}"], "path": ["application", "get", "blocked", "friends"] } }
+        },
+        {
+          "name": "Send friend request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/application/send/friend", "host": ["{{baseUrl}}"], "path": ["application", "send", "friend"] },
+            "description": "Requires an existing mutual match — friendship is the tier above matching, not a parallel one. Expect 155 FRIEND_REQUIRES_MATCH otherwise."
+          }
+        },
+        {
+          "name": "Accept friend request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/application/accept/friend", "host": ["{{baseUrl}}"], "path": ["application", "accept", "friend"] }
+          }
+        },
+        {
+          "name": "Reject friend request",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/application/reject/friend", "host": ["{{baseUrl}}"], "path": ["application", "reject", "friend"] }
+          }
+        },
+        {
+          "name": "Remove friend",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/application/remove/friend", "host": ["{{baseUrl}}"], "path": ["application", "remove", "friend"] }
+          }
+        },
+        {
+          "name": "Block gamer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/application/block/friend", "host": ["{{baseUrl}}"], "path": ["application", "block", "friend"] },
+            "description": "Takes effect everywhere immediately: recommendations, existing matches, and any open conversation."
+          }
+        },
+        {
+          "name": "Unblock gamer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/application/unblock/friend", "host": ["{{baseUrl}}"], "path": ["application", "unblock", "friend"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Match",
+      "description": "Recommendations, swiping, matches and the daily allowance.",
+      "item": [
+        {
+          "name": "Recommendations",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Keep the first candidate around so accept/decline have a target.",
+                  "const body = pm.response.json();",
+                  "const list = body.body && body.body.data && body.body.data.recommendedGamers;",
+                  "if (list && list.length) { pm.collectionVariables.set('otherUserId', list[0].userId); }",
+                  "pm.test('a page came back', () => pm.response.code === 200);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/match/get/recommendations", "host": ["{{baseUrl}}"], "path": ["match", "get", "recommendations"] },
+            "description": "Ranked by the model, filtered to your own age band, with everyone you have already decided on excluded and roughly one in ten slots given to a random candidate so newer gamers stay reachable.\n\nNeeds the Python model on `PREDICT_SERVICE_URL`; without it expect 123 RECOMMENDER_SERVICE_ERROR."
+          }
+        },
+        {
+          "name": "Recommendations for one game",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/match/get/selected/game/{{gameId}}", "host": ["{{baseUrl}}"], "path": ["match", "get", "selected", "game", "{{gameId}}"] }
+          }
+        },
+        {
+          "name": "Accept (like)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/match/accept", "host": ["{{baseUrl}}"], "path": ["match", "accept"] },
+            "description": "Costs a swipe and a like. On the free tier expect 158 ACCEPT_LIMIT_REACHED once the five daily likes are gone, or 163 SWIPE_LIMIT_REACHED once the fifty swipes are.\n\nWhen the other side has already accepted you, this is the moment the match happens and both are notified."
+          }
+        },
+        {
+          "name": "Decline (pass)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{otherUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/match/decline", "host": ["{{baseUrl}}"], "path": ["match", "decline"] },
+            "description": "Costs a swipe but not a like, so declining all day never uses up your likes."
+          }
+        },
+        {
+          "name": "My matches",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/match/get/matches", "host": ["{{baseUrl}}"], "path": ["match", "get", "matches"] },
+            "description": "Mutual only. These are the people you can chat with."
+          }
+        },
+        {
+          "name": "Who liked me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/match/get/liked-you", "host": ["{{baseUrl}}"], "path": ["match", "get", "liked-you"] },
+            "description": "The count is always returned. The identities need Gold — on the free tier `locked` is true and `likedYou` is empty."
+          }
+        },
+        {
+          "name": "Today's allowance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/match/get/accept-allowance", "host": ["{{baseUrl}}"], "path": ["match", "get", "accept-allowance"] },
+            "description": "Swipes and likes remaining, and when they reset. `remainingAccepts` is never larger than `remainingSwipes`: three swipes cannot buy four likes."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "description": "Reading history and reporting. Sending is over STOMP — see the collection description.",
+      "item": [
+        {
+          "name": "Conversation with a match",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/messages/get/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["messages", "get", "{{otherUserId}}"] },
+            "description": "Oldest first, decrypted on the way out. Opening a conversation also moves your read watermark, so the unread count on the inbox drops."
+          }
+        },
+        {
+          "name": "Inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/messages/get/inbox", "host": ["{{baseUrl}}"], "path": ["messages", "get", "inbox"] },
+            "description": "One row per conversation with the latest message and an unread count, newest activity first. Conversations with no messages yet are skipped rather than shown empty."
+          }
+        },
+        {
+          "name": "Report a message",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/messages/report/{{messageId}}", "host": ["{{baseUrl}}"], "path": ["messages", "report", "{{messageId}}"] },
+            "description": "Only the recipient may report, and only inside a conversation they are part of. The text is kept — a moderator has to be able to read what was said."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Community",
+      "item": [
+        {
+          "name": "All communities",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const list = body.body && body.body.data && body.body.data.communities;",
+                  "if (list && list.length) { pm.collectionVariables.set('communityId', list[0].communityId); }"
+                ]
+              }
+            }
+          ],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/community/get/communities", "host": ["{{baseUrl}}"], "path": ["community", "get", "communities"] } }
+        },
+        {
+          "name": "Members",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/community/get/members/{{communityId}}", "host": ["{{baseUrl}}"], "path": ["community", "get", "members", "{{communityId}}"] } }
+        },
+        {
+          "name": "Home feed (joined communities)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/community/get/posts?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["community", "get", "posts"],
+              "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "20" }]
+            },
+            "description": "Ordered and paged in the database, not in memory."
+          }
+        },
+        {
+          "name": "Posts in a community",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const list = body.body && body.body.data && body.body.data.posts;",
+                  "if (list && list.length) { pm.collectionVariables.set('postId', list[0].postId || list[0].id); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/community/get/posts/{{communityId}}?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["community", "get", "posts", "{{communityId}}"],
+              "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "20" }]
+            }
+          }
+        },
+        {
+          "name": "Comments on a post",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/community/get/comments/{{postId}}", "host": ["{{baseUrl}}"], "path": ["community", "get", "comments", "{{postId}}"] } }
+        },
+        {
+          "name": "Post likes",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/community/get/post/likes/{{postId}}", "host": ["{{baseUrl}}"], "path": ["community", "get", "post", "likes", "{{postId}}"] } }
+        },
+        {
+          "name": "Comment likes",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/community/get/comment/likes/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["community", "get", "comment", "likes", "{{commentId}}"] } }
+        },
+        {
+          "name": "Create community",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Valorant TR\",\n  \"description\": \"Turkish Valorant players\",\n  \"avatar\": null,\n  \"wallpaper\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/community/create/community", "host": ["{{baseUrl}}"], "path": ["community", "create", "community"] },
+            "description": "The creator becomes owner and first member."
+          }
+        },
+        {
+          "name": "Create post",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"communityId\": \"{{communityId}}\",\n  \"title\": \"LFG tonight\",\n  \"body\": \"Anyone up for ranked?\",\n  \"picture\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/community/create/post", "host": ["{{baseUrl}}"], "path": ["community", "create", "post"] }
+          }
+        },
+        {
+          "name": "Create comment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"postId\": \"{{postId}}\",\n  \"message\": \"I am in\"\n}" },
+            "url": { "raw": "{{baseUrl}}/community/create/comment", "host": ["{{baseUrl}}"], "path": ["community", "create", "comment"] }
+          }
+        },
+        {
+          "name": "Join community",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"communityId\": \"{{communityId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/community/join/community", "host": ["{{baseUrl}}"], "path": ["community", "join", "community"] }
+          }
+        },
+        {
+          "name": "Leave community",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"communityId\": \"{{communityId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/community/leave/community", "host": ["{{baseUrl}}"], "path": ["community", "leave", "community"] },
+            "description": "An owner may leave; ownership passes to the longest-standing member, or the community is removed if nobody is left."
+          }
+        },
+        {
+          "name": "Transfer ownership",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/community/transfer/community/{{communityId}}/to/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["community", "transfer", "community", "{{communityId}}", "to", "{{otherUserId}}"] }
+          }
+        },
+        {
+          "name": "Like post",
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/community/like/post/{{postId}}", "host": ["{{baseUrl}}"], "path": ["community", "like", "post", "{{postId}}"] } }
+        },
+        {
+          "name": "Unlike post",
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/community/unlike/post/{{postId}}", "host": ["{{baseUrl}}"], "path": ["community", "unlike", "post", "{{postId}}"] } }
+        },
+        {
+          "name": "Like comment",
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/community/like/comment/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["community", "like", "comment", "{{commentId}}"] } }
+        },
+        {
+          "name": "Unlike comment",
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/community/unlike/comment/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["community", "unlike", "comment", "{{commentId}}"] } }
+        },
+        {
+          "name": "Delete community",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"communityId\": \"{{communityId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/community/delete/community", "host": ["{{baseUrl}}"], "path": ["community", "delete", "community"] },
+            "description": "Owner only. Takes its posts and comments with it."
+          }
+        },
+        {
+          "name": "Delete post",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/community/delete/post/{{postId}}", "host": ["{{baseUrl}}"], "path": ["community", "delete", "post", "{{postId}}"] } }
+        },
+        {
+          "name": "Delete comment",
+          "request": { "method": "DELETE", "header": [], "url": { "raw": "{{baseUrl}}/community/delete/comment/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["community", "delete", "comment", "{{commentId}}"] } }
+        },
+        {
+          "name": "Report post",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Harassment\"\n}" },
+            "url": { "raw": "{{baseUrl}}/community/report/post/{{postId}}", "host": ["{{baseUrl}}"], "path": ["community", "report", "post", "{{postId}}"] },
+            "description": "Reporting the same thing twice returns 157 ALREADY_REPORTED."
+          }
+        },
+        {
+          "name": "Report profile",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{ \"reason\": \"Sexual content\" }" },
+            "url": { "raw": "{{baseUrl}}/community/report/profile/{{userId}}", "host": ["{{baseUrl}}"], "path": ["community", "report", "profile", "{{userId}}"] },
+            "description": "Reports a gamer rather than something they wrote. Lands in the same queue as posts and comments; refused with 157 on a second attempt against the same person."
+          }
+        },
+        {
+          "name": "Report comment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"Spam\"\n}" },
+            "url": { "raw": "{{baseUrl}}/community/report/comment/{{commentId}}", "host": ["{{baseUrl}}"], "path": ["community", "report", "comment", "{{commentId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "My subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/billing/subscription", "host": ["{{baseUrl}}"], "path": ["billing", "subscription"] },
+            "description": "The tier actually in force, after checking the expiry — a lapsed subscription reads as BASIC without anything having to write it back. The entitlements come with it so the client does not hard-code what a tier means."
+          }
+        },
+        {
+          "name": "Redeem a purchase",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"platform\": \"GOOGLE_PLAY\",\n  \"productId\": \"gamebuddy.gold.monthly\",\n  \"receipt\": \"sandbox-receipt-001\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/billing/redeem", "host": ["{{baseUrl}}"], "path": ["billing", "redeem"] },
+            "description": "Only works with `BILLING_SANDBOX=true`; otherwise no verifier is registered and every purchase is rejected.\n\nProducts: `gamebuddy.gold.monthly`, `gamebuddy.gold.yearly`, `gamebuddy.coins.500`, `gamebuddy.coins.1200`, `gamebuddy.coins.3000`.\n\nSending the same receipt twice returns 162 PURCHASE_ALREADY_PROCESSED — one payment cannot be redeemed twice."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "My notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/notif/showall?page=0&size=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["notif", "showall"],
+              "query": [{ "key": "page", "value": "0" }, { "key": "size", "value": "50" }]
+            },
+            "description": "Your own history only. There is no send endpoint any more — modules publish an event internally instead of POSTing to each other."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "Everything here needs ROLE_ADMIN. Promote an account in the database first.",
+      "item": [
+        {
+          "name": "Banned gamers",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/admin/get/blocked/users", "host": ["{{baseUrl}}"], "path": ["admin", "get", "blocked", "users"] } }
+        },
+        {
+          "name": "Ban gamer",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/ban/user/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["admin", "ban", "user", "{{otherUserId}}"] },
+            "description": "Also revokes their tokens, so the ban takes effect on the next request rather than whenever their token happens to expire."
+          }
+        },
+        {
+          "name": "Unban gamer",
+          "request": { "method": "POST", "header": [], "url": { "raw": "{{baseUrl}}/admin/unban/user/{{otherUserId}}", "host": ["{{baseUrl}}"], "path": ["admin", "unban", "user", "{{otherUserId}}"] } }
+        },
+        {
+          "name": "Add game",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gameName\": \"VALORANT\",\n  \"gameDescription\": \"5v5 tactical shooter\",\n  \"gameIcon\": null,\n  \"category\": \"FPS\",\n  \"rating\": 4.5\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/admin/add/game", "host": ["{{baseUrl}}"], "path": ["admin", "add", "game"] }
+          }
+        },
+        {
+          "name": "Add keyword",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"keyword\": \"competitive\",\n  \"description\": \"Plays to win\"\n}" },
+            "url": { "raw": "{{baseUrl}}/admin/add/keyword", "host": ["{{baseUrl}}"], "path": ["admin", "add", "keyword"] }
+          }
+        },
+        {
+          "name": "Reported chat messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/chat/reported", "host": ["{{baseUrl}}"], "path": ["admin", "chat", "reported"] },
+            "description": "The only place plaintext leaves a conversation. Message bodies are encrypted at rest and normally only decrypted for the two participants; here they are decrypted for a moderator, and every call is logged with the moderator's id."
+          }
+        },
+        {
+          "name": "Dismiss a chat report",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/admin/chat/reported/{{messageId}}", "host": ["{{baseUrl}}"], "path": ["admin", "chat", "reported", "{{messageId}}"] },
+            "description": "Marks the report reviewed. Does not delete the message — dismissing a report and removing content are different decisions."
+          }
+        },
+        {
+          "name": "Community reports",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/community/admin/reports", "host": ["{{baseUrl}}"], "path": ["community", "admin", "reports"] } }
+        },
+        {
+          "name": "Action a community report",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/community/admin/reports/{{reportId}}/action", "host": ["{{baseUrl}}"], "path": ["community", "admin", "reports", "{{reportId}}", "action"] }
+          }
+        },
+        {
+          "name": "Dismiss a community report",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/community/admin/reports/{{reportId}}/dismiss", "host": ["{{baseUrl}}"], "path": ["community", "admin", "reports", "{{reportId}}", "dismiss"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ops",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/health", "host": ["{{baseUrl}}"], "path": ["actuator", "health"] },
+            "description": "Public, because probes have no credentials. `/actuator/health/liveness` and `/readiness` are what a container orchestrator should watch."
+          }
+        },
+        {
+          "name": "Info",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/actuator/info", "host": ["{{baseUrl}}"], "path": ["actuator", "info"] }
+          }
+        }
+      ]
+    }
+  ]
+}

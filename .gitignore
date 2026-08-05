@@ -1,0 +1,64 @@
+# The original bachelor-project Android client. It is a repository of its own
+# (github.com/GameBuddyDevs/GameBuddy-Android) and is not part of the system this
+# repository builds — the current client is GameBuddy-App. Kept on disk for reference,
+# left out of here so it does not arrive as an empty submodule stub.
+GameBuddy-Android/
+
+# Secrets. .env holds the database password and the signing keys; .env.example is the
+# committed template and is deliberately not ignored.
+#
+# Nothing real belongs in .env.example. It shipped once with the live R2 access key and
+# the actual JWT and chat-encryption secrets copied straight out of .env, which would have
+# handed over write access to the upload buckets to anyone who could read the repository.
+.env
+*.env
+!.env.example
+
+# Service-account credentials. Firebase and Google Play both want a JSON key file, and
+# committing one hands over the ability to send push notifications as you and to read your
+# Play Console financial data.
+# Anything under secret/ — the Firebase service-account key lives there.
+#
+# The existing patterns did not catch it: Firebase names the file after the *project*
+# (gamebuddy-a4205-firebase-adminsdk-....json), so it matched neither
+# *-service-account.json nor firebase-*.json and was one `git add .` from being public.
+# A directory rule cannot be defeated by a filename.
+secret/
+
+*-service-account.json
+firebase-*.json
+google-play-*.json
+
+# Firebase's Android config. Extractable from any APK, so not a secret in the strict
+# sense, but it identifies the project and there is no reason for it to be here.
+# See README for where to get it.
+google-services.json
+
+# Build output
+build/
+out/
+target/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+.gradle/
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent scratch
+.claude/

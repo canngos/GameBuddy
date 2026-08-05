@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "GameBuddy",
+    "slug": "gamebuddy",
+    "scheme": "gamebuddy",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gamebuddy.app"
+    },
+    "android": {
+      "package": "com.gamebuddy.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-secure-store",
+      "expo-font",
+      "expo-splash-screen",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "GameBuddy needs access to your photos so you can use one as your avatar.",
+          "cameraPermission": "GameBuddy needs access to your camera so you can take a photo for your avatar.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-document-picker",
+      "expo-image",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#FF4D67",
+          "defaultChannel": "default"
+        }
+      ],
+      "./plugins/withAndroidJdk17"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
