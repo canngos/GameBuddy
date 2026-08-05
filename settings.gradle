@@ -1,0 +1,24 @@
+rootProject.name = 'gamebuddy'
+
+dependencyResolutionManagement {
+    repositoriesMode = RepositoriesMode.PREFER_SETTINGS
+    repositories {
+        mavenCentral()
+    }
+}
+
+// Two modules build: shared framework code, and the application.
+include 'common'
+include 'backend'
+
+project(':backend').projectDir = file('GameBuddy-backend')
+
+// The five GameBuddy-*-service directories are deliberately not included.
+//
+// Each is its own GitHub repository and keeps its own history, so the folders stay on
+// disk — but their code now lives in GameBuddy-backend as packages under
+// com.gamebuddy.{auth,profile,community,match,notif,billing}. Building both would compile
+// two copies of every entity against one database, which is the arrangement that let
+// avatars resolve to two different schemas at once.
+//
+// They are superseded, not deleted. Nothing should be added to them.

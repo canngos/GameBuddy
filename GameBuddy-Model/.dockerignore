@@ -1,0 +1,14 @@
+# The model image needs gamebuddy_model, the API and the trained artefact. Everything else
+# in this directory is training input and test fixtures, which are large and would be
+# uploaded on every build.
+
+data
+tests
+GameBuddy-Matching
+
+.git
+.venv
+venv
+**/__pycache__
+**/*.pyc
+.pytest_cache

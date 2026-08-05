@@ -1,0 +1,16 @@
+plugins {
+    id 'java-library'
+}
+
+description = 'Shared error contract, response envelope and JWT support for all GameBuddy services.'
+
+dependencies {
+    // Exposed as `api` so every service inherits the web/security/validation types
+    // that appear in the shared public signatures below.
+    api libs.spring.boot.starter.web
+    api libs.spring.boot.starter.security
+    api libs.spring.boot.starter.validation
+    api libs.jjwt.api
+
+    runtimeOnly libs.bundles.jjwt.runtime
+}

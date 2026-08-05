@@ -1,0 +1,15 @@
+package com.gamebuddy.profile.interfaces.dto;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class GamesDto {
+    private String gameId;
+    private String gameName;
+    private String gameIcon;
+    private String category;
+    private Float avgVote;
+    private String description;
+}

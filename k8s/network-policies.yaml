@@ -1,0 +1,106 @@
+# Who may talk to whom inside the cluster.
+#
+# The Ingress stops the internet reaching notif-service's send endpoints. These policies
+# stop anything else in the cluster reaching them either — a compromised pod, or a
+# service that simply should not be pushing notifications. Combined with
+# InternalApiKeyFilter that is three independent barriers on the endpoint that can
+# broadcast to every user at once.
+#
+# Requires a CNI that enforces NetworkPolicy. Minikube:
+#   minikube start --cni=calico
+# Without such a CNI these objects are accepted and silently ignored, so verify with
+# `kubectl exec` from a pod that should be denied before relying on them.
+---
+# Default deny: nothing may reach any pod unless a policy below allows it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+# The four user-facing services accept traffic from the ingress controller only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-public-services
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - auth-service
+          - application-service
+          - community-service
+          - match-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+---
+# notif-service is different: only its history endpoint is public, and its send
+# endpoints exist for two named callers. Both are expressed here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-callers-to-notif-service
+spec:
+  podSelector:
+    matchLabels:
+      app: notif-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # /notif/showall, routed by the ingress.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    # /notif/token and /notif/topic. These two are the only services that send
+    # notifications; nothing else has any business reaching this pod.
+    - from:
+        - podSelector:
+            matchLabels:
+              app: application-service
+        - podSelector:
+            matchLabels:
+              app: match-service
+---
+# Health probes.
+#
+# Kubelet probes originate from the node, not from a pod, so no podSelector matches them
+# and a default-deny policy can block them depending on the CNI. Most CNIs (Calico
+# included, by default) exempt host-originated traffic, in which case nothing more is
+# needed — verify before adding anything:
+#
+#   kubectl get pods -o wide          # confirm READY once these policies are applied
+#   kubectl describe pod <pod>        # look for probe failures
+#
+# If probes do get blocked, add a rule scoped to the node CIDR — and scope it to the
+# specific service, not with `podSelector: {}`. NetworkPolicies are a union of allows,
+# so a blanket rule covering every pod on every port would re-open notif-service to
+# anything whose source address falls in that range, undoing the policy above. On many
+# clusters the pod CIDR sits inside the node CIDR, which makes a broad rule exactly that
+# mistake. For example, for the four public services only:
+#
+#   apiVersion: networking.k8s.io/v1
+#   kind: NetworkPolicy
+#   metadata:
+#     name: allow-node-probes-public
+#   spec:
+#     podSelector:
+#       matchExpressions:
+#         - key: app
+#           operator: In
+#           values: [auth-service, application-service, community-service, match-service]
+#     policyTypes: [Ingress]
+#     ingress:
+#       - from:
+#           - ipBlock:
+#               cidr: <your node CIDR, excluding the pod CIDR>

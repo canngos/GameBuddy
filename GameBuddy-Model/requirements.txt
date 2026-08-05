@@ -1,0 +1,34 @@
+# Pinned to a lower bound rather than left open: an unpinned scikit-learn means a rebuilt
+# image can silently change what the recommender returns, and unpickling an artefact
+# written by a different version is undefined behaviour that usually surfaces as a wrong
+# answer rather than an error.
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.32,<1.0
+pydantic>=2.9,<3.0
+numpy>=2.0,<3.0
+pandas>=2.2,<4.0
+scikit-learn>=1.5,<2.0
+scipy>=1.14,<2.0
+
+# nbformat and nbconvert are gone: they existed only so an HTTP endpoint could execute a
+# Jupyter notebook in-process. Training is a batch job now.
+# SQLAlchemy and psycopg2 are gone with them — nothing in the service talks to the
+# database; it serves a pre-built artefact.
+
+# --- image moderation ------------------------------------------------------
+# Nothing an account uploads is shown to another account until it has been screened, and
+# a paid vision API would bill per image forever — so the classifier is self-hosted here.
+#
+# torch is the CPU build. The default PyPI wheel bundles CUDA and is several gigabytes for
+# a service that will never see a GPU; the Dockerfile installs these from PyTorch's CPU
+# index for that reason. If you install requirements by hand, do the same:
+#
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+#
+# python-multipart is not optional despite looking it: FastAPI's UploadFile silently
+# refuses to parse a multipart body without it, and the failure is a 422 on a request that
+# is perfectly well formed.
+torch>=2.4,<3.0
+transformers>=4.44,<6.0
+pillow>=10.4,<12.0
+python-multipart>=0.0.9,<1.0
