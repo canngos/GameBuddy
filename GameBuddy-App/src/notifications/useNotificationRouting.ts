@@ -33,7 +33,9 @@ function routeFor(kind: string | undefined, targetId: string | undefined, name?:
       return '/profile';
 
     case 'FRIEND_ACCEPTED':
-      return targetId ? { pathname: '/gamer/[userId]', params: { userId: targetId } } : '/profile';
+      return targetId
+        ? { pathname: '/messages/gamer/[userId]', params: { userId: targetId } }
+        : '/profile';
 
     case 'BADGE':
       return '/badges';
@@ -42,7 +44,9 @@ function routeFor(kind: string | undefined, targetId: string | undefined, name?:
     case 'POST_LIKE':
     case 'POST_COMMENT':
     case 'COMMENT_LIKE':
-      return targetId ? { pathname: '/community/post/[postId]', params: { postId: targetId } } : '/community';
+      return targetId
+        ? { pathname: '/community/post/[postId]', params: { postId: targetId } }
+        : '/community';
 
     case 'RETURN':
       // Whatever was waiting is what the copy promised, and both of the things it can
@@ -71,8 +75,7 @@ export function useNotificationRouting(enabled: boolean) {
     const go = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
       const data = response.notification.request.content.data as
-        | { kind?: string; targetId?: string }
-        | undefined;
+        { kind?: string; targetId?: string } | undefined;
       // The title is the sender's name for the kinds that have one.
       const title = response.notification.request.content.title ?? undefined;
       router.push(routeFor(data?.kind, data?.targetId, title) as never);

@@ -164,7 +164,22 @@ public class DefaultAuthService implements AuthService {
             gamer.setRole(Role.USER);
         }
         gamer.setPwd(passwordEncoder.encode(registerRequest.getPassword()));
-        gamer.setFcmToken(registerRequest.getFcmToken());
+        // Deliberately no device token here. Registration is not device registration: on
+        // Android 13+ the client has not asked for notification permission yet and cannot
+        // possess a real token, so what used to arrive was the literal placeholder
+        // "pending" — and it was stored verbatim, for every account.
+        //
+        // That made the column non-unique by construction. Every account that had not yet
+        // completed push registration carried an identical token, which broke the two
+        // places that resolve a gamer *by* token: the preference check in
+        // NotificationDispatcher (a NonUniqueResultException that escaped as a 500 from
+        // whatever request triggered the notification) and the history write in
+        // DefaultNotificationService. It also queued outbox rows addressed to "pending",
+        // which can only ever fail at Firebase.
+        //
+        // The device registers itself after sign-in through updateFcmToken, which detaches
+        // the token from any previous owner first and so keeps the column unique. A null
+        // here is the honest state: no device registered yet.
         gamerRepository.save(gamer);
 
         issueAndSendCode(email, true);
@@ -650,10 +665,25 @@ public class DefaultAuthService implements AuthService {
     }
 
     /**
-     * Asks the recommender to re-cluster once this transaction commits.
+     * Announces that this gamer's games or keywords changed.
      *
-     * <p>See {@link com.gamebuddy.auth.domain.event.RecommenderRefreshListener} for
-     * why this is no longer an inline call.
+     * <p><strong>Nothing listens to this yet, and the recommender is therefore stale until
+     * the next retrain.</strong> The Javadoc here used to point at a
+     * {@code RecommenderRefreshListener} that does not exist in this codebase — it was
+     * planned and never written — which is also why this line does not compile in an IDE
+     * that resolves {@code @link} targets.
+     *
+     * <p>Why it matters: {@code /predict} ranks from features baked into the pickled
+     * artefact at training time, and takes only a user id. {@code DefaultMatchService}
+     * falls back to {@code /predict/cold-start} — the path that reads live games and
+     * keywords — only when {@code /predict} returns an <em>empty</em> list. A gamer the
+     * model already knows returns a non-empty ranking, so editing their profile changes
+     * nothing about who they are shown until the artefact is rebuilt.
+     *
+     * <p>The event is left in place because it is the right signal and the publishers are
+     * correct; what is missing is a consumer. The cheap fix is to mark the gamer so the
+     * feed treats them as cold-start until the next training run, which reuses machinery
+     * that already exists rather than retraining per edit.
      */
     private void refreshRecommenderClusters(Gamer gamer) {
         events.publishEvent(new ProfileChangedEvent(gamer.getUserId()));

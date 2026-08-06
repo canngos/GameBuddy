@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { chatApi } from '../api/chat';
 import type { Conversation } from '../api/types';
 import { useSession } from '../session/store';
-import { createChatSocket, type SocketStatus } from './socket';
+import { useChatSocket } from './ChatSocketProvider';
+
+/** Smallest gap between two "I am typing" frames for the same conversation. */
+const TYPING_THROTTLE_MS = 3000;
 
 /**
  * One conversation: its history, its live socket, and sending.
@@ -21,10 +24,9 @@ import { createChatSocket, type SocketStatus } from './socket';
  */
 export function useConversation(friendId: string) {
   const queryClient = useQueryClient();
-  const token = useSession((s) => s.token);
   const myId = useSession((s) => s.userId);
+  const { status, presence, typing, onMessage, sendTyping } = useChatSocket();
 
-  const [status, setStatus] = useState<SocketStatus>('idle');
   /** Messages that arrived over the socket since this screen opened. */
   const [live, setLive] = useState<Conversation[]>([]);
 
@@ -36,12 +38,11 @@ export function useConversation(friendId: string) {
     refetchInterval: 10_000,
   });
 
-  useEffect(() => {
-    if (!token) return;
-
-    const socket = createChatSocket(token, {
-      onStatus: setStatus,
-      onMessage: (notification) => {
+  useEffect(
+    () =>
+      // The socket belongs to the session, not to this screen — see ChatSocketProvider.
+      // All this registers is an interest in messages while the conversation is mounted.
+      onMessage((notification) => {
         // One subscription serves every conversation, so a message for someone else can
         // land here. Take only the ones from the person on screen; the rest just mean
         // the inbox moved.
@@ -59,12 +60,18 @@ export function useConversation(friendId: string) {
             date: new Date().toISOString(),
           },
         ]);
-      },
-    });
+      }),
+    [onMessage, friendId, myId, queryClient],
+  );
 
-    socket.connect();
-    return () => socket.disconnect();
-  }, [token, friendId, myId, queryClient]);
+  /**
+   * Whatever arrived for the *previous* conversation is not part of this one.
+   *
+   * Without this, opening a second chat kept the live messages from the first and merged
+   * them into a conversation they do not belong to — they are only absent today because
+   * the screen used to be remounted along with its socket.
+   */
+  useEffect(() => setLive([]), [friendId]);
 
   const send = useMutation({
     mutationFn: (text: string) => chatApi.send(friendId, text.trim()),
@@ -81,11 +88,69 @@ export function useConversation(friendId: string) {
     return [...(history.data ?? []), ...live.filter((m) => !seen.has(m.id))];
   }, [history.data, live]);
 
+  /**
+   * The other person's state, asked for on open and again on every reconnect.
+   *
+   * A push only reports a *transition*. Somebody who has been online for an hour generates
+   * no event, so without a fetch the header would say nothing until they happened to close
+   * the app — and, worse, anything that changed while we were disconnected was announced to
+   * a socket that was not listening. Re-asking on reconnect is what closes that window.
+   *
+   * It also has to survive a failed request. This was `retry: false`, and one cancelled
+   * fetch — which a flaky network produces regularly — left the header permanently blank,
+   * because nothing ever asked again. Now a reconnect re-asks, and a couple of retries
+   * cover a failure that happens while the socket stays up.
+   */
+  const fetchedPresence = useQuery({
+    queryKey: ['presence', friendId],
+    queryFn: () => chatApi.presence(friendId),
+    // Presence is state, not a fact: a cached answer from five minutes ago is worse than
+    // no answer, so it is never served stale.
+    staleTime: 0,
+    gcTime: 0,
+    retry: 2,
+  });
+
+  const refetchPresence = fetchedPresence.refetch;
+  useEffect(() => {
+    if (status === 'connected') void refetchPresence();
+  }, [status, refetchPresence]);
+
+  /**
+   * The pushed value wins — but only until the socket drops.
+   *
+   * While disconnected the last push is a memory, not a fact, so on reconnect the fetch
+   * above is authoritative again. Comparing timestamps would be better still; this is the
+   * cheap version of the same idea, and the header refuses to claim anything at all when
+   * our own connection is down (see StatusLabel).
+   */
+  const friendPresence = presence[friendId] ?? fetchedPresence.data ?? null;
+
+  /**
+   * Reports that we are typing, at most once every few seconds.
+   *
+   * Throttled here rather than at the call site because the natural call site is
+   * `onChangeText`, which fires per keystroke — a frame per character would be a burst of
+   * socket traffic and a database check on the server for each one. The indicator lasts
+   * several seconds anyway, so a keystroke that sends nothing changes nothing.
+   */
+  const lastTypingSent = useRef(0);
+  const notifyTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingSent.current < TYPING_THROTTLE_MS) return;
+    lastTypingSent.current = now;
+    sendTyping(friendId);
+  }, [sendTyping, friendId]);
+
   return {
     messages,
     myId,
     /** Live-delivery state only. Sending does not depend on it. */
     status,
+    /** Null until the first answer arrives, which is not the same as "offline". */
+    presence: friendPresence,
+    isTyping: typing[friendId] === true,
+    notifyTyping,
     isLoading: history.isPending,
     error: history.error,
     sending: send.isPending,

@@ -1,10 +1,13 @@
 package com.gamebuddy.match.config;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -31,14 +34,48 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
+    /** Matches what the client asks for, so neither side has to compromise. */
+    private static final long HEARTBEAT_MS = 10_000L;
+
     private final StompAuthChannelInterceptor authChannelInterceptor;
 
     @Value("${gamebuddy.websocket.allowed-origins:http://localhost:3000}")
     private String[] allowedOrigins;
 
+    /**
+     * The heartbeat scheduler, from {@link WebSocketHeartbeatConfig}.
+     *
+     * <p>Spring's {@code messageBrokerTaskScheduler} would be the natural choice and cannot
+     * be used: it is built by the configuration that collects the configurers this class is
+     * one of, so injecting it — by constructor or by field — is a dependency cycle that
+     * stops the context from starting. See that class for the rest.
+     */
+    @Autowired
+    @Qualifier("webSocketHeartbeatScheduler")
+    private TaskScheduler heartbeatScheduler;
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p><strong>Heartbeats are configured explicitly, and that is not cosmetic.</strong>
+     * {@code enableSimpleBroker} defaults to a 10s heartbeat but silently disables it when
+     * no {@link TaskScheduler} is set, so the broker was negotiating {@code heart-beat:0,0}
+     * — telling every client "I will never send you anything, and I do not want anything
+     * from you".
+     *
+     * <p>With no heartbeat in either direction, a connection that dies without a clean
+     * close is undetectable. A phone moving from Wi-Fi to mobile data, a NAT table
+     * expiring, or this process restarting all leave the client holding a socket it still
+     * believes is open: the UI keeps saying "connected", stompjs never fires
+     * {@code onWebSocketClose}, and so its reconnect logic never runs. Chat then stays
+     * silently dead until the screen is reopened. Observed exactly that after a restart —
+     * neither client reconnected, and neither had any reason to think anything was wrong.
+     */
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/queue", "/topic");
+        config.enableSimpleBroker("/queue", "/topic")
+                .setHeartbeatValue(new long[] {HEARTBEAT_MS, HEARTBEAT_MS})
+                .setTaskScheduler(heartbeatScheduler);
         config.setApplicationDestinationPrefixes("/app");
         config.setUserDestinationPrefix("/user");
     }

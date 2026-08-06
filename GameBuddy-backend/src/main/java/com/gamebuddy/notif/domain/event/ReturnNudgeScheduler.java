@@ -105,7 +105,7 @@ public class ReturnNudgeScheduler {
             }
 
             events.publishEvent(new NotificationRequestedEvent(
-                    gamer.getFcmToken(), copy.titleFor(gamer), body, NotificationKind.RETURN));
+                    gamer.getUserId(), gamer.getFcmToken(), copy.titleFor(gamer), body, NotificationKind.RETURN));
 
             gamer.setLastNudgedAt(now);
             gamer.setNudgeCount(gamer.getNudgeCount() + 1);

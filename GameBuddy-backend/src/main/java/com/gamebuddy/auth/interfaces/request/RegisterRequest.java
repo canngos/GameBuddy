@@ -23,6 +23,15 @@ public class RegisterRequest {
             message = "Password must be between 8 and 128 characters")
     private String password;
 
-    @NotBlank(message = "Firebase token field cannot be empty")
+    /**
+     * Ignored, and optional on purpose.
+     *
+     * <p>It was {@code @NotBlank}, which forced a client that cannot yet have a device
+     * token to invent one — and the placeholder it sent was then stored for every account,
+     * making the token column non-unique. See the comment in {@code DefaultAuthService}
+     * where it used to be persisted. The field stays so that an already-installed client
+     * still validates; a device is registered after sign-in, through
+     * {@code PUT /auth/fcm-token}.
+     */
     private String fcmToken;
 }

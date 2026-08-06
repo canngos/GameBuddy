@@ -423,6 +423,7 @@ public class DefaultMatchService implements MatchService {
 
     private void notifyMatched(Gamer recipient, Gamer other) {
         events.publishEvent(new NotificationRequestedEvent(
+                recipient.getUserId(),
                 recipient.getFcmToken(),
                 Constants.MATCH_TITLE,
                 String.format(Constants.MATCH_BODY, other.getGamerUsername()),

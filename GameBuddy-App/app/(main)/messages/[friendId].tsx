@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
+import { profileApi } from '../../../src/api/catalogue';
 import { chatApi } from '../../../src/api/chat';
 import { socialApi } from '../../../src/api/social';
 import type { Conversation } from '../../../src/api/types';
@@ -12,10 +13,30 @@ import { Avatar, cn, ErrorNotice, Screen, Text, TextField } from '../../../src/u
 export default function Chat() {
   const router = useRouter();
   const colors = useThemeColors();
-  const { friendId, username } = useLocalSearchParams<{
+  const { friendId, username: passedUsername } = useLocalSearchParams<{
     friendId: string;
     username?: string;
   }>();
+
+  /**
+   * The name in the header, resolved rather than assumed.
+   *
+   * The param is an optimisation — the inbox already knows the name, so passing it paints
+   * the header before anything loads. It is not a source of truth, and treating it as one
+   * meant every entry point that *cannot* supply it showed "Conversation" with a "?"
+   * avatar, permanently. Opening a chat from a push notification did exactly that, which
+   * is the one route where you most need to know who is talking to you.
+   *
+   * Only fetched when the param is missing, so the common path still costs no request.
+   * Shares the `['gamer', id]` key with the profile screen this header opens, so arriving
+   * there is already warm.
+   */
+  const profile = useQuery({
+    queryKey: ['gamer', friendId],
+    queryFn: () => profileApi.byId(friendId),
+    enabled: !passedUsername,
+  });
+  const username = passedUsername ?? profile.data?.username ?? undefined;
 
   const chat = useConversation(friendId);
   const [draft, setDraft] = useState('');
@@ -56,7 +77,7 @@ export default function Chat() {
         <Pressable
           onPress={() =>
             router.push({
-              pathname: '/gamer/[userId]',
+              pathname: '/messages/gamer/[userId]',
               params: { userId: friendId, username: username ?? '' },
             } as never)
           }
@@ -68,7 +89,7 @@ export default function Chat() {
 
           <View className="flex-1">
             <Text variant="bodyStrong">{username ?? 'Conversation'}</Text>
-            <ConnectionLabel status={chat.status} />
+            <StatusLabel status={chat.status} presence={chat.presence} isTyping={chat.isTyping} />
           </View>
         </Pressable>
 
@@ -136,7 +157,13 @@ export default function Chat() {
         <View className="flex-1">
           <TextField
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={(text) => {
+              setDraft(text);
+              // Only while there is something to type. Clearing the box — including the
+              // clear that happens on send — is not typing, and would otherwise put the
+              // indicator up on the other side just as the message landed.
+              if (text.length > 0) chat.notifyTyping();
+            }}
             placeholder="Message"
             multiline
             maxLength={2000}
@@ -182,7 +209,10 @@ function FriendAction({ userId }: { userId: string }) {
   const queryClient = useQueryClient();
 
   const friends = useQuery({ queryKey: ['friends'], queryFn: socialApi.friends });
-  const incoming = useQuery({ queryKey: ['friendRequests'], queryFn: socialApi.pendingRequests });
+  const incoming = useQuery({
+    queryKey: ['friendRequests'],
+    queryFn: socialApi.pendingRequests,
+  });
   const outgoing = useQuery({ queryKey: ['sentRequests'], queryFn: socialApi.sentRequests });
 
   const refresh = () => {
@@ -193,8 +223,14 @@ function FriendAction({ userId }: { userId: string }) {
     void queryClient.invalidateQueries({ queryKey: ['inbox'] });
   };
 
-  const send = useMutation({ mutationFn: () => socialApi.sendRequest(userId), onSuccess: refresh });
-  const accept = useMutation({ mutationFn: () => socialApi.accept(userId), onSuccess: refresh });
+  const send = useMutation({
+    mutationFn: () => socialApi.sendRequest(userId),
+    onSuccess: refresh,
+  });
+  const accept = useMutation({
+    mutationFn: () => socialApi.accept(userId),
+    onSuccess: refresh,
+  });
 
   /**
    * Re-read the three lists when the chat is opened.
@@ -300,8 +336,14 @@ function PersonIcon({
       >
         {badge === 'plus' && (
           <View className="items-center justify-center" style={{ width: 10, height: 10 }}>
-            <View className="absolute" style={{ width: 10, height: 2, backgroundColor: color }} />
-            <View className="absolute" style={{ width: 2, height: 10, backgroundColor: color }} />
+            <View
+              className="absolute"
+              style={{ width: 10, height: 2, backgroundColor: color }}
+            />
+            <View
+              className="absolute"
+              style={{ width: 2, height: 10, backgroundColor: color }}
+            />
           </View>
         )}
         {badge === 'check' && (
@@ -317,30 +359,94 @@ function PersonIcon({
           />
         )}
         {badge === 'dot' && (
-          <View className="rounded-full" style={{ width: 6, height: 6, backgroundColor: color }} />
+          <View
+            className="rounded-full"
+            style={{ width: 6, height: 6, backgroundColor: color }}
+          />
         )}
       </View>
     </View>
   );
 }
 
-function ConnectionLabel({ status }: { status: ReturnType<typeof useConversation>['status'] }) {
-  // Nothing is said while connected — a permanent "connected" badge is noise. The
-  // states worth surfacing are the ones where a message might not go anywhere.
-  if (status === 'connected') return null;
+/**
+ * The one line under the name: what the other person is doing, or why we cannot say.
+ *
+ * **Our own connection comes first, and that ordering is the important part.** Presence is
+ * something the server pushes to us; if our socket is down we are not being told about
+ * changes, so the last value we saw is only a memory. Showing a confident "Online" over a
+ * dead connection is worse than admitting the connection is dead — it is the difference
+ * between stale and wrong.
+ *
+ * Below that, typing beats online because it is strictly more specific: somebody typing is
+ * obviously online, and saying so instead would be dropping information.
+ */
+function StatusLabel({
+  status,
+  presence,
+  isTyping,
+}: {
+  status: ReturnType<typeof useConversation>['status'];
+  presence: ReturnType<typeof useConversation>['presence'];
+  isTyping: boolean;
+}) {
+  if (status !== 'connected') {
+    const label =
+      status === 'connecting'
+        ? 'Connecting…'
+        : status === 'reconnecting'
+          ? 'Reconnecting…'
+          : 'Offline';
+    return (
+      <Text variant="caption" className={status === 'idle' ? 'text-danger' : 'text-muted'}>
+        {label}
+      </Text>
+    );
+  }
 
-  const label =
-    status === 'connecting'
-      ? 'Connecting…'
-      : status === 'reconnecting'
-        ? 'Reconnecting…'
-        : 'Offline';
+  if (isTyping) {
+    return (
+      <Text variant="caption" className="text-brand">
+        typing…
+      </Text>
+    );
+  }
+
+  // Not yet answered. Deliberately blank rather than "Offline": we do not know, and a
+  // guess that resolves a moment later reads as the other person having just left.
+  if (!presence) return null;
+
+  if (presence.online) {
+    return (
+      <Text variant="caption" className="text-brand">
+        Online
+      </Text>
+    );
+  }
 
   return (
-    <Text variant="caption" className={status === 'idle' ? 'text-danger' : 'text-muted'}>
-      {label}
+    <Text variant="caption" className="text-muted">
+      {presence.lastSeenAt ? `Last seen ${timeAgo(presence.lastSeenAt)}` : 'Offline'}
     </Text>
   );
+}
+
+/**
+ * "3m ago", coarsely.
+ *
+ * Rounded down and capped at a day, because presence is only interesting near the present:
+ * the useful distinction is "just missed them" against "not around", and past a day the
+ * exact figure says nothing a plain "Offline" would not. Nothing here is localised yet —
+ * when that happens this is one of the strings that has to move.
+ */
+function timeAgo(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return 'a while ago';
 }
 
 function Bubble({

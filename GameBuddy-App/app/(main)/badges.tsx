@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, View } from 'react-native';
 import { badgesApi } from '../../src/api/badges';
-import type { Badge, BadgeBoard } from '../../src/api/types';
+import type { Badge, BadgeBoard, UserInfo } from '../../src/api/types';
 import { useThemeColors } from '../../src/theme';
 import { BackHeader, Button, Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
 
@@ -29,6 +29,28 @@ export default function Badges() {
   const board = useQuery({ queryKey: BOARD_KEY, queryFn: badgesApi.board });
 
   /**
+   * Reading the board can *earn* badges, so the profile behind it may now be wrong.
+   *
+   * The server awards on read: it re-evaluates every mission when this endpoint is hit,
+   * so simply opening this screen is what turns "3 matches" into First Contact. Claiming
+   * already invalidated the profile, but the far commoner path does not involve claiming
+   * anything — you open the board, see the new badge, and go back to a Profile still
+   * showing yesterday's count. It stayed wrong for the full five-minute stale window.
+   *
+   * Compared rather than invalidated unconditionally: the count is usually unchanged, and
+   * a refetch on every visit to this screen would be a request that answers with what the
+   * cache already holds.
+   */
+  const earned = board.data?.earned;
+  useEffect(() => {
+    if (earned === undefined) return;
+    const cached = queryClient.getQueryData<UserInfo>(['me']);
+    if (cached && cached.badgeCount !== earned) {
+      void queryClient.invalidateQueries({ queryKey: ['me'] });
+    }
+  }, [earned, queryClient]);
+
+  /**
    * Claiming and showcasing both answer with the whole board, so the response goes
    * straight into the cache instead of triggering a refetch — the same reasoning as the
    * market. A refetch would leave a window where the badge read as claimed but the coin
@@ -45,8 +67,16 @@ export default function Badges() {
 
   const onError = (error: unknown) => setFailure(messageOf(error));
 
-  const collect = useMutation({ mutationFn: badgesApi.collect, onSuccess: applyBoard, onError });
-  const showcase = useMutation({ mutationFn: badgesApi.showcase, onSuccess: applyBoard, onError });
+  const collect = useMutation({
+    mutationFn: badgesApi.collect,
+    onSuccess: applyBoard,
+    onError,
+  });
+  const showcase = useMutation({
+    mutationFn: badgesApi.showcase,
+    onSuccess: applyBoard,
+    onError,
+  });
 
   const busy = collect.isPending || showcase.isPending;
   const badges = board.data?.badges ?? [];

@@ -2,10 +2,10 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { profileApi } from '../../src/api/catalogue';
-import { useSession } from '../../src/session/store';
-import { THEME_OPTIONS, useScheme } from '../../src/theme';
+import { authApi } from '../../../src/api/auth';
+import { profileApi } from '../../../src/api/catalogue';
+import { useSession } from '../../../src/session/store';
+import { THEME_OPTIONS, useScheme } from '../../../src/theme';
 import {
   Button,
   Card,
@@ -16,7 +16,7 @@ import {
   SelectRow,
   Text,
   TextField,
-} from '../../src/ui';
+} from '../../../src/ui';
 
 /**
  * Everything that changes something, in one place.
@@ -59,25 +59,25 @@ export default function Settings() {
             <LinkRow
               label="Avatar"
               hint="Change your picture"
-              href="/edit/avatar"
+              href="/settings/avatar"
               position="first"
             />
             <LinkRow
               label="Age"
               hint="Decides who you are shown"
-              href="/edit/age"
+              href="/settings/age"
               position="middle"
             />
             <LinkRow
               label="Games"
               hint={`${me.data?.games.length ?? 0} selected`}
-              href="/edit/games"
+              href="/settings/games"
               position="middle"
             />
             <LinkRow
               label="Keywords"
               hint={`${me.data?.keywords.length ?? 0} selected`}
-              href="/edit/keywords"
+              href="/settings/keywords"
               position="last"
             />
           </RowGroup>
@@ -96,11 +96,7 @@ export default function Settings() {
                 selected={preference === option.value}
                 onPress={() => setPreference(option.value)}
                 position={
-                  index === 0
-                    ? 'first'
-                    : index === THEME_OPTIONS.length - 1
-                      ? 'last'
-                      : 'middle'
+                  index === 0 ? 'first' : index === THEME_OPTIONS.length - 1 ? 'last' : 'middle'
                 }
               />
             ))}
@@ -118,7 +114,7 @@ export default function Settings() {
             <LinkRow
               label="What we send you"
               hint="Messages, matches, communities, reminders"
-              href="/edit/notifications"
+              href="/settings/notifications"
               position="single"
             />
           </RowGroup>
@@ -131,13 +127,13 @@ export default function Settings() {
             <LinkRow
               label="Password"
               hint="Signs you out everywhere"
-              href="/edit/password"
+              href="/settings/password"
               position="first"
             />
             <LinkRow
               label="Blocked"
               hint="Who you have blocked"
-              href="/edit/blocked"
+              href="/settings/blocked"
               position="last"
             />
           </RowGroup>
@@ -159,8 +155,8 @@ export default function Settings() {
                   This cannot be undone
                 </Text>
                 <Text variant="caption">
-                  Your profile, matches and messages are removed. Enter your password to
-                  confirm — a stolen phone should not be enough to do this.
+                  Your profile, matches and messages are removed. Enter your password to confirm
+                  — a stolen phone should not be enough to do this.
                 </Text>
               </View>
 

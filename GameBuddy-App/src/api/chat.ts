@@ -1,3 +1,4 @@
+import type { PresenceUpdate } from '../chat/socket';
 import { api } from './client';
 import type { Conversation, InboxEntry } from './types';
 
@@ -35,6 +36,15 @@ export const chatApi = {
    */
   send: (receiver: string, message: string) =>
     api.post<void>('/messages/send', { receiver, message }),
+
+  /**
+   * Whether one gamer is online right now.
+   *
+   * Only the opening value — every change after it is pushed over the socket, so this is
+   * not something to poll. Refused unless the two have matched, which is the same rule
+   * that governs seeing their messages: when somebody is at their phone is personal.
+   */
+  presence: (userId: string) => api.get<PresenceUpdate>(`/presence/${userId}`),
 
   /**
    * Flags a message for moderation. Only the *recipient* may report — the backend
