@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { cn } from './cn';
 
@@ -31,12 +32,18 @@ export function Screen({
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={edges}>
-      <KeyboardAvoidingView
-        className="flex-1"
-        // iOS moves the whole view. On Android the system already resizes the window,
-        // and 'padding' there double-counts and leaves a gap above the keyboard.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      {/* From react-native-keyboard-controller, not React Native.
+
+          The built-in one is driven by the window being resized, and Android stopped
+          resizing it when Expo turned on edge-to-edge by default in SDK 54 — so it did
+          nothing at all there, whatever `behavior` it was given. `padding` was tried and
+          measured: the compose bar stayed at y=2016 with the keyboard starting at y=1516,
+          exactly where it had been.
+
+          This one tracks the keyboard inset reported by the platform, so it works the same
+          under edge-to-edge, and 'padding' is now correct on both platforms rather than
+          being a no-op on one of them. */}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
         {scroll ? (
           <ScrollView
             // grow, not flex: fill the screen when short, scroll when tall.

@@ -543,7 +543,8 @@ public class DefaultCommunityService implements CommunityService {
                 || actor.hasBlockRelationshipWith(recipient)) {
             return;
         }
-        events.publishEvent(new NotificationRequestedEvent(recipient.getFcmToken(), title, body, kind, targetId));
+        events.publishEvent(
+                new NotificationRequestedEvent(recipient.getUserId(), recipient.getFcmToken(), title, body, kind, targetId));
     }
 
     /**

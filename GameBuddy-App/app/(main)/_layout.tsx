@@ -1,6 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Platform, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChatSocketProvider } from '../../src/chat/ChatSocketProvider';
 import { NotificationPrimer } from '../../src/notifications/NotificationPrimer';
 import { useNotificationRouting } from '../../src/notifications/useNotificationRouting';
 import { usePushRegistration } from '../../src/notifications/usePushRegistration';
@@ -47,6 +48,11 @@ export default function MainLayout() {
 
   return (
     <RouteGuard allow={(s) => s === 'ready'}>
+      {/* Here, not on the conversation screen. The socket is what tells everyone else
+          you are online, so its lifetime has to be "the app is open" rather than "this
+          chat is open" — otherwise walking back to the deck reads as going offline. It
+          also means the inbox hears about messages, which it previously did not. */}
+      <ChatSocketProvider>
       <Tabs
         // Back returns to the tab you came from, not to Home.
         //
@@ -84,15 +90,15 @@ export default function MainLayout() {
         <Tabs.Screen name="market" options={tab('Market', 'market')} />
         <Tabs.Screen name="profile" options={tab('Profile', 'profile')} />
 
-        {/* Reachable from Profile, but not tabs of their own. The bar is hidden while
-            they are open: these are "change one thing and come back" flows, and a tab
-            press mid-edit would discard the change without saying so. */}
+        {/* Reachable from Profile, but not a tab of its own. One entry, not two: the
+            screens it leads to are inside its stack rather than in a second `edit` tab.
+            Splitting them made every settings row a tab switch, and the edit tab's stack
+            survived leaving it, so back went to whichever page had been opened before.
+
+            The bar is hidden while it is open: these are "change one thing and come back"
+            flows, and a tab press mid-edit would discard the change without saying so. */}
         <Tabs.Screen
           name="settings"
-          options={{ href: null, tabBarStyle: { display: 'none' } }}
-        />
-        <Tabs.Screen
-          name="edit"
           options={{ href: null, tabBarStyle: { display: 'none' } }}
         />
         {/* A conversation is no longer a tab. It was one — `href: null`, so no button,
@@ -101,16 +107,17 @@ export default function MainLayout() {
             tab's own stack, which outlived leaving the tab. It lives in the Messages
             stack now, where the thing you came from is the thing you go back to. */}
 
-        {/* Somebody else's profile, pushed from a conversation. */}
-        <Tabs.Screen
-          name="gamer"
-          options={{ href: null, tabBarStyle: { display: 'none' } }}
-        />
+        {/* Somebody else's profile is not here either. It is pushed from a conversation
+            and nowhere else, so it lives in the Messages stack — as `messages/gamer/
+            [userId]` — for the same reason the conversation itself does. As its own tab
+            it had the same fault: opening one person's profile, backing out, then opening
+            another left both on that tab's stack, and back went to the first one. */}
         {/* Badges keeps the tab bar: it is somewhere to browse rather than a flow with
             an unsaved change in it, and claiming a reward then heading to the market to
             spend it is the path this is meant to make short. */}
         <Tabs.Screen name="badges" options={{ href: null }} />
-      </Tabs>
+        </Tabs>
+      </ChatSocketProvider>
     </RouteGuard>
   );
 }
@@ -121,8 +128,6 @@ function tab(title: string, icon: TabIconName) {
     // `color` is a ColorValue, not a string — it can be an opaque platform colour.
     // TabIcon only ever passes it straight back into a style, so widening the
     // parameter is honest rather than casting it to something it is not.
-    tabBarIcon: ({ color }: { color: ColorValue }) => (
-      <TabIcon name={icon} color={color} />
-    ),
+    tabBarIcon: ({ color }: { color: ColorValue }) => <TabIcon name={icon} color={color} />,
   };
 }

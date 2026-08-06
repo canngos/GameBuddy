@@ -314,6 +314,25 @@ class DefaultAuthServiceTest {
         }
 
         @Test
+        @DisplayName("registration stores no device token, so the column cannot collide")
+        void testRegister_doesNotPersistADeviceToken() {
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+            when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+
+            authService.register(request(GOOD_PASSWORD));
+
+            ArgumentCaptor<Gamer> captor = ArgumentCaptor.forClass(Gamer.class);
+            verify(gamerRepository).save(captor.capture());
+            // The client cannot have a real token yet — permission has not been asked for —
+            // so whatever it sends is a placeholder. Storing it gave every not-yet-registered
+            // account the same token, and the two lookups that resolve a gamer by token then
+            // threw NonUniqueResultException; the one in NotificationDispatcher escaped as a
+            // 500 from whichever request had triggered the notification. The device registers
+            // itself later through updateFcmToken, which detaches it from any previous owner.
+            assertNull(captor.getValue().getFcmToken(), "no device is registered at sign-up");
+        }
+
+        @Test
         @DisplayName("issuing a code invalidates every previous one, and persists that")
         void testRegister_invalidatesPreviousCodes() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());

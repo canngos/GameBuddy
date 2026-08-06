@@ -7,6 +7,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '../src/query';
 import { connectSessionToApi, useSession } from '../src/session/store';
@@ -64,20 +65,33 @@ function Shell() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              // A colour value, not a class: this styles the navigator's own container,
-              // which sits outside the React tree NativeWind processes. Without it the
-              // white default flashes between screens in dark mode.
-              contentStyle: { backgroundColor: colors.canvas },
-            }}
-          />
-        </QueryClientProvider>
-      </SafeAreaProvider>
+      {/* Feeds real keyboard geometry to the whole tree.
+
+          React Native's own KeyboardAvoidingView relies on the system resizing the window
+          — which Android stopped doing once Expo enabled edge-to-edge by default in SDK
+          54. `adjustResize` is still in the manifest and is now simply ignored, so the
+          component became a no-op and the keyboard covered anything at the bottom of the
+          screen. The chat compose box was unusable: field and Send button both sat behind
+          it, so you could neither see what you typed nor reach the button.
+
+          This provider reads the keyboard inset from the platform directly rather than
+          inferring it from window size, so it is unaffected by edge-to-edge. */}
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                // A colour value, not a class: this styles the navigator's own container,
+                // which sits outside the React tree NativeWind processes. Without it the
+                // white default flashes between screens in dark mode.
+                contentStyle: { backgroundColor: colors.canvas },
+              }}
+            />
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

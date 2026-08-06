@@ -63,7 +63,7 @@ class NotificationOutboxTest {
         @DisplayName("the notification is written, not sent, when it is requested")
         void writesToTheOutbox() {
             dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("dev-1", "Title", "Body", NotificationKind.MATCH));
+                    new NotificationRequestedEvent("gamer-1", "dev-1", "Title", "Body", NotificationKind.MATCH));
 
             ArgumentCaptor<NotificationOutbox> captor = ArgumentCaptor.forClass(NotificationOutbox.class);
             verify(repository).save(captor.capture());
@@ -83,10 +83,10 @@ class NotificationOutboxTest {
         void respectsPreferences() {
             Gamer gamer = new Gamer();
             gamer.setNotifyCommunities(false);
-            when(gamers.findByFcmToken("dev-1")).thenReturn(Optional.of(gamer));
+            when(gamers.findById("gamer-1")).thenReturn(Optional.of(gamer));
 
             dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("dev-1", "T", "B", NotificationKind.POST_LIKE));
+                    new NotificationRequestedEvent("gamer-1", "dev-1", "T", "B", NotificationKind.POST_LIKE));
 
             // Enforced here rather than at the nine places that raise notifications: a
             // rule that has to be remembered nine times gets forgotten once, and the
@@ -99,24 +99,24 @@ class NotificationOutboxTest {
         void allowsWantedCategories() {
             Gamer gamer = new Gamer();
             gamer.setNotifyMessages(true);
-            when(gamers.findByFcmToken("dev-1")).thenReturn(Optional.of(gamer));
+            when(gamers.findById("gamer-1")).thenReturn(Optional.of(gamer));
 
             dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("dev-1", "T", "B", NotificationKind.MESSAGE));
+                    new NotificationRequestedEvent("gamer-1", "dev-1", "T", "B", NotificationKind.MESSAGE));
 
             verify(repository).save(any(NotificationOutbox.class));
         }
 
         @Test
-        @DisplayName("a token with no account behind it still goes out")
-        void unknownTokenIsNotSilentlyDropped() {
-            // The device was detached — reinstalled, or claimed by another account. The
-            // send fails harmlessly at Firebase. Refusing here would swallow notifications
-            // for a state we cannot tell apart from a race.
-            when(gamers.findByFcmToken(anyString())).thenReturn(Optional.empty());
+        @DisplayName("an id with no account behind it still goes out")
+        void unknownRecipientIsNotSilentlyDropped() {
+            // The account went away between the publish and this listener. The send fails
+            // harmlessly. Refusing here would swallow notifications for a state we cannot
+            // tell apart from a race.
+            when(gamers.findById(anyString())).thenReturn(Optional.empty());
 
             dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("dev-1", "T", "B", NotificationKind.MESSAGE));
+                    new NotificationRequestedEvent("gamer-1", "dev-1", "T", "B", NotificationKind.MESSAGE));
 
             verify(repository).save(any(NotificationOutbox.class));
         }
@@ -124,8 +124,8 @@ class NotificationOutboxTest {
         @Test
         @DisplayName("a gamer with no device is not queued")
         void skipsMissingToken() {
-            dispatcher.onNotificationRequested(new NotificationRequestedEvent(null, "T", "B", NotificationKind.MATCH));
-            dispatcher.onNotificationRequested(new NotificationRequestedEvent("  ", "T", "B", NotificationKind.MATCH));
+            dispatcher.onNotificationRequested(new NotificationRequestedEvent("gamer-1", null, "T", "B", NotificationKind.MATCH));
+            dispatcher.onNotificationRequested(new NotificationRequestedEvent("gamer-1", "  ", "T", "B", NotificationKind.MATCH));
 
             verifyNoInteractions(repository);
         }
@@ -134,7 +134,7 @@ class NotificationOutboxTest {
         @DisplayName("over-long text is truncated rather than failing the transaction")
         void truncatesOverlongText() {
             dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("dev-1", "x".repeat(500), "y".repeat(5000), NotificationKind.MATCH));
+                    new NotificationRequestedEvent("gamer-1", "dev-1", "x".repeat(500), "y".repeat(5000), NotificationKind.MATCH));
 
             ArgumentCaptor<NotificationOutbox> captor = ArgumentCaptor.forClass(NotificationOutbox.class);
             verify(repository).save(captor.capture());

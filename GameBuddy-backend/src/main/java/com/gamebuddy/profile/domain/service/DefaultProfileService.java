@@ -250,6 +250,7 @@ public class DefaultProfileService implements ProfileService {
         gamerRepository.save(user);
 
         events.publishEvent(new NotificationRequestedEvent(
+                user.getUserId(),
                 user.getFcmToken(),
                 Constants.FRIEND_REQUEST_ACCEPTED_TITLE,
                 String.format(Constants.FRIEND_REQUEST_ACCEPTED_BODY, gamer.getGamerUsername()),
@@ -380,6 +381,7 @@ public class DefaultProfileService implements ProfileService {
         gamerRepository.save(user);
 
         events.publishEvent(new NotificationRequestedEvent(
+                user.getUserId(),
                 user.getFcmToken(),
                 Constants.FRIEND_REQUEST_TITLE,
                 String.format(Constants.FRIEND_REQUEST_BODY, gamer.getGamerUsername()),

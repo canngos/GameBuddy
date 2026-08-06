@@ -3,10 +3,10 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
-import { profileApi } from '../../../src/api/catalogue';
-import { communityApi } from '../../../src/api/community';
-import { socialApi } from '../../../src/api/social';
-import { useThemeColors } from '../../../src/theme';
+import { profileApi } from '../../../../src/api/catalogue';
+import { communityApi } from '../../../../src/api/community';
+import { socialApi } from '../../../../src/api/social';
+import { useThemeColors } from '../../../../src/theme';
 import {
   BackHeader,
   Button,
@@ -17,7 +17,7 @@ import {
   ReportSheet,
   Screen,
   Text,
-} from '../../../src/ui';
+} from '../../../../src/ui';
 
 /**
  * Somebody else's profile.

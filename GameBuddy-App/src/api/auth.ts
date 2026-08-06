@@ -1,13 +1,6 @@
 import { api } from './client';
 import type { ProfileDetails, Session } from './types';
 
-/**
- * The device token Firebase would normally supply. The backend requires the field on
- * registration, and push is not wired up yet, so a placeholder goes in and
- * `PUT /auth/fcm-token` replaces it once notifications are added.
- */
-const PLACEHOLDER_FCM_TOKEN = 'pending';
-
 export const authApi = {
   /**
    * Creates the account and mails a six-digit code.
@@ -19,9 +12,15 @@ export const authApi = {
    * simply re-issues the code — an unverified record is not evidence anyone owns the
    * mailbox. Only a *verified* address comes back as EMAIL_EXISTS, which is why that
    * branch on the register screen is rarer than it looks.
+   *
+   * **No device token is sent.** There cannot be one yet: on Android 13+ notification
+   * permission has not been asked for at this point, so the only thing we could send is a
+   * placeholder — and the backend used to store it, giving every not-yet-registered
+   * account the same token and breaking the lookups that resolve a gamer by it. The device
+   * registers itself after sign-in, in `usePushRegistration`.
    */
-  register: (email: string, password: string, fcmToken = PLACEHOLDER_FCM_TOKEN) =>
-    api.post<void>('/auth/register', { email, password, fcmToken }, { anonymous: true }),
+  register: (email: string, password: string) =>
+    api.post<void>('/auth/register', { email, password }, { anonymous: true }),
 
   /** Exchanges the code for a token. This is where a new user first gets a session. */
   verify: (email: string, verificationCode: number) =>

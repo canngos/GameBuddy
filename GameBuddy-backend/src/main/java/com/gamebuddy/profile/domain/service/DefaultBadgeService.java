@@ -233,6 +233,7 @@ public class DefaultBadgeService implements BadgeService {
             // Published rather than sent: the outbox delivers it after commit, so a
             // transaction that rolls back cannot congratulate anyone on nothing.
             events.publishEvent(new NotificationRequestedEvent(
+                    gamer.getUserId(),
                     gamer.getFcmToken(),
                     Constants.BADGE_TITLE,
                     String.format(Constants.BADGE_BODY, badge.getTitle()),

@@ -18,8 +18,12 @@ import com.gamebuddy.match.interfaces.dto.ConversationDto;
 import com.gamebuddy.match.interfaces.dto.ConversationResponseBody;
 import com.gamebuddy.match.interfaces.dto.InboxDto;
 import com.gamebuddy.match.interfaces.dto.InboxResponseBody;
+import com.gamebuddy.match.interfaces.dto.PresenceResponseBody;
+import com.gamebuddy.match.interfaces.dto.PresenceUpdate;
+import com.gamebuddy.match.interfaces.dto.TypingNotification;
 import com.gamebuddy.match.interfaces.response.ConversationResponse;
 import com.gamebuddy.match.interfaces.response.InboxResponse;
+import com.gamebuddy.match.interfaces.response.PresenceResponse;
 import com.gamebuddy.shared.entity.Avatars;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.event.NotificationKind;
@@ -33,6 +37,7 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +64,62 @@ public class ChatMessageService {
     private final MessageCipher cipher;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final PresenceService presenceService;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    /**
+     * Whether somebody a gamer has matched with is online.
+     *
+     * <p>The match check is the point, not a formality. Presence tells you when a person is
+     * awake and holding their phone, so it is disclosed only to people they have agreed to
+     * talk to — the same bar chat itself sets. Asking about a stranger is refused rather
+     * than answered with "offline", which would still confirm the account exists.
+     */
+    @Transactional(readOnly = true)
+    public PresenceResponse presenceOf(Gamer principal, String userId) {
+        Gamer self = requireGamer(principal.getUserId());
+        Gamer other = requireGamer(userId);
+        if (!self.isMatchedWith(other)) {
+            throw new BusinessException(TransactionCode.NOT_MATCHED);
+        }
+
+        PresenceUpdate presence = presenceService.presenceOf(userId);
+        PresenceResponseBody body = new PresenceResponseBody();
+        body.setUserId(presence.userId());
+        body.setOnline(presence.online());
+        body.setLastSeenAt(presence.lastSeenAt());
+        return respond(new PresenceResponse(), body);
+    }
+
+    /**
+     * Passes a typing indicator to the recipient, if they are entitled to it.
+     *
+     * <p>Re-checks the match on every event rather than trusting that the conversation was
+     * opened legitimately, because the socket is a public destination and nothing stops a
+     * client sending this for an id it invented. A block or an age change also takes effect
+     * immediately, exactly as it does for messages.
+     *
+     * <p>Nothing is stored and nothing is queued for later. If the recipient is not
+     * connected the send is a no-op, which is correct: there is no such thing as a typing
+     * indicator you missed.
+     */
+    @Transactional(readOnly = true)
+    public void relayTyping(String senderId, String receiverId) {
+        if (senderId.equals(receiverId)) {
+            return;
+        }
+        Gamer sender = requireGamer(senderId);
+        Gamer receiver = requireGamer(receiverId);
+
+        if (!sender.isMatchedWith(receiver)
+                || sender.hasBlockRelationshipWith(receiver)
+                || !AgeBand.compatible(sender.getAge(), receiver.getAge())) {
+            return;
+        }
+
+        messagingTemplate.convertAndSendToUser(
+                receiver.getEmail(), "/queue/typing", new TypingNotification(senderId));
+    }
 
     /**
      * Stores an inbound chat message.
@@ -117,7 +178,12 @@ public class ChatMessageService {
         // same trade every chat app makes and worth revisiting if this ever carries
         // anything more sensitive than chat.
         events.publishEvent(new NotificationRequestedEvent(
-                receiver.getFcmToken(), sender.getGamerUsername(), preview(body), NotificationKind.MESSAGE, senderId));
+                receiver.getUserId(),
+                receiver.getFcmToken(),
+                sender.getGamerUsername(),
+                preview(body),
+                NotificationKind.MESSAGE,
+                senderId));
 
         return new SentMessage(
                 message.getId(),
