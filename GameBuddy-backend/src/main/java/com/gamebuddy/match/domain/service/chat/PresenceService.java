@@ -78,7 +78,8 @@ public class PresenceService {
      * <p>Answered without a database read: presence lives entirely in memory.
      */
     public PresenceUpdate presenceOf(String userId) {
-        return new PresenceUpdate(userId, registry.isOnline(userId), registry.lastSeenAt(userId).orElse(null));
+        return new PresenceUpdate(
+                userId, registry.isOnline(userId), registry.lastSeenAt(userId).orElse(null));
     }
 
     /**

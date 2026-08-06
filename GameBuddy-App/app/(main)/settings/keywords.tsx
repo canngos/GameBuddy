@@ -27,7 +27,7 @@ export default function EditKeywords() {
     mutationFn: () => authApi.changeKeywords(current),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
-      // Same as games: this re-clusters the gamer, so the feed is stale.
+      // Same as games: the ranking changes behind this, so the feed is stale.
       void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       router.back();
     },

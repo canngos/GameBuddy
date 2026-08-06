@@ -257,6 +257,12 @@ public class DefaultModerationService implements ModerationService {
         };
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public long openReportCount() {
+        return reportRepository.countByStatus(ContentReport.Status.OPEN);
+    }
+
     private ContentReport requireReport(String reportId) {
         return reportRepository
                 .findById(Ids.uuid(reportId))

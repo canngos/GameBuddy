@@ -16,17 +16,19 @@ cp .env.example .env
 docker compose up --build
 ```
 
-That is the whole setup. It brings up Postgres, the model and the backend, creates the
-schema, seeds the game and keyword catalogue, and waits for each service to report healthy
-before starting the next one.
+That is the whole setup. It brings up Postgres, the model, the backend and the log stack,
+creates the schema, seeds the game and keyword catalogue, and waits for each service to
+report healthy before starting the next one.
 
-| Service  | URL                                    |
-| -------- | -------------------------------------- |
-| Backend  | http://localhost:8080                  |
-| Swagger  | http://localhost:8080/swagger-ui/index.html |
-| Health   | http://localhost:8080/actuator/health  |
-| Model    | http://localhost:8000/health           |
-| Postgres | localhost:5432, user/db `gamebuddy`    |
+| Service       | URL                                         |
+| ------------- | ------------------------------------------- |
+| Backend       | http://localhost:8080                       |
+| Swagger       | http://localhost:8080/swagger-ui/index.html |
+| Health        | http://localhost:8080/actuator/health       |
+| Model         | http://localhost:8000/health                |
+| Postgres      | localhost:5432, user/db `gamebuddy`         |
+| **Kibana**    | **http://localhost:5601/app/discover**      |
+| Elasticsearch | http://localhost:9200                       |
 
 Import `documentation/GameBuddy.postman_collection.json` with the `GameBuddy-Local`
 environment for the full API surface — 86 requests, and login stores the token for the
@@ -76,7 +78,7 @@ must match what the model container was started with.
 ### Tests
 
 ```bash
-./gradlew build                                   # 555 tests (487 backend, 68 common)
+./gradlew build                                   # 573 tests (505 backend, 68 common)
 cd GameBuddy-Model && python -m pytest            # 50 model tests
 ```
 
@@ -102,6 +104,88 @@ Everything that used to be an HTTP call between services is now a method call.
 
 ---
 
+## Logs
+
+**http://localhost:5601/app/discover** — Kibana, with the `GameBuddy logs` data view
+already created. Everything the backend logs is searchable there within a second or two.
+
+```
+backend ──writes──► /app/logs/gamebuddy.json ──tails──► filebeat ──► elasticsearch ──► kibana
+         (ECS JSON)      (shared volume)
+```
+
+The backend logs to two places at once. The console keeps Spring's human-readable format,
+so `docker compose logs -f backend` is unchanged. The file is one JSON object per line in
+[Elastic Common Schema](https://www.elastic.co/guide/en/ecs/current/index.html) — the field
+names Elasticsearch and Kibana already understand — which is what Filebeat ships.
+
+Nothing in the application talks to Elasticsearch. It writes a file and is finished, and
+Filebeat does the rest from its own container. That is deliberate:
+
+- Elasticsearch being down, slow or restarting cannot add latency to a request, and cannot
+  fail one. A logging call that can block is a logging call that will eventually take the
+  site down.
+- Logs written while the cluster was down are still shipped when it comes back, because
+  Filebeat resumes from where it left off rather than from wherever the application
+  happens to be now.
+- `docker compose up backend` still starts only Postgres, the model and the backend. The
+  log stack is genuinely optional.
+
+Everything lands in one Elasticsearch data stream, `gamebuddy-logs`, and the field types
+come out right without a hand-written mapping: `@timestamp` is a `date`,
+`event.duration_ms` and `http.response.status_code` are `long`s, `log.level` and `trace.id`
+are `keyword`s.
+
+### Finding things
+
+Every request gets an id, returned to the caller in the `X-Request-Id` header and attached
+to **every** line that request produces — the access line, a warning four layers down, and
+the stack trace if it fails. So a bug report that quotes an id is one query:
+
+| I want                       | Kibana query                                       |
+| ---------------------------- | -------------------------------------------------- |
+| One request, start to finish | `trace.id: "0f6c…"`                                 |
+| Everything that failed       | `log.level: ERROR`                                  |
+| One user's session           | `user.id: "…"`                                      |
+| Slow requests                | `event.duration_ms > 500`                           |
+| Failed logins                | `message: "Failed login attempt*"`                  |
+| One endpoint                 | `url.path: "/match/recommendations"`                |
+
+`http.response.status_code` and `event.duration_ms` are indexed as numbers, not strings, so
+ranges and averages work — which is the point of shipping structured logs rather than
+grepping text.
+
+Or without Kibana at all:
+
+```bash
+curl 'localhost:9200/gamebuddy-logs/_search?q=log.level:ERROR&size=5&pretty'
+curl 'localhost:9200/gamebuddy-logs/_count'         # is anything arriving?
+docker compose logs filebeat                        # if it is not, why not
+```
+
+### Knobs
+
+| Variable           | Effect                                                          |
+| ------------------ | --------------------------------------------------------------- |
+| `LOG_LEVEL`        | Application log level, `com.gamebuddy` only. `DEBUG` for detail  |
+| `ACCESS_LOG_LEVEL` | `WARN` keeps only failed requests; `OFF` silences the access log |
+| `ENVIRONMENT`      | Tags every document, so one cluster can hold several deployments |
+| `KIBANA_PORT`      | Default 5601                                                     |
+
+Health checks are logged at DEBUG rather than INFO on purpose — polled every ten seconds
+forever, they would otherwise be most of the index.
+
+### Not production-ready as configured
+
+Elasticsearch runs here with `xpack.security.enabled=false`: no authentication, no TLS.
+That is fine for a cluster reachable only from this compose network and from localhost, and
+the honest alternative for a local stack is a certificate dance that ends with everyone
+disabling verification anyway. A deployed cluster needs security enabled, real credentials
+in Filebeat's output, and `setup.ilm.enabled: true` so the data stream rolls over and old
+indices are deleted rather than one backing index growing forever.
+
+---
+
 ## The database
 
 The schema is **owned by SQL**, not generated by Hibernate at startup. Both environments run
@@ -120,6 +204,8 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-9-profile-reports.sql` | A gamer's profile can be reported.       |
 | `db/upgrade-2026-10-notifications.sql` | Deep links, and last-active tracking.  |
 | `db/upgrade-2026-11-notification-preferences.sql` | Per-category opt-outs. |
+| `db/upgrade-2026-12-recommender-staleness.sql` | Flags profiles the model predates. |
+| `db/upgrade-2026-13-avatar-review.sql` | Classifier score and upload time on avatars. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 
 They live in `GameBuddy-backend/src/main/resources/db/`. On a fresh database apply the
@@ -196,10 +282,84 @@ wrong:
 | `MAIL_MODE`           | `smtp` in production. `log` only locally                                  |
 | `FIREBASE_ENABLED`    | Startup fails if `true` without a credentials file                        |
 | `CORS_ALLOWED_ORIGINS`| Empty by default, refusing every browser. Only a web client needs it       |
+| `MODERATOR_EMAIL` / `MODERATOR_PASSWORD` | Creates the one staff account on first start. Empty means no staff account |
+| `AVATAR_PUBLISH_AFTER`| ISO-8601 duration. How long an unreviewed ambiguous avatar waits before publishing |
+| `NSFW_APPROVE_THRESHOLD` / `NSFW_REJECT_THRESHOLD` | On the **model** service. The band between them is what needs a human |
 
 A mismatched `INTERNAL_API_KEY` is the one worth remembering, because it does not announce
 itself: the model answers 503 and the feed reports "Recommendation service unavailable",
 which reads as the model being down rather than a wrong secret.
+
+---
+
+## The moderator console
+
+One staff account, and no way to sign up for it. `ModeratorBootstrap` creates it on first
+start from `MODERATOR_EMAIL` and `MODERATOR_PASSWORD`, and **does nothing at all if an
+account with that address already exists** — including when the configured password
+differs. That is deliberate: a restart with a stale environment variable must not silently
+change the moderator's password, and an attacker who can set an environment variable must
+not be able to take over an existing account. To change the password, sign in as the
+moderator and use `PUT /auth/change/pwd`.
+
+The account has no age, no games and no keywords, and it never completes onboarding. It is
+not a participant:
+
+- `Gamer.isDiscoverable()` is false for ADMIN, so `isPairableWith` refuses it everywhere —
+  the deck, the exploration slots, who-liked-you.
+- `findRandomPairable` and `findPendingAdmirers` repeat the rule in SQL, because a native
+  query cannot call that method. Filtering only in Java would still cost an exploration
+  slot every time the moderator was drawn.
+- Fetching its profile by id answers `USER_NOT_FOUND`, the same as a blocked account, so
+  the response cannot confirm the account exists.
+- `DefaultMatchService.reload` refuses an ADMIN outright, so the moderator cannot swipe
+  either. Without it the account's null age would put it in the minor band and build it a
+  deck of children.
+
+The app routes on the `role` field of `/application/get/user/info` — own profile only,
+never anyone else's — into a separate `(admin)` route group with four tabs:
+
+| Tab      | What it does                                                              |
+| -------- | ------------------------------------------------------------------------- |
+| Overview | `GET /admin/analytics` — population, growth graph, engagement, what is waiting |
+| Reports  | The moderation queue: remove the content, or keep it                       |
+| Avatars  | Uploads the classifier was unsure about — approve or reject                |
+| Accounts | Banned accounts, and restoring one                                         |
+
+### Avatar review is meant to be ignorable
+
+REVIEW marks an upload PENDING and leaves it in the private bucket. Before this there was
+no endpoint that listed or resolved those, so a picture the model hesitated over was
+refused forever while its owner was told a human would look.
+
+The queue must not become a job, though — this is a solo-operated product, and a queue that
+has to be watched is one that will not be. `AvatarReviewJob` drains it, using the fact that
+PENDING has two quite different causes:
+
+| Why it is pending | `avatar_score` | What happens |
+| ----------------- | -------------- | ------------ |
+| The classifier was unreachable | NULL | Re-screened every 10 minutes until it answers |
+| The classifier looked and was unsure | a number | Held for `AVATAR_PUBLISH_AFTER` (3 days), then published |
+
+The first is the common case in practice: a restart or an out-of-memory on the model
+container queues every upload in the window, and none of them have been judged at all.
+Sending those to a person is what would make review feel like work.
+
+Publishing the second after the deadline is a deliberate trade, and it is the Steam
+posture rather than the pre-moderation one: anything the model was confident about was
+already rejected outright, everything published stays reportable and bannable, and holding
+an innocent user's photograph indefinitely because nobody opened the console is the more
+likely harm. Measured before choosing it — ordinary images score around **0.001** against
+an approve threshold of **0.20**, so the ambiguous band is expected to be nearly empty.
+
+What the classifier cannot do is unchanged, and is why the report button carries the real
+weight: it does not recognise a minor, a person who did not consent to being photographed,
+or a picture of a screen showing either.
+
+The image under review is returned as a `data:` URI inside JSON rather than as raw
+`image/jpeg`. React Native's image loader drops the `Authorization` header on Android, so
+the raw form arrived unauthenticated and the moderator saw a blank square with a 401
+visible only in the server log.
 
 ---
 
@@ -239,6 +399,7 @@ GameBuddy-Model/       Recommender + FastAPI service (Python 3.12)
 GameBuddy-App/         Mobile client (React Native, Expo SDK 57) — see its own README
 GameBuddy-Android/     The previous Kotlin client. Reference only; superseded by GameBuddy-App
 common/                Shared framework code used by the backend
+observability/         Filebeat configuration for the log stack
 documentation/         Postman collection and environment
 k8s/                   Kubernetes manifests, from the previous architecture
 GameBuddy-*-service/   Superseded by the modules in GameBuddy-backend

@@ -69,6 +69,12 @@ export type UserInfo = {
   gender: string | null;
   /** Own profile only. */
   coin?: number;
+  /**
+   * Own profile only, and the reason the console exists as a separate shell: an ADMIN
+   * account has no age, games or keywords, so the onboarding check would otherwise
+   * strand it on "finish your profile" forever.
+   */
+  role?: 'USER' | 'ADMIN';
   games: Game[];
   keywords: Keyword[];
   /** The three (at most) this gamer chose to display. Empty is normal. */
@@ -324,3 +330,93 @@ export type NotificationPreferences = {
   /** "Come back" reminders when you have been away. */
   reminders: boolean;
 };
+
+// --- the moderator console -------------------------------------------------
+// Only an ADMIN account can reach any of these. Ordinary builds of the app never
+// render them, but the types live here with the rest so the console is not a second
+// parallel API layer.
+
+/** One day on the growth graph. */
+export type GrowthPoint = {
+  /** ISO date, UTC. */
+  date: string;
+  signups: number;
+  /** Running total across the window, not all time. */
+  total: number;
+};
+
+/**
+ * The overview screen, in one response.
+ *
+ * Aggregates only — no account is named anywhere in here. A dashboard is the screen
+ * most likely to be left open or screenshotted, so it deliberately cannot leak a
+ * person.
+ */
+export type Analytics = {
+  accounts: number;
+  registered: number;
+  activeToday: number;
+  activeWeek: number;
+  activeMonth: number;
+  newToday: number;
+  newWeek: number;
+  banned: number;
+  deleted: number;
+  subscribers: number;
+  /** Under-18 accounts. Drives the compliance position, not vanity. */
+  minors: number;
+  openReports: number;
+  avatarsPending: number;
+  mutualMatches: number;
+  messages: number;
+  growth: GrowthPoint[];
+};
+
+/** An upload waiting on a human verdict. */
+export type PendingAvatar = {
+  userId: string;
+  username: string | null;
+  /** ISO instant, or null for uploads that predate the column. */
+  uploadedAt: string | null;
+  /**
+   * P(sexual content) from the classifier, or null when it never answered.
+   *
+   * Null is the interesting case and does not mean "clean": it means the model was
+   * unreachable when the image arrived, so nothing has judged it. Those are re-screened
+   * automatically, so a null here should be transient.
+   */
+  score: number | null;
+};
+
+export type PendingAvatars = { pending: PendingAvatar[] };
+
+/** One report in the moderation queue. */
+export type Report = {
+  reportId: string;
+  /** POST, COMMENT, MESSAGE or PROFILE. */
+  contentType: string;
+  contentId: string;
+  authorId: string;
+  authorUsername: string | null;
+  reporterId: string;
+  reason: string;
+  status: string;
+  createdAt: string;
+  /** The reported text, or null once the content has been removed. */
+  content: string | null;
+  /** Open reports against this author across everything they have written. */
+  authorOpenReportCount: number | null;
+};
+
+export type Reports = { reports: Report[] };
+
+/** A banned account, as the console lists it. */
+export type BlockedUser = {
+  userId: string;
+  username: string | null;
+  email: string | null;
+  avatar: string | null;
+  createdDate: string | null;
+};
+
+export type BlockedUsers = { blockedUsers: BlockedUser[] };

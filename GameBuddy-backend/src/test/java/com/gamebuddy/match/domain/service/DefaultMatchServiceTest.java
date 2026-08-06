@@ -151,6 +151,19 @@ class DefaultMatchServiceTest {
         return g;
     }
 
+    /** Gives a gamer something for the cold-start path to rank from. */
+    private static void givenTasteFor(Gamer who, String gameName, String keywordName) {
+        Games game = new Games();
+        game.setGameId(UUID.randomUUID().toString());
+        game.setGameName(gameName);
+        who.getLikedgames().add(game);
+
+        Keywords keyword = new Keywords();
+        keyword.setId(UUID.randomUUID());
+        keyword.setKeywordName(keywordName);
+        who.getKeywords().add(keyword);
+    }
+
     /** Registers a mutual match with a new gamer; matches only count when reciprocated. */
     private Gamer reciprocated(String email, String username) {
         Gamer other = newGamer(email, username);
@@ -245,6 +258,60 @@ class DefaultMatchServiceTest {
             // Names, not ids: the model was trained on the catalogue's names.
             assertEquals(List.of("Valorant"), captor.getValue().games());
             assertEquals(List.of("Competitive"), captor.getValue().keywords());
+        }
+
+        @Test
+        @DisplayName("a profile edited since the last retrain is ranked live, not from the stale vector")
+        void testGetRecommendations_whenProfileChangedSinceTraining_UsesColdStart() {
+            givenTasteFor(gamer, "Valorant", "Competitive");
+            // Set by RecommenderStalenessListener when the gamer changed their games. The
+            // artefact still holds whatever they liked before that.
+            gamer.setRecommenderProfileChangedAt(NOW.minusSeconds(60));
+
+            when(predictClient.predictColdStart(any(ColdStartRequest.class)))
+                    .thenReturn(new PredictResponse(gamer.getUserId(), List.of(candidate.getUserId())));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(List.of(candidate));
+
+            RecommendationResponse response = matchService.getRecommendations(gamer);
+
+            assertEquals(1, response.getBody().getData().getRecommendedGamers().size());
+            ArgumentCaptor<ColdStartRequest> captor = ArgumentCaptor.forClass(ColdStartRequest.class);
+            verify(predictClient).predictColdStart(captor.capture());
+            assertEquals(List.of("Valorant"), captor.getValue().games());
+            verify(predictClient, never()).predict(any(PredictRequest.class));
+        }
+
+        @Test
+        @DisplayName("an unedited profile still goes to the trained model, which knows more than the profile does")
+        void testGetRecommendations_whenProfileUnchanged_UsesTheTrainedVector() {
+            givenTasteFor(gamer, "Valorant", "Competitive");
+            assertNull(gamer.getRecommenderProfileChangedAt(), "nothing has been edited");
+
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenReturn(new PredictResponse(gamer.getUserId(), List.of(candidate.getUserId())));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(List.of(candidate));
+
+            matchService.getRecommendations(gamer);
+
+            verify(predictClient, never()).predictColdStart(any());
+        }
+
+        @Test
+        @DisplayName("a stale gamer who has emptied their profile falls back rather than showing an empty deck")
+        void testGetRecommendations_whenStaleButProfileEmpty_FallsBackToTheTrainedVector() {
+            gamer.setRecommenderProfileChangedAt(NOW.minusSeconds(60));
+
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenReturn(new PredictResponse(gamer.getUserId(), List.of(candidate.getUserId())));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(List.of(candidate));
+
+            RecommendationResponse response = matchService.getRecommendations(gamer);
+
+            assertEquals(
+                    1,
+                    response.getBody().getData().getRecommendedGamers().size(),
+                    "a stale ranking beats no ranking at all");
+            verify(predictClient, never()).predictColdStart(any());
         }
 
         @Test

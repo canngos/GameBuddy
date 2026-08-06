@@ -68,6 +68,19 @@ public class ChatMessageService {
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
+     * How many messages have ever been sent, for the console's dashboard.
+     *
+     * <p>Exposed here rather than letting the console read {@code chat_message}, which this
+     * module owns. A count and nothing else: the console has no business being able to
+     * reach message bodies, and this is the shape that makes that true by construction
+     * rather than by everyone remembering.
+     */
+    @Transactional(readOnly = true)
+    public long messageCount() {
+        return messageRepository.count();
+    }
+
+    /**
      * Whether somebody a gamer has matched with is online.
      *
      * <p>The match check is the point, not a formality. Presence tells you when a person is
@@ -117,8 +130,7 @@ public class ChatMessageService {
             return;
         }
 
-        messagingTemplate.convertAndSendToUser(
-                receiver.getEmail(), "/queue/typing", new TypingNotification(senderId));
+        messagingTemplate.convertAndSendToUser(receiver.getEmail(), "/queue/typing", new TypingNotification(senderId));
     }
 
     /**

@@ -48,6 +48,14 @@ WORKDIR /app
 COPY --from=build /src/GameBuddy-backend/build/libs/backend-*.jar app.jar
 RUN chown gamebuddy:gamebuddy app.jar
 
+# The ECS JSON log file lives here and Filebeat reads it from a shared volume.
+#
+# Created in the image, and owned by the runtime user, because Docker seeds a named
+# volume from whatever is already at the mount point — including its ownership. Without
+# this the volume is created root-owned, the non-root JVM cannot open the file, and Boot
+# falls back to console-only logging with one warning that is easy to miss.
+RUN mkdir -p /app/logs && chown gamebuddy:gamebuddy /app/logs
+
 USER gamebuddy
 EXPOSE 8080
 

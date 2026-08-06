@@ -35,8 +35,8 @@ export default function EditGames() {
     mutationFn: () => authApi.changeGames(current),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
-      // Changing games republishes a ProfileChangedEvent and re-clusters this gamer in
-      // the recommender, so the cached feed describes the old profile.
+      // The backend now ranks this gamer from their live profile until the model is
+      // retrained on it, so the cached feed describes the games they just replaced.
       void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       router.back();
     },

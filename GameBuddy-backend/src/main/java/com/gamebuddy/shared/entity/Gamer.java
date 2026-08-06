@@ -11,6 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -73,9 +74,50 @@ public class Gamer implements RevocableUser {
     @Enumerated(EnumType.STRING)
     private AvatarStatus avatarStatus;
 
+    /**
+     * What the classifier scored the current upload, or null if it never answered.
+     *
+     * <p>The distinction is the whole point, and PENDING alone cannot express it. An image
+     * held with a score of 0.4 is genuinely ambiguous and wants a person; an image held
+     * with no score at all was never looked at, because the classifier was down — and the
+     * queue used to conflate the two, so an outage looked exactly like a flood of
+     * borderline photographs. {@code AvatarReviewJob} re-screens the second kind and
+     * leaves the first.
+     *
+     * <p>Kept after the verdict so a moderator can see whether a held image landed at 0.21
+     * or 0.84, and so the thresholds can be retuned against real traffic instead of being
+     * guessed at a second time.
+     */
+    @Column(name = "avatar_score")
+    private Double avatarScore;
+
+    /**
+     * When the current upload arrived.
+     *
+     * <p>Separate from {@link #lastModifiedDate}, which {@code @UpdateTimestamp} moves on
+     * every write to the row — a gamer changing their username would otherwise reset how
+     * long their avatar had been waiting, and the queue would show a two-day-old upload as
+     * new. The auto-publish deadline needs a clock that only the upload winds.
+     */
+    @Column(name = "avatar_uploaded_at")
+    private Instant avatarUploadedAt;
+
     private String gender;
     private String pwd;
 
+    /**
+     * When the account was created.
+     *
+     * <p>Nothing set this. {@code register()} never touched it and there was no annotation
+     * behind it, so every row in the database had NULL here — which nobody noticed because
+     * nothing read it until the console's growth graph did, and a growth graph fed by a
+     * column that is always NULL is a flat line that looks like a product with no users.
+     *
+     * <p>{@code @CreationTimestamp} rather than a line in the registration service: gamers
+     * are created on more than one path, and "remember to stamp it" is the instruction that
+     * was already forgotten once.
+     */
+    @CreationTimestamp
     private Instant createdDate;
 
     @UpdateTimestamp
@@ -221,6 +263,25 @@ public class Gamer implements RevocableUser {
             inverseJoinColumns = @JoinColumn(name = "game_id"))
     private Set<Games> likedgames = new LinkedHashSet<>();
 
+    /**
+     * When the two collections above last changed, or null if the trained model is still a
+     * fair description of this gamer.
+     *
+     * <p>The recommender is trained offline and ranks a known gamer from features frozen
+     * into the artefact at training time, so editing games or keywords used to change
+     * nothing about who that gamer was shown until the next retrain — the feed kept
+     * answering the profile they no longer had. Non-null here means "the artefact's copy of
+     * this profile is out of date", and the feed ranks them from the live profile instead.
+     *
+     * <p>A timestamp rather than a boolean so it can be cleared safely: a retrain only
+     * supersedes the edits it actually saw, and one arriving while the export is running
+     * must survive it. Nothing clears it yet — there is no automated retrain to clear it on
+     * — which is why the column is written but never reset. See
+     * {@code RecommenderStalenessListener}.
+     */
+    @Column(name = "recommender_profile_changed_at")
+    private Instant recommenderProfileChangedAt;
+
     // --- Social ------------------------------------------------------------
 
     /** Written by the profile module; friendship follows a match. */
@@ -341,6 +402,12 @@ public class Gamer implements RevocableUser {
         return email;
     }
 
+    /** The account id, so the logs identify the user without recording their address. */
+    @Override
+    public String getLogIdentifier() {
+        return userId;
+    }
+
     @Override
     public boolean isAccountNonExpired() {
         return true;
@@ -398,9 +465,27 @@ public class Gamer implements RevocableUser {
         return approvedMatches.contains(other) && other.getApprovedMatches().contains(this);
     }
 
+    /**
+     * Whether this account is part of the population at all.
+     *
+     * <p>False for moderators. The moderator account exists to review reports and ban
+     * people, not to be swiped on: it has no age, no games and no keywords, so it cannot
+     * be ranked, and a staff account appearing in the deck is both a privacy problem for
+     * whoever holds it and an obvious target for anyone who works out what it is.
+     *
+     * <p>Checked as a property of the account rather than enforced at each screen, because
+     * "everywhere a gamer can be seen" is a list that grows. The three native queries that
+     * cannot call this repeat the rule in SQL; they are the only other way into the
+     * population.
+     */
+    public boolean isDiscoverable() {
+        return role != Role.ADMIN;
+    }
+
     /** Whether this gamer may be shown, matched with, or chat with {@code other}. */
     public boolean isPairableWith(Gamer other) {
-        return !hasBlockRelationshipWith(other)
+        return other.isDiscoverable()
+                && !hasBlockRelationshipWith(other)
                 && other.isAccountNonLocked()
                 && other.isEnabled()
                 && AgeBand.compatible(age, other.getAge());

@@ -1,6 +1,7 @@
 export { api, setTokenProvider, setSessionExpiredHandler } from './client';
 export { API_BASE_URL } from './config';
 export { ApiError, Code, type Status, type Envelope } from './envelope';
+export { adminApi } from './admin';
 export { authApi } from './auth';
 export { badgesApi } from './badges';
 export { catalogueApi, profileApi } from './catalogue';

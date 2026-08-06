@@ -21,4 +21,7 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, UU
 
     /** How many distinct gamers have reported this author's content. Feeds a ban decision. */
     long countByAuthorIdAndStatus(String authorId, ContentReport.Status status);
+
+    /** How much is waiting for a moderator. Read by the console's dashboard. */
+    long countByStatus(ContentReport.Status status);
 }

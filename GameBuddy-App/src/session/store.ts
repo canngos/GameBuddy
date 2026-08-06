@@ -21,7 +21,13 @@ export type SessionStatus =
   | 'signedOut'
   | 'needsUsername'
   | 'needsDetails'
-  | 'ready';
+  | 'ready'
+  /**
+   * The moderator. A separate status rather than a flag on 'ready' because it is a
+   * different app: the console has its own route group, and an admin must never land
+   * in the deck — the guards are what make that structural instead of a hidden tab.
+   */
+  | 'admin';
 
 type SessionState = {
   status: SessionStatus;
@@ -137,6 +143,10 @@ async function persist(token: string, userId: string) {
  * in on a second device, would both defeat a locally-tracked flag.
  */
 function stageOf(me: UserInfo): SessionStatus {
+  // Before the onboarding checks, deliberately. The moderator account has no age and
+  // no username step to complete, so asking those questions first would send it to a
+  // profile form it can never finish.
+  if (me.role === 'ADMIN') return 'admin';
   if (!me.username) return 'needsUsername';
   // `age` is the field `/auth/details` sets and nothing else does, which makes it the
   // reliable marker that the step completed. Games and keywords are set in the same

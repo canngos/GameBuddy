@@ -1,5 +1,6 @@
 package com.gamebuddy.common.security;
 
+import com.gamebuddy.common.observability.LogContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -62,6 +63,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     var authToken = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                    // From here on, every line this request writes says who it was for.
+                    // RequestLoggingFilter wraps this one, so it also clears it.
+                    if (user instanceof RevocableUser revocable) {
+                        LogContext.setUserId(revocable.getLogIdentifier());
+                    }
                 }
             }
         } catch (RuntimeException e) {

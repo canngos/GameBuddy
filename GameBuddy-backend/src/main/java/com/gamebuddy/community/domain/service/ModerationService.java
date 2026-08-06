@@ -39,4 +39,13 @@ public interface ModerationService {
 
     /** Judges the content acceptable and closes the report. */
     DefaultMessageResponse dismissReport(Gamer principal, String reportId);
+
+    /**
+     * How many reports are still waiting to be looked at.
+     *
+     * <p>Here rather than letting the console query {@code content_report} itself: reports
+     * belong to this module, and a repository is module-private. A plain {@code long} so
+     * the caller cannot accidentally acquire the reports themselves along with the count.
+     */
+    long openReportCount();
 }

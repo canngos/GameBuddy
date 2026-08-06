@@ -5,6 +5,7 @@ import com.gamebuddy.shared.storage.ObjectStorage;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
  * does not exist, so a production deployment cannot end up serving images out of the
  * application process.
  */
+@Slf4j
 @RestController
 @RequestMapping("/media")
 @RequiredArgsConstructor
@@ -57,6 +59,10 @@ public class MediaController {
                     .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePublic())
                     .body(bytes);
         } catch (ObjectNotFoundException e) {
+            // A missing avatar shows up in the app as a broken image and nowhere else, so
+            // without this the only symptom is a screenshot from a user. DEBUG because a
+            // 404 here is also the ordinary result of an old cached URL.
+            log.debug("No approved media at {}", uri);
             return ResponseEntity.notFound().build();
         }
     }

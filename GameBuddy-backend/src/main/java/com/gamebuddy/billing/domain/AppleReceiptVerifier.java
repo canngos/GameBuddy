@@ -105,6 +105,8 @@ public class AppleReceiptVerifier implements ReceiptVerifier {
         try {
             return json.readTree(new String(Base64.getUrlDecoder().decode(base64Url), StandardCharsets.UTF_8));
         } catch (Exception e) {
+            // The receipt itself is never logged: it is a bearer credential for a purchase.
+            log.warn("Apple receipt segment is not decodable JSON: {}", e.getMessage());
             throw new BusinessException(TransactionCode.PURCHASE_VERIFICATION_FAILED, e);
         }
     }
@@ -125,6 +127,7 @@ public class AppleReceiptVerifier implements ReceiptVerifier {
             }
             return chain;
         } catch (Exception e) {
+            log.warn("Apple receipt certificate chain could not be parsed: {}", e.getMessage());
             throw new BusinessException(TransactionCode.PURCHASE_VERIFICATION_FAILED, e);
         }
     }
@@ -165,6 +168,10 @@ public class AppleReceiptVerifier implements ReceiptVerifier {
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
+            // Distinct from "the signature did not verify" above: this is the check
+            // failing to run at all, which is a configuration or JCE problem rather than a
+            // forged receipt, and the two would otherwise be indistinguishable in the log.
+            log.warn("Apple receipt signature could not be checked: {}", e.getMessage());
             throw new BusinessException(TransactionCode.PURCHASE_VERIFICATION_FAILED, e);
         }
     }

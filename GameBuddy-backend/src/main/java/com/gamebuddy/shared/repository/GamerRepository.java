@@ -57,11 +57,17 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
      *
      * <p>{@code ORDER BY RANDOM()} scans the candidate set. Fine at launch scale, wants
      * revisiting past a few hundred thousand gamers.
+     *
+     * <p>The role predicate keeps the moderator out of the sample. {@code isPairableWith}
+     * would drop them afterwards, so this is not the only guard — but filtering in Java
+     * costs an exploration slot every time the moderator is drawn, which silently shortens
+     * the page. See {@link Gamer#isDiscoverable()}.
      */
     @Query(value = """
                     SELECT * FROM gamer g
                     WHERE g.deleted_at IS NULL
                       AND g.is_blocked = false
+                      AND g.role <> 'ADMIN'
                       AND (COALESCE(g.age, 0) < 18) = :minor
                       AND g.user_id <> ALL(CAST(:excluded AS varchar[]))
                     ORDER BY RANDOM()
@@ -85,6 +91,7 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                     WHERE m.matched_id = :userId
                       AND g.deleted_at IS NULL
                       AND g.is_blocked = false
+                      AND g.role <> 'ADMIN'
                     """, nativeQuery = true)
     List<Gamer> findPendingAdmirers(@Param("userId") String userId);
 

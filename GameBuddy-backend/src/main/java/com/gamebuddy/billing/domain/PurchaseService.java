@@ -113,6 +113,11 @@ public class PurchaseService {
             purchases.saveAndFlush(purchase);
         } catch (DataIntegrityViolationException e) {
             // Two concurrent redemptions of the same receipt: the loser reports the replay.
+            //
+            // Worth a WARN even though it is handled. One is a double-tap on a slow
+            // connection; a stream of them against one account is somebody replaying a
+            // receipt to see whether it grants twice, and the count is the only signal.
+            log.warn("Concurrent redemption of {} for {} rejected as a replay", verified.storeTransactionId(), userId);
             throw new BusinessException(TransactionCode.PURCHASE_ALREADY_PROCESSED, e);
         }
 

@@ -8,12 +8,13 @@ import com.gamebuddy.profile.interfaces.dto.AvatarUploadResponseBody;
 import com.gamebuddy.profile.interfaces.response.AvatarUploadResponse;
 import com.gamebuddy.shared.entity.AvatarStatus;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.moderation.ImageAssessment;
 import com.gamebuddy.shared.moderation.ImageModerationService;
-import com.gamebuddy.shared.moderation.ModerationVerdict;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.ImageNormaliser;
 import com.gamebuddy.shared.storage.ObjectStorage;
 import java.io.IOException;
+import java.time.Clock;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,7 @@ public class AvatarUploadService {
     private final ObjectStorage storage;
     private final ImageNormaliser normaliser;
     private final ImageModerationService moderation;
+    private final Clock clock;
 
     @Transactional
     public AvatarUploadResponse upload(Gamer principal, MultipartFile file) {
@@ -61,6 +63,10 @@ public class AvatarUploadService {
         try {
             uploaded = file.getBytes();
         } catch (IOException e) {
+            // The caller is told only that the file was unreadable. Which is true, but it
+            // is also what a full temp directory looks like from the outside, so the real
+            // cause has to be recorded somewhere.
+            log.warn("Could not read the uploaded avatar for {}", principal.getUserId(), e);
             throw new BusinessException(TransactionCode.INVALID_REQUEST, "The upload could not be read");
         }
         return store(principal, uploaded);
@@ -78,6 +84,11 @@ public class AvatarUploadService {
             // A 400 about the file, not a moderation verdict. Telling someone their
             // photograph was refused as sexual content when it was actually a corrupt
             // upload is a bug with a reputational cost.
+            //
+            // DEBUG, not WARN: a phone sending a format the server cannot decode is a
+            // client bug worth being able to find, but it is the user's problem and not
+            // the server's, and at WARN one broken client build would drown the log.
+            log.debug("Unreadable avatar upload from {}: {}", gamer.getUserId(), e.getMessage());
             throw new BusinessException(TransactionCode.INVALID_REQUEST, e.getMessage());
         }
 
@@ -88,12 +99,18 @@ public class AvatarUploadService {
 
         storage.put(ObjectStorage.Bucket.UPLOADS, key, image, ImageNormaliser.CONTENT_TYPE);
 
-        ModerationVerdict verdict = moderation.screen(image, "avatar." + ImageNormaliser.EXTENSION);
+        ImageAssessment assessment = moderation.screen(image, "avatar." + ImageNormaliser.EXTENSION);
 
         String previousKey = gamer.getAvatarKey();
         AvatarStatus previousStatus = gamer.getAvatarStatus();
 
-        switch (verdict) {
+        // Recorded whatever the verdict, including null when the classifier never
+        // answered — that null is what tells AvatarReviewJob this one is worth another
+        // try rather than a person's attention.
+        gamer.setAvatarScore(assessment.score());
+        gamer.setAvatarUploadedAt(clock.instant());
+
+        switch (assessment.verdict()) {
             case APPROVE -> {
                 storage.move(ObjectStorage.Bucket.UPLOADS, key, ObjectStorage.Bucket.MEDIA, key);
                 gamer.setAvatarKey(key);

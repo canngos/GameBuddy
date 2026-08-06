@@ -12,4 +12,5 @@ export const landingRoute: Record<Exclude<SessionStatus, 'loading'>, string> = {
   needsUsername: '/username',
   needsDetails: '/profile',
   ready: '/home',
+  admin: '/console',
 };

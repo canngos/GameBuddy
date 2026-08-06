@@ -178,6 +178,11 @@ public class GooglePlayReceiptVerifier implements ReceiptVerifier {
         try {
             return Instant.parse(value);
         } catch (Exception e) {
+            // Silently substituting a fallback is how a subscription ends up with an
+            // expiry nobody can explain. The substitution is still the right behaviour —
+            // refusing the purchase over a timestamp would be worse — but it should not
+            // also be invisible.
+            log.warn("Google Play sent an unparseable timestamp '{}'; using {}", value, fallback);
             return fallback;
         }
     }
