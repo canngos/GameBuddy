@@ -35,6 +35,20 @@ public class UserInfoResponseBody implements BaseModel {
     /** Own profile only. */
     private Integer coin;
 
+    /**
+     * {@code USER} or {@code ADMIN}. Own profile only.
+     *
+     * <p>The client routes on this: a moderator gets the console instead of the deck, and
+     * since the moderator account has no age, games or keywords, the onboarding check that
+     * every other account passes would otherwise strand it on the "finish your profile"
+     * screen forever.
+     *
+     * <p>Never sent for anyone else's profile. Which accounts are staff is not something a
+     * response to a stranger should answer, and the only account it would identify is one
+     * that is deliberately invisible.
+     */
+    private String role;
+
     private List<GamesDto> games;
     private List<KeywordsDto> keywords;
 

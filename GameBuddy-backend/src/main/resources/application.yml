@@ -93,6 +93,30 @@ gamebuddy:
     expiration: ${JWT_EXPIRATION:7d}
     issuer: gamebuddy
 
+  avatars:
+    # How long an image the classifier was genuinely unsure about waits for a person
+    # before it is published anyway. Not a safety threshold — anything the model was
+    # confident about was already rejected, and everything here stays reportable. It is a
+    # promise about how long somebody's photograph can be held without an answer, and it
+    # exists because a queue only one person can drain is a queue that will not be.
+    publish-after: ${AVATAR_PUBLISH_AFTER:P3D}
+    # Uploads that arrived while the classifier was unreachable have no score and were
+    # never judged at all. Retried often, because the wait is a user looking at their own
+    # greyed-out picture.
+    rescreen-cron: ${AVATAR_RESCREEN_CRON:0 */10 * * * *}
+    publish-cron: ${AVATAR_PUBLISH_CRON:0 20 * * * *}
+
+  moderator:
+    # The one staff account, created on first start if it does not already exist. There is
+    # no sign-up flow for it on purpose: an endpoint that mints an administrator is a
+    # permanent liability. Leave these empty and no account is created.
+    #
+    # Setting them again later does nothing — see ModeratorBootstrap. To change the
+    # password, log in as the moderator and use the ordinary change-password endpoint.
+    email: ${MODERATOR_EMAIL:}
+    password: ${MODERATOR_PASSWORD:}
+    username: ${MODERATOR_USERNAME:moderator}
+
   chat:
     # Message bodies are encrypted before they reach the database, so a leaked dump or a
     # stolen disk yields nothing readable. Not end-to-end: the server can still decrypt,
@@ -197,6 +221,52 @@ management:
 logging:
   level:
     com.gamebuddy: ${LOG_LEVEL:INFO}
+    # One line per HTTP request. Kept out of the com.gamebuddy tree deliberately so it can
+    # be silenced on its own — it is by far the loudest logger here, and turning it down
+    # should not mean going dark everywhere else. See RequestLoggingFilter.LOGGER_NAME.
+    gamebuddy.access: ${ACCESS_LOG_LEVEL:INFO}
+
+  # Two destinations with two audiences. The console keeps Spring's human-readable
+  # pattern, because `docker compose logs backend` is still the fastest way to see what a
+  # process is doing right now. The file is ECS JSON, which is what Filebeat ships to
+  # Elasticsearch — see docker-compose.yml and observability/filebeat/filebeat.yml.
+  #
+  # A file rather than a direct appender to Elasticsearch, on purpose: logs survive the
+  # search cluster being down, restarted or slow, and the application never blocks on it.
+  # A logging pipeline that can take the application down with it is worse than no
+  # logging pipeline.
+  file:
+    name: ${LOG_FILE:./logs/gamebuddy.json}
+
+  logback:
+    rollingpolicy:
+      # Bounded so a container cannot fill its volume. Filebeat follows renames, so
+      # rotation loses nothing that has not already been shipped.
+      max-file-size: ${LOG_MAX_FILE_SIZE:10MB}
+      max-history: ${LOG_MAX_HISTORY:7}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:200MB}
+
+  structured:
+    format:
+      # Elastic Common Schema: @timestamp, log.level, service.name, error.stack_trace and
+      # the rest under the names Elasticsearch and Kibana already expect. Built into Boot
+      # since 3.4, so no encoder dependency and no logback-spring.xml to maintain.
+      file: ecs
+    ecs:
+      service:
+        name: ${spring.application.name}
+        version: ${SERVICE_VERSION:1.0.0}
+        environment: ${ENVIRONMENT:local}
+        # Which instance wrote the line. One container today, so it is the container id and
+        # nobody looks at it; the moment there are two behind a load balancer it is the
+        # difference between "the API is throwing 500s" and "one replica is".
+        node-name: ${HOSTNAME:${COMPUTERNAME:local}}
+    json:
+      stacktrace:
+        # Elasticsearch rejects a document whose field exceeds the analysed-string limit,
+        # and a deep reflective stack trace can reach it. Truncating loses the tail of a
+        # trace; not truncating loses the entire log entry.
+        max-length: 8192
 
 server:
   port: ${SERVER_PORT:8080}

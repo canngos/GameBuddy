@@ -1,6 +1,5 @@
 package com.gamebuddy.auth.domain.service;
 
-import com.gamebuddy.auth.domain.event.ProfileChangedEvent;
 import com.gamebuddy.auth.infrastructure.entity.*;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.dto.*;
@@ -16,6 +15,7 @@ import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
+import com.gamebuddy.shared.event.ProfileChangedEvent;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
 import java.nio.charset.StandardCharsets;
@@ -126,6 +126,11 @@ public class DefaultAuthService implements AuthService {
 
         rateLimiters.login().reset(throttleKey);
         String token = issueSession(gamer);
+
+        // The counterpart to the failed-attempt warning above. Without a record of the
+        // successes, a run of failures followed by silence is indistinguishable from a run
+        // of failures followed by someone getting in.
+        log.info("Login for {}", gamer.getUserId());
 
         LoginResponse response = new LoginResponse();
         LoginResponseBody body = new LoginResponseBody();
@@ -244,6 +249,8 @@ public class DefaultAuthService implements AuthService {
         // Proving control of the mailbox invalidates any previously issued token.
         gamer.revokeIssuedTokens();
         gamerRepository.save(gamer);
+
+        log.info("Account {} verified; previously issued tokens revoked", gamer.getUserId());
 
         String token = issueSession(gamer);
 
@@ -371,6 +378,11 @@ public class DefaultAuthService implements AuthService {
         gamer.revokeIssuedTokens();
         gamerRepository.save(gamer);
         sessionRepository.deleteAllByEmail(gamer.getEmail());
+
+        // A password change is the action a user takes when they believe they have been
+        // compromised, and the action an attacker takes once they are in. Either way it is
+        // the first thing anyone looks for afterwards.
+        log.info("Password changed for {}; all sessions invalidated", gamer.getUserId());
 
         return DefaultMessageResponse.of("Password changed successfully. Please sign in again.");
     }
@@ -667,23 +679,16 @@ public class DefaultAuthService implements AuthService {
     /**
      * Announces that this gamer's games or keywords changed.
      *
-     * <p><strong>Nothing listens to this yet, and the recommender is therefore stale until
-     * the next retrain.</strong> The Javadoc here used to point at a
-     * {@code RecommenderRefreshListener} that does not exist in this codebase — it was
-     * planned and never written — which is also why this line does not compile in an IDE
-     * that resolves {@code @link} targets.
+     * <p>Consumed by {@code RecommenderStalenessListener} in the match module, which marks
+     * the gamer so the feed ranks them from their live profile until the model is retrained
+     * on it. Nothing here re-clusters anything: the recommender is trained offline, and the
+     * name this method still carries is the last trace of a design where every profile edit
+     * refitted the whole model.
      *
-     * <p>Why it matters: {@code /predict} ranks from features baked into the pickled
-     * artefact at training time, and takes only a user id. {@code DefaultMatchService}
-     * falls back to {@code /predict/cold-start} — the path that reads live games and
-     * keywords — only when {@code /predict} returns an <em>empty</em> list. A gamer the
-     * model already knows returns a non-empty ranking, so editing their profile changes
-     * nothing about who they are shown until the artefact is rebuilt.
-     *
-     * <p>The event is left in place because it is the right signal and the publishers are
-     * correct; what is missing is a consumer. The cheap fix is to mark the gamer so the
-     * feed treats them as cold-start until the next training run, which reuses machinery
-     * that already exists rather than retraining per edit.
+     * <p>The Javadoc used to point at a {@code RecommenderRefreshListener} that was never
+     * written, and for a while there was no consumer at all — so {@code /predict}, which
+     * ranks a known gamer from features pickled at training time, went on answering with
+     * the profile they had abandoned.
      */
     private void refreshRecommenderClusters(Gamer gamer) {
         events.publishEvent(new ProfileChangedEvent(gamer.getUserId()));

@@ -124,8 +124,10 @@ class NotificationOutboxTest {
         @Test
         @DisplayName("a gamer with no device is not queued")
         void skipsMissingToken() {
-            dispatcher.onNotificationRequested(new NotificationRequestedEvent("gamer-1", null, "T", "B", NotificationKind.MATCH));
-            dispatcher.onNotificationRequested(new NotificationRequestedEvent("gamer-1", "  ", "T", "B", NotificationKind.MATCH));
+            dispatcher.onNotificationRequested(
+                    new NotificationRequestedEvent("gamer-1", null, "T", "B", NotificationKind.MATCH));
+            dispatcher.onNotificationRequested(
+                    new NotificationRequestedEvent("gamer-1", "  ", "T", "B", NotificationKind.MATCH));
 
             verifyNoInteractions(repository);
         }
@@ -133,8 +135,8 @@ class NotificationOutboxTest {
         @Test
         @DisplayName("over-long text is truncated rather than failing the transaction")
         void truncatesOverlongText() {
-            dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("gamer-1", "dev-1", "x".repeat(500), "y".repeat(5000), NotificationKind.MATCH));
+            dispatcher.onNotificationRequested(new NotificationRequestedEvent(
+                    "gamer-1", "dev-1", "x".repeat(500), "y".repeat(5000), NotificationKind.MATCH));
 
             ArgumentCaptor<NotificationOutbox> captor = ArgumentCaptor.forClass(NotificationOutbox.class);
             verify(repository).save(captor.capture());

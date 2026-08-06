@@ -1,6 +1,17 @@
 import { View, type ColorValue } from 'react-native';
 
-export type TabIconName = 'deck' | 'community' | 'messages' | 'market' | 'profile';
+export type TabIconName =
+  | 'deck'
+  | 'community'
+  | 'messages'
+  | 'market'
+  | 'profile'
+  // The moderator console. Still rectangles and circles, so still no icon library —
+  // but this is the set the header comment means: anything past these wants SVG.
+  | 'analytics'
+  | 'reports'
+  | 'avatars'
+  | 'settings';
 
 type TabIconProps = {
   name: TabIconName;
@@ -48,6 +59,118 @@ export function TabIcon({ name, color, size = 24 }: TabIconProps) {
               transform: [{ rotate: '8deg' }, { translateX: size * 0.1 }],
             }}
           />
+        </View>
+      );
+
+    case 'analytics':
+      // Three bars of increasing height: the growth graph, in miniature.
+      return (
+        <View
+          style={{ width: size, height: size }}
+          className="flex-row items-end justify-center"
+        >
+          {[0.4, 0.68, 1].map((scale) => (
+            <View
+              key={scale}
+              className="rounded-[1.5px]"
+              style={{
+                width: size * 0.16,
+                height: size * 0.72 * scale,
+                backgroundColor: color,
+                marginHorizontal: size * 0.045,
+              }}
+            />
+          ))}
+        </View>
+      );
+
+    case 'reports':
+      // A pennant on a pole. A flag rather than the usual warning triangle because a
+      // triangle here would have to be faked with border tricks.
+      return (
+        <View style={{ width: size, height: size }} className="items-center justify-center">
+          <View
+            className="absolute rounded-full"
+            style={{
+              width: size * 0.1,
+              height: size * 0.8,
+              backgroundColor: color,
+              left: size * 0.24,
+            }}
+          />
+          <View
+            className="absolute rounded-[2px] border-2"
+            style={{
+              width: size * 0.44,
+              height: size * 0.36,
+              borderColor: color,
+              left: size * 0.33,
+              top: size * 0.12,
+            }}
+          />
+        </View>
+      );
+
+    case 'avatars':
+      // A picture frame with a head in it: the avatar queue.
+      return (
+        <View style={{ width: size, height: size }} className="items-center justify-center">
+          <View
+            className="absolute rounded-[4px] border-2"
+            style={{ width: size * 0.82, height: size * 0.82, borderColor: color }}
+          />
+          <View
+            className="absolute rounded-full border-2"
+            style={{
+              width: size * 0.26,
+              height: size * 0.26,
+              borderColor: color,
+              top: size * 0.24,
+            }}
+          />
+          <View
+            className="absolute rounded-t-full border-2"
+            style={{
+              width: size * 0.46,
+              height: size * 0.2,
+              borderColor: color,
+              bottom: size * 0.13,
+            }}
+          />
+        </View>
+      );
+
+    case 'settings':
+      // Sliders: three tracks with a knob on each. A gear needs teeth, which is where
+      // borders and radii stop being enough and an SVG library would start earning its
+      // place.
+      return (
+        <View style={{ width: size, height: size }} className="justify-center">
+          {[0.28, 0.6, 0.42].map((knob, row) => (
+            <View
+              key={knob}
+              className="w-full flex-row items-center"
+              style={{ marginVertical: size * 0.06 }}
+            >
+              <View
+                className="flex-1 rounded-full"
+                style={{ height: 2, backgroundColor: color }}
+              />
+              <View
+                className="absolute rounded-full border-2"
+                style={{
+                  width: size * 0.22,
+                  height: size * 0.22,
+                  borderColor: color,
+                  backgroundColor: 'transparent',
+                  left: size * knob,
+                }}
+                // The knob sits on the track rather than beside it, which is what makes
+                // three identical rows read as one control.
+                key={`knob-${row}`}
+              />
+            </View>
+          ))}
         </View>
       );
 

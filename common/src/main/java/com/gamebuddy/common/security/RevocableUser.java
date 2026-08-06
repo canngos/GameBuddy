@@ -22,4 +22,16 @@ public interface RevocableUser extends UserDetails {
      * "nothing has been revoked", so all otherwise-valid tokens are accepted.
      */
     Instant getTokensValidFrom();
+
+    /**
+     * How this account is named in the logs.
+     *
+     * <p>Separate from {@link #getUsername()} because that is the e-mail address, and an
+     * address in a log line is an address in every backup, every shipped index and every
+     * screenshot pasted into a chat. Implementations return their own primary key; the
+     * default is here only so the interface stays implementable without one.
+     */
+    default String getLogIdentifier() {
+        return null;
+    }
 }

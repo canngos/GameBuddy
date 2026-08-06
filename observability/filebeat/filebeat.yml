@@ -1,0 +1,102 @@
+# Ships the backend's ECS log file into Elasticsearch.
+#
+# The backend writes one JSON object per line to a file on a shared volume (see
+# logging.structured in application.yml); Filebeat tails that file and indexes each line.
+# Nothing here parses text with regular expressions, because nothing here has to: the
+# application already emits the fields, so a stack trace arrives as one document with an
+# error.stack_trace field rather than forty unrelated lines that have to be stitched back
+# together by a multiline pattern that is wrong in some cases.
+#
+# Filebeat rather than an appender that writes to Elasticsearch directly, on purpose:
+#   - logs survive Elasticsearch being down. Filebeat retries from its registry, and the
+#     application is never aware there was a problem;
+#   - the application never blocks on the search cluster. A logging call that can add
+#     latency to a request is a logging call that will, eventually, take the site down;
+#   - restarting the log pipeline does not restart the application.
+
+filebeat.inputs:
+  - type: filestream
+    id: gamebuddy-backend
+    enabled: true
+    paths:
+      - /var/log/gamebuddy/gamebuddy.json
+    parsers:
+      - ndjson:
+          # Merge the decoded object into the root of the event rather than nesting it
+          # under a field, so log.level stays log.level and Kibana's ECS-aware UI
+          # recognises it.
+          target: ""
+          # Required for the application's own @timestamp to be used as the event time.
+          # Without it the timestamp is when Filebeat happened to read the line, which is
+          # close enough to be believed and wrong exactly when it matters — during the
+          # incident that made the queue back up.
+          overwrite_keys: true
+          add_error_key: true
+
+    # Rotation is handled by Logback (logging.logback.rollingpolicy). filestream follows
+    # the file by identity, so a rename mid-read finishes the old file before moving on.
+    prospector.scanner.check_interval: 2s
+
+processors:
+  # Shipper and host metadata, dropped whole rather than field by field.
+  #
+  # One application in one container, already identified by service.name, so none of it
+  # distinguishes anything — and dropping the last child of an object leaves an empty
+  # "host": {} behind in every document, which is worse than what it replaced.
+  #
+  # log.file.path stays, because "which file did this come from" is a real question once
+  # more than one thing is being shipped. Its device id, inode and fingerprint do not:
+  # those are how Filebeat tracks the file, not anything anyone would search for.
+  - drop_fields:
+      fields:
+        - agent
+        - input
+        - host
+        - log.offset
+        - log.file.device_id
+        - log.file.inode
+        - log.file.fingerprint
+      ignore_missing: true
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  # A data stream, not an index. Filebeat 9 creates one either way — naming a plain index
+  # here does not opt out — so this names it deliberately instead of ending up with one by
+  # accident. Elasticsearch manages the backing indices behind it.
+  index: "gamebuddy-logs"
+
+# The pattern has no dash before the star, and that is not a typo.
+#
+# Filebeat writes the template under setup.template.name and then creates a data stream of
+# that same name. With the obvious pattern — "gamebuddy-logs-*" — the name "gamebuddy-logs"
+# does not match its own template, and Elasticsearch answers:
+#
+#   400 no matching index template found for data stream [gamebuddy-logs]
+#
+# The trap is what happens next: Filebeat reports that as a *failed connection*, backs off,
+# reconnects, fails identically, and ships nothing — while the only visible symptom is
+# "Failed to connect to elasticsearch:9200" against a cluster that is green and answering.
+# Half an hour can go into checking the network before anyone reads the rest of the line.
+setup.template.name: "gamebuddy-logs"
+setup.template.pattern: "gamebuddy-logs*"
+# So a changed field mapping takes effect on the next start rather than being silently
+# ignored because a template of that name already exists.
+setup.template.overwrite: true
+
+# Index lifecycle management is off, so the data stream has one backing index that grows
+# rather than rolling over. Fine for a laptop; a deployment turns ILM back on and gets
+# rollover, a warm tier and a retention policy with it.
+setup.ilm.enabled: false
+
+# Filebeat's own logs go to the container's stdout, where `docker compose logs filebeat`
+# finds them. Not into Elasticsearch: a shipper that indexes its own failures needs the
+# thing it is failing to talk to.
+logging.to_files: false
+
+# No dashboards or index-pattern setup pushed into Kibana from here — the data view is
+# created once by the kibana-setup service in docker-compose.yml, which is visible and
+# does not silently depend on a Beats version matching a Kibana version.
+setup.dashboards.enabled: false
+setup.kibana.host: ""
+
+monitoring.enabled: false

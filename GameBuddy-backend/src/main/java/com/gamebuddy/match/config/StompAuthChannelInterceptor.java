@@ -75,6 +75,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         if (!jwtService.isTokenValid(jwt, user) || !user.isAccountNonLocked() || !user.isEnabled()) {
+            // WARN rather than DEBUG, unlike the parse failure above: the token was
+            // readable and the account exists, so this is a valid-looking credential being
+            // refused — an expired session, or a banned account still trying to connect.
+            log.warn("Refusing a chat session for a token that no longer authorises one");
             throw new IllegalArgumentException("Invalid credentials");
         }
 

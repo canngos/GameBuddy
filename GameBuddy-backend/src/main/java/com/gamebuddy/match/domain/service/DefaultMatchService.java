@@ -357,8 +357,22 @@ public class DefaultMatchService implements MatchService {
     // Helpers
     // =======================================================================
 
+    /**
+     * The authenticated gamer, refused if they are not a participant.
+     *
+     * <p>Every entry point in this service goes through here, which is why the moderator
+     * check sits here rather than at each of them. Keeping the moderator out of other
+     * people's decks is only half the rule — they must not be able to swipe either, and
+     * the account has no age, so {@code AgeBand} would place it in the minor band and
+     * quietly build it a deck of children. The client never shows these screens to a
+     * moderator; this is what makes that true rather than merely usual.
+     */
     private Gamer reload(Gamer principal) {
-        return requireGamer(principal.getUserId());
+        Gamer gamer = requireGamer(principal.getUserId());
+        if (!gamer.isDiscoverable()) {
+            throw new BusinessException(TransactionCode.FORBIDDEN, "the moderator account cannot match");
+        }
+        return gamer;
     }
 
     /**
@@ -387,6 +401,11 @@ public class DefaultMatchService implements MatchService {
     private void requirePairable(Gamer gamer, Gamer target) {
         if (gamer.getUserId().equals(target.getUserId())) {
             throw new BusinessException(TransactionCode.INVALID_REQUEST, "you cannot match with yourself");
+        }
+        if (!target.isDiscoverable()) {
+            // Same code as a blocked account, and for the same reason: an accept aimed at
+            // an id the deck never served should not tell the caller what that id is.
+            throw new BusinessException(TransactionCode.USER_BLOCKED);
         }
         if (gamer.hasBlockRelationshipWith(target)) {
             // Deliberately the same code either way: telling the caller "they blocked
@@ -450,10 +469,25 @@ public class DefaultMatchService implements MatchService {
      * <p>An empty result is therefore treated as "the model has not met this gamer",
      * not as "there is nobody". A gamer who genuinely has no candidates left produces an
      * empty cold-start result too, so nothing is lost by trying.
+     *
+     * <p>The same fallback is taken <em>first</em> for a gamer whose profile has changed
+     * since the artefact was trained. Their vector exists, so {@code /predict} answers
+     * confidently — with the games and keywords they have since replaced. An out-of-date
+     * answer is worse than the cold-start one, which is computed from what they like now.
      */
     private List<String> predict(Gamer gamer, Set<String> exclude) {
         String userId = gamer.getUserId();
         try {
+            if (gamer.getRecommenderProfileChangedAt() != null) {
+                List<String> fresh = coldStart(gamer, exclude);
+                if (!fresh.isEmpty()) {
+                    return fresh;
+                }
+                // Falls through on purpose. Empty here means the profile has nothing left
+                // to rank from, and a stale ranking still beats an empty deck.
+                log.debug("Stale profile for {} has nothing to rank from; using the trained vector", userId);
+            }
+
             List<String> ranked = predictClient
                     .predict(new PredictRequest(userId, exclude, RECOMMENDATION_FETCH_SIZE))
                     .similarUsers();
@@ -461,24 +495,39 @@ public class DefaultMatchService implements MatchService {
                 return ranked;
             }
 
-            // Names, not ids: the model was trained on the catalogue's names and has
-            // never seen our UUIDs.
-            List<String> games =
-                    gamer.getLikedgames().stream().map(Games::getGameName).toList();
-            List<String> keywords =
-                    gamer.getKeywords().stream().map(Keywords::getKeywordName).toList();
-            if (games.isEmpty() && keywords.isEmpty()) {
-                return List.of();
-            }
-
             log.debug("Model has no vector for {}; ranking from the profile instead", userId);
-            return predictClient
-                    .predictColdStart(new ColdStartRequest(userId, games, keywords, exclude, RECOMMENDATION_FETCH_SIZE))
-                    .similarUsers();
+            return coldStart(gamer, exclude);
         } catch (RuntimeException e) {
             log.warn("Recommendation model unavailable for {}", userId, e);
             throw new BusinessException(TransactionCode.RECOMMENDER_SERVICE_ERROR, e);
         }
+    }
+
+    /**
+     * Ranks from the profile as it stands right now, rather than from the trained vector.
+     *
+     * <p>Serves two different callers — a gamer the artefact has never seen, and one whose
+     * profile has changed since it was built — because the answer to both is the same: work
+     * out the query vector live. Nothing else is given up by doing so; the model still
+     * clusters and scores the candidates exactly as {@code /predict} would, including the
+     * desirability prior.
+     *
+     * @return the ranking, or empty when there is nothing to rank from
+     */
+    private List<String> coldStart(Gamer gamer, Set<String> exclude) {
+        // Names, not ids: the model was trained on the catalogue's names and has never
+        // seen our UUIDs.
+        List<String> games =
+                gamer.getLikedgames().stream().map(Games::getGameName).toList();
+        List<String> keywords =
+                gamer.getKeywords().stream().map(Keywords::getKeywordName).toList();
+        if (games.isEmpty() && keywords.isEmpty()) {
+            return List.of();
+        }
+        return predictClient
+                .predictColdStart(
+                        new ColdStartRequest(gamer.getUserId(), games, keywords, exclude, RECOMMENDATION_FETCH_SIZE))
+                .similarUsers();
     }
 
     /**

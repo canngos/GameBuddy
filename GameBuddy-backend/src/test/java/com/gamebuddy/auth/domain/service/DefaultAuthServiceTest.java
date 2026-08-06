@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.gamebuddy.auth.domain.event.ProfileChangedEvent;
 import com.gamebuddy.auth.infrastructure.entity.*;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.request.*;
@@ -15,6 +14,7 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.shared.entity.*;
+import com.gamebuddy.shared.event.ProfileChangedEvent;
 import com.gamebuddy.shared.repository.*;
 import java.time.Duration;
 import java.time.Instant;

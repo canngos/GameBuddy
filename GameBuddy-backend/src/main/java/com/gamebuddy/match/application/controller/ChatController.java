@@ -129,7 +129,8 @@ public class ChatController {
      */
     @GetMapping("/presence/{userId}")
     @ResponseBody
-    public ResponseEntity<PresenceResponse> presence(@AuthenticationPrincipal Gamer principal, @PathVariable String userId) {
+    public ResponseEntity<PresenceResponse> presence(
+            @AuthenticationPrincipal Gamer principal, @PathVariable String userId) {
         return ResponseEntity.ok(chatMessageService.presenceOf(principal, userId));
     }
 

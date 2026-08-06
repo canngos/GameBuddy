@@ -1,6 +1,7 @@
 package com.gamebuddy.common.config;
 
 import com.gamebuddy.common.exception.GlobalExceptionHandler;
+import com.gamebuddy.common.observability.RequestLoggingFilter;
 import com.gamebuddy.common.security.JwtAuthenticationFilter;
 import com.gamebuddy.common.security.JwtProperties;
 import com.gamebuddy.common.security.JwtService;
@@ -8,6 +9,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -41,6 +43,23 @@ public class CommonAutoConfiguration {
     @ConditionalOnMissingBean
     public GlobalExceptionHandler globalExceptionHandler() {
         return new GlobalExceptionHandler();
+    }
+
+    /**
+     * The access log and the per-request MDC context.
+     *
+     * <p>Registered explicitly rather than as a plain {@code @Bean} of a {@code Filter}
+     * type so the order can be set: it has to wrap the Spring Security chain, or a request
+     * rejected with 401 would never be logged at all — and an endpoint quietly returning
+     * 401 to everybody is precisely the sort of thing the logs are for.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public FilterRegistrationBean<RequestLoggingFilter> requestLoggingFilter() {
+        FilterRegistrationBean<RequestLoggingFilter> registration =
+                new FilterRegistrationBean<>(new RequestLoggingFilter());
+        registration.setOrder(RequestLoggingFilter.ORDER);
+        return registration;
     }
 
     /** Each service supplies its own {@link UserDetailsService} over its own Gamer entity. */

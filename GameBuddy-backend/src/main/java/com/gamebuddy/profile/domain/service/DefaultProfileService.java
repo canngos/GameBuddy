@@ -83,6 +83,12 @@ public class DefaultProfileService implements ProfileService {
             // account exists would tell the caller they have been blocked.
             throw new BusinessException(TransactionCode.USER_NOT_FOUND);
         }
+        if (!own && !gamer.isDiscoverable()) {
+            // The moderator, fetched by id. Nothing links to this account, but ids appear
+            // in deep links and in anything anybody has previously seen, so the only
+            // reliable answer is the one given for an account that is not there.
+            throw new BusinessException(TransactionCode.USER_NOT_FOUND);
+        }
 
         UserInfoResponseBody body = new UserInfoResponseBody();
         body.setUserId(gamer.getUserId());
@@ -109,6 +115,7 @@ public class DefaultProfileService implements ProfileService {
             body.setEmail(gamer.getEmail());
             body.setCoin(gamer.getCoin());
             body.setFriends(toFriendDtos(gamer.getFriends()));
+            body.setRole(gamer.getRole().name());
         }
 
         return respond(new UserInfoResponse(), body);
