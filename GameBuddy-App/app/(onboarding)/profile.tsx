@@ -2,11 +2,11 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { CountryPicker } from '../../src/onboarding/CountryPicker';
-import { AvatarPicker } from '../../src/pickers/AvatarPicker';
 import { useDraft } from '../../src/onboarding/draft';
 import { StepHeader } from '../../src/onboarding/StepHeader';
-import { Button, cn, Screen, Text, TextField } from '../../src/ui';
-import { ageError, MIN_AGE } from '../../src/validation';
+import { BirthDateField } from '../../src/onboarding/BirthDateField';
+import { Button, cn, Screen, Text } from '../../src/ui';
+import { birthDateError, MIN_AGE } from '../../src/validation';
 
 /**
  * The backend stores gender as a single character and does not constrain it further.
@@ -27,37 +27,40 @@ export default function Profile() {
   const [touched, setTouched] = useState(false);
 
   const problems = {
-    age: ageError(draft.age),
+    birthDate: birthDateError(draft.birthDay, draft.birthMonth, draft.birthYear),
     country: draft.country ? null : 'Choose your country',
-    avatar: draft.avatarId ? null : 'Pick an avatar',
   };
-  const valid = !problems.age && !problems.country && !problems.avatar;
+  const valid = !problems.birthDate && !problems.country;
 
   function next() {
     setTouched(true);
     if (!valid) return;
-    router.push('/games');
+    router.push('/avatar');
   }
 
   return (
     <Screen scroll>
       <StepHeader
         step={2}
-        total={4}
+        total={5}
         title="About you"
-        subtitle="Age decides who you are shown. Under-18 and over-18 are never matched with each other."
+        subtitle="GameBuddy is for adults. We use your date of birth to confirm you are 18 or over — it is never shown to anyone."
       />
 
       <View className="gap-6">
-        <TextField
-          label="Age"
-          value={draft.age}
-          onChangeText={(t) => draft.set({ age: t.replace(/\D/g, '').slice(0, 2) })}
-          error={touched ? problems.age : null}
-          hint={`You must be at least ${MIN_AGE}.`}
-          keyboardType="number-pad"
-          maxLength={2}
-          placeholder="21"
+        <BirthDateField
+          day={draft.birthDay}
+          month={draft.birthMonth}
+          year={draft.birthYear}
+          onChange={(parts) =>
+            draft.set({
+              ...(parts.day !== undefined && { birthDay: parts.day }),
+              ...(parts.month !== undefined && { birthMonth: parts.month }),
+              ...(parts.year !== undefined && { birthYear: parts.year }),
+            })
+          }
+          error={touched ? problems.birthDate : null}
+          hint={`You must be ${MIN_AGE} or over.`}
         />
 
         <CountryPicker
@@ -96,22 +99,6 @@ export default function Profile() {
           </View>
         </View>
 
-        <View>
-          <Text variant="label" className="mb-3 text-muted">
-            Avatar
-          </Text>
-
-          <AvatarPicker
-            selected={draft.avatarId}
-            onSelect={(avatarId) => draft.set({ avatarId })}
-          />
-
-          {touched && problems.avatar && (
-            <Text variant="caption" className="mt-3 text-danger">
-              {problems.avatar}
-            </Text>
-          )}
-        </View>
       </View>
 
       {/* No Back: the username step arrives here with `replace`, so this is the bottom

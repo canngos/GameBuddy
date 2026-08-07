@@ -3,8 +3,17 @@
 !.env.example
 
 secret/
-documentation/
 tools/
+
+# Contents, not the directory itself. Git cannot re-include a file whose *parent* is
+# excluded, so a plain `documentation/` would make the negation below impossible.
+documentation/*
+
+# The legal documents are tracked, deliberately. They are the terms and the privacy policy
+# the store listings point at, and the ones registration records acceptance of — losing
+# them on a fresh clone is not an option. Nothing in them is secret; the operator details
+# are placeholders until a lawyer has read them.
+!documentation/legal/
 
 *-service-account.json
 firebase-*.json

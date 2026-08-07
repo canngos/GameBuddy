@@ -9,6 +9,7 @@ export { FramedAvatar, FrameOverlay } from './FramedAvatar';
 export { ProfileBanner } from './ProfileBanner';
 export { Card } from './Card';
 export { SelectRow } from './SelectRow';
+export { Checkbox } from './Checkbox';
 export { LinkRow } from './LinkRow';
 export { RowGroup } from './RowGroup';
 export { ErrorNotice, messageOf } from './ErrorNotice';

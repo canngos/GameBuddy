@@ -28,11 +28,37 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
 
     Optional<Gamer> findByGamerUsername(String username);
 
+    /**
+     * Used to decide whether a username is taken.
+     *
+     * <p>Case-insensitively, deliberately. The unique constraint on the column is not:
+     * to the database {@code Sarah} and {@code sarah} are two different names, which is
+     * exactly the pair someone would pick to be mistaken for somebody else.
+     */
+    Optional<Gamer> findByGamerUsernameIgnoreCase(String username);
+
     /** Used by push delivery to resolve a device token back to an account. */
     Optional<Gamer> findByFcmToken(String fcmToken);
 
     /** Admin: the banned list. */
     List<Gamer> findAllByIsBlockedTrue();
+
+    /**
+     * Recomputes the cached age for everyone whose birthday has passed since it was last
+     * written. Native because {@code AGE()} has no JPQL equivalent.
+     *
+     * <p>The predicate restricts it to rows that are actually wrong, so on an ordinary
+     * night this writes roughly one row in three hundred and sixty-five rather than
+     * rewriting the whole table and churning a page of the index for nothing.
+     */
+    @Modifying
+    @Query(value = """
+                    UPDATE gamer
+                    SET age = EXTRACT(YEAR FROM AGE(birth_date))
+                    WHERE birth_date IS NOT NULL
+                      AND (age IS NULL OR age <> EXTRACT(YEAR FROM AGE(birth_date)))
+                    """, nativeQuery = true)
+    int refreshAgesFromBirthDate();
 
     /**
      * Detaches a device token from every account except the one claiming it.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { type Ref, useState } from 'react';
 import { Pressable, TextInput, type TextInputProps, View } from 'react-native';
 import { useThemeColors } from '../theme';
 import { cn } from './cn';
@@ -12,6 +12,14 @@ type TextFieldProps = TextInputProps & {
   /** Adds a show/hide toggle and starts obscured. */
   secure?: boolean;
   className?: string;
+  /**
+   * Forwarded to the inner TextInput, so a caller can move focus between fields — the
+   * date-of-birth row advances day to month to year on its own.
+   *
+   * A plain prop rather than `forwardRef`: React 19 passes `ref` to function components
+   * like any other prop, and `forwardRef` is on its way out.
+   */
+  ref?: Ref<TextInput>;
 };
 
 export function TextField({
@@ -22,6 +30,7 @@ export function TextField({
   className,
   onFocus,
   onBlur,
+  ref,
   ...rest
 }: TextFieldProps) {
   const colors = useThemeColors();
@@ -45,6 +54,7 @@ export function TextField({
         )}
       >
         <TextInput
+          ref={ref}
           className="flex-1 py-3 font-sans text-[15px] leading-[22px] text-content"
           // Not reachable by a class — this is a colour value, not a style.
           placeholderTextColor={colors.muted}

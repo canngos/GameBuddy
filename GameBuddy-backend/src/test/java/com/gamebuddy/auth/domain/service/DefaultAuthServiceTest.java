@@ -15,9 +15,13 @@ import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.ProfileChangedEvent;
+import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -89,6 +93,18 @@ class DefaultAuthServiceTest {
             new RateLimiter(10, Duration.ofMinutes(15)),
             new RateLimiter(3, Duration.ofMinutes(15)),
             new RateLimiter(10, Duration.ofMinutes(15)));
+
+    /**
+     * The real filter, not a mock. It is a pure function over a word list, so stubbing it
+     * would only mean asserting that a stub was called — and the thing worth knowing is
+     * whether a username with a slur in it actually gets through.
+     */
+    @Spy
+    private TextModerationService textModeration = new TextModerationService();
+
+    /** Fixed, so an age derived from a date of birth is the same number every run. */
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-08-07T12:00:00Z"), ZoneOffset.UTC);
 
     private static final String EMAIL = "test@example.com";
     private static final String GOOD_PASSWORD = "Str0ngPassw0rd";
@@ -254,7 +270,32 @@ class DefaultAuthServiceTest {
             r.setEmail(EMAIL);
             r.setPassword(password);
             r.setFcmToken("fcm");
+            r.setAcceptedTerms(true);
             return r;
+        }
+
+        @Test
+        @DisplayName("registration without accepting the terms is refused, and stores nothing")
+        void testRegister_whenTermsNotAccepted_ReturnError169() {
+            RegisterRequest request = request(GOOD_PASSWORD);
+            request.setAcceptedTerms(null);
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.register(request));
+            assertEquals(169, ex.getTransactionCode().getId());
+            verify(gamerRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("the version and the moment of acceptance are recorded, not just a yes")
+        void testRegister_whenTermsAccepted_StampsVersionAndTime() {
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+            authService.register(request(GOOD_PASSWORD));
+
+            ArgumentCaptor<Gamer> saved = ArgumentCaptor.forClass(Gamer.class);
+            verify(gamerRepository).save(saved.capture());
+            assertEquals(TermsPolicy.CURRENT_VERSION, saved.getValue().getTermsVersion());
+            assertEquals(Instant.parse("2026-08-07T12:00:00Z"), saved.getValue().getTermsAcceptedAt());
         }
 
         @Test
@@ -634,7 +675,7 @@ class DefaultAuthServiceTest {
             Gamer other = new Gamer();
             other.setUserId(UUID.randomUUID().toString());
             when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
-            when(gamerRepository.findByGamerUsername("taken")).thenReturn(Optional.of(other));
+            when(gamerRepository.findByGamerUsernameIgnoreCase("taken")).thenReturn(Optional.of(other));
 
             var request = request("taken");
             BusinessException ex = assertThrows(BusinessException.class, () -> authService.setUsername(gamer, request));
@@ -644,7 +685,7 @@ class DefaultAuthServiceTest {
         @Test
         void testSetUsername_whenUserChangesCurrentUsername_ReturnSuccess() {
             when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
-            when(gamerRepository.findByGamerUsername("tester")).thenReturn(Optional.of(gamer));
+            when(gamerRepository.findByGamerUsernameIgnoreCase("tester")).thenReturn(Optional.of(gamer));
 
             assertEquals(
                     "100",
@@ -657,11 +698,51 @@ class DefaultAuthServiceTest {
         @Test
         void testSetUsername_whenValidUsernameProvided_ReturnSuccess() {
             when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
-            when(gamerRepository.findByGamerUsername("fresh")).thenReturn(Optional.empty());
+            when(gamerRepository.findByGamerUsernameIgnoreCase("fresh")).thenReturn(Optional.empty());
 
             assertEquals(
                     "100",
                     authService.setUsername(gamer, request("fresh")).getStatus().getCode());
+            assertEquals("fresh", gamer.getGamerUsername());
+        }
+
+        @Test
+        @DisplayName("a name the policy refuses never reaches the uniqueness check")
+        void testSetUsername_whenUsernameBreaksThePolicy_ReturnError148() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+
+            var request = request("moderator");
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.setUsername(gamer, request));
+            assertEquals(148, ex.getTransactionCode().getId());
+            verify(gamerRepository, never()).findByGamerUsernameIgnoreCase(anyString());
+            verify(gamerRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("a name taken in a different case is taken")
+        void testSetUsername_whenUsernameTakenInAnotherCase_ReturnError107() {
+            Gamer other = new Gamer();
+            other.setUserId(UUID.randomUUID().toString());
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            when(gamerRepository.findByGamerUsernameIgnoreCase("Taken")).thenReturn(Optional.of(other));
+
+            var request = request("Taken");
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.setUsername(gamer, request));
+            assertEquals(107, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("surrounding whitespace is trimmed before anything else looks at it")
+        void testSetUsername_whenPaddedWithWhitespace_TrimsBeforeValidating() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            when(gamerRepository.findByGamerUsernameIgnoreCase("fresh")).thenReturn(Optional.empty());
+
+            assertEquals(
+                    "100",
+                    authService
+                            .setUsername(gamer, request("  fresh  "))
+                            .getStatus()
+                            .getCode());
             assertEquals("fresh", gamer.getGamerUsername());
         }
     }
@@ -671,7 +752,7 @@ class DefaultAuthServiceTest {
 
         private DetailsRequest request(int games, int keywords) {
             DetailsRequest r = new DetailsRequest();
-            r.setAge(20);
+            r.setBirthDate(LocalDate.of(1998, 8, 24));
             r.setCountry("TR");
             r.setGender("M");
             r.setAvatar(UUID.randomUUID().toString());
@@ -876,14 +957,31 @@ class DefaultAuthServiceTest {
         }
 
         @Test
+        @DisplayName("the age is derived from the date, not taken from the request")
         void testChangeAge_whenCalled_ReturnSuccess() {
             when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
             ChangeAgeRequest request = new ChangeAgeRequest();
-            request.setAge(25);
+            request.setBirthDate(LocalDate.of(1998, 8, 24));
 
             assertEquals(
                     "100", authService.changeAge(gamer, request).getStatus().getCode());
-            assertEquals(25, gamer.getAge());
+            // The clock is 2026-08-07 and the birthday falls on the 24th, so this year's
+            // has not happened yet: 27, not 28. Exactly the off-by-one a stored age drifts
+            // into, and the reason the date is what gets stored.
+            assertEquals(27, gamer.getAge());
+            assertEquals(LocalDate.of(1998, 8, 24), gamer.getBirthDate());
+        }
+
+        @Test
+        @DisplayName("a date of birth under 18 is refused")
+        void testChangeAge_whenUnderEighteen_ReturnError168() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            ChangeAgeRequest request = new ChangeAgeRequest();
+            request.setBirthDate(LocalDate.of(2010, 1, 1));
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.changeAge(gamer, request));
+            assertEquals(168, ex.getTransactionCode().getId());
+            assertNull(gamer.getBirthDate());
         }
 
         @Test

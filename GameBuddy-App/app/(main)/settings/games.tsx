@@ -26,7 +26,10 @@ export default function EditGames() {
       (games.data ?? []).map((game) => ({
         id: game.gameId,
         label: game.gameName,
-        keywords: game.category ?? undefined,
+        // The category is shown under the name, so it no longer needs to be duplicated
+        // into `keywords` for the search to reach it — the picker searches `detail` too.
+        detail: game.category,
+        image: game.gameIcon || null,
       })),
     [games.data],
   );
@@ -62,6 +65,7 @@ export default function EditGames() {
         isLoading={games.isPending || me.isPending}
         error={games.error}
         onRetry={() => games.refetch()}
+        layout="grid"
         searchPlaceholder="Search games"
       />
 

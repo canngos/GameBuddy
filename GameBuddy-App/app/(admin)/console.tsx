@@ -57,6 +57,29 @@ export default function ConsoleScreen() {
                 <Stat label="Open reports" value={data.openReports} emphasis />
                 <Stat label="Avatars to review" value={data.avatarsPending} emphasis />
               </View>
+
+              {/* The terms commit to answering a report within 24 hours. This is the
+                  number that says whether that is true right now — on the first screen
+                  of the console, because a commitment you have to go looking for is one
+                  you find out about from a reviewer. */}
+              {data.openReports > 0 && (
+                <View
+                  className={
+                    data.oldestOpenReportHours >= 24
+                      ? 'mt-4 rounded-input bg-danger/15 p-3'
+                      : 'mt-4 rounded-input bg-canvas p-3'
+                  }
+                >
+                  <Text
+                    variant="caption"
+                    className={data.oldestOpenReportHours >= 24 ? 'text-danger' : undefined}
+                  >
+                    {data.oldestOpenReportHours >= 24
+                      ? `Oldest report has been open ${data.oldestOpenReportHours}h — past the 24-hour commitment.`
+                      : `Oldest report has been open ${data.oldestOpenReportHours}h of the 24-hour commitment.`}
+                  </Text>
+                </View>
+              )}
             </Card>
           )}
 

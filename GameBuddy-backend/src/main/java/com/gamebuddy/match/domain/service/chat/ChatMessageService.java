@@ -28,6 +28,9 @@ import com.gamebuddy.shared.entity.Avatars;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
+import com.gamebuddy.shared.moderation.TextAssessment;
+import com.gamebuddy.shared.moderation.TextModerationService;
+import com.gamebuddy.shared.moderation.TextSurface;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
@@ -65,6 +68,7 @@ public class ChatMessageService {
     private final Clock clock;
     private final ApplicationEventPublisher events;
     private final PresenceService presenceService;
+    private final TextModerationService textModeration;
     private final SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -164,8 +168,18 @@ public class ChatMessageService {
             throw new BusinessException(TransactionCode.AGE_BAND_MISMATCH);
         }
 
+        // Screened before it is encrypted, because after encryption nothing can read it —
+        // including a filter. PRIVATE: profanity is masked and slurs are refused, but
+        // contact details are left alone. Two matched adults agreeing to carry on in a
+        // party chat is this app working, not a leak to be plugged.
+        TextAssessment assessment = textModeration.screen(body, TextSurface.PRIVATE);
+        if (assessment.blocked()) {
+            throw new BusinessException(TransactionCode.CONTENT_BLOCKED);
+        }
+        String screened = assessment.cleaned();
+
         ChatRoom room = chatRoomService.findOrCreate(senderId, receiverId);
-        MessageCipher.Encrypted encrypted = cipher.encrypt(body);
+        MessageCipher.Encrypted encrypted = cipher.encrypt(screened);
 
         ChatMessage message = new ChatMessage();
         message.setId(UUID.randomUUID());
@@ -193,15 +207,19 @@ public class ChatMessageService {
                 receiver.getUserId(),
                 receiver.getFcmToken(),
                 sender.getGamerUsername(),
-                preview(body),
+                preview(screened),
                 NotificationKind.MESSAGE,
                 senderId));
 
+        // The screened text, not what was typed. The sender's own client renders what it
+        // gets back, so returning the original would show the author their unmasked words
+        // while everybody else saw asterisks — and they would reasonably conclude the
+        // filter had not fired.
         return new SentMessage(
                 message.getId(),
                 senderId,
                 sender.getGamerUsername(),
-                body,
+                screened,
                 message.getCreatedAt(),
                 receiver.getEmail());
     }

@@ -9,6 +9,12 @@ type AvatarPickerProps = {
   selected: string | null;
   onSelect: (avatarId: string) => void;
   size?: number;
+  /**
+   * How many to a row. Unset keeps the original wrap, which is right where the picker is
+   * one control among several; the onboarding step sets 3 so the tiles are big enough to
+   * actually look at.
+   */
+  columns?: number;
 };
 
 /**
@@ -18,7 +24,7 @@ type AvatarPickerProps = {
  * shown here is selectable — a special avatar that has not been purchased is simply
  * absent rather than shown and then refused. Special avatars are bought in Market.
  */
-export function AvatarPicker({ selected, onSelect, size = 64 }: AvatarPickerProps) {
+export function AvatarPicker({ selected, onSelect, size = 64, columns }: AvatarPickerProps) {
   const colors = useThemeColors();
   const avatars = useQuery({ queryKey: ['avatars'], queryFn: catalogueApi.avatars });
 
@@ -29,7 +35,7 @@ export function AvatarPicker({ selected, onSelect, size = 64 }: AvatarPickerProp
         <ErrorNotice error={avatars.error} onRetry={() => avatars.refetch()} />
       )}
 
-      <View className="flex-row flex-wrap gap-3">
+      <View className="flex-row flex-wrap justify-between gap-y-4">
         {avatars.data?.map((avatar, index) => (
           <Pressable
             key={avatar.id}
@@ -37,6 +43,9 @@ export function AvatarPicker({ selected, onSelect, size = 64 }: AvatarPickerProp
             accessibilityRole="radio"
             accessibilityLabel={`Avatar ${index + 1}`}
             accessibilityState={{ selected: selected === avatar.id }}
+            // A share of the row rather than a fixed width, so three fit a narrow phone
+            // and a wide one without measuring the screen.
+            style={columns ? { width: `${100 / columns - 3}%`, alignItems: 'center' } : undefined}
             className="active:opacity-70"
           >
             <Avatar

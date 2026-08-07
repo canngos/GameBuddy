@@ -10,7 +10,7 @@ import { StepHeader } from '../../src/onboarding/StepHeader';
 import { CataloguePicker } from '../../src/pickers/CataloguePicker';
 import { useSession } from '../../src/session/store';
 import { Button, ErrorNotice, Screen } from '../../src/ui';
-import { MIN_GAMES, MIN_KEYWORDS } from '../../src/validation';
+import { MIN_GAMES, MIN_KEYWORDS, parseBirthDate, toIsoDate } from '../../src/validation';
 
 export default function Keywords() {
   const router = useRouter();
@@ -21,14 +21,22 @@ export default function Keywords() {
   const keywords = useQuery({ queryKey: ['keywords'], queryFn: catalogueApi.keywords });
 
   const items = useMemo(
-    () => (keywords.data ?? []).map((k) => ({ id: k.id, label: k.keywordName })),
+    () =>
+      (keywords.data ?? []).map((k) => ({
+        id: k.id,
+        label: k.keywordName,
+        detail: k.description,
+      })),
     [keywords.data],
   );
 
   const submit = useMutation({
     mutationFn: () =>
       authApi.setDetails({
-        age: Number(draft.age),
+        // The server derives the age from this and refuses anything under 18. Sending a
+        // date rather than a number is the point: an age is an assertion, a date is a fact
+        // the server can check.
+        birthDate: toIsoDate(parseBirthDate(draft.birthDay, draft.birthMonth, draft.birthYear)!),
         country: draft.country,
         avatar: draft.avatarId!,
         // null means the question was never answered; the backend wants a string, and
@@ -51,14 +59,17 @@ export default function Keywords() {
   // earlier answers are gone and cannot be recovered, so restart the run rather than
   // submit a half-filled profile the server will reject.
   const draftIntact =
-    !!draft.age && !!draft.country && !!draft.avatarId && draft.gameIds.length >= MIN_GAMES;
+    !!parseBirthDate(draft.birthDay, draft.birthMonth, draft.birthYear) &&
+    !!draft.country &&
+    !!draft.avatarId &&
+    draft.gameIds.length >= MIN_GAMES;
   if (!draftIntact && !submit.isSuccess) return <Redirect href="/profile" />;
 
   return (
     <Screen scroll>
       <StepHeader
-        step={4}
-        total={4}
+        step={5}
+        total={5}
         title="How do you play?"
         subtitle={`Pick at least ${MIN_KEYWORDS}. These are the habits and moods we match on.`}
       />

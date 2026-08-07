@@ -45,6 +45,15 @@ public class AnalyticsResponseBody implements BaseModel {
     private long openReports;
     private long avatarsPending;
 
+    /**
+     * How long the oldest unanswered report has been waiting, in hours.
+     *
+     * <p>The terms promise 24. This is the number that says whether that promise is being
+     * kept right now, which is the only form of a commitment worth making — one whose
+     * state can be seen without going and looking.
+     */
+    private long oldestOpenReportHours;
+
     // --- What the product produced -----------------------------------------
 
     private long mutualMatches;

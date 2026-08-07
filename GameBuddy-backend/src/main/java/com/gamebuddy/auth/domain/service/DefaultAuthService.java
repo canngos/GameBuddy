@@ -16,12 +16,14 @@ import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
 import com.gamebuddy.shared.event.ProfileChangedEvent;
+import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -70,6 +72,8 @@ public class DefaultAuthService implements AuthService {
     private final JavaMailSender emailSender;
     private final ApplicationEventPublisher events;
     private final AuthRateLimiters rateLimiters;
+    private final TextModerationService textModeration;
+    private final Clock clock;
 
     @Value("${spring.mail.username:noreply@gamebuddy.app}")
     private String sender;
@@ -153,6 +157,7 @@ public class DefaultAuthService implements AuthService {
     public RegisterResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail().trim().toLowerCase(Locale.ROOT);
         PasswordPolicy.validate(registerRequest.getPassword());
+        TermsPolicy.requireAcceptance(registerRequest.getAcceptedTerms());
 
         Gamer gamer = gamerRepository.findByEmail(email).orElse(null);
         if (gamer != null) {
@@ -169,6 +174,10 @@ public class DefaultAuthService implements AuthService {
             gamer.setRole(Role.USER);
         }
         gamer.setPwd(passwordEncoder.encode(registerRequest.getPassword()));
+        // Stamped on every registration attempt, including a re-claimed unverified one:
+        // whoever ends up owning this account is the person who ticked the box just now.
+        gamer.setTermsAcceptedAt(clock.instant());
+        gamer.setTermsVersion(TermsPolicy.CURRENT_VERSION);
         // Deliberately no device token here. Registration is not device registration: on
         // Android 13+ the client has not asked for notification permission yet and cannot
         // possess a real token, so what used to arrive was the literal placeholder
@@ -310,8 +319,15 @@ public class DefaultAuthService implements AuthService {
     public DefaultMessageResponse setUsername(Gamer principal, UsernameRequest usernameRequest) {
         Gamer gamer = reload(principal);
         String username = usernameRequest.getUsername().trim();
+        UsernamePolicy.validate(username);
+        // A username is on every message, every post and every profile card this account
+        // ever appears on, so it is refused rather than masked — there is no useful
+        // rendering of a slur with asterisks in it.
+        if (!textModeration.isCleanIdentifier(username)) {
+            throw new BusinessException(TransactionCode.CONTENT_BLOCKED);
+        }
 
-        Optional<Gamer> clash = gamerRepository.findByGamerUsername(username);
+        Optional<Gamer> clash = gamerRepository.findByGamerUsernameIgnoreCase(username);
         if (clash.isPresent() && !Objects.equals(clash.get().getUserId(), gamer.getUserId())) {
             throw new BusinessException(TransactionCode.USERNAME_EXISTS);
         }
@@ -337,7 +353,10 @@ public class DefaultAuthService implements AuthService {
                     TransactionCode.INVALID_REQUEST, "select at least " + MIN_KEYWORDS + " keywords");
         }
 
-        gamer.setAge(detailsRequest.getAge());
+        // The client sends a date, never an age: the number that decides eligibility is
+        // computed here or it is not trustworthy.
+        gamer.setBirthDate(detailsRequest.getBirthDate());
+        gamer.setAge(AgePolicy.validate(detailsRequest.getBirthDate(), clock));
         gamer.setCountry(detailsRequest.getCountry());
         gamer.setGender(detailsRequest.getGender());
         // Only when one was sent. Onboarding no longer asks for an avatar — see
@@ -402,9 +421,23 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public DefaultMessageResponse changeAge(Gamer principal, ChangeAgeRequest changeAgeRequest) {
         Gamer gamer = reload(principal);
-        gamer.setAge(changeAgeRequest.getAge());
+        int age = AgePolicy.validate(changeAgeRequest.getBirthDate(), clock);
+
+        // Logged because this is the field an account holder would edit if they wanted to
+        // be somewhere they are not allowed. It cannot achieve that any more — the floor
+        // is 18 and it is checked above — but an unexplained change of date of birth is
+        // still the first thing worth seeing when investigating a report.
+        log.info(
+                "Gamer {} changed date of birth from {} to {} (age {})",
+                gamer.getUserId(),
+                gamer.getBirthDate(),
+                changeAgeRequest.getBirthDate(),
+                age);
+
+        gamer.setBirthDate(changeAgeRequest.getBirthDate());
+        gamer.setAge(age);
         gamerRepository.save(gamer);
-        return DefaultMessageResponse.of("Age changed successfully");
+        return DefaultMessageResponse.of("Date of birth changed successfully");
     }
 
     /**

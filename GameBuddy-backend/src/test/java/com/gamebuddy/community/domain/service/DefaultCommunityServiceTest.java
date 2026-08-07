@@ -17,6 +17,7 @@ import com.gamebuddy.community.interfaces.request.CreateCommunityRequest;
 import com.gamebuddy.community.interfaces.request.PostRequest;
 import com.gamebuddy.community.interfaces.response.*;
 import com.gamebuddy.shared.entity.*;
+import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.AvatarUrls;
 import com.gamebuddy.shared.storage.CosmeticUrls;
@@ -39,6 +40,13 @@ import org.springframework.data.domain.Pageable;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class DefaultCommunityServiceTest {
+
+    /**
+     * The real filter, not a mock: it is a pure function over a word list, so a stub would
+     * only prove a stub was called. What matters is whether a slur actually gets stored.
+     */
+    @Spy
+    private TextModerationService textModeration = new TextModerationService();
 
     @InjectMocks
     private DefaultCommunityService communityService;

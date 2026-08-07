@@ -135,7 +135,18 @@ export function createChatSocket(token: string, listeners: Listeners) {
 
     // Only in development. A socket that hangs rather than failing gives no other
     // clue about what it was doing.
-    debug: __DEV__ ? (line) => console.log('[stomp]', line) : undefined,
+    //
+    // A no-op in production, never `undefined`. stompjs assigns its own no-op default in
+    // the constructor and then copies this configuration over the top, so `undefined`
+    // here does not mean "keep the default" — it *replaces* the default with nothing, and
+    // every internal `this.debug(...)` throws `undefined is not a function`.
+    //
+    // The one that matters is inside the connection-timeout watchdog (client.js:443): it
+    // fires a few seconds after a socket fails to connect, throws out of a timer where
+    // nothing can catch it, and React Native tears the whole instance down. That is a
+    // white screen with no error, and it can only happen in a release build — in
+    // development `__DEV__` is true and the function exists.
+    debug: __DEV__ ? (line) => console.log('[stomp]', line) : () => {},
 
     onConnect: () => {
       listeners.onStatus('connected');

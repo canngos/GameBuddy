@@ -1,17 +1,25 @@
 package com.gamebuddy.auth.interfaces.request;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
 public class ChangeAgeRequest {
-    // Minors are welcome, but never matched with adults: AgeBand splits the
-    // population at 18 and every pairing decision — recommendation, accept and
-    // each chat message — requires both gamers to be in the same band.
-    @Min(value = 12, message = "Age must be at least 12 years old")
-    @Max(value = 99, message = "Age must be at most 99 years old")
-    private int age;
+
+    /**
+     * A date of birth, not an age.
+     *
+     * <p>This endpoint used to take an integer and store it unchecked, which meant the
+     * boundary the whole safety model rested on could be crossed by typing a different
+     * number into a settings field. GameBuddy is 18+ now, so that particular crossing no
+     * longer exists — but the value is still re-checked here rather than trusted, and the
+     * change is logged.
+     */
+    @NotNull(message = "Date of birth is required")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private LocalDate birthDate;
 }

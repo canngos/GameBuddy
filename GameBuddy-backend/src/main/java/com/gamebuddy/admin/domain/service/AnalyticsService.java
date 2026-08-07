@@ -69,6 +69,7 @@ public class AnalyticsService {
         body.setAvatarsPending(counts.getAvatarsPending());
 
         body.setOpenReports(moderation.openReportCount());
+        body.setOldestOpenReportHours(moderation.oldestOpenReportHours());
         body.setMessages(chat.messageCount());
         body.setMutualMatches(analytics.countMutualMatches());
         body.setGrowth(growth(now));
