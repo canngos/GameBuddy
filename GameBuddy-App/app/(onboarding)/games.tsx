@@ -21,7 +21,10 @@ export default function Games() {
       (games.data ?? []).map((game) => ({
         id: game.gameId,
         label: game.gameName,
-        keywords: game.category ?? undefined,
+        // The category is shown under the name, so it no longer needs to be duplicated
+        // into `keywords` for the search to reach it — the picker searches `detail` too.
+        detail: game.category,
+        image: game.gameIcon || null,
       })),
     [games.data],
   );
@@ -29,8 +32,8 @@ export default function Games() {
   return (
     <Screen scroll>
       <StepHeader
-        step={3}
-        total={4}
+        step={4}
+        total={5}
         title="What do you play?"
         subtitle={`Pick at least ${MIN_GAMES}. This is most of what the recommendations are built from.`}
       />
@@ -42,6 +45,7 @@ export default function Games() {
         isLoading={games.isPending}
         error={games.error}
         onRetry={() => games.refetch()}
+        layout="grid"
         searchPlaceholder="Search games"
       />
 

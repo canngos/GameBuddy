@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
 import { Platform, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChatSocketProvider } from '../../src/chat/ChatSocketProvider';
@@ -6,6 +7,8 @@ import { NotificationPrimer } from '../../src/notifications/NotificationPrimer';
 import { useNotificationRouting } from '../../src/notifications/useNotificationRouting';
 import { usePushRegistration } from '../../src/notifications/usePushRegistration';
 import { RouteGuard } from '../../src/session/RouteGuard';
+import { TutorialOverlay } from '../../src/tutorial/TutorialOverlay';
+import { useTutorial } from '../../src/tutorial/store';
 import { useThemeColors } from '../../src/theme';
 import { Screen } from '../../src/ui';
 import { TabIcon, type TabIconName } from '../../src/ui/TabIcon';
@@ -31,6 +34,22 @@ export default function MainLayout() {
   // Asking on the sign-up screen would be asking before there is anything to notify about.
   const { shouldPrime, onPrimerDone } = usePushRegistration(true);
   useNotificationRouting(true);
+
+  // The walkthrough, once, after onboarding. Started here rather than from the deck so
+  // it owns the whole tab bar from the first frame — it navigates between tabs, and a
+  // tour that begins inside one of the screens it is touring fights itself.
+  //
+  // Held back until the notification primer is done: two full-screen things asking for
+  // attention at the same moment is one too many, and the primer spends the single
+  // system permission prompt, so it goes first.
+  const tutorial = useTutorial();
+  useEffect(() => {
+    if (!tutorial.hydrated) {
+      void tutorial.load();
+      return;
+    }
+    if (!tutorial.seen && tutorial.step === null && !shouldPrime) tutorial.start();
+  }, [tutorial, shouldPrime]);
 
   // Shown once, over the app, before the operating system's own prompt — see
   // NotificationPrimer. Rendered instead of the tabs rather than on top of them: it asks
@@ -117,6 +136,10 @@ export default function MainLayout() {
             spend it is the path this is meant to make short. */}
         <Tabs.Screen name="badges" options={{ href: null }} />
         </Tabs>
+
+      {/* After the tabs, so it draws over them — and inside the guard, so it can never
+          appear for an account that has not finished onboarding. */}
+      <TutorialOverlay />
       </ChatSocketProvider>
     </RouteGuard>
   );

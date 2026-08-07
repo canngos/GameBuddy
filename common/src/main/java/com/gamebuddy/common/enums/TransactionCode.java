@@ -142,6 +142,21 @@ public enum TransactionCode {
     /** More badges chosen for the showcase than a profile has slots for. */
     SHOWCASE_FULL(167, "You can show at most three badges", HttpStatus.CONFLICT),
 
+    // --- Eligibility and content --------------------------------------------
+    /**
+     * The stated date of birth puts the account holder under 18. Its own code rather than
+     * a generic invalid value, because the client has to say something specific and final
+     * here — this is the one rejection that is not worth retrying.
+     */
+    UNDERAGE(168, "You must be at least 18 years old to use GameBuddy", HttpStatus.FORBIDDEN),
+    /** Registration attempted without agreeing to the terms. */
+    TERMS_NOT_ACCEPTED(169, "You must accept the terms to create an account", HttpStatus.BAD_REQUEST),
+    /**
+     * Text refused outright by the content filter — a slur, or sexual abuse aimed at
+     * somebody. Ordinary profanity is masked instead and never reaches this.
+     */
+    CONTENT_BLOCKED(170, "That message breaks the community rules", HttpStatus.BAD_REQUEST),
+
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);
 

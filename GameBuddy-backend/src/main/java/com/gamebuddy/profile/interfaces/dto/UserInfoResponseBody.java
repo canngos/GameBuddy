@@ -22,6 +22,16 @@ public class UserInfoResponseBody implements BaseModel {
     private String email;
 
     private String age;
+
+    /**
+     * The date the age came from, {@code yyyy-MM-dd}, and only ever on your own profile.
+     *
+     * <p>Never sent for anybody else. An age is what other people are shown; a date of
+     * birth narrows a stranger down to one of three hundred and sixty-five, which is more
+     * than anyone needs to know about somebody they have not met.
+     */
+    private String birthDate;
+
     private String country;
     private String avatar;
 

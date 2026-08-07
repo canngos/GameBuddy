@@ -19,7 +19,12 @@ export default function EditKeywords() {
   const current = selected ?? me.data?.keywords.map((k) => k.id) ?? [];
 
   const items = useMemo(
-    () => (keywords.data ?? []).map((k) => ({ id: k.id, label: k.keywordName })),
+    () =>
+      (keywords.data ?? []).map((k) => ({
+        id: k.id,
+        label: k.keywordName,
+        detail: k.description,
+      })),
     [keywords.data],
   );
 

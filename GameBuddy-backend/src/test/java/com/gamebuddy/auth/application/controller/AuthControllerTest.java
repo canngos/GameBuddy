@@ -17,6 +17,7 @@ import com.gamebuddy.common.exception.GlobalExceptionHandler;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.security.JwtAuthenticationFilter;
 import com.gamebuddy.shared.entity.Gamer;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -254,7 +255,7 @@ class AuthControllerTest {
     @Test
     void testDetails_whenValidDetailsProvided_shouldReturnSuccessMessage() throws Exception {
         DetailsRequest request = new DetailsRequest();
-        request.setAge(20);
+        request.setBirthDate(LocalDate.of(1998, 8, 24));
         request.setCountry("TR");
         request.setGender("M");
         request.setAvatar(UUID.randomUUID().toString());
@@ -272,7 +273,7 @@ class AuthControllerTest {
     @DisplayName("fewer than three games is rejected at the edge")
     void testDetails_whenTooFewGames_shouldReturn400() throws Exception {
         DetailsRequest request = new DetailsRequest();
-        request.setAge(20);
+        request.setBirthDate(LocalDate.of(1998, 8, 24));
         request.setCountry("TR");
         request.setAvatar(UUID.randomUUID().toString());
         request.setFavoriteGames(List.of("g1"));
@@ -326,8 +327,8 @@ class AuthControllerTest {
     @Test
     void testChangeAge_whenValidAgeProvided_shouldReturnSuccessMessage() throws Exception {
         ChangeAgeRequest request = new ChangeAgeRequest();
-        request.setAge(25);
-        when(authService.changeAge(any(), any())).thenReturn(ok("Age changed successfully"));
+        request.setBirthDate(LocalDate.of(1998, 8, 24));
+        when(authService.changeAge(any(), any())).thenReturn(ok("Date of birth changed successfully"));
 
         mockMvc.perform(put("/auth/change/age")
                         .contentType("application/json")

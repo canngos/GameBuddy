@@ -81,8 +81,21 @@ export default function ReportsScreen() {
           <Card className="mb-3">
             <View className="flex-row items-center justify-between">
               <Text variant="overline">{item.contentType}</Text>
-              <Text variant="caption">{when(item.createdAt)}</Text>
+              <Text variant="caption" className={item.overdue ? 'text-danger' : undefined}>
+                {when(item.createdAt)}
+              </Text>
             </View>
+
+            {/* The terms promise a decision within 24 hours. A promise whose state is
+                invisible is one that gets broken quietly, so the queue says so — and it
+                says so on the row, not in a summary somewhere else. */}
+            {item.overdue && (
+              <View className="mt-2 self-start rounded-full bg-danger/15 px-3 py-1">
+                <Text variant="caption" className="text-danger">
+                  Past the 24-hour commitment — {item.ageHours}h open
+                </Text>
+              </View>
+            )}
 
             <Text variant="bodyStrong" className="mt-2">
               {item.authorUsername ?? 'Unknown author'}

@@ -26,4 +26,16 @@ public class ReportDto {
 
     /** How many open reports stand against this author across all their content. */
     private Long authorOpenReportCount;
+
+    /**
+     * True once this report has been open longer than the 24 hours the terms promise.
+     *
+     * <p>Computed on the server rather than in the console, so the deadline has one
+     * definition. A commitment nobody can see the state of is a commitment that gets
+     * missed quietly.
+     */
+    private Boolean overdue;
+
+    /** Hours this report has been open, so the console can show the ones getting close. */
+    private Long ageHours;
 }

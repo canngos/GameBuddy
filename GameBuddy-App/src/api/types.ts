@@ -58,6 +58,13 @@ export type UserInfo = {
   username: string | null;
   /** Own profile only; undefined when viewing someone else. */
   email?: string;
+  /**
+   * `yyyy-MM-dd`, own profile only, and null on accounts created before 18+ shipped.
+   *
+   * Other people are shown `age`. A date of birth narrows somebody down far more than an
+   * age does, so it never leaves the account it belongs to.
+   */
+  birthDate?: string | null;
   /** A string, not a number — and null until the details step. */
   age: string | null;
   country: string | null;
@@ -157,7 +164,8 @@ export type Conversation = {
 
 /** Everything `POST /auth/details` needs. Ids throughout, never display names. */
 export type ProfileDetails = {
-  age: number;
+  /** `yyyy-MM-dd`. The server derives the age from it and refuses anything under 18. */
+  birthDate: string;
   country: string;
   /** Avatar UUID. */
   avatar: string;
@@ -367,6 +375,11 @@ export type Analytics = {
   minors: number;
   openReports: number;
   avatarsPending: number;
+  /**
+   * How long the oldest unanswered report has been waiting. The terms promise 24 hours,
+   * so anything approaching that is the one number on this screen that needs acting on.
+   */
+  oldestOpenReportHours: number;
   mutualMatches: number;
   messages: number;
   growth: GrowthPoint[];
@@ -406,6 +419,10 @@ export type Report = {
   content: string | null;
   /** Open reports against this author across everything they have written. */
   authorOpenReportCount: number | null;
+  /** Past the 24 hours the terms promise. Decided by the server, not here. */
+  overdue: boolean | null;
+  /** How long this has been waiting. */
+  ageHours: number | null;
 };
 
 export type Reports = { reports: Report[] };

@@ -22,6 +22,9 @@ import com.gamebuddy.community.interfaces.response.*;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
+import com.gamebuddy.shared.moderation.TextAssessment;
+import com.gamebuddy.shared.moderation.TextModerationService;
+import com.gamebuddy.shared.moderation.TextSurface;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.AvatarUrls;
 import com.gamebuddy.shared.storage.CosmeticUrls;
@@ -58,6 +61,7 @@ public class DefaultCommunityService implements CommunityService {
     private final AvatarUrls avatarUrls;
     private final CosmeticUrls cosmeticUrls;
     private final ApplicationEventPublisher events;
+    private final TextModerationService textModeration;
 
     // =======================================================================
     // Reads
@@ -211,8 +215,10 @@ public class DefaultCommunityService implements CommunityService {
 
         Community community = new Community();
         community.setCommunityId(UUID.randomUUID());
-        community.setName(request.getName());
-        community.setDescription(request.getDescription());
+        // A community name is a heading on other people's screens, so it is refused
+        // rather than masked — see TextModerationService#isCleanIdentifier.
+        community.setName(requireCleanName(request.getName()));
+        community.setDescription(clean(request.getDescription()));
         community.setCommunityAvatar(request.getAvatar());
         community.setWallpaper(request.getWallpaper());
         community.setOwner(gamer);
@@ -232,8 +238,8 @@ public class DefaultCommunityService implements CommunityService {
         Post post = new Post();
         post.setPostId(UUID.randomUUID());
         post.setOwner(gamer.getUserId());
-        post.setTitle(request.getTitle());
-        post.setBody(request.getBody());
+        post.setTitle(clean(request.getTitle()));
+        post.setBody(clean(request.getBody()));
         post.setPicture(request.getPicture());
         post.setCommunity(community);
         postRepository.save(post);
@@ -272,7 +278,7 @@ public class DefaultCommunityService implements CommunityService {
 
         Comment comment = new Comment();
         comment.setCommentId(UUID.randomUUID());
-        comment.setMessage(request.getMessage());
+        comment.setMessage(clean(request.getMessage()));
         comment.setOwner(gamer.getUserId());
         // Only the owning side is set. `post.addComment(comment)` as well used to make
         // this a guaranteed HTTP 500: the id is assigned by hand, so Spring Data sees a
@@ -559,6 +565,33 @@ public class DefaultCommunityService implements CommunityService {
         }
         String trimmed = text.strip();
         return trimmed.length() <= 60 ? trimmed : trimmed.substring(0, 59) + "…";
+    }
+
+    /**
+     * Screens text bound for a community, which is a public surface: everything here is
+     * readable by every member, and members are strangers to each other.
+     *
+     * <p>Profanity comes back masked and the post is stored. A slur comes back refused, and
+     * the author is told so rather than having their message silently swallowed — a filter
+     * that pretends to accept what it discarded teaches people it is broken.
+     */
+    private String clean(String text) {
+        TextAssessment assessment = textModeration.screen(text, TextSurface.PUBLIC);
+        if (assessment.blocked()) {
+            throw new BusinessException(TransactionCode.CONTENT_BLOCKED);
+        }
+        return assessment.cleaned();
+    }
+
+    /**
+     * The same, for text that is a name rather than a body. Refused instead of masked:
+     * a community called {@code ****} helps nobody, and the author can simply choose again.
+     */
+    private String requireCleanName(String name) {
+        if (!textModeration.isCleanIdentifier(name)) {
+            throw new BusinessException(TransactionCode.CONTENT_BLOCKED);
+        }
+        return name;
     }
 
     /** Re-reads the principal inside this transaction; the filter's copy is detached. */

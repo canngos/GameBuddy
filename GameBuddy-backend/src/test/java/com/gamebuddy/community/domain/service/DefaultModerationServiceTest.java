@@ -14,7 +14,9 @@ import com.gamebuddy.community.infrastructure.repository.PostRepository;
 import com.gamebuddy.community.interfaces.request.ReportRequest;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -33,6 +36,10 @@ import org.mockito.quality.Strictness;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class DefaultModerationServiceTest {
+
+    /** Fixed, so "how long has this report been open" is the same number every run. */
+    @Spy
+    private Clock clock = Clock.fixed(Instant.parse("2026-08-07T12:00:00Z"), ZoneOffset.UTC);
 
     @InjectMocks
     private DefaultModerationService moderationService;

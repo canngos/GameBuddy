@@ -4,77 +4,71 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../../../src/api/auth';
 import { profileApi } from '../../../src/api/catalogue';
+import { BirthDateField } from '../../../src/onboarding/BirthDateField';
+import { Text } from '../../../src/ui';
 import { EditScreen } from '../../../src/ui/EditScreen';
-import { Text, TextField } from '../../../src/ui';
-import { ageError, MIN_AGE } from '../../../src/validation';
+import { birthDateError, MIN_AGE, parseBirthDate, toIsoDate } from '../../../src/validation';
 
-export default function EditAge() {
+export default function EditBirthDate() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
 
-  const [age, setAge] = useState(me.data?.age ?? '');
+  // `birthDate` comes back as yyyy-MM-dd, and only for your own profile. Accounts that
+  // predate the 18+ change have an age but no date, so the fields start empty and the
+  // account holder types one — which is the only way to get a real date rather than one
+  // reverse-engineered from a number.
+  const [day, setDay] = useState(() => partOf(me.data?.birthDate, 2));
+  const [month, setMonth] = useState(() => partOf(me.data?.birthDate, 1));
+  const [year, setYear] = useState(() => partOf(me.data?.birthDate, 0));
   const [touched, setTouched] = useState(false);
 
-  const currentBand = bandOf(Number(me.data?.age));
-  const nextBand = bandOf(Number(age));
-  const crossesBand = !!currentBand && !!nextBand && currentBand !== nextBand;
+  const problem = birthDateError(day, month, year);
 
   const save = useMutation({
-    mutationFn: () => authApi.changeAge(Number(age)),
+    mutationFn: () => authApi.changeBirthDate(toIsoDate(parseBirthDate(day, month, year)!)),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
-      // Age decides which population is shown, so the cached feed is now wrong.
-      void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
       router.back();
     },
   });
 
   return (
     <EditScreen
-      title="Your age"
-      subtitle="Age decides who you are shown. Under-18 and over-18 are never matched with each other."
+      title="Date of birth"
+      subtitle="Used to confirm you are old enough to be here. Other people see your age, never the date."
       onSave={() => {
         setTouched(true);
-        if (ageError(age)) return;
+        if (problem) return;
         save.mutate();
       }}
       saving={save.isPending}
       error={save.error}
     >
-      <TextField
-        label="Age"
-        value={age}
-        onChangeText={(t) => setAge(t.replace(/\D/g, '').slice(0, 2))}
-        error={touched ? ageError(age) : null}
-        hint={`Between ${MIN_AGE} and 99.`}
-        keyboardType="number-pad"
-        maxLength={2}
-        placeholder="21"
+      <BirthDateField
+        day={day}
+        month={month}
+        year={year}
+        onChange={(parts) => {
+          if (parts.day !== undefined) setDay(parts.day);
+          if (parts.month !== undefined) setMonth(parts.month);
+          if (parts.year !== undefined) setYear(parts.year);
+        }}
+        error={touched ? problem : null}
+        hint={`You must be ${MIN_AGE} or over.`}
       />
 
-      {crossesBand && (
-        <View className="mt-4 rounded-card border border-danger/40 bg-danger/10 p-4">
-          <Text variant="bodyStrong" className="text-danger">
-            This moves you to a different age group
-          </Text>
-          {/* Precisely what happens: `getMatches` does not filter by band, so existing
-              matches stay in the list — but `ChatMessageService` refuses every message
-              with AGE_BAND_MISMATCH, and the deck only draws from the new band. Saying
-              "they disappear" would be wrong and would surprise people later. */}
-          <Text variant="caption" className="mt-1">
-            People you already matched with in your current group stay in your matches,
-            but you will no longer be able to message them. New people you are shown
-            will all be from the other group.
-          </Text>
-        </View>
-      )}
+      <View className="mt-4 rounded-card border border-line bg-raised p-4">
+        <Text variant="caption">
+          Changes to your date of birth are recorded. GameBuddy is for adults only, and a
+          date that puts you under {MIN_AGE} will be refused.
+        </Text>
+      </View>
     </EditScreen>
   );
 }
 
-/** The split the backend enforces on every pairing. See AgeBand. */
-function bandOf(age: number): 'minor' | 'adult' | null {
-  if (!Number.isFinite(age) || age <= 0) return null;
-  return age < 18 ? 'minor' : 'adult';
+/** `2000-08-24` split on the dash; index 0 is the year, 2 the day. */
+function partOf(iso: string | null | undefined, index: number): string {
+  return iso?.split('-')[index] ?? '';
 }

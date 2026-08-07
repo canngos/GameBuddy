@@ -94,6 +94,9 @@ public class DefaultProfileService implements ProfileService {
         body.setUserId(gamer.getUserId());
         body.setUsername(gamer.getGamerUsername());
         body.setAge(gamer.getAge() == null ? null : String.valueOf(gamer.getAge()));
+        // Your own only. See UserInfoResponseBody#birthDate.
+        body.setBirthDate(
+                own && gamer.getBirthDate() != null ? gamer.getBirthDate().toString() : null);
         body.setCountry(gamer.getCountry());
         body.setGender(gamer.getGender());
         body.setAvatar(

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../../../src/api/auth';
 import { profileApi } from '../../../src/api/catalogue';
+import { openPrivacy, openTerms } from '../../../src/legal';
+import { useTutorial } from '../../../src/tutorial/store';
 import { useSession } from '../../../src/session/store';
 import { THEME_OPTIONS, useScheme } from '../../../src/theme';
 import {
@@ -33,6 +35,7 @@ export default function Settings() {
   const signOut = useSession((s) => s.signOut);
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const startTutorial = useTutorial((s) => s.start);
   const [password, setPassword] = useState('');
 
   // Only for the row hints ("3 selected"). Already cached by the Profile tab, so this
@@ -63,8 +66,8 @@ export default function Settings() {
               position="first"
             />
             <LinkRow
-              label="Age"
-              hint="Decides who you are shown"
+              label="Date of birth"
+              hint="Confirms you are 18 or over"
               href="/settings/age"
               position="middle"
             />
@@ -118,6 +121,54 @@ export default function Settings() {
               position="single"
             />
           </RowGroup>
+        </View>
+
+        <View className="gap-3">
+          <Text variant="overline">ABOUT</Text>
+
+          {/* Both stores want these reachable from inside the app, not only from the
+              listing page — somebody who already installed it will never see that page
+              again. */}
+          <RowGroup>
+            <LinkRow
+              label="Show the tutorial again"
+              hint="Walks you through the five tabs"
+              onPress={() => {
+                // Back to the deck first: the overlay navigates from wherever it starts,
+                // and starting it from inside Settings would leave the settings stack
+                // open underneath the whole tour.
+                router.replace('/home');
+                startTutorial();
+              }}
+              position="single"
+            />
+          </RowGroup>
+
+          <RowGroup>
+            <LinkRow
+              label="Terms of Service"
+              hint="Including the rules on content and conduct"
+              onPress={() => void openTerms()}
+              position="first"
+            />
+            <LinkRow
+              label="Privacy Policy"
+              hint="What we collect, and what we do with it"
+              onPress={() => void openPrivacy()}
+              position="last"
+            />
+          </RowGroup>
+
+          <Text variant="caption" className="px-1">
+            Reports are reviewed within 24 hours. There is no tolerance for objectionable
+            content or abusive users.
+          </Text>
+
+          {/* IGDB's terms require attribution wherever their data is used, and the game
+              covers and descriptions in the catalogue come from them. */}
+          <Text variant="caption" className="px-1">
+            Game covers and descriptions from IGDB.com.
+          </Text>
         </View>
 
         <View className="gap-3">

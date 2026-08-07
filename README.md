@@ -42,7 +42,7 @@ Register, then read the code out of the backend log:
 ```bash
 curl -X POST http://localhost:8080/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"you@example.com","password":"Str0ng!Passw0rd","fcmToken":"dev"}'
+  -d '{"email":"you@example.com","password":"Str0ng!Passw0rd","acceptedTerms":true}'
 
 docker compose logs backend | grep "verification code"
 ```
@@ -78,7 +78,7 @@ must match what the model container was started with.
 ### Tests
 
 ```bash
-./gradlew build                                   # 573 tests (505 backend, 68 common)
+./gradlew build                                   # 647 tests (579 backend, 68 common)
 cd GameBuddy-Model && python -m pytest            # 50 model tests
 ```
 
@@ -206,6 +206,8 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-11-notification-preferences.sql` | Per-category opt-outs. |
 | `db/upgrade-2026-12-recommender-staleness.sql` | Flags profiles the model predates. |
 | `db/upgrade-2026-13-avatar-review.sql` | Classifier score and upload time on avatars. |
+| `db/upgrade-2026-14-username-and-device-token.sql` | Unique device tokens, case-insensitive usernames. |
+| `db/upgrade-2026-15-adults-only.sql` | Date of birth and recorded terms acceptance. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 
 They live in `GameBuddy-backend/src/main/resources/db/`. On a fresh database apply the
@@ -241,6 +243,73 @@ It seeds 1200 by default, which is more than it sounds like it needs: the recomm
 ranks against the population it was *trained* on, and only ids that also exist in this
 database survive. A small seed intersects the model's top-ranked candidates barely at
 all, and the deck looks broken when it is merely under-populated.
+
+## Adults only
+
+GameBuddy is an 18+ service, and that is a decision about what the app is rather than a
+rating chosen to please a store. The product shows photographs of strangers, asks for a
+yes or no, and opens a private conversation on a mutual yes. Whatever the intent — and the
+intent is finding people to play with — that is the mechanic every store and regulator
+reads as dating, and mixing adults with children inside it is indefensible however
+carefully the pools are separated.
+
+The previous minimum was 12. It sat below the age of digital consent under GDPR Article 8
+in Finland (13) and below COPPA's threshold in the United States, and the separation
+between minors and adults rested on a number the account holder could retype in Settings
+at any moment.
+
+What enforces it:
+
+| Where | What happens |
+| --- | --- |
+| `AgePolicy` | The single definition of eligible. Computes the age from a date of birth; refuses under 18, future dates and implausible ones |
+| Onboarding | Asks for a date of birth, never an age. The client cannot assert the number |
+| `PUT /auth/change/age` | Re-validates, and logs every change. The field an abuser would edit is the field that leaves a trail |
+| `AgeBand` | Kept. With an 18+ floor it is no longer the primary control, but it still catches an account whose age is missing or wrong, and it costs nothing |
+| `BirthdayJob` | Keeps the cached `age` column true to the date it came from |
+
+`gamer.age` is a cache of `gamer.birth_date`, not a separate fact. The recommendation feed
+filters on it in native SQL and the model reads it as a feature, which is why it stays a
+column; nothing but `AgePolicy` and `BirthdayJob` may write it.
+
+**The local seed contains under-18 profiles.** They are synthetic and predate this change;
+`upgrade-2026-15` deliberately reports them rather than deleting them, because a migration
+that removes accounts is not something to run on autopilot. Production must start clean.
+
+## What the stores require, and where it lives
+
+| Requirement | Where |
+| --- | --- |
+| Terms containing no tolerance for objectionable content or abusive users | `documentation/legal/TERMS.md`, section 2 |
+| Active acceptance, recorded | `TermsPolicy`, `gamer.terms_accepted_at` / `terms_version`. Registration returns 169 without it |
+| In-app account deletion | Settings → Delete account. Requires the password; no email, no website |
+| Reports acted on within 24 hours | Promised in the terms; measured by `ReportDto.overdue` and `analytics.oldestOpenReportHours`, both surfaced in the console |
+| An admin dashboard | The console — see [The moderator console](#the-moderator-console) |
+| Text filtering | `TextModerationService`. Masks profanity, refuses slurs, strips contact details from public surfaces only |
+| Image filtering | `ImageModerationService` and the NSFW classifier — see [Avatar review](#avatar-review) |
+| An age gate at registration | Date of birth at onboarding, plus a 18-or-over confirmation the account holder has to tick |
+| A privacy policy URL, in the app and on the listing | `documentation/legal/PRIVACY.md`; linked from Settings → About via `EXPO_PUBLIC_PRIVACY_URL` |
+
+Both documents carry placeholder operator details in their final section and need a lawyer
+before submission. The URLs must serve them before the first store review — until the site
+exists, the links in the app resolve to nothing, which is a launch blocker rather than a
+bug.
+
+### Why the text filter treats chat and posts differently
+
+`TextSurface.PRIVATE` masks profanity and refuses slurs. It does **not** strip contact
+details, because two matched adults swapping Discord tags is this app working — that is
+the point of a service for finding people to play with, and redacting it would be sabotage
+dressed as safety.
+
+`TextSurface.PUBLIC` — posts, comments, community names, usernames — also removes email
+addresses, links and phone numbers, which are a different thing when broadcast to
+strangers.
+
+The word list is a floor, not a solution. It does not understand context, it will mask a
+word somebody used innocently, and anyone determined will get a slur through;
+`TextNormaliser` only raises the cost of the obvious evasions. What protects people is the
+report button and a moderator who answers it.
 
 ### Regenerating the baseline schema
 

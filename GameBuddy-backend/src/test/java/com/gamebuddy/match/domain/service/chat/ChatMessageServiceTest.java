@@ -12,6 +12,7 @@ import com.gamebuddy.match.infrastructure.entity.ChatRoom;
 import com.gamebuddy.match.infrastructure.repository.ChatMessageRepository;
 import com.gamebuddy.match.infrastructure.repository.ChatParticipantRepository;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
@@ -37,6 +38,13 @@ import org.springframework.context.ApplicationEventPublisher;
 class ChatMessageServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-02T12:00:00Z");
+
+    /**
+     * The real filter, not a mock: it is a pure function over a word list, so a stub would
+     * only prove a stub was called. What matters is whether a slur actually gets stored.
+     */
+    @Spy
+    private TextModerationService textModeration = new TextModerationService();
 
     @InjectMocks
     private ChatMessageService chatMessageService;

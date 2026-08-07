@@ -9,7 +9,9 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
+import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
 
@@ -21,9 +23,22 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // Already hidden, which happens on a fast refresh. Not a problem.
 });
 
+// Before anything else, so an error thrown while the rest of this module is still
+// evaluating is logged rather than swallowed.
+installGlobalErrorHandler();
+
 // The API client is wired to the session store once, at module scope, so it is done
 // before any component can fire a request during its first render.
 connectSessionToApi();
+
+/**
+ * Expo Router renders this instead of the tree when a descendant throws.
+ *
+ * Exported from the root layout so it covers everything. Without it a render error
+ * unmounts the app and leaves a white screen carrying no information at all — which is
+ * what a release build did, while the same error in development was a red box.
+ */
+export { AppErrorBoundary as ErrorBoundary };
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);

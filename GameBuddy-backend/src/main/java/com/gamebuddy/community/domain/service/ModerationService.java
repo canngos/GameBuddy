@@ -48,4 +48,10 @@ public interface ModerationService {
      * the caller cannot accidentally acquire the reports themselves along with the count.
      */
     long openReportCount();
+
+    /**
+     * How long the oldest open report has been waiting, in hours; zero when nothing is
+     * waiting. The single number that says whether the 24-hour commitment is being kept.
+     */
+    long oldestOpenReportHours();
 }

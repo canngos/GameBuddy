@@ -16,7 +16,8 @@ import com.gamebuddy.community.interfaces.request.ReportRequest;
 import com.gamebuddy.community.interfaces.response.ReportsResponse;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.repository.*;
-import java.time.Instant;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,10 +33,19 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DefaultModerationService implements ModerationService {
 
+    /**
+     * How long a report may sit before the promise made in the terms is broken.
+     *
+     * <p>Apple requires a commitment to act on reports within 24 hours, and the terms make
+     * one. This constant is that promise expressed where it can actually be measured.
+     */
+    private static final Duration REVIEW_SLA = Duration.ofHours(24);
+
     private final ContentReportRepository reportRepository;
     private final PostRepository postRepository;
     private final CommentRepository commentRepository;
     private final GamerRepository gamerRepository;
+    private final Clock clock;
 
     @Override
     @Transactional
@@ -207,7 +217,7 @@ public class DefaultModerationService implements ModerationService {
     private void close(ContentReport report, Gamer admin, ContentReport.Status status) {
         report.setStatus(status);
         report.setReviewedBy(admin.getUserId());
-        report.setReviewedAt(Instant.now());
+        report.setReviewedAt(clock.instant());
     }
 
     /**
@@ -233,6 +243,10 @@ public class DefaultModerationService implements ModerationService {
         dto.setAuthorUsername(author == null ? null : author.getGamerUsername());
         dto.setAuthorOpenReportCount(
                 reportRepository.countByAuthorIdAndStatus(report.getAuthorId(), ContentReport.Status.OPEN));
+
+        Duration open = Duration.between(report.getCreatedAt(), clock.instant());
+        dto.setAgeHours(open.toHours());
+        dto.setOverdue(open.compareTo(REVIEW_SLA) > 0 && report.getStatus() == ContentReport.Status.OPEN);
 
         dto.setContent(currentText(report));
         return dto;
@@ -261,6 +275,15 @@ public class DefaultModerationService implements ModerationService {
     @Transactional(readOnly = true)
     public long openReportCount() {
         return reportRepository.countByStatus(ContentReport.Status.OPEN);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long oldestOpenReportHours() {
+        return reportRepository
+                .oldestCreatedAt(ContentReport.Status.OPEN)
+                .map(oldest -> Duration.between(oldest, clock.instant()).toHours())
+                .orElse(0L);
     }
 
     private ContentReport requireReport(String reportId) {

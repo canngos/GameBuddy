@@ -34,4 +34,18 @@ public class RegisterRequest {
      * {@code PUT /auth/fcm-token}.
      */
     private String fcmToken;
+
+    /**
+     * Whether the account holder ticked the box agreeing to the terms and privacy policy.
+     *
+     * <p>Not {@code @AssertTrue}: a bean-validation failure here would come back as a
+     * generic 400 among any other field errors, and this rejection needs its own answer so
+     * the client can point at the checkbox. {@code TermsPolicy} raises
+     * {@code TERMS_NOT_ACCEPTED} instead.
+     *
+     * <p>{@code Boolean} rather than {@code boolean} so that a client which omits the
+     * field is refused rather than silently defaulted to false-means-no — the distinction
+     * matters if this ever needs debugging.
+     */
+    private Boolean acceptedTerms;
 }

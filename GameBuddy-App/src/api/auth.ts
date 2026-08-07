@@ -18,9 +18,14 @@ export const authApi = {
    * placeholder — and the backend used to store it, giving every not-yet-registered
    * account the same token and breaking the lookups that resolve a gamer by it. The device
    * registers itself after sign-in, in `usePushRegistration`.
+   *
+   * `acceptedTerms` is not a formality the client can shortcut: the server refuses the
+   * registration without it (169) and stamps the account with the version and the moment
+   * of acceptance. Passing `true` from anywhere the user did not actually tick the box
+   * would forge that record.
    */
-  register: (email: string, password: string) =>
-    api.post<void>('/auth/register', { email, password }, { anonymous: true }),
+  register: (email: string, password: string, acceptedTerms: boolean) =>
+    api.post<void>('/auth/register', { email, password, acceptedTerms }, { anonymous: true }),
 
   /** Exchanges the code for a token. This is where a new user first gets a session. */
   verify: (email: string, verificationCode: number) =>
@@ -60,7 +65,11 @@ export const authApi = {
 
   changeAvatar: (avatarId: string) => api.put<void>('/auth/change/avatar', { avatarId }),
 
-  changeAge: (age: number) => api.put<void>('/auth/change/age', { age }),
+  /**
+   * Takes a date, not a number. The server derives the age, refuses anything under 18,
+   * and logs the change — see AgePolicy and DefaultAuthService#changeAge.
+   */
+  changeBirthDate: (birthDate: string) => api.put<void>('/auth/change/age', { birthDate }),
 
   changeGames: (gameIds: string[]) =>
     api.put<void>('/auth/change/games', { gamesOrKeywordsList: gameIds }),

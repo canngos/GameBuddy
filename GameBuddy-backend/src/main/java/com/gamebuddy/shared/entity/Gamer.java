@@ -6,6 +6,7 @@ import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.security.RevocableUser;
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -45,7 +46,27 @@ public class Gamer implements RevocableUser {
     @Column(unique = true, nullable = false)
     private String email;
 
+    /**
+     * Completed years, derived from {@link #birthDate} and refreshed nightly.
+     *
+     * <p>Kept as a column rather than computed on every read because the recommendation
+     * feed filters on it in native SQL and the model uses it as a feature. It is a cache
+     * of the birth date, never a separate fact: nothing outside
+     * {@code AgePolicy}/{@code BirthdayJob} may set it.
+     */
     private Integer age;
+
+    /**
+     * What the account holder said their date of birth is.
+     *
+     * <p>The authority for eligibility — {@link #age} is derived from it. Nullable
+     * because accounts created before 18+ have only an age; those are treated as adults
+     * if their recorded age says so, and are asked for nothing further. Everyone
+     * registering now supplies one.
+     */
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
     private String country;
     /**
      * The legacy catalogue avatar: a row in {@code avatars}.
@@ -122,6 +143,24 @@ public class Gamer implements RevocableUser {
 
     @UpdateTimestamp
     private Instant lastModifiedDate;
+
+    /**
+     * When this account holder accepted the terms, and which version they accepted.
+     *
+     * <p>Two columns rather than a boolean, because the question that gets asked later is
+     * never "did they agree" but "what did they agree to, and when". Apple requires the
+     * terms to carry a no-tolerance clause for objectionable content and abusive users,
+     * and requires agreement to be active rather than implied; this is the record that it
+     * was. Registration will not complete without it — see {@code TermsPolicy}.
+     *
+     * <p>Nullable for accounts that predate the requirement. They are asked to accept on
+     * next sign-in rather than being locked out or quietly assumed to have agreed.
+     */
+    @Column(name = "terms_accepted_at")
+    private Instant termsAcceptedAt;
+
+    @Column(name = "terms_version")
+    private String termsVersion;
 
     @Column(nullable = false)
     private Boolean isBlocked = Boolean.FALSE;

@@ -49,10 +49,23 @@
           "defaultChannel": "default"
         }
       ],
-      "./plugins/withAndroidJdk17"
+      "./plugins/withAndroidJdk17",
+      "./plugins/withLanCleartext"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7dd92485-36ce-4814-98b7-eb2439ec2101"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7dd92485-36ce-4814-98b7-eb2439ec2101"
     }
   }
 }
