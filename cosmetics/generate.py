@@ -441,6 +441,51 @@ def banner_arena(top, bottom, line, accent):
     return banner_finish(image)
 
 
+def banner_laurel(top, bottom, accent, glow):
+    """Slow diagonal rays with a warm bloom, for the membership banner.
+
+    Deliberately the quietest thing in the set. This one is not chosen — it arrives with a
+    subscription and stays on somebody's profile for as long as they keep it, so it has to
+    survive being looked at for a month. The rest of the banners can afford to be loud
+    because they were picked on purpose; a reward that shouts gets tiring and then gets
+    swapped out, which defeats the point of giving it away.
+
+    No crown, no laurel drawn literally. Gold reads as gold from the palette alone, and a
+    badge shape behind a profile header would fight the avatar sitting on top of it.
+    """
+    image, d = banner_canvas(top, bottom)
+    w, h = BANNER_W * SCALE, BANNER_H * SCALE
+
+    # Rays on their own layer so the whole fan can be blurred at once. Drawn sharp and
+    # then softened is not the same as drawn soft: overlapping thin lines accumulate into
+    # a gradient this way, which is what makes it read as light rather than as stripes.
+    rays = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    rd = ImageDraw.Draw(rays)
+    origin_x, origin_y = -w * 0.20, h * 0.42
+
+    for i in range(9):
+        angle = math.radians(-26 + i * 6.4)
+        end = (origin_x + math.cos(angle) * w * 1.6, origin_y + math.sin(angle) * w * 1.6)
+        rd.line([origin_x, origin_y, end[0], end[1]], fill=rgba(accent, 0.30), width=px(6))
+
+    rays = rays.filter(ImageFilter.GaussianBlur(px(9)))
+    image.alpha_composite(rays)
+
+    # The bloom where they converge, well off the left edge. Large and very soft — this is
+    # the whole reason the banner reads as warm rather than as a set of lines.
+    bloom = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(bloom)
+    r = px(260)
+    bd.ellipse([origin_x - r, origin_y - r, origin_x + r, origin_y + r], fill=rgba(glow, 0.55))
+    bloom = bloom.filter(ImageFilter.GaussianBlur(px(90)))
+    image.alpha_composite(bloom)
+
+    # One hairline low enough to stay clear of the avatar and the name. The only hard
+    # edge in the image, and it is there so the eye has something to land on.
+    d.line([0, h * 0.84, w, h * 0.74], fill=rgba(accent, 0.48), width=px(2))
+    return banner_finish(image)
+
+
 # =========================================================================
 
 STATIC_FRAMES = {
@@ -469,6 +514,9 @@ BANNERS = {
     "banner-arena": lambda: banner_arena((26, 12, 16), (14, 10, 14), BRAND, GOLD),
     "banner-void": lambda: banner_starfield((14, 16, 34), (6, 6, 16), VIOLET, CYAN),
     "banner-dusk": lambda: banner_grid((44, 24, 16), (18, 14, 24), EMBER, horizon=0.58),
+    # Not for sale. Granted with a Gold membership and revoked with it — see the
+    # membership cosmetics migration.
+    "banner-gold": lambda: banner_laurel((58, 42, 14), (16, 13, 10), GOLD, (255, 226, 160)),
 }
 
 

@@ -30,5 +30,4 @@ public class SubscriptionResponseBody implements BaseModel {
 
     private boolean canSeeWhoLikedYou;
     private boolean canUseAdvancedFilters;
-    private int maxGroupChats;
 }

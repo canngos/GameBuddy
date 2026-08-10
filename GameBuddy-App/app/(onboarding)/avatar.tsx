@@ -26,7 +26,15 @@ export default function AvatarStep() {
   }
 
   return (
-    <Screen scroll>
+    <Screen
+      scroll
+      footer={
+        <View className="gap-2">
+          <Button label="Continue" onPress={next} />
+          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+        </View>
+      }
+    >
       <StepHeader
         step={3}
         total={5}
@@ -47,11 +55,6 @@ export default function AvatarStep() {
           Pick one to carry on.
         </Text>
       )}
-
-      <View className="mt-auto gap-2 pt-10">
-        <Button label="Continue" onPress={next} />
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
-      </View>
     </Screen>
   );
 }

@@ -89,14 +89,45 @@ class MatchControllerTest {
 
     @Test
     void testGetRecommendations_whenCalled_ReturnsRecommendedGamers() throws Exception {
-        when(matchService.getRecommendations(any())).thenReturn(recommendations("buddy"));
+        when(matchService.getRecommendations(any(), any())).thenReturn(recommendations("buddy"));
 
         mockMvc.perform(get("/match/get/recommendations"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.body.data.recommendedGamers[0].gamerUsername")
                         .value("buddy"));
 
-        verify(matchService).getRecommendations(argThat(g -> g.getUserId().equals(principal.getUserId())));
+        verify(matchService).getRecommendations(argThat(g -> g.getUserId().equals(principal.getUserId())), any());
+    }
+
+    @Test
+    @DisplayName("no query parameters means no filters, which is the free request")
+    void testGetRecommendations_whenNoParams_PassesEmptyFilters() throws Exception {
+        when(matchService.getRecommendations(any(), any())).thenReturn(recommendations("buddy"));
+
+        mockMvc.perform(get("/match/get/recommendations")).andExpect(status().isOk());
+
+        // narrowing() false is what keeps an unfiltered feed free — if this ever arrives
+        // as a narrowing filter, every free account starts getting 402s on the deck.
+        verify(matchService).getRecommendations(any(), argThat(f -> !f.narrowing()));
+    }
+
+    @Test
+    @DisplayName("every filter reaches the service as sent")
+    void testGetRecommendations_whenFiltered_PassesFilters() throws Exception {
+        when(matchService.getRecommendations(any(), any())).thenReturn(recommendations("buddy"));
+
+        mockMvc.perform(get("/match/get/recommendations")
+                        .param("gameId", "g1")
+                        .param("country", "FI")
+                        .param("onlineNow", "true"))
+                .andExpect(status().isOk());
+
+        verify(matchService)
+                .getRecommendations(
+                        any(),
+                        argThat(f -> "g1".equals(f.gameId())
+                                && "FI".equals(f.country())
+                                && Boolean.TRUE.equals(f.onlineNow())));
     }
 
     @Test

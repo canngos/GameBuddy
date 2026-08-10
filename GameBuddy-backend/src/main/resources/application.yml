@@ -57,10 +57,10 @@ spring:
     #
     # To send nothing and print the code instead, set gamebuddy.mail.mode=log. See
     # MailConfig — that is a local-only switch and it is not the default.
-    host: ${MAIL_HOST:smtp.gmail.com}
+    host: ${MAIL_HOST:smtp-relay.brevo.com}
     port: ${MAIL_PORT:587}
-    username: ${EMAIL:}
-    password: ${EMAIL_PWD:}
+    username: ${SMTP_EMAIL:}
+    password: ${SMTP_EMAIL_PWD:}
     properties:
       mail:
         smtp:
@@ -87,6 +87,7 @@ gamebuddy:
     # the only way to reach the signup screen without a mail server. Never 'log' in
     # production: it would let anyone reading the logs verify any address.
     mode: ${MAIL_MODE:smtp}
+    from: ${MAIL_FROM:noreply@mail.findgamebuddy.com}
 
   jwt:
     secret: ${JWT_SECRET}

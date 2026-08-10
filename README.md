@@ -208,6 +208,9 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-13-avatar-review.sql` | Classifier score and upload time on avatars. |
 | `db/upgrade-2026-14-username-and-device-token.sql` | Unique device tokens, case-insensitive usernames. |
 | `db/upgrade-2026-15-adults-only.sql` | Date of birth and recorded terms acceptance. |
+| `db/upgrade-2026-16-keyword-descriptions.sql` | Real explanations for the keyword catalogue. |
+| `db/upgrade-2026-17-row-timestamps.sql` | created_at everywhere, updated_at where rows change. |
+| `db/upgrade-2026-18-membership-cosmetics.sql` | The Gold frame and banner come with membership. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 
 They live in `GameBuddy-backend/src/main/resources/db/`. On a fresh database apply the

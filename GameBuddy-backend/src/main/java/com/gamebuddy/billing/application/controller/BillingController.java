@@ -61,8 +61,7 @@ public class BillingController {
                 tier == SubscriptionTier.BASIC ? null : principal.getSubscriptionExpiresAt(),
                 tier.dailyAccepts(),
                 tier.canSeeWhoLikedYou(),
-                tier.canUseAdvancedFilters(),
-                tier.maxGroupChats());
+                tier.canUseAdvancedFilters());
 
         SubscriptionResponse response = new SubscriptionResponse();
         response.setBody(new BaseBody<>(body));

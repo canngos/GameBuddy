@@ -135,6 +135,15 @@ export default function MainLayout() {
             an unsaved change in it, and claiming a reward then heading to the market to
             spend it is the path this is meant to make short. */}
         <Tabs.Screen name="badges" options={{ href: null }} />
+
+        {/* Reached from the badge in the deck header rather than a tab of its own. It
+            keeps the tab bar: seeing who liked you and going straight back to swiping is
+            the loop this screen exists to close. */}
+        <Tabs.Screen name="admirers" options={{ href: null }} />
+
+        {/* The paywall. Tab bar hidden: it is a decision with a price on it, and a stray
+            tab press mid-purchase is not a decision anybody meant to make. */}
+        <Tabs.Screen name="gold" options={{ href: null, tabBarStyle: { display: 'none' } }} />
         </Tabs>
 
       {/* After the tabs, so it draws over them — and inside the guard, so it can never

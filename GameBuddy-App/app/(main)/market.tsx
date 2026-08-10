@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
+import { billingApi } from '../../src/api/billing';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
 import { useThemeColors } from '../../src/theme';
@@ -70,6 +72,8 @@ export default function Market() {
           <Text variant="caption">coins</Text>
         </View>
       </View>
+
+      <GoldCard />
 
       <View className="flex-row gap-2 pb-5">
         <Segment label="Frames" active={kind === 'FRAME'} onPress={() => setKind('FRAME')} />
@@ -226,5 +230,53 @@ function Row({
         )}
       </View>
     </Card>
+  );
+}
+
+
+/**
+ * The membership, at the top of the Market.
+ *
+ * One of the four places the paywall is reachable from, and the least urgent of them —
+ * somebody on this screen is already thinking about how their profile looks, which is
+ * the mood Gold's cosmetics speak to. The pressing ones are the limit sheet and the
+ * admirers screen, where the thing Gold removes is the thing currently in the way.
+ *
+ * Shows status rather than a pitch once somebody has subscribed. A paywall that keeps
+ * selling to an existing member reads as a system that does not know who they are.
+ */
+function GoldCard() {
+  const router = useRouter();
+  const subscription = useQuery({
+    queryKey: ['subscription'],
+    queryFn: billingApi.subscription,
+  });
+
+  const isGold = subscription.data?.tier === 'GOLD';
+
+  return (
+    <Pressable
+      onPress={() => router.push('/gold')}
+      accessibilityRole="button"
+      accessibilityLabel={isGold ? 'Your Gold membership' : 'Get GameBuddy Gold'}
+      className="mb-5 active:opacity-80"
+    >
+      <Card>
+        <View className="flex-row items-center justify-between gap-4">
+          <View className="flex-1 gap-1">
+            <Text variant="overline" className="text-brand">
+              GAMEBUDDY GOLD
+            </Text>
+            <Text variant="heading">{isGold ? 'You are a member' : 'See who likes you'}</Text>
+            <Text variant="caption">
+              {isGold
+                ? 'The Gold frame and banner are yours while your membership lasts.'
+                : 'No daily limit, advanced filters, and the Gold frame and banner.'}
+            </Text>
+          </View>
+          <View className="h-2 w-2 rotate-45 border-r-2 border-t-2 border-muted" />
+        </View>
+      </Card>
+    </Pressable>
   );
 }

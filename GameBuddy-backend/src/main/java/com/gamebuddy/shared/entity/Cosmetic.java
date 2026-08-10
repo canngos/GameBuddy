@@ -75,6 +75,16 @@ public class Cosmetic implements Serializable {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    /**
+     * Arrives with a Gold membership and is withdrawn when it lapses. Never for sale.
+     *
+     * <p>Distinct from {@link #isFree()}, which means "everybody has this" — the opposite
+     * claim. A membership item is owned by a subset of accounts and that subset changes,
+     * which is exactly what makes it worth wearing: it is only a signal while it is true.
+     */
+    @Column(name = "membership_only", nullable = false)
+    private boolean membershipOnly;
+
     @Column(name = "created_date", nullable = false)
     private Instant createdDate = Instant.now();
 

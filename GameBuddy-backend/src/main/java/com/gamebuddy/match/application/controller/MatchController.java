@@ -1,6 +1,7 @@
 package com.gamebuddy.match.application.controller;
 
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
+import com.gamebuddy.match.domain.service.FeedFilters;
 import com.gamebuddy.match.domain.service.MatchService;
 import com.gamebuddy.match.interfaces.request.GamerRequest;
 import com.gamebuddy.match.interfaces.response.AcceptResponse;
@@ -25,9 +26,21 @@ public class MatchController {
 
     private final MatchService matchService;
 
+    /**
+     * The deck.
+     *
+     * <p>Every filter is optional, and sending none is the free behaviour. Supplying any
+     * of them is a Gold entitlement and is refused with 402 otherwise — the client already
+     * routes that to the paywall.
+     */
     @GetMapping("/get/recommendations")
-    public ResponseEntity<RecommendationResponse> getRecommendations(@AuthenticationPrincipal Gamer principal) {
-        return ResponseEntity.ok(matchService.getRecommendations(principal));
+    public ResponseEntity<RecommendationResponse> getRecommendations(
+            @AuthenticationPrincipal Gamer principal,
+            @RequestParam(required = false) String gameId,
+            @RequestParam(required = false) String country,
+            @RequestParam(required = false) Boolean onlineNow) {
+        return ResponseEntity.ok(
+                matchService.getRecommendations(principal, new FeedFilters(gameId, country, onlineNow)));
     }
 
     @GetMapping("/get/selected/game/{gameId}")

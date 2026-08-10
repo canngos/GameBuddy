@@ -66,7 +66,21 @@ export default function Keywords() {
   if (!draftIntact && !submit.isSuccess) return <Redirect href="/profile" />;
 
   return (
-    <Screen scroll>
+    <Screen
+      scroll
+      footer={
+        <View className="gap-2">
+          <SelectionCount picked={draft.keywordIds.length} minimum={MIN_KEYWORDS} />
+          <Button
+            label="Finish"
+            disabled={draft.keywordIds.length < MIN_KEYWORDS}
+            loading={submit.isPending}
+            onPress={() => submit.mutate()}
+          />
+          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+        </View>
+      }
+    >
       <StepHeader
         step={5}
         total={5}
@@ -88,17 +102,6 @@ export default function Keywords() {
           <ErrorNotice error={submit.error} />
         </View>
       )}
-
-      <View className="mt-auto gap-2 pt-10">
-        <SelectionCount picked={draft.keywordIds.length} minimum={MIN_KEYWORDS} />
-        <Button
-          label="Finish"
-          disabled={draft.keywordIds.length < MIN_KEYWORDS}
-          loading={submit.isPending}
-          onPress={() => submit.mutate()}
-        />
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
-      </View>
     </Screen>
   );
 }

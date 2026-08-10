@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -46,6 +47,7 @@ const COPY: Record<Block['kind'], { title: string; body: string }> = {
  * and why no `className` appears on an animated component here.
  */
 export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
+  const router = useRouter();
   const visible = !!block;
   const progress = useSharedValue(0);
 
@@ -95,7 +97,23 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
                 </View>
               )}
 
-              <Button label="Keep looking" onPress={onDismiss} />
+              {/* The upgrade is the primary action and dismissing is secondary, because
+                  this sheet only appears at the moment the limit is the thing in the way
+                  — which is the one moment removing it is worth paying for. It used to
+                  offer only "Keep looking", which acknowledged the wall and then left the
+                  gamer standing at it. */}
+              <View className="gap-2">
+                <Button
+                  label="Get Gold — no daily limit"
+                  onPress={() => {
+                    // Dismiss first: the sheet is a positioned sibling of the deck rather
+                    // than a Modal, so leaving it mounted would put it over the paywall.
+                    onDismiss();
+                    router.push('/gold');
+                  }}
+                />
+                <Button label="Keep looking" variant="ghost" onPress={onDismiss} />
+              </View>
             </View>
           </Animated.View>
         </View>

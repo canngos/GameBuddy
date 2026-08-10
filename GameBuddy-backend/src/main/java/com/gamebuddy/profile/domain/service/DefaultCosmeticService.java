@@ -67,6 +67,12 @@ public class DefaultCosmeticService implements CosmeticService {
         if (cosmetic.isFree() || ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), cosmetic.getId())) {
             throw new BusinessException(TransactionCode.COSMETIC_ALREADY_OWNED);
         }
+        // A membership item has a price of zero and is not a free item: it cannot be
+        // bought at any price, because owning it is what says somebody is a member. The
+        // store never offers these, so reaching here means a crafted request.
+        if (cosmetic.isMembershipOnly()) {
+            throw new BusinessException(TransactionCode.SUBSCRIPTION_REQUIRED);
+        }
         if (gamer.getCoin() < cosmetic.getPrice()) {
             throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
         }
