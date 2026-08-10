@@ -38,7 +38,24 @@ export function EditScreen({
   const router = useRouter();
 
   return (
-    <Screen scroll edges={['top', 'bottom']}>
+    <Screen
+      scroll
+      edges={['top', 'bottom']}
+      // Pinned rather than scrolled past. The games and keywords screens use this and
+      // their lists are a hundred rows long; Save at the end of the content meant
+      // scrolling the whole catalogue to reach it and back up to keep choosing.
+      footer={
+        <View className="gap-2">
+          <Button label={saveLabel} loading={saving} disabled={!canSave} onPress={onSave} />
+          <Button
+            label="Cancel"
+            variant="ghost"
+            disabled={saving}
+            onPress={() => router.back()}
+          />
+        </View>
+      }
+    >
       <View className="gap-2 pb-6 pt-8">
         <Text variant="title">{title}</Text>
         {subtitle && (
@@ -55,16 +72,6 @@ export function EditScreen({
           <ErrorNotice error={error} />
         </View>
       )}
-
-      <View className="mt-auto gap-2 pt-10">
-        <Button label={saveLabel} loading={saving} disabled={!canSave} onPress={onSave} />
-        <Button
-          label="Cancel"
-          variant="ghost"
-          disabled={saving}
-          onPress={() => router.back()}
-        />
-      </View>
     </Screen>
   );
 }

@@ -12,6 +12,18 @@ type ScreenProps = {
   edges?: readonly Edge[];
   padded?: boolean;
   className?: string;
+  /**
+   * Pinned below the scroll area, always visible.
+   *
+   * For the actions that end a screen — Continue, Back, Save. Inside a `scroll` screen
+   * those sit after the content, which is fine for a form and wrong for a list: choosing
+   * three games out of a hundred meant scrolling the whole catalogue to reach Continue,
+   * and then scrolling back up to carry on choosing.
+   *
+   * Inside the keyboard-avoiding view, so it rises with the keyboard instead of being
+   * covered by it.
+   */
+  footer?: ReactNode;
 };
 
 /**
@@ -27,6 +39,7 @@ export function Screen({
   edges = ['top', 'bottom'],
   padded = true,
   className,
+  footer,
 }: ScreenProps) {
   const gutter = padded ? 'px-6' : '';
 
@@ -55,6 +68,13 @@ export function Screen({
           </ScrollView>
         ) : (
           <View className={cn('flex-1', gutter, className)}>{children}</View>
+        )}
+
+        {/* The hairline is what stops this reading as the end of the list. Without it the
+            buttons look like the last two rows, and content scrolling underneath them
+            looks like a rendering fault. */}
+        {footer && (
+          <View className={cn('border-t border-line bg-canvas pb-2 pt-3', gutter)}>{footer}</View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>

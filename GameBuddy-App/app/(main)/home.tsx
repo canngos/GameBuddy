@@ -1,4 +1,5 @@
 import { ActivityIndicator, View } from 'react-native';
+import { AdmirersBadge } from './admirers';
 import { CandidateCard } from '../../src/match/CandidateCard';
 import { DeckActions } from '../../src/match/DeckActions';
 import { LimitSheet } from '../../src/match/LimitSheet';
@@ -30,7 +31,13 @@ export default function Deck() {
         {/* Settings used to live here. It moved to Profile once that tab existed —
             one less thing in the header, and it stops colliding with the floating
             dev-menu button Expo Go draws in exactly this corner. */}
-        <Allowance deck={deck} />
+        {/* Two numbers, and they answer different questions: how many likes you have
+            left, and how many people are waiting for you. The second is the reason to
+            come back, so it sits closest to the thumb. */}
+        <View className="flex-row items-center gap-4">
+          <AdmirersBadge />
+          <Allowance deck={deck} />
+        </View>
       </View>
 
       <View className="flex-1 px-6 py-3">

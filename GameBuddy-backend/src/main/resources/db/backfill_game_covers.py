@@ -74,12 +74,9 @@ GAME_TYPES = "(0,3,8,9,10,11)"
 #
 # A string is a search term, used where IGDB simply files the game under a fuller name.
 #
-# Deliberately absent, because IGDB has no entry for them and inventing one would be worse
-# than the lettered fallback:
-#   Overwatch 2   — only seasons and cosmetic bundles exist; the base game is folded into
-#                   the "Overwatch" entry, which is a different game as far as a player
-#                   choosing what they play is concerned.
-#   eFootball 2026 — only sponsored editions ("Leo Messi Edition 2026") are listed.
+# Deliberately absent: eFootball 2026, which IGDB lists only as sponsored editions
+# ("eFootball: Leo Messi Edition 2026"). None of those is the game, and inventing a match
+# would be worse than the lettered fallback the picker shows instead.
 OVERRIDES: dict[str, int | str] = {
     "The Finals": 214417,
     "The Forest": 7504,
@@ -90,6 +87,23 @@ OVERRIDES: dict[str, int | str] = {
     "REPO": "R.E.P.O.",
     "Black Desert Online": "Black Desert",
     "Football Manager 2025": "Football Manager 25",
+    # IGDB has no "Overwatch 2" entry — only seasons and cosmetic bundles. Its "Overwatch"
+    # record is the 2023 one, which is the game people are actually playing, so the
+    # catalogue follows it and takes that name and cover.
+    "Overwatch 2": "Overwatch",
+}
+
+# Catalogue names that keep their own spelling instead of adopting IGDB's.
+#
+# IGDB's titles are more accurate than the hand-typed catalogue and are used everywhere
+# else, but a few are catalogue entries rather than titles: IGDB calls Dragon Quest XI S
+# "Dragon Quest XI S: Echoes of an Elusive Age - Definitive Edition", which is correct and
+# also seventy characters that will wrap to three lines in a card two-across on a phone.
+#
+# This does not change which entry is matched — only the name that gets stored — so the
+# cover and description still come from the full record.
+KEEP_OUR_NAME = {
+    "Dragon Quest XI S",
 }
 
 
@@ -363,11 +377,18 @@ def main() -> int:
                 continue
 
             found += 1
-            note = "" if match.name.lower() == game_name.lower() else f"  -> renamed: {match.name}"
+            kept = game_name in KEEP_OUR_NAME
+            note = (
+                ""
+                if kept or match.name.lower() == game_name.lower()
+                else f"  -> renamed: {match.name}"
+            )
             print(f"  ok {game_name}{note}")
 
             if not args.apply:
                 continue
+
+            stored_name = game_name if game_name in KEEP_OUR_NAME else match.name
 
             try:
                 stored = upload_cover(s3, bucket, public_url, game_id, match.cover_url)
@@ -390,7 +411,7 @@ def main() -> int:
                         description = COALESCE(NULLIF(%s, ''), description)
                     WHERE game_id = %s
                     """,
-                    (stored, match.name, (match.summary or "")[:255], game_id),
+                    (stored, stored_name, (match.summary or "")[:255], game_id),
                 )
             uploaded += 1
 

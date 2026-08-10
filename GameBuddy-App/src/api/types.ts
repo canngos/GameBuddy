@@ -128,6 +128,25 @@ export type SwipeAllowance = {
   resetsAt: string | null;
 };
 
+/** What GET /billing/subscription reports. The tier is derived, never the stored one. */
+export type Subscription = {
+  /** 'BASIC' or 'GOLD'. */
+  tier: string;
+  /** ISO instant. Null on BASIC. */
+  expiresAt: string | null;
+  dailyAccepts: number;
+  canSeeWhoLikedYou: boolean;
+  canUseAdvancedFilters: boolean;
+};
+
+/** What POST /billing/redeem returns once the receipt has been verified. */
+export type Purchase = {
+  productId: string;
+  status: string;
+  /** ISO instant. Null for a consumable such as a coin pack. */
+  entitlementExpiresAt: string | null;
+};
+
 export type LikedYou = {
   /** Always populated, on every tier. */
   count: number;

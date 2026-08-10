@@ -101,7 +101,21 @@ public class DefaultMatchService implements MatchService {
     @Override
     @Transactional(readOnly = true)
     public RecommendationResponse getRecommendations(Gamer principal) {
+        return getRecommendations(principal, FeedFilters.none());
+    }
+
+    @Override
+    @Transactional
+    public RecommendationResponse getRecommendations(Gamer principal, FeedFilters filters) {
         Gamer gamer = reload(principal);
+
+        // The entitlement is checked before any work is done, and only when the request
+        // actually narrows anything — an unfiltered feed is free, and asking for one must
+        // never cost a 402. Same accessor as every other tier check, so a lapsed
+        // subscription stops working here at the same instant it stops working elsewhere.
+        if (filters.narrowing() && !swipeQuota.effectiveTier(gamer).canUseAdvancedFilters()) {
+            throw new BusinessException(TransactionCode.SUBSCRIPTION_REQUIRED);
+        }
 
         // Everyone already decided on, sent to the model so it can rank *past* them.
         // Filtering the response instead is what made the feed run dry: the ranking is a
@@ -124,12 +138,23 @@ public class DefaultMatchService implements MatchService {
             log.warn("The model returned {} unknown gamer id(s)", candidates.size() - recommended.size());
         }
 
-        List<Gamer> ranked = pairable(gamer, rankedAsModelOrdered(candidates, recommended));
-        List<Gamer> explored = exploration(gamer, ranked, decided);
+        List<Gamer> ranked = filtered(pairable(gamer, rankedAsModelOrdered(candidates, recommended)), filters);
+        // Exploration is filtered too. It exists to surface people the model would never
+        // rank, and a filtered feed that quietly injects somebody playing a different game
+        // is not showing an overlooked candidate — it is ignoring the request.
+        List<Gamer> explored = filtered(exploration(gamer, ranked, decided), filters);
         List<Gamer> page = merge(ranked, explored);
 
         recordImpressions(gamer, page, explored);
         return recommendationResponse(page);
+    }
+
+    /** Applies the filters, if any were asked for. */
+    private List<Gamer> filtered(List<Gamer> candidates, FeedFilters filters) {
+        if (!filters.narrowing()) {
+            return candidates;
+        }
+        return candidates.stream().filter(c -> filters.matches(c, clock)).toList();
     }
 
     /**

@@ -136,10 +136,21 @@ services:
       # Prints verification codes to `docker compose logs backend` instead of sending them.
       # Without this, registration rolls its transaction back when SMTP is unreachable and
       # no account can be created at all.
-      MAIL_MODE: log
+      MAIL_MODE: smtp
+
+      # Verifies NOTHING. The purchase flow can then be exercised end to end before store
+      # credentials exist: any non-blank receipt is accepted and the entitlement granted.
+      # Local only — see SandboxReceiptVerifier, which warns on every startup and every
+      # call, and note that with this absent PurchaseService refuses every purchase rather
+      # than granting one.
+      BILLING_SANDBOX: "true"
       # Still required even in log mode: with no host configured Boot creates no
       # JavaMailSender and the application will not start.
-      MAIL_HOST: localhost
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-}
+      SMTP_EMAIL: ${SMTP_EMAIL:-}
+      SMTP_EMAIL_PWD: ${SMTP_EMAIL_PWD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
 
       # Push delivery. On, because the service-account key is now mounted below.

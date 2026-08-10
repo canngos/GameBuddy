@@ -30,7 +30,20 @@ export default function Games() {
   );
 
   return (
-    <Screen scroll>
+    <Screen
+      scroll
+      footer={
+        <View className="gap-2">
+          <SelectionCount picked={gameIds.length} minimum={MIN_GAMES} />
+          <Button
+            label="Continue"
+            disabled={gameIds.length < MIN_GAMES}
+            onPress={() => router.push('/keywords')}
+          />
+          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+        </View>
+      }
+    >
       <StepHeader
         step={4}
         total={5}
@@ -48,16 +61,6 @@ export default function Games() {
         layout="grid"
         searchPlaceholder="Search games"
       />
-
-      <View className="mt-auto gap-2 pt-10">
-        <SelectionCount picked={gameIds.length} minimum={MIN_GAMES} />
-        <Button
-          label="Continue"
-          disabled={gameIds.length < MIN_GAMES}
-          onPress={() => router.push('/keywords')}
-        />
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
-      </View>
     </Screen>
   );
 }

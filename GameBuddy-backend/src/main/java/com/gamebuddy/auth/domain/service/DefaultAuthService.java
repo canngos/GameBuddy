@@ -75,7 +75,7 @@ public class DefaultAuthService implements AuthService {
     private final TextModerationService textModeration;
     private final Clock clock;
 
-    @Value("${spring.mail.username:noreply@gamebuddy.app}")
+    @Value("${gamebuddy.mail.from:noreply@mail.findgamebuddy.com}")
     private String sender;
 
     // =======================================================================

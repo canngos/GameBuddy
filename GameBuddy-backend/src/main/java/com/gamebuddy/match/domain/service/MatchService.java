@@ -12,6 +12,12 @@ public interface MatchService {
 
     RecommendationResponse getRecommendations(Gamer principal);
 
+    /**
+     * The same feed, narrowed. Refuses with {@code SUBSCRIPTION_REQUIRED} when the filters
+     * ask for anything and the tier does not carry {@code canUseAdvancedFilters}.
+     */
+    RecommendationResponse getRecommendations(Gamer principal, FeedFilters filters);
+
     RecommendationResponse getSelectedGameRecommendations(Gamer principal, String gameId);
 
     /**
