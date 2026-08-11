@@ -60,6 +60,33 @@ class FeedFiltersTest {
     }
 
     @Nested
+    @DisplayName("activeSince")
+    class ActiveSince {
+
+        @Test
+        @DisplayName("null unless the online filter is actually on")
+        void nullWhenNotFiltering() {
+            assertNull(FeedFilters.none().activeSince(clock));
+            assertNull(new FeedFilters(null, null, false).activeSince(clock));
+        }
+
+        @Test
+        @DisplayName("the cutoff the database is given is the same one matches() uses")
+        void agreesWithMatches() {
+            // These two run in different places — one in SQL to decide who gets ranked,
+            // one in memory to decide who gets shown — and a disagreement between them
+            // would show offline people under an "online now" filter.
+            FeedFilters filters = new FeedFilters(null, null, true);
+            Instant cutoff = filters.activeSince(clock);
+            assertEquals(NOW.minusSeconds(15 * 60), cutoff);
+
+            // A candidate exactly on the boundary is in, one a second earlier is out.
+            assertTrue(filters.matches(gamer("FI", cutoff), clock));
+            assertFalse(filters.matches(gamer("FI", cutoff.minusSeconds(1)), clock));
+        }
+    }
+
+    @Nested
     @DisplayName("matching")
     class Matching {
 

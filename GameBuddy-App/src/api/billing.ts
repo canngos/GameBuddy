@@ -1,10 +1,17 @@
-import { Platform } from 'react-native';
 import { api } from './client';
-import type { Purchase, Subscription } from './types';
+import type { Subscription } from './types';
 
 /**
- * Which store product a plan maps to. These ids must match `Product.java` exactly and,
- * before real money moves, the products registered in both consoles.
+ * Which store product a plan maps to.
+ *
+ * These ids must match `Product.java` exactly, the products registered in both consoles,
+ * and the offering configured in RevenueCat. A mismatch in any of the three is a purchase
+ * that takes somebody's money and grants nothing.
+ *
+ * The prices here are display copy only. RevenueCat reports the real localised price from
+ * the store, and once the offering is wired up these strings should be replaced by it —
+ * showing "$7.99" to somebody who will be charged €8.99 is a store-review problem as well
+ * as a trust one.
  */
 export const GOLD_PLANS = [
   {
@@ -32,11 +39,6 @@ export const GOLD_PLANS = [
 
 export type GoldPlan = (typeof GOLD_PLANS)[number];
 
-/** What the backend calls this platform. Matches the `PurchasePlatform` enum. */
-function platform(): 'APPLE' | 'GOOGLE' {
-  return Platform.OS === 'ios' ? 'APPLE' : 'GOOGLE';
-}
-
 export const billingApi = {
   /**
    * What this account currently holds.
@@ -44,33 +46,12 @@ export const billingApi = {
    * The tier is derived server-side from the stored tier *and* the expiry, never read
    * straight off the row — see `SubscriptionTier.effective`. So this is the only
    * trustworthy answer to "am I Gold", and the client must not cache its own idea of it.
+   *
+   * **This is now the only billing endpoint.** `POST /billing/redeem` is gone: receipts go
+   * to RevenueCat, which verifies them with Apple or Google and tells our backend over a
+   * webhook. There is deliberately no call the app can make to assert that it bought
+   * something — that would have been a free subscription for anyone willing to send the
+   * request by hand.
    */
   subscription: () => api.get<Subscription>('/billing/subscription'),
-
-  /**
-   * Hands a store receipt to the backend, which verifies it and grants the entitlement.
-   *
-   * **No store sheet is opened here yet.** The IAP library is not installed — that is a
-   * separate task, and it needs a config plugin and a rebuild. Until then this sends a
-   * development receipt, which only works because `gamebuddy.billing.sandbox=true` is set
-   * locally; with it off, `PurchaseService` has no verifier for the platform and refuses
-   * every purchase rather than granting one. Nothing here can accidentally work in
-   * production.
-   *
-   * When the library lands, the only change is where `receipt` comes from.
-   */
-  redeem: (productId: string, receipt: string) =>
-    api.post<Purchase>('/billing/redeem', { platform: platform(), productId, receipt }),
 };
-
-/**
- * A receipt for local testing.
- *
- * Deliberately obvious in the logs and in the database: anything that turns up with this
- * shape was never paid for. It is unique per attempt because `SandboxReceiptVerifier`
- * derives the store transaction id from the receipt, and a repeated id is correctly
- * rejected as a replay by the unique constraint.
- */
-export function developmentReceipt(productId: string): string {
-  return `dev-${productId}-${Date.now()}`;
-}

@@ -138,12 +138,12 @@ services:
       # no account can be created at all.
       MAIL_MODE: smtp
 
-      # Verifies NOTHING. The purchase flow can then be exercised end to end before store
-      # credentials exist: any non-blank receipt is accepted and the entitlement granted.
-      # Local only — see SandboxReceiptVerifier, which warns on every startup and every
-      # call, and note that with this absent PurchaseService refuses every purchase rather
-      # than granting one.
-      BILLING_SANDBOX: "true"
+      # The shared secret RevenueCat sends in the Authorization header of its webhook, and
+      # the only thing that can grant a paid entitlement now that receipt verification is
+      # RevenueCat's job. The backend refuses to start without it, so this default keeps
+      # local work running; set a real one from `openssl rand -base64 32` in .env before
+      # pointing a RevenueCat project at this.
+      REVENUECAT_WEBHOOK_TOKEN: ${REVENUECAT_WEBHOOK_TOKEN:-local-development-webhook-token}
       # Still required even in log mode: with no host configured Boot creates no
       # JavaMailSender and the application will not start.
       MAIL_HOST: ${MAIL_HOST:-}

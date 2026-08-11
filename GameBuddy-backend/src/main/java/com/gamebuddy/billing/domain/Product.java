@@ -19,6 +19,16 @@ import java.util.Optional;
  */
 public enum Product {
 
+    /**
+     * One week of Gold.
+     *
+     * <p>The cheapest way in, and the one somebody buys to unlock filters for a weekend
+     * rather than to subscribe. It was offered by the paywall before it existed here,
+     * which verified against the store and then failed with {@code 160 Unknown product} —
+     * exactly the charged-but-granted-nothing failure this enum exists to prevent.
+     */
+    GOLD_WEEKLY("gamebuddy.gold.weekly", SubscriptionTier.GOLD, Duration.ofDays(7), 0),
+
     /** One month of Gold. */
     GOLD_MONTHLY("gamebuddy.gold.monthly", SubscriptionTier.GOLD, Duration.ofDays(30), 0),
 

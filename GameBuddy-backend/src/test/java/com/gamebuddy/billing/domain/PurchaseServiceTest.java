@@ -4,25 +4,33 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.billing.domain.PurchaseService.VerifiedPurchase;
 import com.gamebuddy.billing.infrastructure.entity.Purchase;
 import com.gamebuddy.billing.infrastructure.entity.PurchasePlatform;
 import com.gamebuddy.billing.infrastructure.entity.PurchaseStatus;
 import com.gamebuddy.billing.infrastructure.repository.PurchaseRepository;
 import com.gamebuddy.common.enums.SubscriptionTier;
-import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
+/**
+ * Granting a purchase that RevenueCat has already verified.
+ *
+ * <p>Nothing here tests receipt verification, because nothing here does any: that moved to
+ * RevenueCat. What is left is the part that stayed ours and can still get somebody's money
+ * wrong — idempotency, and how a paid period is extended.
+ */
+@DisplayName("PurchaseService")
 class PurchaseServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-01T12:00:00Z");
@@ -31,6 +39,7 @@ class PurchaseServiceTest {
     private PurchaseRepository purchases;
     private GamerRepository gamers;
     private Gamer gamer;
+    private PurchaseService service;
 
     @BeforeEach
     void setUp() {
@@ -44,209 +53,209 @@ class PurchaseServiceTest {
 
         when(gamers.findById(USER)).thenReturn(Optional.of(gamer));
         when(purchases.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+
+        service = new PurchaseService(purchases, gamers, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
-    /** A verifier that agrees with whatever is claimed. */
-    private ReceiptVerifier acceptingVerifier(PurchasePlatform platform, Instant expiry) {
-        ReceiptVerifier verifier = mock(ReceiptVerifier.class);
-        when(verifier.platform()).thenReturn(platform);
-        when(verifier.verify(any(), any()))
-                .thenAnswer(i ->
-                        new ReceiptVerifier.VerifiedPurchase("txn-1", i.getArgument(1, Product.class), NOW, expiry));
-        return verifier;
+    private VerifiedPurchase purchase(Product product, Instant expiresAt) {
+        return new VerifiedPurchase(USER, product, PurchasePlatform.GOOGLE_PLAY, "txn-1", NOW, expiresAt);
     }
 
-    private PurchaseService service(ReceiptVerifier... verifiers) {
-        return new PurchaseService(purchases, gamers, Clock.fixed(NOW, ZoneOffset.UTC), List.of(verifiers));
+    @Nested
+    @DisplayName("granting")
+    class Granting {
+
+        @Test
+        @DisplayName("a subscription sets the tier and the store's expiry")
+        void grantsSubscription() {
+            Instant storeExpiry = NOW.plus(Duration.ofDays(30));
+
+            assertTrue(service.grant(purchase(Product.GOLD_MONTHLY, storeExpiry)));
+
+            assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
+            assertEquals(storeExpiry, gamer.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("a consumable adds coins and grants no tier")
+        void grantsCoins() {
+            assertTrue(service.grant(purchase(Product.COINS_SMALL, null)));
+
+            assertEquals(100 + Product.COINS_SMALL.coins(), gamer.getCoin());
+            assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+            assertNull(gamer.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("the transaction is recorded before the entitlement is handed over")
+        void recordsBeforeGranting() {
+            // The unique constraint is the idempotency mechanism, so it has to be taken
+            // first. Granting first and recording after leaves a window where a retry
+            // grants twice.
+            service.grant(purchase(Product.GOLD_MONTHLY, NOW.plus(Duration.ofDays(30))));
+
+            var order = inOrder(purchases, gamers);
+            order.verify(purchases).saveAndFlush(any(Purchase.class));
+            order.verify(gamers).save(gamer);
+        }
     }
 
-    // -- the security-critical paths ----------------------------------------
+    @Nested
+    @DisplayName("idempotency")
+    class Idempotency {
 
-    @Test
-    @DisplayName("with no verifier configured, every purchase is rejected rather than trusted")
-    void failsClosedWithoutAVerifier() {
-        PurchaseService service = service();
+        @Test
+        @DisplayName("a replayed webhook grants nothing and is not an error")
+        void replayIsIgnored() {
+            when(purchases.existsByPlatformAndStoreTransactionId(PurchasePlatform.GOOGLE_PLAY, "txn-1"))
+                    .thenReturn(true);
 
-        assertThrows(
-                BusinessException.class,
-                () -> service.redeem(USER, PurchasePlatform.APPLE_APP_STORE, "gamebuddy.gold.monthly", "receipt"));
-        verify(purchases, never()).saveAndFlush(any());
-        assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+            // False, not an exception. RevenueCat retries until it gets a 2xx, so a
+            // duplicate is the normal case — throwing would make it retry forever.
+            assertFalse(service.grant(purchase(Product.GOLD_MONTHLY, NOW.plus(Duration.ofDays(30)))));
+
+            assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+            verify(purchases, never()).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("two deliveries racing: the loser grants nothing")
+        void concurrentDeliveryIsIgnored() {
+            when(purchases.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("unique"));
+
+            assertFalse(service.grant(purchase(Product.GOLD_MONTHLY, NOW.plus(Duration.ofDays(30)))));
+            assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+        }
+
+        @Test
+        @DisplayName("an event for an account that no longer exists is dropped, not retried")
+        void unknownAccountIsDropped() {
+            when(gamers.findById(USER)).thenReturn(Optional.empty());
+
+            assertFalse(service.grant(purchase(Product.GOLD_MONTHLY, NOW.plus(Duration.ofDays(30)))));
+            verify(purchases, never()).saveAndFlush(any());
+        }
     }
 
-    @Test
-    @DisplayName("a platform with no verifier is rejected even when another platform has one")
-    void rejectsUnconfiguredPlatform() {
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
+    @Nested
+    @DisplayName("extending a paid period without a store expiry")
+    class Extending {
 
-        assertThrows(
-                BusinessException.class,
-                () -> service.redeem(USER, PurchasePlatform.APPLE_APP_STORE, "gamebuddy.gold.monthly", "receipt"));
+        @Test
+        @DisplayName("renewing early adds to the time already paid for")
+        void earlyRenewalExtends() {
+            Instant existing = NOW.plus(Duration.ofDays(10));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(existing);
+
+            service.grant(purchase(Product.GOLD_MONTHLY, null));
+
+            // Not truncated to now + 30. Somebody who renews with time left keeps it.
+            assertEquals(existing.plus(Duration.ofDays(30)), gamer.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("renewing after a lapse starts from now, not from the old expiry")
+        void lapsedRenewalDoesNotBackdate() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.minus(Duration.ofDays(60)));
+
+            service.grant(purchase(Product.GOLD_MONTHLY, null));
+
+            // Back-dating would sell somebody thirty days and hand them none of them.
+            assertEquals(NOW.plus(Duration.ofDays(30)), gamer.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("the store's expiry wins whenever it gives one")
+        void storeExpiryWins() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(10)));
+            Instant storeExpiry = NOW.plus(Duration.ofDays(3));
+
+            service.grant(purchase(Product.GOLD_MONTHLY, storeExpiry));
+
+            // Even when it is sooner than ours. The store knows about refunds, grace
+            // periods and billing retries; we are guessing.
+            assertEquals(storeExpiry, gamer.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("a week is a week")
+        void weeklyGrantsSevenDays() {
+            service.grant(purchase(Product.GOLD_WEEKLY, null));
+            assertEquals(NOW.plus(Duration.ofDays(7)), gamer.getSubscriptionExpiresAt());
+        }
     }
 
-    @Test
-    @DisplayName("if the store reports a different product than the client claimed, nothing is granted")
-    void refusesWhenStoreDisagreesWithTheClient() {
-        ReceiptVerifier verifier = mock(ReceiptVerifier.class);
-        when(verifier.platform()).thenReturn(PurchasePlatform.GOOGLE_PLAY);
-        // Client asks for Gold; the store says it was actually a small coin pack.
-        when(verifier.verify(any(), any()))
-                .thenReturn(new ReceiptVerifier.VerifiedPurchase("txn-1", Product.COINS_SMALL, NOW, null));
+    @Nested
+    @DisplayName("taking it away")
+    class Revoking {
 
-        PurchaseService service = service(verifier);
+        @Test
+        @DisplayName("expiry ends the subscription now")
+        void expireEndsIt() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(10)));
 
-        assertThrows(
-                BusinessException.class,
-                () -> service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.gold.monthly", "receipt"));
-        assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
-        assertEquals(100, gamer.getCoin());
-    }
+            service.expire(USER);
 
-    @Test
-    void unknownProductIsRejectedBeforeAnythingElseHappens() {
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
+            assertEquals(NOW, gamer.getSubscriptionExpiresAt());
+            assertEquals(
+                    SubscriptionTier.BASIC,
+                    SubscriptionTier.effective(
+                            gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), NOW.plusSeconds(1)));
+        }
 
-        assertThrows(
-                BusinessException.class,
-                () -> service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "not.a.real.product", "receipt"));
-        verifyNoInteractions(purchases);
-    }
+        @Test
+        @DisplayName("expiring an already-lapsed account does not move the date")
+        void expireIsIdempotent() {
+            Instant lapsed = NOW.minus(Duration.ofDays(5));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(lapsed);
 
-    // -- idempotency ---------------------------------------------------------
+            service.expire(USER);
 
-    @Test
-    @DisplayName("a receipt already redeemed is refused, so one payment cannot be spent twice")
-    void replayIsRefused() {
-        when(purchases.existsByPlatformAndStoreTransactionId(any(), eq("txn-1")))
-                .thenReturn(true);
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
+            // Pushing it forward to now would silently hand back five days.
+            assertEquals(lapsed, gamer.getSubscriptionExpiresAt());
+            verify(gamers, never()).save(any());
+        }
 
-        assertThrows(
-                BusinessException.class,
-                () -> service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.coins.500", "receipt"));
-        assertEquals(100, gamer.getCoin(), "no coins granted on a replay");
-    }
+        @Test
+        @DisplayName("a refund expires the subscription and marks the row")
+        void refundRevokesSubscription() {
+            Purchase row = new Purchase();
+            row.setUserId(USER);
+            row.setProductId(Product.GOLD_MONTHLY.storeId());
+            row.setStatus(PurchaseStatus.GRANTED);
+            when(purchases.findByPlatformAndStoreTransactionId(PurchasePlatform.GOOGLE_PLAY, "txn-1"))
+                    .thenReturn(Optional.of(row));
 
-    @Test
-    @DisplayName("a concurrent redemption that loses the unique constraint reports a replay, not a 500")
-    void concurrentRedemptionSurfacesAsAlreadyProcessed() {
-        when(purchases.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(20)));
 
-        BusinessException ex = assertThrows(
-                BusinessException.class,
-                () -> service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.coins.500", "receipt"));
-        assertEquals(162, ex.getTransactionCode().getId());
-    }
+            service.refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
 
-    // -- granting ------------------------------------------------------------
+            assertEquals(PurchaseStatus.REFUNDED, row.getStatus());
+            assertEquals(NOW, gamer.getSubscriptionExpiresAt());
+        }
 
-    @Test
-    void subscriptionGrantsTheTierAndAnExpiry() {
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
+        @Test
+        @DisplayName("refunded coins cannot push a balance negative")
+        void refundedCoinsFloorAtZero() {
+            Purchase row = new Purchase();
+            row.setUserId(USER);
+            row.setProductId(Product.COINS_LARGE.storeId());
+            row.setStatus(PurchaseStatus.GRANTED);
+            when(purchases.findByPlatformAndStoreTransactionId(PurchasePlatform.GOOGLE_PLAY, "txn-1"))
+                    .thenReturn(Optional.of(row));
 
-        Purchase purchase = service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.gold.monthly", "receipt");
+            // Already spent most of them.
+            gamer.setCoin(50);
 
-        assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
-        assertEquals(NOW.plus(Duration.ofDays(30)), gamer.getSubscriptionExpiresAt());
-        assertEquals(PurchaseStatus.GRANTED, purchase.getStatus());
-    }
+            service.refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
 
-    @Test
-    @DisplayName("the store's own expiry wins, because it knows about renewals we do not")
-    void storeExpiryIsAuthoritative() {
-        Instant storeExpiry = NOW.plus(Duration.ofDays(400));
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, storeExpiry));
-
-        service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.gold.monthly", "receipt");
-
-        assertEquals(storeExpiry, gamer.getSubscriptionExpiresAt());
-    }
-
-    @Test
-    @DisplayName("renewing early adds to the time left instead of truncating it")
-    void earlyRenewalExtendsFromTheExistingExpiry() {
-        gamer.setSubscriptionTier(SubscriptionTier.GOLD);
-        gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(10)));
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
-
-        service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.gold.monthly", "receipt");
-
-        assertEquals(NOW.plus(Duration.ofDays(40)), gamer.getSubscriptionExpiresAt());
-    }
-
-    @Test
-    @DisplayName("renewing after a lapse starts from now, not from the old expiry in the past")
-    void lapsedRenewalDoesNotBackdate() {
-        gamer.setSubscriptionTier(SubscriptionTier.GOLD);
-        gamer.setSubscriptionExpiresAt(NOW.minus(Duration.ofDays(60)));
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
-
-        service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.gold.monthly", "receipt");
-
-        assertEquals(NOW.plus(Duration.ofDays(30)), gamer.getSubscriptionExpiresAt());
-    }
-
-    @Test
-    void coinPackCreditsTheBalance() {
-        PurchaseService service = service(acceptingVerifier(PurchasePlatform.GOOGLE_PLAY, null));
-
-        service.redeem(USER, PurchasePlatform.GOOGLE_PLAY, "gamebuddy.coins.500", "receipt");
-
-        assertEquals(600, gamer.getCoin());
-        assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier(), "a consumable grants no tier");
-    }
-
-    // -- refunds -------------------------------------------------------------
-
-    @Test
-    @DisplayName("a refunded subscription expires immediately")
-    void refundExpiresSubscription() {
-        gamer.setSubscriptionTier(SubscriptionTier.GOLD);
-        gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(20)));
-
-        Purchase purchase = new Purchase();
-        purchase.setUserId(USER);
-        purchase.setProductId("gamebuddy.gold.monthly");
-        purchase.setStatus(PurchaseStatus.GRANTED);
-        when(purchases.findByPlatformAndStoreTransactionId(any(), any())).thenReturn(Optional.of(purchase));
-
-        service().refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
-
-        assertEquals(PurchaseStatus.REFUNDED, purchase.getStatus());
-        assertEquals(
-                SubscriptionTier.BASIC,
-                SubscriptionTier.effective(gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), NOW));
-    }
-
-    @Test
-    @DisplayName("refunding coins already spent does not push the balance negative")
-    void refundDoesNotGoNegative() {
-        gamer.setCoin(10);
-
-        Purchase purchase = new Purchase();
-        purchase.setUserId(USER);
-        purchase.setProductId("gamebuddy.coins.500");
-        purchase.setStatus(PurchaseStatus.GRANTED);
-        when(purchases.findByPlatformAndStoreTransactionId(any(), any())).thenReturn(Optional.of(purchase));
-
-        service().refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
-
-        assertEquals(0, gamer.getCoin());
-    }
-
-    @Test
-    @DisplayName("the refunded row is kept, so the same receipt cannot be redeemed again")
-    void refundKeepsTheRowClaimed() {
-        Purchase purchase = new Purchase();
-        purchase.setUserId(USER);
-        purchase.setProductId("gamebuddy.coins.500");
-        purchase.setStatus(PurchaseStatus.GRANTED);
-        when(purchases.findByPlatformAndStoreTransactionId(any(), any())).thenReturn(Optional.of(purchase));
-
-        service().refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
-
-        verify(purchases, never()).delete(any());
-        assertEquals(PurchaseStatus.REFUNDED, purchase.getStatus());
+            assertEquals(0, gamer.getCoin());
+        }
     }
 }

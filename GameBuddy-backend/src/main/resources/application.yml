@@ -177,23 +177,17 @@ gamebuddy:
     cleanup-cron: ${IMPRESSION_CLEANUP_CRON:0 30 3 * * *}
 
   billing:
-    # Nothing is registered by default, and PurchaseService rejects any platform it has no
-    # verifier for. A deployment that has not been configured refuses to sell rather than
-    # giving product away.
-    google:
-      # Needs a service-account JSON with "View financial data" on the Play Console.
-      enabled: ${GOOGLE_BILLING_ENABLED:false}
-      package-name: ${GOOGLE_PACKAGE_NAME:}
-      service-account-file: ${GOOGLE_SERVICE_ACCOUNT_FILE:}
-    apple:
-      # Needs Apple's root certificates on disk; they are shipped with the deployment,
-      # never fetched at runtime.
-      enabled: ${APPLE_BILLING_ENABLED:false}
-      bundle-id: ${APPLE_BUNDLE_ID:}
-      root-certificate-dir: ${APPLE_ROOT_CERT_DIR:}
-    # Verifies NOTHING. Local development only — with this on, anyone who can reach the
-    # endpoint can grant themselves Gold and unlimited coins.
-    sandbox: ${BILLING_SANDBOX:false}
+    revenuecat:
+      # The shared secret typed into the Authorization field of the webhook in the
+      # RevenueCat dashboard. RevenueCat sends it verbatim in the Authorization header.
+      #
+      # This is the ONLY thing standing between an anonymous POST and a free subscription:
+      # with receipt verification delegated to RevenueCat, the webhook is the single path
+      # that can grant a paid entitlement. RevenueCatWebhookController refuses to start
+      # without it rather than defaulting to something permissive.
+      #
+      # Generate one with `openssl rand -base64 32` and put the same value in both places.
+      webhook-token: ${REVENUECAT_WEBHOOK_TOKEN:}
 
 springdoc:
   swagger-ui:

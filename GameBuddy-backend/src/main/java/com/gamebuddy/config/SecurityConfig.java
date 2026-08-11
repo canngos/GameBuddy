@@ -64,7 +64,13 @@ public class SecurityConfig {
         // being involved at all. Public because an <Image> fetches a URL with no
         // Authorization header, exactly as it would against R2's public bucket. Only the
         // MEDIA bucket is reachable through it; nothing awaiting review is.
-        "/media/**"
+        "/media/**",
+        // RevenueCat's webhook. Public to Spring Security because the caller is a server
+        // with no account and no JWT, but *not* unauthenticated: the controller checks a
+        // shared secret sent in the Authorization header and refuses without it. This is
+        // the only path that can grant a paid entitlement, so that check is the whole
+        // security boundary for billing — see RevenueCatWebhookController.
+        "/billing/revenuecat/webhook"
     };
 
     private final JwtAuthenticationFilter jwtAuthFilter;

@@ -139,14 +139,6 @@ export type Subscription = {
   canUseAdvancedFilters: boolean;
 };
 
-/** What POST /billing/redeem returns once the receipt has been verified. */
-export type Purchase = {
-  productId: string;
-  status: string;
-  /** ISO instant. Null for a consumable such as a coin pack. */
-  entitlementExpiresAt: string | null;
-};
-
 export type LikedYou = {
   /** Always populated, on every tier. */
   count: number;

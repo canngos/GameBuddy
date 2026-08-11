@@ -2,7 +2,10 @@ package com.gamebuddy.config;
 
 import jakarta.mail.internet.MimeMessage;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +13,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessagePreparator;
+import org.springframework.util.StringUtils;
 
 /**
  * Where verification emails go.
@@ -57,6 +61,71 @@ public class MailConfig {
         log.warn("Anyone who can read these logs can verify any address. Local use only.");
         log.warn("=".repeat(78));
         return new LoggingMailSender();
+    }
+
+    /**
+     * Refuses to start when real sending is configured but incompletely.
+     *
+     * <p>This exists because of how the missing piece announced itself. A blank
+     * {@code gamebuddy.mail.from} is not caught anywhere near the configuration — it travels
+     * all the way to {@code setFrom("")} and surfaces as {@code AddressException: Illegal
+     * address in string ''} inside the first registration attempt. The application starts
+     * clean, the health check passes, and the fault is invisible until a real person tries
+     * to sign up and is told the email could not be sent. Every account creation fails, and
+     * nothing says why until somebody reads a stack trace.
+     *
+     * <p>A missing host or password behaves the same way: fine at boot, broken on first use.
+     * So all four settings are checked together and the application refuses to start without
+     * them. A container that will not start is noticed immediately; one that starts and
+     * cannot register anybody is noticed by users.
+     *
+     * <p>Skipped entirely in {@code log} mode, which sends nothing and needs none of it.
+     */
+    @Bean
+    public Object smtpConfigurationCheck(
+            @Value("${gamebuddy.mail.mode:smtp}") String mode,
+            @Value("${gamebuddy.mail.from:}") String from,
+            @Value("${spring.mail.host:}") String host,
+            @Value("${spring.mail.username:}") String username,
+            @Value("${spring.mail.password:}") String password) {
+
+        if ("log".equalsIgnoreCase(mode)) {
+            return new Object();
+        }
+
+        List<String> missing = new ArrayList<>();
+        if (!StringUtils.hasText(from)) {
+            missing.add("MAIL_FROM (gamebuddy.mail.from)");
+        }
+        if (!StringUtils.hasText(host)) {
+            missing.add("MAIL_HOST (spring.mail.host)");
+        }
+        if (!StringUtils.hasText(username)) {
+            missing.add("SMTP_EMAIL (spring.mail.username)");
+        }
+        if (!StringUtils.hasText(password)) {
+            missing.add("SMTP_EMAIL_PWD (spring.mail.password)");
+        }
+
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException("Mail mode is '" + mode
+                    + "' (real sending) but these settings are blank: " + String.join(", ", missing)
+                    + ". Set them, or set MAIL_MODE=log for local work — with them missing every"
+                    + " registration would fail at the point of sending.");
+        }
+
+        // The sender is the one value SMTP will not reject on our behalf: Brevo and every
+        // other relay authenticates the login, not the From header, so a malformed address
+        // here is only discovered when a message is built.
+        if (!from.contains("@") || from.startsWith("@") || from.endsWith("@")) {
+            throw new IllegalStateException(
+                    "MAIL_FROM is not an email address: '" + from + "'. It becomes the From"
+                            + " header of every verification email and must be a sender your relay"
+                            + " is allowed to send as.");
+        }
+
+        log.info("Mail: sending over {} as {}", host, from);
+        return new Object();
     }
 
     /**
