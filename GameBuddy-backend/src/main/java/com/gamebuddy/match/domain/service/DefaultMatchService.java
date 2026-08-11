@@ -34,6 +34,11 @@ import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.repository.GamesRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
 import com.gamebuddy.shared.storage.CosmeticUrls;
+import com.gamebuddy.match.interfaces.dto.BoostResponseBody;
+import com.gamebuddy.match.interfaces.dto.RewindResponseBody;
+import com.gamebuddy.match.interfaces.response.BoostResponse;
+import com.gamebuddy.match.interfaces.response.RewindResponse;
+import com.gamebuddy.common.enums.SubscriptionTier;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
@@ -153,10 +158,67 @@ public class DefaultMatchService implements MatchService {
         // rank, and a filtered feed that quietly injects somebody playing a different game
         // is not showing an overlooked candidate — it is ignoring the request.
         List<Gamer> explored = filtered(exploration(gamer, ranked, decided), filters);
-        List<Gamer> page = merge(ranked, explored);
+        List<Gamer> page = boostedFirst(gamer, merge(ranked, explored), decided, filters);
 
         recordImpressions(gamer, page, explored);
         return recommendationResponse(page);
+    }
+
+    /**
+     * How many boosted gamers may take the front of one page.
+     *
+     * <p>Small on purpose. A boost is worth buying because it is seen; it stops being worth
+     * buying the moment the top of everyone's deck is nothing but other people's boosts,
+     * because then the deck is an advertisement rather than a recommendation and people
+     * stop swiping it at all. Three is enough to be noticed and few enough that the ranked
+     * feed is still the feed.
+     */
+    private static final int BOOST_SLOTS = 3;
+
+    /**
+     * Puts boosted gamers in this country at the front.
+     *
+     * <p>Applied after ranking rather than by weighting the model, because a boost is a
+     * commercial promise — thirty minutes at the front — and a score nudge is not a promise
+     * anybody can check. Doing it here also means the model never learns that paying makes
+     * somebody more similar to everyone, which is what a boosted training signal would
+     * eventually teach it.
+     *
+     * <p>Boosted candidates still pass every ordinary gate: age band, blocks, the decided
+     * set, and any filters that were asked for. Paying moves you up a queue; it does not
+     * get you past the door.
+     */
+    private List<Gamer> boostedFirst(Gamer gamer, List<Gamer> page, Set<String> decided, FeedFilters filters) {
+        if (gamer.getCountry() == null) {
+            return page;
+        }
+
+        // Everyone already on the page is excluded so a boosted candidate is promoted
+        // rather than duplicated.
+        Set<String> exclude = new HashSet<>(decided);
+        page.forEach(candidate -> exclude.add(candidate.getUserId()));
+
+        List<Gamer> boosted = gamerRepository
+                .findBoosted(
+                        gamer.getCountry(),
+                        AgeBand.of(gamer.getAge()) == AgeBand.MINOR,
+                        exclude.toArray(String[]::new),
+                        clock.instant(),
+                        BOOST_SLOTS)
+                .stream()
+                // The SQL cannot see the block graph, which lives in a join table on both
+                // sides, so the same check every other path uses is applied here too.
+                .filter(gamer::isPairableWith)
+                .filter(candidate -> filters.matches(candidate, clock))
+                .toList();
+
+        if (boosted.isEmpty()) {
+            return page;
+        }
+
+        List<Gamer> promoted = new ArrayList<>(boosted);
+        promoted.addAll(page);
+        return promoted;
     }
 
     /**
@@ -293,6 +355,7 @@ public class DefaultMatchService implements MatchService {
         // sets could both contain the same gamer, and getRecommendations then removed
         // them twice while acceptGamer and declineGamer disagreed about the outcome.
         declinedMatches.clear(gamer.getUserId(), target.getUserId());
+        rememberDecision(gamer, target, true);
 
         boolean mutual = target.getApprovedMatches().contains(gamer);
         if (mutual) {
@@ -393,9 +456,141 @@ public class DefaultMatchService implements MatchService {
         // gamer must be able to dismiss anyone who reached their screen.
         declinedMatches.save(new DeclinedMatch(gamer.getUserId(), target.getUserId(), clock.instant()));
         gamer.getApprovedMatches().remove(target);
+        rememberDecision(gamer, target, false);
         gamerRepository.save(gamer);
 
         return DefaultMessageResponse.of("Gamer declined");
+    }
+
+    /**
+     * Notes what was just swiped, so it can be taken back.
+     *
+     * <p>Overwrites rather than appends: only the most recent decision is rewindable, and
+     * keeping one slot is what makes that true without a second counter to get wrong.
+     */
+    private void rememberDecision(Gamer gamer, Gamer target, boolean accept) {
+        gamer.setLastDecisionUserId(target.getUserId());
+        gamer.setLastDecisionAccept(accept);
+        gamer.setLastDecisionAt(clock.instant());
+    }
+
+    /**
+     * Takes back the last swipe.
+     *
+     * <p>Refuses a like that was answered. Undoing it would delete a conversation both
+     * sides can already see and take a match away from somebody who did nothing but say
+     * yes — a rewind is allowed to undo <em>your</em> decision, not somebody else's.
+     *
+     * <p>The quota is refunded, because the swipe is being un-made. Not refunding it would
+     * mean a rewind costs coins <em>and</em> a like, which is the opposite of removing a
+     * regret.
+     */
+    @Override
+    @Transactional
+    public RewindResponse rewind(Gamer principal) {
+        Gamer gamer = reload(principal);
+
+        String targetId = gamer.getLastDecisionUserId();
+        if (targetId == null || gamer.getLastDecisionAccept() == null) {
+            throw new BusinessException(TransactionCode.NOTHING_TO_REWIND);
+        }
+
+        Gamer target = requireGamer(targetId);
+        boolean wasAccept = Boolean.TRUE.equals(gamer.getLastDecisionAccept());
+
+        if (wasAccept && target.getApprovedMatches().contains(gamer)) {
+            throw new BusinessException(TransactionCode.REWIND_MATCHED);
+        }
+
+        int cost = BoostPolicy.rewindCost(swipeQuota.effectiveTier(gamer));
+        if (cost > 0) {
+            if (gamer.getCoin() < cost) {
+                throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
+            }
+            gamer.setCoin(gamer.getCoin() - cost);
+        }
+
+        if (wasAccept) {
+            gamer.getApprovedMatches().remove(target);
+        } else {
+            declinedMatches.clear(gamer.getUserId(), targetId);
+        }
+
+        swipeQuota.refund(gamer, wasAccept);
+
+        // Cleared so the same regret cannot be undone twice.
+        gamer.setLastDecisionUserId(null);
+        gamer.setLastDecisionAccept(null);
+        gamer.setLastDecisionAt(null);
+        gamerRepository.save(gamer);
+
+        RewindResponse response = new RewindResponse();
+        response.setBody(new BaseBody<>(new RewindResponseBody(candidate(target), cost, gamer.getCoin())));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
+    }
+
+    /**
+     * Puts this gamer at the front of decks in their country for half an hour.
+     *
+     * <p>Free once a week on Gold, otherwise coins. Refuses while one is already running
+     * rather than extending it: stacking would let somebody spend four boosts on two hours
+     * nobody is awake for, and "you are already boosted" is the answer they actually want.
+     */
+    @Override
+    @Transactional
+    public BoostResponse boost(Gamer principal) {
+        Gamer gamer = reload(principal);
+        Instant now = clock.instant();
+
+        if (BoostPolicy.boosted(gamer.getBoostExpiresAt(), now)) {
+            throw new BusinessException(TransactionCode.BOOST_ALREADY_ACTIVE);
+        }
+
+        SubscriptionTier tier = swipeQuota.effectiveTier(gamer);
+        boolean free = BoostPolicy.freeBoostAvailable(tier, gamer.getLastFreeBoostAt(), now);
+        int cost = free ? 0 : BoostPolicy.BOOST_COST_COINS;
+
+        if (cost > 0) {
+            if (gamer.getCoin() < cost) {
+                throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
+            }
+            gamer.setCoin(gamer.getCoin() - cost);
+        } else {
+            // Only stamped when the weekly one was actually spent, so a paid boost does
+            // not quietly consume the free one somebody was saving.
+            gamer.setLastFreeBoostAt(now);
+        }
+
+        gamer.setBoostExpiresAt(now.plus(BoostPolicy.BOOST_DURATION));
+        gamerRepository.save(gamer);
+
+        return boostStatusResponse(gamer, tier, now, cost);
+    }
+
+    /** What the deck's Boost button needs to render itself without guessing. */
+    @Override
+    @Transactional(readOnly = true)
+    public BoostResponse boostStatus(Gamer principal) {
+        Gamer gamer = reload(principal);
+        Instant now = clock.instant();
+        return boostStatusResponse(gamer, swipeQuota.effectiveTier(gamer), now, null);
+    }
+
+    private BoostResponse boostStatusResponse(Gamer gamer, SubscriptionTier tier, Instant now, Integer spent) {
+        BoostResponseBody body = new BoostResponseBody(
+                BoostPolicy.boosted(gamer.getBoostExpiresAt(), now),
+                gamer.getBoostExpiresAt(),
+                BoostPolicy.boostCost(tier, gamer.getLastFreeBoostAt(), now),
+                BoostPolicy.freeBoostAvailable(tier, gamer.getLastFreeBoostAt(), now),
+                BoostPolicy.nextFreeBoostAt(tier, gamer.getLastFreeBoostAt(), now),
+                gamer.getCoin(),
+                spent);
+
+        BoostResponse response = new BoostResponse();
+        response.setBody(new BaseBody<>(body));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
     }
 
     // =======================================================================
@@ -587,6 +782,11 @@ public class DefaultMatchService implements MatchService {
     private List<Gamer> rankedAsModelOrdered(List<String> ranking, List<Gamer> fetched) {
         Map<String, Gamer> byId = fetched.stream().collect(Collectors.toMap(Gamer::getUserId, g -> g));
         return ranking.stream().map(byId::get).filter(Objects::nonNull).toList();
+    }
+
+    /** One gamer in the same shape the deck already renders. */
+    private GamerDto candidate(Gamer gamer) {
+        return toDtos(List.of(gamer)).getFirst();
     }
 
     /** Maps gamers to DTOs, resolving every avatar in one query rather than per row. */

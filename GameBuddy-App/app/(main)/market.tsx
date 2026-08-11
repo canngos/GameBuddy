@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
 import { cosmeticsApi } from '../../src/api/cosmetics';
+import { ApiError, Code } from '../../src/api/envelope';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
+import { CoinShop } from '../../src/market/CoinShop';
+import { EarnCoins } from '../../src/market/EarnCoins';
 import { useThemeColors } from '../../src/theme';
 import { Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
 
@@ -24,6 +27,11 @@ export default function Market() {
   const queryClient = useQueryClient();
   const [kind, setKind] = useState<'FRAME' | 'BANNER'>('FRAME');
   const [failure, setFailure] = useState<string | null>(null);
+  /** Set when a purchase was refused for want of coins, which has its own way out. */
+  const [shortOfCoins, setShortOfCoins] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const coinShopY = useRef(0);
 
   const store = useQuery({ queryKey: STORE_KEY, queryFn: cosmeticsApi.store });
 
@@ -38,11 +46,35 @@ export default function Market() {
    */
   const applyStore = (next: CosmeticStore) => {
     setFailure(null);
+    setShortOfCoins(false);
     queryClient.setQueryData(STORE_KEY, next);
     void queryClient.invalidateQueries({ queryKey: ['me'] });
   };
 
-  const onError = (error: unknown) => setFailure(messageOf(error));
+  /**
+   * Running out of coins is not the same kind of event as a request failing.
+   *
+   * It gets its own state and its own copy, because it is the one failure here with an
+   * obvious remedy — and because the remedy must stay the gamer's to choose. Opening a
+   * store sheet on somebody who has just been told "no" turns a refusal into a sales
+   * pitch at the exact moment they are least receptive to one; this offers a button that
+   * scrolls to the packs, and that is all.
+   */
+  const onError = (error: unknown) => {
+    if (error instanceof ApiError && error.is(Code.COIN_NOT_ENOUGH)) {
+      setShortOfCoins(true);
+      setFailure(null);
+      return;
+    }
+    setShortOfCoins(false);
+    setFailure(messageOf(error));
+  };
+
+  const showCoinPacks = () => {
+    setShortOfCoins(false);
+    // -24 so the "COINS" heading is not flush against the top edge on arrival.
+    scrollRef.current?.scrollTo({ y: Math.max(0, coinShopY.current - 24), animated: true });
+  };
 
   const buy = useMutation({ mutationFn: cosmeticsApi.buy, onSuccess: applyStore, onError });
   const equip = useMutation({ mutationFn: cosmeticsApi.equip, onSuccess: applyStore, onError });
@@ -57,7 +89,7 @@ export default function Market() {
   const wearingOne = items.some((item) => item.equipped);
 
   return (
-    <Screen scroll edges={['top']}>
+    <Screen scroll edges={['top']} scrollRef={scrollRef}>
       <View className="flex-row items-end justify-between pb-5 pt-8">
         <View className="gap-1">
           <Text variant="overline">MARKET</Text>
@@ -91,6 +123,24 @@ export default function Market() {
         </Card>
       )}
 
+      {shortOfCoins && (
+        <Card className="mb-3">
+          <Text variant="bodyStrong">Not enough coins</Text>
+          <Text variant="caption" className="mt-1">
+            You have {store.data?.coins ?? 0}. Badges earn coins, or you can top up.
+          </Text>
+          <Pressable
+            onPress={showCoinPacks}
+            accessibilityRole="button"
+            className="mt-3 self-start rounded-full bg-brand/15 px-4 py-2 active:opacity-70"
+          >
+            <Text variant="label" className="text-brand">
+              See coin packs
+            </Text>
+          </Pressable>
+        </Card>
+      )}
+
       <View className="gap-3 pb-8">
         {items.map((item) => (
           <Row
@@ -118,6 +168,18 @@ export default function Market() {
           </Pressable>
         )}
       </View>
+
+      {/* Earning comes before buying, and both come after the shelf. Somebody who has not
+          yet seen a frame they want has no reason for either — putting the till before the
+          goods is what makes a cosmetics shop feel like a slot machine. */}
+      <EarnCoins />
+
+      <CoinShop
+        balance={store.data?.coins ?? 0}
+        onLayoutY={(y) => {
+          coinShopY.current = y;
+        }}
+      />
     </Screen>
   );
 }

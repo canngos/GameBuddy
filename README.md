@@ -316,15 +316,58 @@ report button and a moderator who answers it.
 
 ### Regenerating the baseline schema
 
-Only needed after changing an entity. Point the app at a scratch database with
-`DDL_AUTO=create`, let it start once, then dump:
+Needed after changing an entity, and **it is not optional**: the baseline once went sixteen
+columns behind the entities across five separate features, and nothing complained until a
+fresh database refused to start. Nothing in the build checks this, so it has to be done
+with the change that causes it.
+
+**Regenerate from the migrations, never from the entities.** Build a scratch database by
+replaying the current baseline plus every upgrade, and dump that:
 
 ```bash
-docker compose exec postgres psql -U gamebuddy -c "CREATE DATABASE scratch;"
-# start the backend against .../scratch with DDL_AUTO=create, wait for it to boot, stop it
+docker compose exec postgres psql -U gamebuddy -d postgres -c "CREATE DATABASE scratch;"
+
+docker compose exec -T postgres psql -U gamebuddy -d scratch \
+  -f /dev/stdin < GameBuddy-backend/src/main/resources/db/schema-baseline.sql
+
+# Numeric order, not filename order — `ls` puts upgrade-10 before upgrade-4.
+for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+  f=$(ls GameBuddy-backend/src/main/resources/db/upgrade-2026-$n-*.sql)
+  docker compose exec -T postgres psql -U gamebuddy -d scratch -f /dev/stdin < "$f"
+done
+
 docker compose exec postgres pg_dump -U gamebuddy -d scratch \
   --schema-only --no-owner --no-privileges --schema=gamebuddy
 ```
+
+Then delete the `\restrict` and `\unrestrict` lines: they are psql session meta-commands
+from newer `pg_dump` versions, and they fail with "wrong key" when the file is piped to
+`psql` rather than replayed exactly as written.
+
+Prove it before committing — none of this fails loudly when it is wrong. Load the result
+into an empty database, run `seed-local.sql` against it, and boot with
+`DDL_AUTO=validate`. A clean `Started GameBuddyApplication` is the only evidence that
+counts.
+
+### Two ways to get this badly wrong
+
+**Do not generate it with `ddl-auto=create`.** Pointing Hibernate at an empty database
+produces the same tables and columns, so a diff of table names looks perfect — and the
+result carries **no column DEFAULTs at all**, because Hibernate supplies those values from
+Java instead. All 50 defaults in the baseline came from migrations, and `seed-local.sql`
+and `tools/local-gamers.sql` both depend on them. Regenerating this way drops every one,
+and the first symptom is a seed failing on a NOT NULL column several steps later.
+
+**`DB_URL` is not a variable this project reads.** `docker-compose.yml` sets
+`SPRING_DATASOURCE_URL`, and that is what `application.yml` binds. Overriding `DB_URL` on a
+`docker compose run` changes nothing, the container quietly uses the *main* database from
+compose, and with `DDL_AUTO=create` that drops and recreates every table in it. Always
+override `SPRING_DATASOURCE_URL`, and never combine an override with `DDL_AUTO=create`
+without checking which database actually got it.
+
+Recovering from that: rebuild as above, then `seed-local.sql`, then
+`GameBuddy-Model/tools/local-gamers.sql` for the swipeable population. Only the accounts
+you registered by hand are unrecoverable.
 
 Then re-apply the one thing the entities cannot express: `idx_outbox_pending` is **partial**
 (`WHERE sent_at IS NULL`). The outbox is overwhelmingly delivered rows, and a full index

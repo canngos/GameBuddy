@@ -156,6 +156,25 @@ public enum TransactionCode {
      * somebody. Ordinary profanity is masked instead and never reaches this.
      */
     CONTENT_BLOCKED(170, "That message breaks the community rules", HttpStatus.BAD_REQUEST),
+    NOTHING_TO_REWIND(171, "There is no swipe to take back", HttpStatus.CONFLICT),
+    /**
+     * The like being rewound was answered. Undoing it would delete a conversation both
+     * sides can already see, and take a match away from somebody who did nothing wrong.
+     */
+    REWIND_MATCHED(172, "You matched with them — that one cannot be taken back", HttpStatus.CONFLICT),
+    BOOST_ALREADY_ACTIVE(173, "You are already boosted", HttpStatus.CONFLICT),
+    /** The daily coins, a quest or the stipend was asked for before it was due. */
+    REWARD_NOT_READY(174, "There is nothing to claim yet", HttpStatus.CONFLICT),
+    /** A quest whose target has not been reached. */
+    QUEST_UNFINISHED(175, "That one is not finished yet", HttpStatus.CONFLICT),
+    /**
+     * Two writes to the same row raced and this one lost the optimistic lock.
+     *
+     * <p>Almost always a double-tap on a button that spends or earns coins. The winner's
+     * write stands; this one changed nothing, which is exactly the property the lock exists
+     * to guarantee. A conflict rather than a server error, because nothing is broken.
+     */
+    CONCURRENT_MODIFICATION(176, "That went through already — check and try again", HttpStatus.CONFLICT),
 
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);

@@ -25,8 +25,12 @@ ALTER TABLE gamebuddy.cosmetic
 
 -- The new banner. Fixed uuid so re-running this cannot create a second one, and so every
 -- environment agrees on the id.
-INSERT INTO gamebuddy.cosmetic (id, kind, name, asset_key, animated, price, sort_order, membership_only)
-VALUES ('1f0c9f4e-2b6a-4d3e-9c47-5a8b1e7d6c20', 'BANNER', 'Gold', 'banners/banner-gold.jpg', false, 0, 0, true)
+-- created_date is supplied explicitly. The column was created with DEFAULT now() by
+-- upgrade-2026-7, but a schema built straight from the entities has no default —
+-- Hibernate does not emit one for @CreationTimestamp, which it populates in Java.
+-- Naming it here means this runs on either.
+INSERT INTO gamebuddy.cosmetic (id, kind, name, asset_key, animated, price, sort_order, membership_only, created_date)
+VALUES ('1f0c9f4e-2b6a-4d3e-9c47-5a8b1e7d6c20', 'BANNER', 'Gold', 'banners/banner-gold.jpg', false, 0, 0, true, now())
 ON CONFLICT (id) DO UPDATE
     SET kind = EXCLUDED.kind,
         name = EXCLUDED.name,

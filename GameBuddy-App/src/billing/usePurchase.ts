@@ -1,6 +1,7 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { billingApi } from '../api/billing';
+import { cosmeticsApi } from '../api/cosmetics';
 import { PurchaseCancelledError, entitlementArrived, purchase as openStoreSheet } from './purchases';
 
 /**
@@ -20,10 +21,10 @@ const ENTITLEMENT_QUERIES = [
 ];
 
 /**
- * How long to wait for the entitlement to appear after the store sheet closes.
+ * How long to wait for the purchase to appear on our side after the store sheet closes.
  *
- * This wait exists because of how the money now travels: the store charges, RevenueCat
- * verifies, RevenueCat posts a webhook to our backend, and only then are we Gold. The user
+ * This wait exists because of how the money travels: the store charges, RevenueCat
+ * verifies, RevenueCat posts a webhook to our backend, and only then do we know. The user
  * has paid before any of the last three have happened. Usually it is a second or two.
  *
  * Ten seconds is a compromise between two bad screens. Give up too early and somebody who
@@ -37,13 +38,33 @@ const POLL_INTERVAL_MS = 1_000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Buys a product and waits for the entitlement to land.
+ * What kind of thing is being bought, which decides what "it arrived" means.
  *
- * There is no receipt here and nothing is persisted, which is the point of moving to
- * RevenueCat: if this app dies between the charge and the entitlement, RevenueCat still
- * has the purchase and still delivers the webhook. Recovery stopped being the client's job.
+ * A subscription is a tier, and its arrival is visible as `tier === 'GOLD'`. A coin pack
+ * is a balance, and there is no flag to look for — only a number that should have gone up.
+ * They cannot share a check, and using the subscription one for coins would wait ten
+ * seconds and then always report a timeout on a purchase that worked perfectly.
  */
-export function usePurchase() {
+export type PurchaseKind = 'subscription' | 'coins';
+
+/** The balance before buying, so an increase can be recognised. */
+async function coinBalance(queryClient: QueryClient): Promise<number> {
+  const store = await queryClient.fetchQuery({
+    queryKey: ['cosmetics'],
+    queryFn: cosmeticsApi.store,
+    staleTime: 0,
+  });
+  return store.coins;
+}
+
+/**
+ * Buys a product and waits for it to land on our side.
+ *
+ * There is no receipt here and nothing is persisted, which is the point of RevenueCat: if
+ * this app dies between the charge and the entitlement, RevenueCat still has the purchase
+ * and still delivers the webhook. Recovery stopped being the client's job.
+ */
+export function usePurchase(kind: PurchaseKind = 'subscription') {
   const queryClient = useQueryClient();
 
   const refresh = useCallback(async () => {
@@ -54,6 +75,10 @@ export function usePurchase() {
 
   const buy = useMutation({
     mutationFn: async (productId: string) => {
+      // Read before the sheet opens. Afterwards the webhook may already have landed, and
+      // a "baseline" taken then would include the coins we are waiting for.
+      const baseline = kind === 'coins' ? await coinBalance(queryClient) : 0;
+
       try {
         await openStoreSheet(productId);
       } catch (error) {
@@ -67,12 +92,16 @@ export function usePurchase() {
       // our backend knows about it.
       const deadline = Date.now() + ENTITLEMENT_TIMEOUT_MS;
       while (Date.now() < deadline) {
-        const subscription = await queryClient.fetchQuery({
-          queryKey: ['subscription'],
-          queryFn: billingApi.subscription,
-          staleTime: 0,
-        });
-        if (entitlementArrived(subscription)) return { granted: true, cancelled: false };
+        if (kind === 'coins') {
+          if ((await coinBalance(queryClient)) > baseline) return { granted: true, cancelled: false };
+        } else {
+          const subscription = await queryClient.fetchQuery({
+            queryKey: ['subscription'],
+            queryFn: billingApi.subscription,
+            staleTime: 0,
+          });
+          if (entitlementArrived(subscription)) return { granted: true, cancelled: false };
+        }
         await sleep(POLL_INTERVAL_MS);
       }
 
@@ -90,7 +119,7 @@ export function usePurchase() {
     buy: buy.mutate,
     isPending: buy.isPending,
     error: buy.error,
-    /** True when the sheet completed but the entitlement had not arrived before the timeout. */
+    /** True when the sheet completed but the purchase had not arrived before the timeout. */
     awaitingEntitlement: buy.data?.granted === false && !buy.data.cancelled,
     reset: buy.reset,
   };

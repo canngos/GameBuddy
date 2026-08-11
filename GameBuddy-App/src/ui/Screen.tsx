@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
@@ -24,6 +24,13 @@ type ScreenProps = {
    * covered by it.
    */
   footer?: ReactNode;
+  /**
+   * The underlying ScrollView, for screens that need to move the viewport themselves.
+   *
+   * Only meaningful with `scroll`. Added for the Market, where refusing a purchase for
+   * want of coins has to be able to show the gamer where coins come from.
+   */
+  scrollRef?: RefObject<ScrollView | null>;
 };
 
 /**
@@ -40,6 +47,7 @@ export function Screen({
   padded = true,
   className,
   footer,
+  scrollRef,
 }: ScreenProps) {
   const gutter = padded ? 'px-6' : '';
 
@@ -59,6 +67,7 @@ export function Screen({
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         {scroll ? (
           <ScrollView
+            ref={scrollRef}
             // grow, not flex: fill the screen when short, scroll when tall.
             contentContainerClassName={cn('flex-grow pb-8', gutter, className)}
             keyboardShouldPersistTaps="handled"
