@@ -139,6 +139,59 @@ export type Subscription = {
   canUseAdvancedFilters: boolean;
 };
 
+/** What POST /match/rewind returns: the swipe that was taken back. */
+export type Rewind = {
+  /** Whoever came back, ready to be put on top of the deck again. */
+  gamer: Candidate;
+  /** Coins this cost. Zero on Gold, which gets rewinds as an entitlement. */
+  coinsSpent: number;
+  /** The balance afterwards, so the Market header does not need refetching. */
+  coinBalance: number;
+};
+
+/** Boost state, returned by both GET and POST /match/boost. */
+export type Boost = {
+  active: boolean;
+  /** ISO instant. Null when nothing is running. */
+  expiresAt: string | null;
+  /** What the next boost costs. Zero when the weekly Gold one is available. */
+  cost: number;
+  freeAvailable: boolean;
+  /** ISO instant, or null when a free one is available now or never. */
+  nextFreeAt: string | null;
+  coinBalance: number;
+  /** What the call just spent, or null when nothing was bought. */
+  coinsSpent: number | null;
+};
+
+/** One weekly quest, with this week's progress. */
+export type Quest = {
+  /** The enum name, which is what a claim is addressed to. */
+  code: string;
+  title: string;
+  /** Capped at `target` by the server, so a progress bar needs no guard. */
+  progress: number;
+  target: number;
+  reward: number;
+  claimed: boolean;
+};
+
+/** What GET /coins/earn reports, and what every claim returns. */
+export type Earn = {
+  dailyAvailable: boolean;
+  /** What claiming now would pay, at the streak it would reach. */
+  dailyReward: number;
+  streak: number;
+  /** ISO instant, or null when available now or never claimed. */
+  dailyReadyAt: string | null;
+  quests: Quest[];
+  stipendAvailable: boolean;
+  stipendAmount: number;
+  /** ISO instant, or null when available now or not a member. */
+  stipendReadyAt: string | null;
+  coinBalance: number;
+};
+
 export type LikedYou = {
   /** Always populated, on every tier. */
   count: number;

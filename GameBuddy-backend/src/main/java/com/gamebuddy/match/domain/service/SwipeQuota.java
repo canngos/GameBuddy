@@ -81,6 +81,24 @@ public class SwipeQuota {
         }
     }
 
+    /**
+     * Gives back one decision's worth of budget, for a swipe that is being un-made.
+     *
+     * <p>Floored at zero rather than trusted to be positive. The counters reset lazily, so
+     * a rewind can land after the window rolled — the swipe was charged yesterday and
+     * today's counter is already zero — and decrementing that would hand out a free extra
+     * like every midnight.
+     *
+     * <p>Does not touch {@code quotaResetAt}. The window belongs to the day, not to the
+     * decisions in it, and moving it would let a rewind quietly extend somebody's day.
+     */
+    public void refund(Gamer gamer, boolean accept) {
+        gamer.setSwipesUsed(Math.max(0, gamer.getSwipesUsed() - 1));
+        if (accept) {
+            gamer.setAcceptsUsed(Math.max(0, gamer.getAcceptsUsed() - 1));
+        }
+    }
+
     /** What is left of both allowances, and when they return. */
     public SwipeAllowance remaining(Gamer gamer) {
         SubscriptionTier tier = effectiveTier(gamer);

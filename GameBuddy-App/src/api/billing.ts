@@ -39,6 +39,40 @@ export const GOLD_PLANS = [
 
 export type GoldPlan = (typeof GOLD_PLANS)[number];
 
+/**
+ * Coin packs. Consumables, so they grant a balance rather than an entitlement.
+ *
+ * `coins` must match `Product.java` — the backend grants from its own table, so a wrong
+ * number here does not shortchange anybody, it just advertises the wrong amount, which is
+ * worse in its own way. The three ids and amounts are checked against the enum.
+ *
+ * `bonus` is presentation, computed from the per-coin rate against the smallest pack. It
+ * is not a second source of truth: change a price or an amount and the badge follows.
+ */
+export const COIN_PACKS = [
+  { productId: 'gamebuddy.coins.500', coins: 500, price: '$1.99' },
+  { productId: 'gamebuddy.coins.1200', coins: 1200, price: '$3.99' },
+  { productId: 'gamebuddy.coins.3000', coins: 3000, price: '$8.99' },
+] as const;
+
+export type CoinPack = (typeof COIN_PACKS)[number];
+
+/**
+ * How much better value a pack is than the smallest one, as a percentage, or null when it
+ * is not meaningfully better.
+ *
+ * Rounded down, and anything under 5% returns null: "2% more coins" is not a reason to
+ * spend more money and putting a badge on it only teaches people to ignore the badges.
+ */
+export function bonusPercent(pack: CoinPack): number | null {
+  const base = COIN_PACKS[0];
+  if (pack.productId === base.productId) return null;
+
+  const rate = (p: CoinPack) => p.coins / Number(p.price.replace(/[^0-9.]/g, ''));
+  const better = Math.floor((rate(pack) / rate(base) - 1) * 100);
+  return better >= 5 ? better : null;
+}
+
 export const billingApi = {
   /**
    * What this account currently holds.

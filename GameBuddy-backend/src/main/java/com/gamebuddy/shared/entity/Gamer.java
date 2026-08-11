@@ -282,6 +282,73 @@ public class Gamer implements RevocableUser {
     @Column(name = "quota_reset_at")
     private Instant quotaResetAt;
 
+    // --- Rewind ------------------------------------------------------------
+    // The single most recent swipe, so it can be taken back. Cleared once rewound, which
+    // is what stops one regret being undone twice. No history is kept: rewind is for the
+    // swipe you just regretted, and a log of every decision ever made would be a far
+    // larger privacy commitment than this feature earns.
+
+    @Column(name = "last_decision_user_id")
+    private String lastDecisionUserId;
+
+    /** True when that decision was a like. Decides which table a rewind has to undo. */
+    @Column(name = "last_decision_accept")
+    private Boolean lastDecisionAccept;
+
+    @Column(name = "last_decision_at")
+    private Instant lastDecisionAt;
+
+    // --- Boost -------------------------------------------------------------
+
+    /**
+     * While this is in the future, the gamer is pinned to the front of decks in their
+     * country. An expiry rather than a flag: nothing has to run to turn it off, so there
+     * is no sweep that can fail and leave somebody boosted forever.
+     */
+    @Column(name = "boost_expires_at")
+    private Instant boostExpiresAt;
+
+    /** When the weekly Gold boost was last taken. Null means never. */
+    @Column(name = "last_free_boost_at")
+    private Instant lastFreeBoostAt;
+
+    // --- Earning coins -----------------------------------------------------
+    // Here rather than in a wallet table, matching where the swipe quota and the boost
+    // expiry already live: per-gamer counters, read on one screen, written by one action.
+
+    @Column(name = "daily_claimed_at")
+    private Instant dailyClaimedAt;
+
+    /** Consecutive days claimed. Reset to 1 by a claim after a gap, never to 0. */
+    @Column(name = "daily_streak", nullable = false)
+    private int dailyStreak = 0;
+
+    @Column(name = "stipend_claimed_at")
+    private Instant stipendClaimedAt;
+
+    /**
+     * Start of the week the quest baselines below were taken at.
+     *
+     * <p>The baselines exist because {@code BadgeMetric} counts are lifetime totals, and a
+     * weekly quest asks about a week. Progress is the current total minus the baseline,
+     * which reuses one counting system instead of building a second.
+     */
+    @Column(name = "quest_week_started_at")
+    private Instant questWeekStartedAt;
+
+    @Column(name = "quest_base_messages", nullable = false)
+    private int questBaseMessages = 0;
+
+    @Column(name = "quest_base_matches", nullable = false)
+    private int questBaseMatches = 0;
+
+    @Column(name = "quest_base_posts", nullable = false)
+    private int questBasePosts = 0;
+
+    /** Bitmask of quests already paid this week; cleared when the week rolls over. */
+    @Column(name = "quest_claimed_mask", nullable = false)
+    private int questClaimedMask = 0;
+
     // --- Taste -------------------------------------------------------------
     // Batch-fetched: rendering a profile touches friends, games, keywords and
     // achievements, and one SELECT per element made that page O(n) queries.

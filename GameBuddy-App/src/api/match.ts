@@ -1,6 +1,6 @@
 import { NO_FILTERS, type FeedFilters } from '../match/filters';
 import { api } from './client';
-import type { Candidate, LikedYou, SwipeAllowance } from './types';
+import type { Boost, Candidate, LikedYou, Rewind, SwipeAllowance } from './types';
 
 export const matchApi = {
   /**
@@ -58,4 +58,22 @@ export const matchApi = {
     api
       .get<{ recommendedGamers: Candidate[] }>('/match/get/matches')
       .then((d) => d.recommendedGamers ?? []),
+
+  /**
+   * Takes back the last swipe and returns whoever came back.
+   *
+   * The candidate comes back in full so the deck can put them straight on top without
+   * refetching the feed — which would also record a second impression for somebody who
+   * was already shown once, quietly teaching the model about a view that never happened.
+   *
+   * Refused with 171 when there is nothing to undo, 172 when the like was already
+   * answered (that match is not only yours to reverse), and 129 when the coins are short.
+   */
+  rewind: () => api.post<Rewind>('/match/rewind'),
+
+  /** Boost state and price, for the button to describe itself. */
+  boostStatus: () => api.get<Boost>('/match/boost'),
+
+  /** Starts a boost. Free once a week on Gold, otherwise coins. */
+  boost: () => api.post<Boost>('/match/boost'),
 };

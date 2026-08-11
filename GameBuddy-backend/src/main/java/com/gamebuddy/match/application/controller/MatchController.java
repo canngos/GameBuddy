@@ -9,6 +9,8 @@ import com.gamebuddy.match.interfaces.response.LikedYouResponse;
 import com.gamebuddy.match.interfaces.response.RecommendationResponse;
 import com.gamebuddy.match.interfaces.response.SwipeAllowanceResponse;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.match.interfaces.response.BoostResponse;
+import com.gamebuddy.match.interfaces.response.RewindResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -41,6 +43,28 @@ public class MatchController {
             @RequestParam(required = false) Boolean onlineNow) {
         return ResponseEntity.ok(
                 matchService.getRecommendations(principal, new FeedFilters(gameId, country, onlineNow)));
+    }
+
+    /**
+     * Takes back the last swipe.
+     *
+     * <p>POST, not DELETE: this spends coins and changes a quota, so it is not the
+     * idempotent removal that a DELETE promises — calling it twice is not the same as
+     * calling it once.
+     */
+    @PostMapping("/rewind")
+    public ResponseEntity<RewindResponse> rewind(@AuthenticationPrincipal Gamer principal) {
+        return ResponseEntity.ok(matchService.rewind(principal));
+    }
+
+    @PostMapping("/boost")
+    public ResponseEntity<BoostResponse> boost(@AuthenticationPrincipal Gamer principal) {
+        return ResponseEntity.ok(matchService.boost(principal));
+    }
+
+    @GetMapping("/boost")
+    public ResponseEntity<BoostResponse> boostStatus(@AuthenticationPrincipal Gamer principal) {
+        return ResponseEntity.ok(matchService.boostStatus(principal));
     }
 
     @GetMapping("/get/selected/game/{gameId}")

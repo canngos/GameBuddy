@@ -250,4 +250,67 @@ class SwipeQuotaTest {
         assertEquals(SubscriptionTier.BASIC, quotaAt(NOW).effectiveTier(gold(NOW.minusSeconds(60))));
         assertEquals(SubscriptionTier.BASIC, quotaAt(NOW).effectiveTier(basic()));
     }
+
+    // -- refunds, for rewind -------------------------------------------------
+
+    @Test
+    @DisplayName("a refunded like gives back both the swipe and the like")
+    void refundGivesBackBoth() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        quota.charge(gamer, true);
+        assertEquals(1, gamer.getSwipesUsed());
+        assertEquals(1, gamer.getAcceptsUsed());
+
+        quota.refund(gamer, true);
+        assertEquals(0, gamer.getSwipesUsed());
+        assertEquals(0, gamer.getAcceptsUsed());
+    }
+
+    @Test
+    @DisplayName("a refunded pass gives back the swipe but touches no like")
+    void refundOfDeclineLeavesAcceptsAlone() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        quota.charge(gamer, true);
+        quota.charge(gamer, false);
+        assertEquals(2, gamer.getSwipesUsed());
+        assertEquals(1, gamer.getAcceptsUsed());
+
+        quota.refund(gamer, false);
+        assertEquals(1, gamer.getSwipesUsed());
+        assertEquals(1, gamer.getAcceptsUsed());
+    }
+
+    @Test
+    @DisplayName("a refund across the daily reset cannot mint a free like")
+    void refundFloorsAtZero() {
+        // The counters reset lazily, so a rewind can land after the window rolled: the
+        // swipe was charged yesterday and today's counter is already zero. Decrementing
+        // that would hand out a spare like every midnight.
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        quota.refund(gamer, true);
+
+        assertEquals(0, gamer.getSwipesUsed());
+        assertEquals(0, gamer.getAcceptsUsed());
+    }
+
+    @Test
+    @DisplayName("a refund does not move the day's reset instant")
+    void refundDoesNotExtendTheWindow() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+        quota.charge(gamer, true);
+        Instant resetAt = gamer.getQuotaResetAt();
+
+        quota.refund(gamer, true);
+
+        // The window belongs to the day, not to the decisions in it — moving it would let
+        // a rewind quietly extend somebody's allowance.
+        assertEquals(resetAt, gamer.getQuotaResetAt());
+    }
 }

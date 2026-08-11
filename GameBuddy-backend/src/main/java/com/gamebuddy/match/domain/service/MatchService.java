@@ -5,6 +5,8 @@ import com.gamebuddy.match.interfaces.request.GamerRequest;
 import com.gamebuddy.match.interfaces.response.AcceptResponse;
 import com.gamebuddy.match.interfaces.response.LikedYouResponse;
 import com.gamebuddy.match.interfaces.response.RecommendationResponse;
+import com.gamebuddy.match.interfaces.response.BoostResponse;
+import com.gamebuddy.match.interfaces.response.RewindResponse;
 import com.gamebuddy.match.interfaces.response.SwipeAllowanceResponse;
 import com.gamebuddy.shared.entity.Gamer;
 
@@ -44,4 +46,18 @@ public interface MatchService {
 
     /** Accepts left today, and when the allowance returns. Declining is never rationed. */
     SwipeAllowanceResponse getSwipeAllowance(Gamer principal);
+
+    /**
+     * Takes back the most recent swipe.
+     *
+     * <p>Free on Gold, otherwise coins. Refuses when there is nothing to undo, and when
+     * the like being undone was already answered — that one is not only yours to reverse.
+     */
+    RewindResponse rewind(Gamer principal);
+
+    /** Puts this gamer at the front of decks in their country for half an hour. */
+    BoostResponse boost(Gamer principal);
+
+    /** What the Boost button needs to describe itself: state, cost and balance. */
+    BoostResponse boostStatus(Gamer principal);
 }

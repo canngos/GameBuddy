@@ -103,6 +103,37 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
             @Param("minor") boolean minor, @Param("excluded") String[] excluded, @Param("limit") int limit);
 
     /**
+     * Gamers currently boosted in one country.
+     *
+     * <p>Ordered newest-boost-first so that when several people boost at once the one who
+     * just paid is seen first — the money is most recent and the attention is worth most
+     * while their thirty minutes are still running.
+     *
+     * <p>The age-band predicate mirrors {@code AgeBand} exactly, and a null age counts as a
+     * minor: a boost must not be a way around the segregation every other path enforces.
+     * Country is compared case-insensitively, matching the feed filter.
+     */
+    @Query(value = """
+                    SELECT * FROM gamer g
+                    WHERE g.boost_expires_at > :now
+                      AND g.deleted_at IS NULL
+                      AND g.is_blocked = false
+                      AND g.role <> 'ADMIN'
+                      AND (COALESCE(g.age, 0) < 18) = :minor
+                      AND lower(g.country) = lower(CAST(:country AS varchar))
+                      AND g.user_id <> ALL(CAST(:excluded AS varchar[]))
+                    ORDER BY g.boost_expires_at DESC
+                    LIMIT :limit
+                    """,
+            nativeQuery = true)
+    List<Gamer> findBoosted(
+            @Param("country") String country,
+            @Param("minor") boolean minor,
+            @Param("excluded") String[] excluded,
+            @Param("now") Instant now,
+            @Param("limit") int limit);
+
+    /**
      * Everyone a narrowed feed must not show, so the model can rank <em>past</em> them.
      *
      * <p>Filtering the model's answer is not enough, and the reason is the same one that

@@ -1,0 +1,44 @@
+package com.gamebuddy.profile.interfaces.dto;
+
+import com.gamebuddy.common.base.BaseModel;
+import java.time.Instant;
+import java.util.List;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+/**
+ * Everything the earn screen shows, and everything a claim returns.
+ *
+ * <p>One shape for both, so a claim leaves the screen correct without a second request. The
+ * balance is included for the same reason: after taking coins the number in the Market
+ * header is wrong, and the client should not have to guess the new one by adding.
+ */
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+public class EarnResponseBody implements BaseModel {
+
+    private boolean dailyAvailable;
+
+    /** What claiming now would pay, at the streak it would reach. */
+    private int dailyReward;
+
+    /** Consecutive days already claimed. */
+    private int streak;
+
+    /** When the daily becomes available, or null when it is available now or never taken. */
+    private Instant dailyReadyAt;
+
+    private List<QuestDto> quests;
+
+    private boolean stipendAvailable;
+    private int stipendAmount;
+
+    /** When the next stipend is due, or null when available now or not a member. */
+    private Instant stipendReadyAt;
+
+    private int coinBalance;
+}

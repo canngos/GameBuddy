@@ -122,6 +122,35 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     [candidates, cursor, decide],
   );
 
+  /**
+   * Takes back the last swipe and puts that gamer back on top.
+   *
+   * The returned candidate is spliced into the cached page rather than triggering a
+   * refetch, for the same reason the queue is held locally at all: a refetch records a
+   * fresh impression for everyone it returns, so undoing one swipe would tell the model
+   * about fifty views that never happened.
+   *
+   * `cursor` does not move. The candidate is inserted *at* the cursor, so the deck is
+   * showing them the moment this resolves.
+   */
+  const rewind = useMutation({
+    mutationFn: matchApi.rewind,
+    onSuccess: (result) => {
+      queryClient.setQueryData<Candidate[]>(['recommendations', filters], (page) => {
+        const current = page ?? [];
+        // Guard against a double-tap racing the response: the server refuses the second
+        // one with 171, but the first could still land twice through a retry.
+        if (current.some((c) => c.userId === result.gamer.userId)) return current;
+        return [...current.slice(0, cursor), result.gamer, ...current.slice(cursor)];
+      });
+
+      // The swipe was un-made, so the budget went back up, and coins may have been spent.
+      void queryClient.invalidateQueries({ queryKey: ['allowance'] });
+      void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
+      void queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+
   /** Asks for a fresh page. This is the only path that records new impressions. */
   const reload = useCallback(async () => {
     setCursor(0);
@@ -154,5 +183,12 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     submit,
     reload,
     refetchFeed: feed.refetch,
+
+    /** Only offered once something has actually been swiped this session. */
+    canRewind: cursor > 0 && !rewind.isPending,
+    rewind: rewind.mutate,
+    rewinding: rewind.isPending,
+    rewindError: rewind.error,
+    clearRewindError: rewind.reset,
   };
 }

@@ -2,7 +2,7 @@
 -- GameBuddy baseline schema.
 --
 -- Creates an empty database from nothing. Apply this first, then any upgrade-*.sql newer
--- than it, in filename order.
+-- than it, in numeric order (4, 5, ... 20 — NOT filename order, which puts 10 before 4).
 --
 -- Generated from the JPA entities and then committed, rather than left to Hibernate at
 -- startup. The point is that both environments can run ddl-auto=validate: the schema is
@@ -11,20 +11,22 @@
 -- the application silently reshapes the database instead, which is convenient exactly
 -- until it quietly diverges from production.
 --
--- Regenerate with: see README, "Regenerating the baseline schema".
+-- HOW TO REGENERATE, AND THE MISTAKE NOT TO REPEAT
 --
--- One thing this file carries that the entities cannot: idx_outbox_pending is partial.
+-- Dump a database built by replaying THIS FILE PLUS EVERY UPGRADE — never one built by
+-- pointing Hibernate at an empty database with ddl-auto=create.
 --
-
+-- Both produce the same tables and columns, so the difference is invisible in a diff of
+-- table names, and it is not invisible at runtime: an entity-generated schema carries no
+-- column DEFAULTs at all. Hibernate does not emit them, because it supplies those values
+-- from Java. Every DEFAULT in this file — 48 of them — came from a migration, and the
+-- seed scripts and the synthetic population loader both rely on them. Regenerating from
+-- the entities drops all 48, and the first symptom is `seed-local.sql` failing on a NOT
+-- NULL column three steps later.
 --
--- PostgreSQL database dump
+-- The procedure is in the README under "Regenerating the baseline schema". Prove the
+-- result by loading it into an empty database and booting with ddl-auto=validate.
 --
-
-\restrict hw9djYOdNyxWzYtlIfuQLXPVzyHcGxDobY96IoFKoAz99JaByvJfyoitwnElx1U
-
--- Dumped from database version 17.10
--- Dumped by pg_dump version 17.10
-
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -44,6 +46,25 @@ SET row_security = off;
 CREATE SCHEMA gamebuddy;
 
 
+--
+-- Name: set_updated_at(); Type: FUNCTION; Schema: gamebuddy; Owner: -
+--
+
+CREATE FUNCTION gamebuddy.set_updated_at() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    -- Only when something actually changed. An UPDATE that writes the same values is not
+    -- a modification, and treating it as one makes "last changed" mean "last touched by
+    -- any job that happened to rewrite the row".
+    IF NEW IS DISTINCT FROM OLD THEN
+        NEW.updated_at = now();
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -54,7 +75,8 @@ SET default_table_access_method = heap;
 
 CREATE TABLE gamebuddy.approved_matches (
     matched_id character varying(255) NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -64,7 +86,9 @@ CREATE TABLE gamebuddy.approved_matches (
 
 CREATE TABLE gamebuddy.avatars (
     id uuid NOT NULL,
-    image character varying(255)
+    image character varying(255),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -74,7 +98,8 @@ CREATE TABLE gamebuddy.avatars (
 
 CREATE TABLE gamebuddy.blocked_friends (
     blocked_user_id character varying(255) NOT NULL,
-    gamer_id character varying(255) NOT NULL
+    gamer_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -101,7 +126,9 @@ CREATE TABLE gamebuddy.chat_message (
 CREATE TABLE gamebuddy.chat_participant (
     last_read_at timestamp(6) with time zone,
     room_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -112,7 +139,8 @@ CREATE TABLE gamebuddy.chat_participant (
 CREATE TABLE gamebuddy.chat_room (
     created_at timestamp(6) with time zone NOT NULL,
     id uuid NOT NULL,
-    pair_key character varying(512) NOT NULL
+    pair_key character varying(512) NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -126,7 +154,8 @@ CREATE TABLE gamebuddy.comment (
     comment_id uuid NOT NULL,
     post_id uuid NOT NULL,
     message character varying(255),
-    owner character varying(255)
+    owner character varying(255),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -136,7 +165,8 @@ CREATE TABLE gamebuddy.comment (
 
 CREATE TABLE gamebuddy.comment_likes_join (
     comment_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -151,7 +181,8 @@ CREATE TABLE gamebuddy.community (
     community_avatar character varying(255),
     name character varying(255) NOT NULL,
     owner character varying(255) NOT NULL,
-    wallpaper character varying(255)
+    wallpaper character varying(255),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -161,7 +192,8 @@ CREATE TABLE gamebuddy.community (
 
 CREATE TABLE gamebuddy.community_members_join (
     community_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -180,7 +212,8 @@ CREATE TABLE gamebuddy.content_report (
     reporter_id character varying(255) NOT NULL,
     reviewed_by character varying(255),
     status character varying(255) NOT NULL,
-    CONSTRAINT content_report_content_type_check CHECK (((content_type)::text = ANY (ARRAY[('POST'::character varying)::text, ('COMMENT'::character varying)::text]))),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT content_report_content_type_check CHECK (((content_type)::text = ANY ((ARRAY['POST'::character varying, 'COMMENT'::character varying, 'PROFILE'::character varying])::text[]))),
     CONSTRAINT content_report_status_check CHECK (((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('ACTIONED'::character varying)::text, ('DISMISSED'::character varying)::text])))
 );
 
@@ -198,7 +231,9 @@ CREATE TABLE gamebuddy.cosmetic (
     price integer DEFAULT 0 NOT NULL,
     sort_order integer DEFAULT 0 NOT NULL,
     created_date timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT cosmetic_kind_check CHECK (((kind)::text = ANY ((ARRAY['FRAME'::character varying, 'BANNER'::character varying])::text[]))),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    membership_only boolean DEFAULT false NOT NULL,
+    CONSTRAINT cosmetic_kind_check CHECK (((kind)::text = ANY (ARRAY[('FRAME'::character varying)::text, ('BANNER'::character varying)::text]))),
     CONSTRAINT cosmetic_price_check CHECK ((price >= 0))
 );
 
@@ -220,7 +255,8 @@ CREATE TABLE gamebuddy.declined_matches (
 
 CREATE TABLE gamebuddy.friends (
     friend_id character varying(255) NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -257,10 +293,92 @@ CREATE TABLE gamebuddy.gamer (
     avatar_status character varying(16),
     equipped_frame_id uuid,
     equipped_banner_id uuid,
-    CONSTRAINT gamer_avatar_status_check CHECK (((avatar_status IS NULL) OR ((avatar_status)::text = ANY ((ARRAY['PENDING'::character varying, 'APPROVED'::character varying, 'REJECTED'::character varying])::text[])))),
+    last_active_at timestamp with time zone,
+    last_nudged_at timestamp with time zone,
+    nudge_count integer DEFAULT 0 NOT NULL,
+    reminders_enabled boolean DEFAULT true NOT NULL,
+    notify_messages boolean DEFAULT true NOT NULL,
+    notify_social boolean DEFAULT true NOT NULL,
+    notify_communities boolean DEFAULT true NOT NULL,
+    recommender_profile_changed_at timestamp(6) with time zone,
+    avatar_score double precision,
+    avatar_uploaded_at timestamp(6) with time zone,
+    birth_date date,
+    terms_accepted_at timestamp(6) with time zone,
+    terms_version character varying(32),
+    last_decision_user_id character varying(255),
+    last_decision_accept boolean,
+    last_decision_at timestamp with time zone,
+    boost_expires_at timestamp with time zone,
+    last_free_boost_at timestamp with time zone,
+    daily_claimed_at timestamp with time zone,
+    daily_streak integer DEFAULT 0 NOT NULL,
+    stipend_claimed_at timestamp with time zone,
+    quest_week_started_at timestamp with time zone,
+    quest_base_messages integer DEFAULT 0 NOT NULL,
+    quest_base_matches integer DEFAULT 0 NOT NULL,
+    quest_base_posts integer DEFAULT 0 NOT NULL,
+    quest_claimed_mask integer DEFAULT 0 NOT NULL,
+    CONSTRAINT gamer_avatar_status_check CHECK (((avatar_status IS NULL) OR ((avatar_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text])))),
     CONSTRAINT gamer_role_check CHECK (((role)::text = ANY (ARRAY[('USER'::character varying)::text, ('ADMIN'::character varying)::text]))),
     CONSTRAINT gamer_subscription_tier_check CHECK (((subscription_tier)::text = ANY (ARRAY[('BASIC'::character varying)::text, ('GOLD'::character varying)::text])))
 );
+
+
+--
+-- Name: COLUMN gamer.last_decision_user_id; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.last_decision_user_id IS 'Who the most recent swipe was about. NULL when there is nothing to rewind.';
+
+
+--
+-- Name: COLUMN gamer.last_decision_accept; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.last_decision_accept IS 'True if that swipe was a like. Decides which table a rewind has to undo.';
+
+
+--
+-- Name: COLUMN gamer.boost_expires_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.boost_expires_at IS 'While in the future, this gamer is pinned to the front of decks in their country.';
+
+
+--
+-- Name: COLUMN gamer.last_free_boost_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.last_free_boost_at IS 'When the weekly Gold boost was last taken. NULL means never.';
+
+
+--
+-- Name: COLUMN gamer.daily_claimed_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.daily_claimed_at IS 'When the daily coins were last taken. Drives both "again yet?" and the streak.';
+
+
+--
+-- Name: COLUMN gamer.daily_streak; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.daily_streak IS 'Consecutive days claimed. Resets to 1 after a missed day, never to 0 by a claim.';
+
+
+--
+-- Name: COLUMN gamer.quest_week_started_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.quest_week_started_at IS 'Start of the week the baselines below were taken at. Null means never started one.';
+
+
+--
+-- Name: COLUMN gamer.quest_claimed_mask; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.quest_claimed_mask IS 'Which of this week''s quests have been paid. Cleared when the week rolls over.';
 
 
 --
@@ -273,6 +391,7 @@ CREATE TABLE gamebuddy.gamer_badge (
     earned_at timestamp with time zone DEFAULT now() NOT NULL,
     collected_at timestamp with time zone,
     showcase_slot integer,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT gamer_badge_slot_check CHECK (((showcase_slot >= 0) AND (showcase_slot <= 2)))
 );
 
@@ -285,7 +404,8 @@ CREATE TABLE gamebuddy.gamer_cosmetic (
     user_id character varying(255) NOT NULL,
     cosmetic_id uuid NOT NULL,
     paid integer DEFAULT 0 NOT NULL,
-    acquired_at timestamp with time zone DEFAULT now() NOT NULL
+    acquired_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -295,7 +415,8 @@ CREATE TABLE gamebuddy.gamer_cosmetic (
 
 CREATE TABLE gamebuddy.gamer_games_join (
     game_id character varying(255) NOT NULL,
-    gamer_id character varying(255) NOT NULL
+    gamer_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -305,7 +426,8 @@ CREATE TABLE gamebuddy.gamer_games_join (
 
 CREATE TABLE gamebuddy.gamer_keywords_join (
     keyword_id uuid NOT NULL,
-    gamer_id character varying(255) NOT NULL
+    gamer_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -320,7 +442,9 @@ CREATE TABLE gamebuddy.games (
     description character varying(255),
     game_icon character varying(255),
     game_id character varying(255) NOT NULL,
-    game_name character varying(255)
+    game_name character varying(255),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -332,7 +456,8 @@ CREATE TABLE gamebuddy.keywords (
     created_date timestamp(6) with time zone,
     id uuid NOT NULL,
     description character varying(255),
-    keyword_name character varying(255)
+    keyword_name character varying(255),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -349,7 +474,10 @@ CREATE TABLE gamebuddy.notification_outbox (
     title character varying(200) NOT NULL,
     last_error character varying(500),
     fcm_token character varying(512) NOT NULL,
-    body character varying(1000) NOT NULL
+    body character varying(1000) NOT NULL,
+    kind character varying(32) DEFAULT 'GENERAL'::character varying NOT NULL,
+    target_id character varying(64),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -363,7 +491,8 @@ CREATE TABLE gamebuddy.notifications (
     id uuid NOT NULL,
     body character varying(1000),
     recipient character varying(255) NOT NULL,
-    title character varying(255) NOT NULL
+    title character varying(255) NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -379,7 +508,8 @@ CREATE TABLE gamebuddy.post (
     body character varying(4000),
     owner character varying(255),
     picture character varying(255),
-    title character varying(255)
+    title character varying(255),
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -389,7 +519,8 @@ CREATE TABLE gamebuddy.post (
 
 CREATE TABLE gamebuddy.post_likes_join (
     post_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -407,6 +538,7 @@ CREATE TABLE gamebuddy.purchase (
     product_id character varying(255) NOT NULL,
     store_transaction_id character varying(255) NOT NULL,
     user_id character varying(255) NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT purchase_platform_check CHECK (((platform)::text = ANY (ARRAY[('APPLE_APP_STORE'::character varying)::text, ('GOOGLE_PLAY'::character varying)::text]))),
     CONSTRAINT purchase_status_check CHECK (((status)::text = ANY (ARRAY[('GRANTED'::character varying)::text, ('REFUNDED'::character varying)::text])))
 );
@@ -436,7 +568,8 @@ CREATE TABLE gamebuddy.session (
     expires_at timestamp(6) with time zone NOT NULL,
     id uuid NOT NULL,
     token_hash character varying(64) NOT NULL,
-    email character varying(255) NOT NULL
+    email character varying(255) NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -451,7 +584,8 @@ CREATE TABLE gamebuddy.verification_code (
     created_at timestamp(6) with time zone NOT NULL,
     expires_at timestamp(6) with time zone NOT NULL,
     id uuid NOT NULL,
-    email character varying(255) NOT NULL
+    email character varying(255) NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -461,7 +595,8 @@ CREATE TABLE gamebuddy.verification_code (
 
 CREATE TABLE gamebuddy.waiting_friends (
     requested_id character varying(255) NOT NULL,
-    user_id character varying(255) NOT NULL
+    user_id character varying(255) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -768,6 +903,13 @@ CREATE INDEX idx_chat_message_room_time ON gamebuddy.chat_message USING btree (r
 
 
 --
+-- Name: idx_chat_participant_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_chat_participant_user ON gamebuddy.chat_participant USING btree (user_id);
+
+
+--
 -- Name: idx_cosmetic_asset_key; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
@@ -803,10 +945,38 @@ CREATE UNIQUE INDEX idx_gamer_badge_showcase ON gamebuddy.gamer_badge USING btre
 
 
 --
+-- Name: idx_gamer_boost_active; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_gamer_boost_active ON gamebuddy.gamer USING btree (country, boost_expires_at) WHERE (boost_expires_at IS NOT NULL);
+
+
+--
 -- Name: idx_gamer_cosmetic_user; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
 CREATE INDEX idx_gamer_cosmetic_user ON gamebuddy.gamer_cosmetic USING btree (user_id);
+
+
+--
+-- Name: idx_gamer_dormant; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_gamer_dormant ON gamebuddy.gamer USING btree (last_active_at) WHERE ((deleted_at IS NULL) AND reminders_enabled);
+
+
+--
+-- Name: idx_gamer_fcm_token; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_gamer_fcm_token ON gamebuddy.gamer USING btree (fcm_token) WHERE (fcm_token IS NOT NULL);
+
+
+--
+-- Name: idx_gamer_username_lower; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_gamer_username_lower ON gamebuddy.gamer USING btree (lower((username)::text));
 
 
 --
@@ -877,6 +1047,125 @@ CREATE INDEX idx_session_email ON gamebuddy.session USING btree (email);
 --
 
 CREATE INDEX idx_verification_code_email ON gamebuddy.verification_code USING btree (email);
+
+
+--
+-- Name: avatars set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.avatars FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: chat_participant set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.chat_participant FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: chat_room set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.chat_room FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: comment set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.comment FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: community set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.community FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: content_report set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.content_report FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: cosmetic set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.cosmetic FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: gamer_badge set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.gamer_badge FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: gamer_cosmetic set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.gamer_cosmetic FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: games set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.games FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: keywords set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.keywords FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: notification_outbox set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.notification_outbox FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: notifications set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.notifications FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: post set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.post FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: purchase set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.purchase FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: session set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.session FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: verification_code set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.verification_code FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
 
 
 --
@@ -1090,6 +1379,3 @@ ALTER TABLE ONLY gamebuddy.gamer
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict hw9djYOdNyxWzYtlIfuQLXPVzyHcGxDobY96IoFKoAz99JaByvJfyoitwnElx1U
-

@@ -41,6 +41,8 @@ export const Code = {
   TOKEN_NOT_FOUND: '111',
   PASSWORD_SAME: '112',
   USER_BLOCKED: '113',
+  /** A cosmetic cost more than the balance. The Market offers coins rather than nagging. */
+  COIN_NOT_ENOUGH: '129',
   COMMUNITY_NOT_FOUND: '131',
   /** Community posts, comments and members are all members-only reads, not just writes. */
   NOT_MEMBER: '132',

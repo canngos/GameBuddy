@@ -208,26 +208,30 @@ COMMIT;
 -- Two of each kind are free, so a gamer who never spends anything still has a choice to
 -- make. Animated frames cost more than static ones because they took more to make and
 -- are the thing people actually want.
-INSERT INTO cosmetic (id, kind, name, asset_key, animated, price, sort_order) VALUES
-  ('948fe89b-b161-5324-8fe3-d54014739e97', 'FRAME', 'Steel', 'frames/frame-steel.png', false, 0, 0),
-  ('c65bd3d8-6b59-546a-ac85-8f9bd080b279', 'FRAME', 'Signature', 'frames/frame-brand.png', false, 0, 1),
-  ('202e2cb8-5e54-577e-8ea1-2a56d4aa6a5d', 'FRAME', 'Reticle', 'frames/frame-reticle.png', false, 150, 2),
-  ('772595df-1b8a-5c40-b18a-fafa83de3297', 'FRAME', 'Bronze', 'frames/frame-bronze.png', false, 200, 3),
-  ('7767adda-3c57-5bb8-9c19-66e3668d961c', 'FRAME', 'Gold', 'frames/frame-gold.png', false, 400, 4),
-  ('5111d8c6-c0e3-5320-8a22-e06fe89883c1', 'FRAME', 'Pulse', 'frames/frame-pulse.webp', true, 600, 5),
-  ('df6369a3-e370-5c22-9fa5-4e51bab9cdec', 'FRAME', 'Sweep', 'frames/frame-sweep.webp', true, 750, 6),
-  ('089fed4f-abc2-5193-ac25-5aa437fd52a0', 'FRAME', 'Orbit', 'frames/frame-orbit.webp', true, 900, 7),
-  ('0473126d-f42e-5971-8e64-d6e2a26bed08', 'FRAME', 'Toxic', 'frames/frame-toxic.webp', true, 900, 8),
-  ('90f6a11b-fa77-561b-9722-6c5b0ee79d09', 'FRAME', 'Rotor', 'frames/frame-rotor.webp', true, 1200, 9),
-  ('32fa7c71-9011-59d9-9155-4e5e710e974c', 'FRAME', 'Ember', 'frames/frame-ember.webp', true, 1500, 10),
-  ('5c03c249-15e3-5e97-98e7-e2b659e3c444', 'BANNER', 'Hex', 'banners/banner-hex.jpg', false, 0, 0),
-  ('c4793a6f-b11f-544e-8fb5-50070bc6e7c3', 'BANNER', 'CRT', 'banners/banner-crt.jpg', false, 0, 1),
-  ('40fe7f85-d3e0-5def-942e-4be7d6c36fc3', 'BANNER', 'Bokeh', 'banners/banner-bokeh.jpg', false, 200, 2),
-  ('23a03605-0cbe-5abf-80d3-59a1fcea2397', 'BANNER', 'Circuit', 'banners/banner-circuit.jpg', false, 300, 3),
-  ('c637135f-3d1c-58b9-84ed-a7d2c3bad9c1', 'BANNER', 'Void', 'banners/banner-void.jpg', false, 400, 4),
-  ('a217b933-c1e1-5a13-aa29-e36321cd1cbd', 'BANNER', 'Arena', 'banners/banner-arena.jpg', false, 500, 5),
-  ('0fe0e4e0-9c3b-5526-87af-46b192ca596d', 'BANNER', 'Dusk', 'banners/banner-dusk.jpg', false, 600, 6),
-  ('10db4e23-1579-5f41-83f9-e4db8f75d93a', 'BANNER', 'Synthwave', 'banners/banner-synthwave.jpg', false, 800, 7)
+-- membership_only is listed explicitly rather than left to the column default.
+-- The migration that added it supplies `DEFAULT false`; the entity does not declare
+-- one, so a schema built by Hibernate from the entities has the column NOT NULL with
+-- no default and this insert fails on it. Being explicit works on both paths.
+INSERT INTO cosmetic (id, kind, name, asset_key, animated, price, sort_order, membership_only, created_date) VALUES
+  ('948fe89b-b161-5324-8fe3-d54014739e97', 'FRAME', 'Steel', 'frames/frame-steel.png', false, 0, 0, false, now()),
+  ('c65bd3d8-6b59-546a-ac85-8f9bd080b279', 'FRAME', 'Signature', 'frames/frame-brand.png', false, 0, 1, false, now()),
+  ('202e2cb8-5e54-577e-8ea1-2a56d4aa6a5d', 'FRAME', 'Reticle', 'frames/frame-reticle.png', false, 150, 2, false, now()),
+  ('772595df-1b8a-5c40-b18a-fafa83de3297', 'FRAME', 'Bronze', 'frames/frame-bronze.png', false, 200, 3, false, now()),
+  ('7767adda-3c57-5bb8-9c19-66e3668d961c', 'FRAME', 'Gold', 'frames/frame-gold.png', false, 400, 4, false, now()),
+  ('5111d8c6-c0e3-5320-8a22-e06fe89883c1', 'FRAME', 'Pulse', 'frames/frame-pulse.webp', true, 600, 5, false, now()),
+  ('df6369a3-e370-5c22-9fa5-4e51bab9cdec', 'FRAME', 'Sweep', 'frames/frame-sweep.webp', true, 750, 6, false, now()),
+  ('089fed4f-abc2-5193-ac25-5aa437fd52a0', 'FRAME', 'Orbit', 'frames/frame-orbit.webp', true, 900, 7, false, now()),
+  ('0473126d-f42e-5971-8e64-d6e2a26bed08', 'FRAME', 'Toxic', 'frames/frame-toxic.webp', true, 900, 8, false, now()),
+  ('90f6a11b-fa77-561b-9722-6c5b0ee79d09', 'FRAME', 'Rotor', 'frames/frame-rotor.webp', true, 1200, 9, false, now()),
+  ('32fa7c71-9011-59d9-9155-4e5e710e974c', 'FRAME', 'Ember', 'frames/frame-ember.webp', true, 1500, 10, false, now()),
+  ('5c03c249-15e3-5e97-98e7-e2b659e3c444', 'BANNER', 'Hex', 'banners/banner-hex.jpg', false, 0, 0, false, now()),
+  ('c4793a6f-b11f-544e-8fb5-50070bc6e7c3', 'BANNER', 'CRT', 'banners/banner-crt.jpg', false, 0, 1, false, now()),
+  ('40fe7f85-d3e0-5def-942e-4be7d6c36fc3', 'BANNER', 'Bokeh', 'banners/banner-bokeh.jpg', false, 200, 2, false, now()),
+  ('23a03605-0cbe-5abf-80d3-59a1fcea2397', 'BANNER', 'Circuit', 'banners/banner-circuit.jpg', false, 300, 3, false, now()),
+  ('c637135f-3d1c-58b9-84ed-a7d2c3bad9c1', 'BANNER', 'Void', 'banners/banner-void.jpg', false, 400, 4, false, now()),
+  ('a217b933-c1e1-5a13-aa29-e36321cd1cbd', 'BANNER', 'Arena', 'banners/banner-arena.jpg', false, 500, 5, false, now()),
+  ('0fe0e4e0-9c3b-5526-87af-46b192ca596d', 'BANNER', 'Dusk', 'banners/banner-dusk.jpg', false, 600, 6, false, now()),
+  ('10db4e23-1579-5f41-83f9-e4db8f75d93a', 'BANNER', 'Synthwave', 'banners/banner-synthwave.jpg', false, 800, 7, false, now())
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name, asset_key = EXCLUDED.asset_key, animated = EXCLUDED.animated,
   price = EXCLUDED.price, sort_order = EXCLUDED.sort_order;
