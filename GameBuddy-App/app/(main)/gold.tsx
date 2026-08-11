@@ -1,8 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
-import { billingApi, developmentReceipt, GOLD_PLANS, type GoldPlan } from '../../src/api/billing';
+import { billingApi, GOLD_PLANS, type GoldPlan } from '../../src/api/billing';
+import { storeAvailable } from '../../src/billing/purchases';
+import { usePurchase } from '../../src/billing/usePurchase';
 import { BackHeader, Button, Card, ErrorNotice, Screen, SelectRow, Text } from '../../src/ui';
 
 /**
@@ -13,15 +15,15 @@ import { BackHeader, Button, Card, ErrorNotice, Screen, SelectRow, Text } from '
  * gating before anyone has seen the product converts worse, and the free tier is meant to
  * be good enough to sell this on its own.
  *
- * **No store sheet yet.** The purchase goes straight to `/billing/redeem` with a
- * development receipt, which the backend accepts only because sandbox billing is switched
- * on locally. That is the whole of the "pretend it was paid" behaviour, and it lives in
- * one place: `developmentReceipt`. When the IAP library lands, the receipt comes from the
- * store instead and nothing else on this screen changes.
+ * Buying goes through RevenueCat — see `src/billing/purchases.ts`. The store sheet closing
+ * does not make anyone Gold: RevenueCat has to tell our backend first, so `usePurchase`
+ * waits for the entitlement and this screen has a state for "paid, still arriving".
+ *
+ * `canBuy` is false on builds made before the SDK was installed, and on builds with no
+ * RevenueCat key. That is a normal state to be in right now, not an error.
  */
 export default function Gold() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<GoldPlan>(GOLD_PLANS[1]);
 
   const subscription = useQuery({
@@ -31,19 +33,11 @@ export default function Gold() {
 
   const isGold = subscription.data?.tier === 'GOLD';
 
-  const buy = useMutation({
-    mutationFn: (plan: GoldPlan) =>
-      billingApi.redeem(plan.productId, developmentReceipt(plan.productId)),
-    onSuccess: () => {
-      // Everything that reads a tier is now wrong: the deck's allowance, the admirers
-      // list's `locked`, and the subscription itself.
-      void queryClient.invalidateQueries({ queryKey: ['subscription'] });
-      void queryClient.invalidateQueries({ queryKey: ['admirers'] });
-      void queryClient.invalidateQueries({ queryKey: ['allowance'] });
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-      void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
-    },
-  });
+  // Opens the store sheet, then waits for the webhook to land before calling it done.
+  const buy = usePurchase();
+  // False on any build made before react-native-purchases was installed, and on any build
+  // with no RevenueCat key configured.
+  const canBuy = storeAvailable();
 
   return (
     <Screen
@@ -53,10 +47,15 @@ export default function Gold() {
           <Button label="Done" onPress={() => router.back()} />
         ) : (
           <View className="gap-2">
+            {/* Disabled rather than hidden when the build cannot purchase. A missing button
+                reads as a broken screen; a disabled one with a reason underneath does not,
+                and this state is normal for anyone running a build made before the store
+                was wired up. */}
             <Button
-              label={`Continue — ${selected.price}`}
+              label={canBuy ? `Continue — ${selected.price}` : 'Purchases not available yet'}
               loading={buy.isPending}
-              onPress={() => buy.mutate(selected)}
+              disabled={!canBuy}
+              onPress={() => buy.buy(selected.productId)}
             />
             <Button label="Not now" variant="ghost" onPress={() => router.back()} />
           </View>
@@ -100,6 +99,19 @@ export default function Gold() {
             </View>
           )}
 
+          {/* The store took the money but our side has not heard yet. Deliberately not an
+              error: RevenueCat keeps retrying the webhook, so this resolves itself, and
+              calling it a failure is how somebody ends up paying twice. */}
+          {buy.awaitingEntitlement && (
+            <View className="mt-4 rounded-card bg-raised p-4">
+              <Text variant="bodyStrong">Your purchase is going through</Text>
+              <Text variant="caption" className="mt-1">
+                It can take a moment to arrive. Gold will switch on by itself — there is no
+                need to buy again.
+              </Text>
+            </View>
+          )}
+
           <Text variant="caption" className="pt-4">
             Cancel any time from your store account. A subscription renews until you cancel
             it.
@@ -116,7 +128,10 @@ function Benefits() {
       {[
         ['See who liked you', 'Every face, not just the number.'],
         ['No daily limit', 'Swipe and like as much as you want.'],
-        ['Advanced filters', 'Game, platform, region, online now.'],
+        // Platform is deliberately not listed: the profile has no such field, so it is not
+        // something we can filter by. Promising it on a paid product is the kind of claim
+        // that earns a refund and a store complaint rather than a subscriber.
+        ['Advanced filters', 'Narrow the deck by game, region, and who is online now.'],
         ['The Gold frame and banner', 'Yours while you are a member. Not for sale.'],
       ].map(([title, body]) => (
         <View key={title} className="flex-row gap-3">

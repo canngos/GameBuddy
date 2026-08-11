@@ -103,6 +103,44 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
             @Param("minor") boolean minor, @Param("excluded") String[] excluded, @Param("limit") int limit);
 
     /**
+     * Everyone a narrowed feed must not show, so the model can rank <em>past</em> them.
+     *
+     * <p>Filtering the model's answer is not enough, and the reason is the same one that
+     * made the feed run dry before declines were sent to the model: the model returns its
+     * top N by similarity, and a filter applied afterwards can only remove from those N —
+     * it can never reach the person who ranks 300th but is the only one online in your
+     * country. Measured on the development population: 25 accounts active inside the
+     * window, none of them in the 37 the model returned, so "online now" — the headline
+     * Gold filter — returned an empty deck every time while 25 people sat there matching.
+     *
+     * <p>Returns the complement rather than the eligible set because the model's request
+     * only carries an exclusion list. That makes the result grow with the population, not
+     * with the answer, which is the wrong way round and is fine only while the population
+     * is small: a country filter on a million accounts would ship most of them over the
+     * wire. The fix when that day comes is an inclusion list in {@code PredictRequest},
+     * not a bigger array here.
+     *
+     * <p>A null parameter disables its clause entirely — an unset filter must never
+     * exclude anybody. Country is compared case-insensitively and a candidate with no
+     * country recorded fails a country filter rather than passing it by accident.
+     */
+    @Query(value = """
+                    SELECT g.user_id FROM gamer g
+                    WHERE (:gameId IS NOT NULL
+                            AND NOT EXISTS (SELECT 1 FROM gamer_games_join j
+                                             WHERE j.gamer_id = g.user_id AND j.game_id = :gameId))
+                       OR (:country IS NOT NULL
+                            AND (g.country IS NULL OR lower(g.country) <> lower(CAST(:country AS varchar))))
+                       OR (CAST(:activeSince AS timestamptz) IS NOT NULL
+                            AND (g.last_active_at IS NULL OR g.last_active_at < CAST(:activeSince AS timestamptz)))
+                    """,
+            nativeQuery = true)
+    List<String> findIdsExcludedByFilters(
+            @Param("gameId") String gameId,
+            @Param("country") String country,
+            @Param("activeSince") Instant activeSince);
+
+    /**
      * Gamers who have swiped yes on this one and are still waiting for an answer.
      *
      * <p>Reads the owning side of {@code approved_matches} directly. The inverse of a

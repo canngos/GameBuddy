@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ApiError, Code } from '../api/envelope';
 import { matchApi } from '../api/match';
 import type { Candidate } from '../api/types';
+import { NO_FILTERS, type FeedFilters } from './filters';
 
 export type Decision = 'accept' | 'decline';
 
@@ -21,7 +22,7 @@ export type Block =
  * Refetching after each decision would both stall the deck and pollute the training
  * data with impressions nobody actually saw.
  */
-export function useDeck() {
+export function useDeck(filters: FeedFilters = NO_FILTERS) {
   const queryClient = useQueryClient();
 
   /** How far through the fetched page we are. */
@@ -31,13 +32,24 @@ export function useDeck() {
   const [matchedWith, setMatchedWith] = useState<Candidate | null>(null);
 
   const feed = useQuery({
-    queryKey: ['recommendations'],
-    queryFn: matchApi.recommendations,
+    // Filters are part of the key, so each combination is its own cached page rather than
+    // one page that changes meaning. Going back to a filter you had on returns the deck
+    // you left, and — because a fetch is what records impressions — does not re-record
+    // everyone in it.
+    queryKey: ['recommendations', filters],
+    queryFn: () => matchApi.recommendations(filters),
     // The page is a snapshot tied to the impressions already recorded for it. Silently
     // replacing it mid-session would skip candidates the gamer never saw.
     staleTime: Infinity,
     gcTime: 30 * 60 * 1000,
   });
+
+  // The cursor is an index into a specific queue. Changing filters swaps the queue for a
+  // different one, so keeping the old index would open the new deck partway through and
+  // silently skip the first however-many people in it.
+  useEffect(() => {
+    setCursor(0);
+  }, [filters.gameId, filters.country, filters.onlineNow]);
 
   const allowance = useQuery({
     queryKey: ['allowance'],
@@ -48,7 +60,9 @@ export function useDeck() {
   const candidates = feed.data ?? [];
   const current = candidates[cursor] ?? null;
   const upcoming = candidates[cursor + 1] ?? null;
-  const exhausted = !feed.isPending && cursor >= candidates.length;
+  // A failed fetch also leaves the queue empty, and "that's everyone for now" is a lie
+  // about a request that never returned anybody in the first place.
+  const exhausted = !feed.isPending && !feed.error && cursor >= candidates.length;
 
   const decide = useMutation({
     mutationFn: async ({ decision, candidate }: { decision: Decision; candidate: Candidate }) => {
@@ -115,13 +129,21 @@ export function useDeck() {
     await queryClient.invalidateQueries({ queryKey: ['recommendations'] });
   }, [queryClient]);
 
+  // A filtered feed from a free account is refused outright, and it can happen without
+  // anybody touching the controls: Gold expiring mid-session turns a working deck into a
+  // 159. Separated from `error` because the answer is a paywall, not a Retry button —
+  // retrying the same refused request forever is the one thing that cannot help.
+  const filtersRefused =
+    feed.error instanceof ApiError && feed.error.is(Code.SUBSCRIPTION_REQUIRED);
+
   return {
     current,
     upcoming,
     exhausted,
     remaining: Math.max(0, candidates.length - cursor),
     isLoading: feed.isPending,
-    error: feed.error,
+    error: filtersRefused ? null : feed.error,
+    filtersRefused,
     /** Only failures that were not turned into a `block`. */
     decisionError: block ? null : decide.error,
     allowance: allowance.data ?? null,

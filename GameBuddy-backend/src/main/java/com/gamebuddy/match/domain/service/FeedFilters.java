@@ -37,6 +37,18 @@ public record FeedFilters(String gameId, String country, Boolean onlineNow) {
         return new FeedFilters(null, null, null);
     }
 
+    /**
+     * The instant a candidate must have been active since to count as online, or null when
+     * the filter is off.
+     *
+     * <p>Exists so the database query that pre-excludes candidates and the in-memory
+     * {@link #matches} check cannot drift apart about what "online" means. Two copies of
+     * fifteen minutes would eventually become fourteen and sixteen.
+     */
+    public Instant activeSince(Clock clock) {
+        return Boolean.TRUE.equals(onlineNow) ? clock.instant().minus(ONLINE_WINDOW) : null;
+    }
+
     /** Whether this asks for anything at all. Only a narrowed feed needs the entitlement. */
     public boolean narrowing() {
         return gameId != null || country != null || Boolean.TRUE.equals(onlineNow);
@@ -50,9 +62,10 @@ public record FeedFilters(String gameId, String country, Boolean onlineNow) {
         if (country != null && !country.equalsIgnoreCase(candidate.getCountry())) {
             return false;
         }
-        if (Boolean.TRUE.equals(onlineNow)) {
+        Instant activeSince = activeSince(clock);
+        if (activeSince != null) {
             Instant lastActive = candidate.getLastActiveAt();
-            if (lastActive == null || lastActive.isBefore(clock.instant().minus(ONLINE_WINDOW))) {
+            if (lastActive == null || lastActive.isBefore(activeSince)) {
                 return false;
             }
         }

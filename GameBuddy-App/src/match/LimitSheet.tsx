@@ -39,9 +39,9 @@ const COPY: Record<Block['kind'], { title: string; body: string }> = {
  * The card that triggered it has already been put back by `useDeck`, so dismissing
  * this returns the gamer to exactly where they were rather than one person poorer.
  *
- * There is no purchase button yet: billing is built and verified server-side, but no
- * store product has ever been exercised against a real console, so a button here would
- * lead nowhere. Wiring it up is the billing task, not this one.
+ * The upgrade button goes to the paywall, not to a store sheet: no IAP library is
+ * installed yet, so `/gold` is where a purchase currently gets made (with a development
+ * receipt). When the library lands, only the paywall changes.
  *
  * See {@link MatchOverlay} for why this is a positioned sibling rather than a `Modal`,
  * and why no `className` appears on an animated component here.

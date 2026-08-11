@@ -2,11 +2,13 @@ import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { identify } from '../../src/billing/purchases';
 import { ChatSocketProvider } from '../../src/chat/ChatSocketProvider';
 import { NotificationPrimer } from '../../src/notifications/NotificationPrimer';
 import { useNotificationRouting } from '../../src/notifications/useNotificationRouting';
 import { usePushRegistration } from '../../src/notifications/usePushRegistration';
 import { RouteGuard } from '../../src/session/RouteGuard';
+import { useSession } from '../../src/session/store';
 import { TutorialOverlay } from '../../src/tutorial/TutorialOverlay';
 import { useTutorial } from '../../src/tutorial/store';
 import { useThemeColors } from '../../src/theme';
@@ -34,6 +36,20 @@ export default function MainLayout() {
   // Asking on the sign-up screen would be asking before there is anything to notify about.
   const { shouldPrime, onPrimerDone } = usePushRegistration(true);
   useNotificationRouting(true);
+
+  // Tells RevenueCat which account is buying, before anybody can reach a paywall.
+  //
+  // This is the whole of billing's client-side identity, and skipping it does not fail
+  // loudly — purchases would succeed, arrive at our webhook under an anonymous id, and be
+  // refused with nowhere to go while the buyer waits for a subscription they paid for.
+  //
+  // There is no purchase-recovery step to go with it, on purpose: a charge that never
+  // reached us is RevenueCat's to retry, not this app's to remember. That is most of why
+  // billing moved there.
+  const userId = useSession((s) => s.userId);
+  useEffect(() => {
+    if (userId) void identify(userId);
+  }, [userId]);
 
   // The walkthrough, once, after onboarding. Started here rather than from the deck so
   // it owns the whole tab bar from the first frame — it navigates between tabs, and a

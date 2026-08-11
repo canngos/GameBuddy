@@ -128,6 +128,16 @@ public class DefaultMatchService implements MatchService {
         // its target, so the pool refills instead of shrinking to nothing.
         decided.addAll(declinedMatches.findActiveExclusions(gamer.getUserId(), declineHorizon()));
 
+        // Anybody the filters rule out goes into the same exclusion set, for exactly the
+        // reason above: the model returns its top N by similarity and a filter applied to
+        // the answer can only remove from those N. It can never reach the person ranked
+        // 300th who is the only one online in your country — so the filter that sounds
+        // most valuable is the one that most reliably returned nothing.
+        if (filters.narrowing()) {
+            decided.addAll(gamerRepository.findIdsExcludedByFilters(
+                    filters.gameId(), filters.country(), filters.activeSince(clock)));
+        }
+
         List<String> candidates = predict(gamer, decided);
 
         // findAllById rather than one findById per candidate, and a candidate the model
@@ -149,7 +159,17 @@ public class DefaultMatchService implements MatchService {
         return recommendationResponse(page);
     }
 
-    /** Applies the filters, if any were asked for. */
+    /**
+     * Applies the filters, if any were asked for.
+     *
+     * <p>Kept even though the excluded ids were already withheld from the model. The two
+     * are not redundant: the exclusion decides <em>who gets ranked</em>, this decides
+     * <em>who gets shown</em>, and between them sits a model call that can return an id
+     * the exclusion list should have covered — a stale artefact, a cold-start path, or a
+     * gamer who went idle in the seconds since the query ran. Showing an offline person
+     * under an "online now" filter is the one outcome that makes the feature look broken,
+     * so the cheap in-memory check stays.
+     */
     private List<Gamer> filtered(List<Gamer> candidates, FeedFilters filters) {
         if (!filters.narrowing()) {
             return candidates;

@@ -355,12 +355,92 @@ wrong:
 | `FIREBASE_ENABLED`    | Startup fails if `true` without a credentials file                        |
 | `CORS_ALLOWED_ORIGINS`| Empty by default, refusing every browser. Only a web client needs it       |
 | `MODERATOR_EMAIL` / `MODERATOR_PASSWORD` | Creates the one staff account on first start. Empty means no staff account |
+| `REVENUECAT_WEBHOOK_TOKEN` | **Startup fails without it.** The only thing that can grant a paid entitlement — see Billing below |
 | `AVATAR_PUBLISH_AFTER`| ISO-8601 duration. How long an unreviewed ambiguous avatar waits before publishing |
 | `NSFW_APPROVE_THRESHOLD` / `NSFW_REJECT_THRESHOLD` | On the **model** service. The band between them is what needs a human |
 
 A mismatched `INTERNAL_API_KEY` is the one worth remembering, because it does not announce
 itself: the model answers 503 and the feed reports "Recommendation service unavailable",
 which reads as the model being down rather than a wrong secret.
+
+---
+
+## Billing
+
+**This backend never sees a receipt.** RevenueCat talks to Apple and Google, decides whether
+a purchase is real, and posts the outcome to `POST /billing/revenuecat/webhook`. We map that
+onto an account and grant the entitlement.
+
+The consequence to understand before changing anything here: **that webhook is the entire
+security boundary for billing.** There is no second opinion and no receipt to re-check, so
+anybody who can post a convincing body to that URL with the right header can hand themselves
+a subscription. Hence:
+
+- `REVENUECAT_WEBHOOK_TOKEN` is required and the application refuses to start without it. An
+  unset secret would not fail closed on its own — an empty expected value matches an empty
+  header — so the only safe unconfigured state is not running.
+- The comparison is constant-time, and a rejection returns a bare 401 with no body.
+- There is deliberately **no endpoint the app can call to claim a purchase.** `POST
+  /billing/redeem` used to exist and was removed with the verifiers; re-adding one would
+  make the paywall decorative.
+
+Set the same value in two places: this variable, and the Authorization field of the webhook
+in the RevenueCat dashboard. `openssl rand -base64 32`.
+
+### What the events mean
+
+| Event | Effect |
+| ----- | ------ |
+| `INITIAL_PURCHASE`, `RENEWAL`, `UNCANCELLATION`, `PRODUCT_CHANGE`, `NON_RENEWING_PURCHASE` | Grant, using the store's own expiry |
+| `EXPIRATION` | Revoke now |
+| `CANCELLATION` with `cancel_reason: CUSTOMER_SUPPORT` | Refund: revoke now, mark the row `REFUNDED` |
+| `CANCELLATION` for any other reason | **Nothing.** Auto-renew is off; they keep what they paid for until `EXPIRATION` |
+| `BILLING_ISSUE`, `SUBSCRIPTION_PAUSED` | Nothing. The store is still retrying, and revoking would cut off somebody whose card needs updating |
+| Anything else | Logged and ignored |
+
+Two behaviours that look wrong and are not. **Every authorised call answers 200**, including
+ones we could not make sense of: RevenueCat retries non-2xx with backoff and eventually
+disables a webhook that keeps failing, which would take every other purchase down with it.
+And a **replayed transaction grants nothing while still answering 200** — retries are normal,
+not exceptional, and the unique constraint on `(platform, store_transaction_id)` is what makes
+that safe.
+
+### The app side
+
+`react-native-purchases` (RevenueCat's SDK), installed and wired in
+`GameBuddy-App/src/billing/purchases.ts` — the only file that imports it.
+`react-native-purchases-ui` is deliberately **not** installed: that package renders
+RevenueCat's own paywall templates, and ours is already built and wired into four entry
+points.
+
+The SDK is loaded with `require` on first use rather than imported at the top of the file,
+and `NativeModules.RNPurchases` is checked before anything else. That check is the load-
+bearing part: the package does not throw when its native half is missing, it just leaves
+`NativeModules.RNPurchases` undefined, so a try/catch around the import would report success
+on a build that cannot purchase. Getting this wrong turns a disabled button into a crash
+inside `configure`.
+
+The consequence is useful: **a development build made before this install keeps working.**
+Everything runs; only the purchase button is disabled, with "Purchases not available yet"
+on it. `storeAvailable()` is what decides.
+
+`EXPO_PUBLIC_REVENUECAT_API_KEY` is the public SDK key. Public by design — it ships inside
+the binary and can only read offerings and start purchases. It comes from `eas.json` for
+EAS builds and from `GameBuddy-App/.env` for local work (gitignored, so each machine needs
+its own).
+
+It is set on the `lan` and `preview` profiles and **deliberately not on `production`**: the
+only key this project has is a Test Store key, and a shipped build configured against a
+store that takes no money is worse than one that plainly cannot sell. Add the `goog_`/`appl_`
+key to `production` when Google Play verification completes.
+
+### `app_user_id` has to be our user id
+
+The app must call `Purchases.logIn(userId)` before any purchase, so the webhook arrives
+carrying `gamer.user_id`. Without it RevenueCat invents an anonymous id
+(`$RCAnonymousID:…`), the event has nowhere to be delivered, and the backend logs an error
+while somebody sits there having paid. `src/billing/purchases.ts` in the app is the one place
+that wiring lives.
 
 ---
 
