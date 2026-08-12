@@ -3,6 +3,8 @@ package com.gamebuddy.match.domain.service;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.AgeBand;
+import com.gamebuddy.common.enums.Platform;
+import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
@@ -13,19 +15,29 @@ import com.gamebuddy.match.domain.client.PredictClient;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent.ServedCandidate;
 import com.gamebuddy.match.infrastructure.entity.*;
+import com.gamebuddy.match.infrastructure.entity.UnlockedAdmirer;
 import com.gamebuddy.match.infrastructure.repository.DeclinedMatchRepository;
+import com.gamebuddy.match.infrastructure.repository.UnlockedAdmirerRepository;
 import com.gamebuddy.match.interfaces.dto.AcceptResponseBody;
+import com.gamebuddy.match.interfaces.dto.BoostResponseBody;
+import com.gamebuddy.match.interfaces.dto.ConsumableResponseBody;
 import com.gamebuddy.match.interfaces.dto.GamerDto;
 import com.gamebuddy.match.interfaces.dto.LikedYouResponseBody;
 import com.gamebuddy.match.interfaces.dto.RecommendationResponseBody;
+import com.gamebuddy.match.interfaces.dto.RewindResponseBody;
 import com.gamebuddy.match.interfaces.dto.SwipeAllowanceResponseBody;
 import com.gamebuddy.match.interfaces.request.ColdStartRequest;
 import com.gamebuddy.match.interfaces.request.GamerRequest;
 import com.gamebuddy.match.interfaces.request.PredictRequest;
 import com.gamebuddy.match.interfaces.response.AcceptResponse;
+import com.gamebuddy.match.interfaces.response.BoostResponse;
+import com.gamebuddy.match.interfaces.response.ConsumableResponse;
 import com.gamebuddy.match.interfaces.response.LikedYouResponse;
 import com.gamebuddy.match.interfaces.response.RecommendationResponse;
+import com.gamebuddy.match.interfaces.response.RewindResponse;
 import com.gamebuddy.match.interfaces.response.SwipeAllowanceResponse;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
@@ -34,11 +46,6 @@ import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.repository.GamesRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
 import com.gamebuddy.shared.storage.CosmeticUrls;
-import com.gamebuddy.match.interfaces.dto.BoostResponseBody;
-import com.gamebuddy.match.interfaces.dto.RewindResponseBody;
-import com.gamebuddy.match.interfaces.response.BoostResponse;
-import com.gamebuddy.match.interfaces.response.RewindResponse;
-import com.gamebuddy.common.enums.SubscriptionTier;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
@@ -90,6 +97,8 @@ public class DefaultMatchService implements MatchService {
     private final RateLimiter decisionRateLimiter;
 
     private final DeclinedMatchRepository declinedMatches;
+    private final UnlockedAdmirerRepository unlockedAdmirers;
+    private final CoinLedger coins;
     private final Clock clock;
 
     /**
@@ -140,7 +149,10 @@ public class DefaultMatchService implements MatchService {
         // most valuable is the one that most reliably returned nothing.
         if (filters.narrowing()) {
             decided.addAll(gamerRepository.findIdsExcludedByFilters(
-                    filters.gameId(), filters.country(), filters.activeSince(clock)));
+                    filters.gameId(),
+                    filters.country(),
+                    filters.activeSince(clock),
+                    filters.platform() == null ? null : filters.platform().name()));
         }
 
         List<String> candidates = predict(gamer, decided);
@@ -346,9 +358,21 @@ public class DefaultMatchService implements MatchService {
         Gamer target = requireGamer(request.getUserId());
         requirePairable(gamer, target);
         requireNotFlooding(gamer);
+        // Refused rather than downgraded when none are owned. Somebody who asked to make a
+        // statement and silently made an ordinary like would never know, and would keep
+        // believing they had spent one.
+        boolean superLike = request.isSuperLike();
+        if (superLike && gamer.getSuperLikes() <= 0) {
+            throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH, "you have no super likes");
+        }
+
         // Charged before the decision is recorded, so a refused accept changes nothing.
         // An accept costs a swipe *and* draws on the much tighter accept sub-cap.
         swipeQuota.charge(gamer, true);
+
+        if (superLike) {
+            gamer.setSuperLikes(gamer.getSuperLikes() - 1);
+        }
 
         gamer.getApprovedMatches().add(target);
         // A decision replaces the previous one rather than sitting alongside it; the two
@@ -358,6 +382,20 @@ public class DefaultMatchService implements MatchService {
         rememberDecision(gamer, target, true);
 
         boolean mutual = target.getApprovedMatches().contains(gamer);
+
+        // Only when it is not already a match. Two notifications a second apart, the first
+        // saying somebody likes you and the second that you matched, is noise — and the
+        // match is the better news, so it wins.
+        if (superLike && !mutual) {
+            events.publishEvent(new NotificationRequestedEvent(
+                    target.getUserId(),
+                    target.getFcmToken(),
+                    Constants.SUPER_LIKE_TITLE,
+                    Constants.SUPER_LIKE_BODY,
+                    NotificationKind.SUPER_LIKE,
+                    gamer.getUserId()));
+        }
+
         if (mutual) {
             // Both sides get told, because both sides have just gained the ability to
             // start a conversation.
@@ -410,7 +448,18 @@ public class DefaultMatchService implements MatchService {
         // withholding it would leave nothing to upgrade for.
         body.setCount(admirers.size());
         body.setLocked(!unlocked);
-        body.setLikedYou(unlocked ? toDtos(admirers) : List.of());
+
+        if (unlocked) {
+            body.setLikedYou(toDtos(admirers));
+        } else {
+            // Without Gold, only the ones already paid for by name. The list still reports
+            // the full count above, so the screen shows "three more" rather than pretending
+            // the bought one is all there is.
+            Set<String> bought = new HashSet<>(unlockedAdmirers.findAdmirerIds(gamer.getUserId()));
+            body.setLikedYou(toDtos(admirers.stream()
+                    .filter(other -> bought.contains(other.getUserId()))
+                    .toList()));
+        }
 
         LikedYouResponse response = new LikedYouResponse();
         response.setBody(new BaseBody<>(body));
@@ -507,7 +556,7 @@ public class DefaultMatchService implements MatchService {
             if (gamer.getCoin() < cost) {
                 throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
             }
-            gamer.setCoin(gamer.getCoin() - cost);
+            coins.spend(gamer, cost, CoinReason.REWIND);
         }
 
         if (wasAccept) {
@@ -555,7 +604,7 @@ public class DefaultMatchService implements MatchService {
             if (gamer.getCoin() < cost) {
                 throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
             }
-            gamer.setCoin(gamer.getCoin() - cost);
+            coins.spend(gamer, cost, CoinReason.BOOST);
         } else {
             // Only stamped when the weekly one was actually spent, so a paid boost does
             // not quietly consume the free one somebody was saving.
@@ -566,6 +615,131 @@ public class DefaultMatchService implements MatchService {
         gamerRepository.save(gamer);
 
         return boostStatusResponse(gamer, tier, now, cost);
+    }
+
+    /**
+     * Buys a consumable with coins.
+     *
+     * <p>Read-check-write in one transaction, so it runs under the {@code @Version} lock on
+     * {@link Gamer} — two taps of a buy button would otherwise both read the same balance,
+     * both find it sufficient, and hand over two items for the price of one.
+     *
+     * <p>{@link Consumable#UNLOCK_ADMIRER} is not sold here: it needs to know <em>whom</em>
+     * it is unlocking, and a purchase that grants "one unlock" to be spent later is exactly
+     * the counter this deliberately avoids. See {@link #unlockAdmirer}.
+     */
+    @Override
+    @Transactional
+    public ConsumableResponse buyConsumable(Gamer principal, Consumable item) {
+        if (item == Consumable.UNLOCK_ADMIRER) {
+            throw new BusinessException(TransactionCode.INVALID_REQUEST, "unlock is bought against a gamer");
+        }
+
+        Gamer gamer = reload(principal);
+        spend(gamer, item.cost(), item == Consumable.SUPER_LIKE ? CoinReason.SUPER_LIKE : CoinReason.EXTRA_LIKES);
+
+        switch (item) {
+            case SUPER_LIKE -> gamer.setSuperLikes(gamer.getSuperLikes() + 1);
+            case EXTRA_LIKES -> {
+                // Anchored to the current window so a purchase made before the first swipe
+                // of the day is not wiped by the lazy reset that swipe would trigger.
+                Instant now = clock.instant();
+                if (gamer.getQuotaResetAt() == null || !gamer.getQuotaResetAt().isAfter(now)) {
+                    gamer.setSwipesUsed(0);
+                    gamer.setAcceptsUsed(0);
+                    gamer.setBonusAccepts(0);
+                    gamer.setQuotaResetAt(now.plus(SwipeQuota.WINDOW));
+                }
+                gamer.setBonusAccepts(gamer.getBonusAccepts() + Consumable.EXTRA_LIKES_COUNT);
+            }
+            default -> throw new BusinessException(TransactionCode.INVALID_REQUEST, "not for sale");
+        }
+
+        gamerRepository.save(gamer);
+        log.info("{} bought {} for {} coins", gamer.getUserId(), item, item.cost());
+        return consumableResponse(gamer);
+    }
+
+    /**
+     * Pays to see one particular admirer.
+     *
+     * <p>Bought against a person rather than as a token, so what the gamer receives is the
+     * face they were looking at when they decided to pay. Already-unlocked and already-Gold
+     * both refuse rather than charging again — the second is the one that would really
+     * sting, because it takes coins for something the subscription already gives.
+     */
+    @Override
+    @Transactional
+    public LikedYouResponse unlockAdmirer(Gamer principal, String admirerId) {
+        Gamer gamer = reload(principal);
+
+        if (swipeQuota.effectiveTier(gamer).canSeeWhoLikedYou()) {
+            throw new BusinessException(TransactionCode.INVALID_REQUEST, "your membership already shows this");
+        }
+        if (unlockedAdmirers.existsByUserIdAndAdmirerId(gamer.getUserId(), admirerId)) {
+            throw new BusinessException(TransactionCode.COSMETIC_ALREADY_OWNED);
+        }
+
+        // Only somebody actually waiting on an answer can be unlocked. Without this, the
+        // endpoint sells the identity of any account whose id is known.
+        boolean admires = gamerRepository.findPendingAdmirers(gamer.getUserId()).stream()
+                .anyMatch(other -> other.getUserId().equals(admirerId) && gamer.isPairableWith(other));
+        if (!admires) {
+            throw new BusinessException(TransactionCode.USER_NOT_FOUND);
+        }
+
+        spend(gamer, Consumable.UNLOCK_ADMIRER.cost(), CoinReason.UNLOCK_ADMIRER);
+        gamerRepository.save(gamer);
+        unlockedAdmirers.save(new UnlockedAdmirer(gamer.getUserId(), admirerId, clock.instant()));
+
+        log.info("{} unlocked admirer {}", gamer.getUserId(), admirerId);
+        return getWhoLikedYou(gamer);
+    }
+
+    /**
+     * Reveals the newest admirer still hidden.
+     *
+     * <p>The server chooses, because the client cannot: a locked admirer is sent with no
+     * id at all, and sending ids so the client could pick would hand over the paid feature
+     * for free — an id is enough to fetch a public profile.
+     *
+     * <p>Newest first, so the coins buy the person most likely to still be looking.
+     */
+    @Override
+    @Transactional
+    public LikedYouResponse unlockNextAdmirer(Gamer principal) {
+        Gamer gamer = reload(principal);
+
+        Set<String> already = new HashSet<>(unlockedAdmirers.findAdmirerIds(gamer.getUserId()));
+        Set<String> recentlyDeclined =
+                new HashSet<>(declinedMatches.findActiveExclusions(gamer.getUserId(), declineHorizon()));
+
+        String next = gamerRepository.findPendingAdmirers(gamer.getUserId()).stream()
+                .filter(other -> !gamer.getApprovedMatches().contains(other))
+                .filter(other -> !recentlyDeclined.contains(other.getUserId()))
+                .filter(gamer::isPairableWith)
+                .map(Gamer::getUserId)
+                .filter(id -> !already.contains(id))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(TransactionCode.NO_ADMIRERS_LEFT));
+
+        return unlockAdmirer(gamer, next);
+    }
+
+    /** Takes coins, or refuses. */
+    private void spend(Gamer gamer, int cost, CoinReason reason) {
+        if (gamer.getCoin() < cost) {
+            throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
+        }
+        coins.spend(gamer, cost, reason);
+    }
+
+    private ConsumableResponse consumableResponse(Gamer gamer) {
+        ConsumableResponse response = new ConsumableResponse();
+        response.setBody(new BaseBody<>(
+                new ConsumableResponseBody(gamer.getCoin(), gamer.getSuperLikes(), gamer.getBonusAccepts())));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
     }
 
     /** What the deck's Boost button needs to render itself without guessing. */
@@ -805,6 +979,10 @@ public class DefaultMatchService implements MatchService {
                     dto.setSelectedKeywords(g.getKeywords().stream()
                             .map(Keywords::getKeywordName)
                             .toList());
+                    // Labels, not enum names — see GamerDto#platforms. @BatchSize(50) on
+                    // the collection keeps a page of cards to one extra query.
+                    dto.setPlatforms(
+                            g.getPlatforms().stream().map(Platform::label).toList());
                     return dto;
                 })
                 .toList();

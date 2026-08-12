@@ -32,7 +32,13 @@ public final class BoostPolicy {
     /** How often a Gold member gets one for nothing. */
     public static final Duration FREE_BOOST_INTERVAL = Duration.ofDays(7);
 
-    public static final int BOOST_COST_COINS = 200;
+    /**
+     * A boost is the most expensive thing on the shelf, and about a week and a half of a
+     * free player's income. That is the intended shape: it is the one consumable whose
+     * value is other people's attention, which is finite — cheap boosts would mean
+     * everybody boosting, which is the same as nobody boosting.
+     */
+    public static final int BOOST_COST_COINS = 300;
 
     /**
      * Deliberately cheap.
@@ -58,7 +64,8 @@ public final class BoostPolicy {
         if (tier != SubscriptionTier.GOLD) {
             return false;
         }
-        return lastFreeBoostAt == null || !lastFreeBoostAt.plus(FREE_BOOST_INTERVAL).isAfter(now);
+        return lastFreeBoostAt == null
+                || !lastFreeBoostAt.plus(FREE_BOOST_INTERVAL).isAfter(now);
     }
 
     /**

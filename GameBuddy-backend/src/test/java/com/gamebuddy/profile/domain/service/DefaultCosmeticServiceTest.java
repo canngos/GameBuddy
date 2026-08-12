@@ -7,6 +7,8 @@ import static org.mockito.Mockito.*;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.profile.interfaces.dto.CosmeticDto;
 import com.gamebuddy.profile.interfaces.response.CosmeticsResponse;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.entity.Cosmetic;
 import com.gamebuddy.shared.entity.CosmeticKind;
 import com.gamebuddy.shared.entity.Gamer;
@@ -15,6 +17,7 @@ import com.gamebuddy.shared.repository.CosmeticRepository;
 import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.CosmeticUrls;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -25,7 +28,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
@@ -35,7 +37,6 @@ import org.mockito.quality.Strictness;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class DefaultCosmeticServiceTest {
 
-    @InjectMocks
     private DefaultCosmeticService cosmeticService;
 
     @Mock
@@ -50,10 +51,23 @@ class DefaultCosmeticServiceTest {
     @Mock
     private CosmeticUrls cosmeticUrls;
 
+    @Mock
+    private CoinLedgerRepository coinLedgerRepository;
+
     private Gamer gamer;
 
     @BeforeEach
     void setUp() {
+        // A real ledger over a mocked repository rather than a mock ledger: the ledger is
+        // what moves the balance now, and a stubbed one would leave every coin assertion
+        // below passing without a coin having gone anywhere.
+        cosmeticService = new DefaultCosmeticService(
+                cosmeticRepository,
+                ownershipRepository,
+                gamerRepository,
+                cosmeticUrls,
+                new CoinLedger(coinLedgerRepository, Clock.systemUTC()));
+
         gamer = new Gamer();
         gamer.setUserId(UUID.randomUUID().toString());
         gamer.setCoin(100);

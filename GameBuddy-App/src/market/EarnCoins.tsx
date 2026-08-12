@@ -1,7 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { REWARDED_AD_COINS, adsAvailable, showRewardedAd } from '../ads/rewarded';
 import { earnApi } from '../api/coins';
 import type { Earn, Quest } from '../api/types';
+import { useSession } from '../session/store';
 import { Text, messageOf } from '../ui';
 
 const EARN_KEY = ['earn'];
@@ -42,7 +45,32 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
   const quest = useMutation({ mutationFn: earnApi.claimQuest, onSuccess: applyEarn });
   const stipend = useMutation({ mutationFn: earnApi.claimStipend, onSuccess: applyEarn });
 
-  const busy = daily.isPending || quest.isPending || stipend.isPending;
+  // Watching an advert is not a mutation of ours: nothing is claimed and no endpoint is
+  // called. AdMob's servers pay the coins through the server-side callback, so all this
+  // tracks is whether an ad is on screen, and afterwards it refetches to pick up whatever
+  // the server decided.
+  const userId = useSession((s) => s.userId);
+  const [watching, setWatching] = useState(false);
+
+  async function watchAd() {
+    if (!userId) return;
+    setWatching(true);
+    try {
+      const outcome = await showRewardedAd(userId);
+      if (outcome === 'earned') {
+        // Deliberately a refetch rather than adding the coins locally. The grant happens
+        // out of band on Google's callback, so the client genuinely does not know the new
+        // balance — and guessing it would show coins that might never arrive.
+        await queryClient.invalidateQueries({ queryKey: EARN_KEY });
+        void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
+        void queryClient.invalidateQueries({ queryKey: ['me'] });
+      }
+    } finally {
+      setWatching(false);
+    }
+  }
+
+  const busy = daily.isPending || quest.isPending || stipend.isPending || watching;
   const failure = daily.error ?? quest.error ?? stipend.error;
   const state = earn.data;
 
@@ -87,6 +115,25 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
         busy={busy}
         onPress={() => daily.mutate()}
       />
+
+      {/* Only where the build can actually show one. An older development build has no
+          AdMob native module in it, and offering a button that reports "unavailable" is
+          worse than not offering it. */}
+      {adsAvailable() && (
+        <ClaimRow
+          icon="🎬"
+          title="Watch a short video"
+          detail={
+            state.adsLeftToday > 0
+              ? `${state.adsLeftToday} left today`
+              : 'That is today’s videos — back tomorrow'
+          }
+          reward={REWARDED_AD_COINS}
+          ready={state.adsLeftToday > 0}
+          busy={busy}
+          onPress={() => void watchAd()}
+        />
+      )}
 
       {state.quests.map((q) => (
         <QuestRow key={q.code} quest={q} busy={busy} onPress={() => quest.mutate(q.code)} />

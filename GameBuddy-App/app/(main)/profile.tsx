@@ -89,6 +89,9 @@ export default function Profile() {
             <View className="h-px bg-line" />
 
             <Tags title="Games" items={me.data.games.map((g) => g.gameName)} accent />
+            {/* Directly under games, because it is the second half of the same question:
+                what you play, and what you play it on. */}
+            <Tags title="Plays on" items={me.data.platforms ?? []} />
             <Tags title="Keywords" items={me.data.keywords.map((k) => k.keywordName)} />
           </Card>
         )}

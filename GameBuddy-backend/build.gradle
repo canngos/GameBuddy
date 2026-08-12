@@ -15,6 +15,11 @@ dependencies {
 
     implementation libs.spring.boot.starter.data.jpa
     implementation libs.spring.boot.starter.websocket
+
+    // Redis, for fanning WebSocket delivery and presence across instances. Optional at
+    // runtime: with no host configured the application falls back to local-only delivery,
+    // which is correct for one instance — see UserMessaging.
+    implementation libs.spring.boot.starter.data.redis
     implementation libs.spring.boot.starter.actuator
     implementation libs.spring.boot.starter.mail
     implementation libs.springdoc.webmvc.ui

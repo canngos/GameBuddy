@@ -11,12 +11,15 @@ import com.gamebuddy.profile.interfaces.dto.BadgesResponseBody;
 import com.gamebuddy.profile.interfaces.dto.ShowcasedBadgeDto;
 import com.gamebuddy.shared.badge.BadgeMetric;
 import com.gamebuddy.shared.badge.BadgeMetricSource;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.GamerBadge;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
 import com.gamebuddy.shared.repository.GamerBadgeRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.ObjectStorage;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -83,7 +86,15 @@ class DefaultBadgeServiceTest {
         BadgeMetricSource two =
                 g -> filtered(BadgeMetric.MESSAGES_SENT, BadgeMetric.POSTS_WRITTEN, BadgeMetric.COMMUNITIES_JOINED);
 
-        badgeService = new DefaultBadgeService(badgeRepository, gamerRepository, storage, events, List.of(one, two));
+        badgeService = new DefaultBadgeService(
+                badgeRepository,
+                gamerRepository,
+                storage,
+                events,
+                List.of(one, two),
+                // Real, over a mocked repository: the badge reward is a coin movement now,
+                // and a stubbed ledger would pay nothing while the tests still passed.
+                new CoinLedger(mock(CoinLedgerRepository.class), Clock.systemUTC()));
 
         when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
         when(gamerRepository.save(any(Gamer.class))).thenAnswer(i -> i.getArgument(0));

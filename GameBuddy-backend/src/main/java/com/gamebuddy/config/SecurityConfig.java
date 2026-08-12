@@ -70,7 +70,14 @@ public class SecurityConfig {
         // shared secret sent in the Authorization header and refuses without it. This is
         // the only path that can grant a paid entitlement, so that check is the whole
         // security boundary for billing — see RevenueCatWebhookController.
-        "/billing/revenuecat/webhook"
+        "/billing/revenuecat/webhook",
+        // AdMob's rewarded-ad callback. Public for the same reason as the line above —
+        // Google's servers call it and have no account here — but authenticated by the
+        // ECDSA signature AdMob puts on the query string, checked against Google's
+        // published verifier keys. This is the only path that can mint coins without a
+        // session, so that signature check is the whole security boundary for the ad
+        // economy; see RewardedAdController and RewardedAdVerifier.
+        "/ads/reward"
     };
 
     private final JwtAuthenticationFilter jwtAuthFilter;

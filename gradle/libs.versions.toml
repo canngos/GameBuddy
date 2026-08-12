@@ -37,6 +37,7 @@ spring-boot-starter-data-mongodb = { module = "org.springframework.boot:spring-b
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
 spring-boot-starter-websocket = { module = "org.springframework.boot:spring-boot-starter-websocket" }
+spring-boot-starter-data-redis = { module = "org.springframework.boot:spring-boot-starter-data-redis" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 # Boot 4 split the slice-test annotations out of spring-boot-test-autoconfigure:
 # @WebMvcTest now lives in spring-boot-starter-webmvc-test.

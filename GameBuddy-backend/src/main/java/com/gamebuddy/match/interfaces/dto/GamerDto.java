@@ -24,4 +24,17 @@ public class GamerDto {
 
     private List<GamesDto> favoriteGames;
     private List<String> selectedKeywords;
+
+    /**
+     * What this gamer plays on, as human-readable labels.
+     *
+     * <p>Labels rather than enum names, for the same reason the keywords above are names
+     * rather than ids: the deck renders these directly, and a client that has to translate
+     * {@code PLAYSTATION} into "PlayStation" is a client that will eventually spell it
+     * differently from every other screen.
+     *
+     * <p>Empty for accounts that pre-date the field. The card omits the row entirely rather
+     * than showing "Plays on: —", because an absent answer is not information.
+     */
+    private List<String> platforms;
 }

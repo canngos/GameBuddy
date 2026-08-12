@@ -17,6 +17,15 @@ public enum NotificationKind {
     /** Both sides said yes. {@code targetId} is the other gamer. */
     MATCH,
 
+    /**
+     * Somebody spent a super like on this gamer. {@code targetId} is the sender.
+     *
+     * <p>Its own kind rather than reusing MATCH, because it is not a match — nothing is
+     * open yet, and telling somebody they matched when they have not is the kind of
+     * notification that gets an app muted.
+     */
+    SUPER_LIKE,
+
     /** A chat message arrived. {@code targetId} is the sender. */
     MESSAGE,
 
@@ -60,7 +69,7 @@ public enum NotificationKind {
     public NotificationCategory category() {
         return switch (this) {
             case MESSAGE -> NotificationCategory.MESSAGES;
-            case MATCH, FRIEND_REQUEST, FRIEND_ACCEPTED, BADGE -> NotificationCategory.SOCIAL;
+            case MATCH, SUPER_LIKE, FRIEND_REQUEST, FRIEND_ACCEPTED, BADGE -> NotificationCategory.SOCIAL;
             case COMMUNITY_POST, POST_LIKE, POST_COMMENT, COMMENT_LIKE -> NotificationCategory.COMMUNITIES;
             case RETURN -> NotificationCategory.REMINDERS;
         };

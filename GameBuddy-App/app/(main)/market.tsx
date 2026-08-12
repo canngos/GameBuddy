@@ -8,6 +8,8 @@ import { cosmeticsApi } from '../../src/api/cosmetics';
 import { ApiError, Code } from '../../src/api/envelope';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
 import { CoinShop } from '../../src/market/CoinShop';
+import { ConsumableShelf } from '../../src/market/ConsumableShelf';
+import { SeasonPassTeaser } from '../../src/market/SeasonPassTeaser';
 import { EarnCoins } from '../../src/market/EarnCoins';
 import { useThemeColors } from '../../src/theme';
 import { Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
@@ -34,6 +36,10 @@ export default function Market() {
   const coinShopY = useRef(0);
 
   const store = useQuery({ queryKey: STORE_KEY, queryFn: cosmeticsApi.store });
+
+  // Same key as GoldCard's own query, so react-query serves both from one request. Read
+  // here only for the Season Pass flag — the card itself knows nothing about tiers.
+  const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
 
   /**
    * Buy, equip and unequip all answer with the whole refreshed store, so the response
@@ -105,7 +111,39 @@ export default function Market() {
         </View>
       </View>
 
+      {/* Section order is the analysis's, not an accident: what the app is selling first,
+          then what it is about to sell, then the currency, then how to earn it, then what
+          it spends on, and the shelf last.
+
+          It is the opposite of what this screen used to do, which led with the cosmetics.
+          The argument for that was that somebody has no reason to buy currency before they
+          have seen something they want. The argument against — and the one that won — is
+          that a Market tab exists to sell, and burying the subscription under a shelf of
+          150-coin frames sells the cheapest thing on the screen. */}
+
       <GoldCard />
+
+      {/* Server-switchable. Absent, not empty, when the flag is off. */}
+      {subscription.data?.seasonPassTeaser && <SeasonPassTeaser />}
+
+      <CoinShop
+        balance={store.data?.coins ?? 0}
+        onLayoutY={(y) => {
+          coinShopY.current = y;
+        }}
+      />
+
+      <EarnCoins />
+
+      <ConsumableShelf balance={store.data?.coins ?? 0} />
+
+      {/* Cosmetics last. Everything above is bought to be spent; this is what it is spent
+          on, and it is the one section that keeps working with an empty balance — the free
+          frames are here. */}
+      <View className="gap-1 pb-3">
+        <Text variant="overline">FRAMES AND BANNERS</Text>
+        <Text variant="caption">Worn on your profile, and on every card you appear in.</Text>
+      </View>
 
       <View className="flex-row gap-2 pb-5">
         <Segment label="Frames" active={kind === 'FRAME'} onPress={() => setKind('FRAME')} />
@@ -168,18 +206,6 @@ export default function Market() {
           </Pressable>
         )}
       </View>
-
-      {/* Earning comes before buying, and both come after the shelf. Somebody who has not
-          yet seen a frame they want has no reason for either — putting the till before the
-          goods is what makes a cosmetics shop feel like a slot machine. */}
-      <EarnCoins />
-
-      <CoinShop
-        balance={store.data?.coins ?? 0}
-        onLayoutY={(y) => {
-          coinShopY.current = y;
-        }}
-      />
     </Screen>
   );
 }
@@ -263,7 +289,12 @@ function Row({
         <View className="flex-1 gap-0.5">
           <Text variant="bodyStrong">{item.name}</Text>
           <Text variant="caption">
-            {[item.animated ? 'Animated' : null, item.price === 0 ? 'Free' : `${item.price} coins`]
+            {[
+              item.animated ? 'Animated' : null,
+              // A membership item is stored at price zero, so without this it reads as
+              // "Free" — which is the one thing it is not.
+              item.membershipOnly ? 'With Gold' : item.price === 0 ? 'Free' : `${item.price} coins`,
+            ]
               .filter(Boolean)
               .join(' · ')}
           </Text>
@@ -272,6 +303,14 @@ function Row({
         {item.equipped ? (
           <Text variant="label" className="text-brand">
             Worn
+          </Text>
+        ) : item.membershipOnly && !item.owned ? (
+          // No button at all. The server refuses to sell these at any price, so a Buy
+          // control here could only ever fail — and a locked padlock would imply it is
+          // purchasable if you find the right screen. It is not; it arrives with the
+          // membership and leaves with it.
+          <Text variant="label" className="text-muted">
+            Members only
           </Text>
         ) : (
           <Pressable

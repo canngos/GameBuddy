@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
+import { trackFunnel } from '../api/funnel';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -50,6 +51,12 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
   const router = useRouter();
   const visible = !!block;
   const progress = useSharedValue(0);
+
+  // The moment a limit actually bites. Recorded here rather than at the paywall because
+  // this is where demand appears; whether it converts is the next event's job.
+  useEffect(() => {
+    if (visible) trackFunnel('PAYWALL_TRIGGERED');
+  }, [visible]);
 
   useEffect(() => {
     progress.value = visible

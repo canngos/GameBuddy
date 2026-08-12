@@ -14,6 +14,7 @@ import com.gamebuddy.match.domain.client.PredictClient;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent;
 import com.gamebuddy.match.infrastructure.entity.*;
 import com.gamebuddy.match.infrastructure.repository.*;
+import com.gamebuddy.match.infrastructure.repository.UnlockedAdmirerRepository;
 import com.gamebuddy.match.interfaces.dto.GamerDto;
 import com.gamebuddy.match.interfaces.request.ColdStartRequest;
 import com.gamebuddy.match.interfaces.request.GamerRequest;
@@ -81,6 +82,13 @@ class DefaultMatchServiceTest {
 
     @Mock
     private DeclinedMatchRepository declinedMatches;
+
+    /**
+     * Admirers bought one at a time. Mocked and empty by default, which is the truthful
+     * state for every gamer in these tests: nobody here has paid to reveal anybody.
+     */
+    @Mock
+    private UnlockedAdmirerRepository unlockedAdmirers;
 
     /**
      * Mocked rather than fixed, so a test can move time forward and watch a decline expire

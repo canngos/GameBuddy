@@ -19,7 +19,7 @@
 -- Both produce the same tables and columns, so the difference is invisible in a diff of
 -- table names, and it is not invisible at runtime: an entity-generated schema carries no
 -- column DEFAULTs at all. Hibernate does not emit them, because it supplies those values
--- from Java. Every DEFAULT in this file — 48 of them — came from a migration, and the
+-- from Java. Every DEFAULT in this file — 55 of them — came from a migration, and the
 -- seed scripts and the synthetic population loader both rely on them. Regenerating from
 -- the entities drops all 48, and the first symptom is `seed-local.sql` failing on a NOT
 -- NULL column three steps later.
@@ -145,6 +145,26 @@ CREATE TABLE gamebuddy.chat_room (
 
 
 --
+-- Name: coin_ledger; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.coin_ledger (
+    id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    delta integer NOT NULL,
+    reason character varying(32) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE coin_ledger; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.coin_ledger IS 'Every coin movement, signed. Positive earns, negative spends.';
+
+
+--
 -- Name: comment; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -261,6 +281,25 @@ CREATE TABLE gamebuddy.friends (
 
 
 --
+-- Name: funnel_event; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.funnel_event (
+    id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    kind character varying(32) NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE funnel_event; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.funnel_event IS 'Client-reported funnel steps. Nothing here grants anything; see CoinLedger for money.';
+
+
+--
 -- Name: gamer; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -319,6 +358,12 @@ CREATE TABLE gamebuddy.gamer (
     quest_base_matches integer DEFAULT 0 NOT NULL,
     quest_base_posts integer DEFAULT 0 NOT NULL,
     quest_claimed_mask integer DEFAULT 0 NOT NULL,
+    super_likes integer DEFAULT 0 NOT NULL,
+    bonus_accepts integer DEFAULT 0 NOT NULL,
+    like_cap_cohort character varying(16),
+    upgrade_prompt_shown_at timestamp with time zone,
+    rewarded_ads_today integer DEFAULT 0 NOT NULL,
+    rewarded_ad_day timestamp with time zone,
     CONSTRAINT gamer_avatar_status_check CHECK (((avatar_status IS NULL) OR ((avatar_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text])))),
     CONSTRAINT gamer_role_check CHECK (((role)::text = ANY (ARRAY[('USER'::character varying)::text, ('ADMIN'::character varying)::text]))),
     CONSTRAINT gamer_subscription_tier_check CHECK (((subscription_tier)::text = ANY (ARRAY[('BASIC'::character varying)::text, ('GOLD'::character varying)::text])))
@@ -382,6 +427,48 @@ COMMENT ON COLUMN gamebuddy.gamer.quest_claimed_mask IS 'Which of this week''s q
 
 
 --
+-- Name: COLUMN gamer.super_likes; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.super_likes IS 'Owned super likes, spent one per highlighted like. Never expires.';
+
+
+--
+-- Name: COLUMN gamer.bonus_accepts; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.bonus_accepts IS 'Extra likes added to TODAY''s cap. Cleared when the daily quota window rolls.';
+
+
+--
+-- Name: COLUMN gamer.like_cap_cohort; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.like_cap_cohort IS 'Stable A/B bucket for the free daily like cap. Assigned once, at registration.';
+
+
+--
+-- Name: COLUMN gamer.upgrade_prompt_shown_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.upgrade_prompt_shown_at IS 'When the one-time day-3 Gold prompt was shown. Null means never; set once, never cleared.';
+
+
+--
+-- Name: COLUMN gamer.rewarded_ads_today; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.rewarded_ads_today IS 'Rewarded adverts paid for during rewarded_ad_day. Meaningless once that day has passed.';
+
+
+--
+-- Name: COLUMN gamer.rewarded_ad_day; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.rewarded_ad_day IS 'UTC midnight of the day rewarded_ads_today counts. Null means never watched one.';
+
+
+--
 -- Name: gamer_badge; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -429,6 +516,23 @@ CREATE TABLE gamebuddy.gamer_keywords_join (
     gamer_id character varying(255) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: gamer_platform; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.gamer_platform (
+    user_id character varying(255) NOT NULL,
+    platform character varying(16) NOT NULL
+);
+
+
+--
+-- Name: TABLE gamer_platform; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.gamer_platform IS 'Which platforms each gamer plays on. A set, not a single value.';
 
 
 --
@@ -539,9 +643,25 @@ CREATE TABLE gamebuddy.purchase (
     store_transaction_id character varying(255) NOT NULL,
     user_id character varying(255) NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    period_type character varying(16),
+    event_type character varying(32),
     CONSTRAINT purchase_platform_check CHECK (((platform)::text = ANY (ARRAY[('APPLE_APP_STORE'::character varying)::text, ('GOOGLE_PLAY'::character varying)::text]))),
     CONSTRAINT purchase_status_check CHECK (((status)::text = ANY (ARRAY[('GRANTED'::character varying)::text, ('REFUNDED'::character varying)::text])))
 );
+
+
+--
+-- Name: COLUMN purchase.period_type; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.purchase.period_type IS 'RevenueCat period_type. TRIAL is what separates a trial start from a paid month.';
+
+
+--
+-- Name: COLUMN purchase.event_type; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.purchase.event_type IS 'RevenueCat event type. RENEWAL is what makes month-2 retention countable.';
 
 
 --
@@ -560,6 +680,25 @@ CREATE TABLE gamebuddy.recommendation_impression (
 
 
 --
+-- Name: rewarded_ad_grant; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.rewarded_ad_grant (
+    transaction_id character varying(128) NOT NULL,
+    user_id character varying(255) NOT NULL,
+    coins integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE rewarded_ad_grant; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.rewarded_ad_grant IS 'Rewarded-ad callbacks already honoured. The primary key is the replay defence.';
+
+
+--
 -- Name: session; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -571,6 +710,24 @@ CREATE TABLE gamebuddy.session (
     email character varying(255) NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: unlocked_admirer; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.unlocked_admirer (
+    user_id character varying(255) NOT NULL,
+    admirer_id character varying(255) NOT NULL,
+    unlocked_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE unlocked_admirer; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.unlocked_admirer IS 'Admirers revealed one at a time with coins, by gamers without Gold.';
 
 
 --
@@ -649,6 +806,14 @@ ALTER TABLE ONLY gamebuddy.chat_room
 
 
 --
+-- Name: coin_ledger coin_ledger_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.coin_ledger
+    ADD CONSTRAINT coin_ledger_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: comment_likes_join comment_likes_join_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -713,6 +878,14 @@ ALTER TABLE ONLY gamebuddy.friends
 
 
 --
+-- Name: funnel_event funnel_event_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.funnel_event
+    ADD CONSTRAINT funnel_event_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: gamer_badge gamer_badge_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -758,6 +931,14 @@ ALTER TABLE ONLY gamebuddy.gamer_keywords_join
 
 ALTER TABLE ONLY gamebuddy.gamer
     ADD CONSTRAINT gamer_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: gamer_platform gamer_platform_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_platform
+    ADD CONSTRAINT gamer_platform_pkey PRIMARY KEY (user_id, platform);
 
 
 --
@@ -833,6 +1014,14 @@ ALTER TABLE ONLY gamebuddy.recommendation_impression
 
 
 --
+-- Name: rewarded_ad_grant rewarded_ad_grant_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.rewarded_ad_grant
+    ADD CONSTRAINT rewarded_ad_grant_pkey PRIMARY KEY (transaction_id);
+
+
+--
 -- Name: session session_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -862,6 +1051,14 @@ ALTER TABLE ONLY gamebuddy.chat_room
 
 ALTER TABLE ONLY gamebuddy.purchase
     ADD CONSTRAINT uk_purchase_store_transaction UNIQUE (platform, store_transaction_id);
+
+
+--
+-- Name: unlocked_admirer unlocked_admirer_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.unlocked_admirer
+    ADD CONSTRAINT unlocked_admirer_pkey PRIMARY KEY (user_id, admirer_id);
 
 
 --
@@ -910,6 +1107,20 @@ CREATE INDEX idx_chat_participant_user ON gamebuddy.chat_participant USING btree
 
 
 --
+-- Name: idx_coin_ledger_time; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_coin_ledger_time ON gamebuddy.coin_ledger USING btree (created_at);
+
+
+--
+-- Name: idx_coin_ledger_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_coin_ledger_user ON gamebuddy.coin_ledger USING btree (user_id, created_at DESC);
+
+
+--
 -- Name: idx_cosmetic_asset_key; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
@@ -928,6 +1139,20 @@ CREATE INDEX idx_cosmetic_kind ON gamebuddy.cosmetic USING btree (kind, sort_ord
 --
 
 CREATE INDEX idx_declined_user_time ON gamebuddy.declined_matches USING btree (user_id, declined_at);
+
+
+--
+-- Name: idx_funnel_event_kind; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_funnel_event_kind ON gamebuddy.funnel_event USING btree (kind, created_at);
+
+
+--
+-- Name: idx_funnel_event_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_funnel_event_user ON gamebuddy.funnel_event USING btree (user_id, kind);
 
 
 --
@@ -952,6 +1177,13 @@ CREATE INDEX idx_gamer_boost_active ON gamebuddy.gamer USING btree (country, boo
 
 
 --
+-- Name: idx_gamer_cohort; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_gamer_cohort ON gamebuddy.gamer USING btree (like_cap_cohort, created_date);
+
+
+--
 -- Name: idx_gamer_cosmetic_user; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
@@ -970,6 +1202,13 @@ CREATE INDEX idx_gamer_dormant ON gamebuddy.gamer USING btree (last_active_at) W
 --
 
 CREATE UNIQUE INDEX idx_gamer_fcm_token ON gamebuddy.gamer USING btree (fcm_token) WHERE (fcm_token IS NOT NULL);
+
+
+--
+-- Name: idx_gamer_platform_platform; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_gamer_platform_platform ON gamebuddy.gamer_platform USING btree (platform);
 
 
 --
@@ -1036,10 +1275,24 @@ CREATE INDEX idx_report_status ON gamebuddy.content_report USING btree (status, 
 
 
 --
+-- Name: idx_rewarded_ad_grant_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_rewarded_ad_grant_user ON gamebuddy.rewarded_ad_grant USING btree (user_id, created_at DESC);
+
+
+--
 -- Name: idx_session_email; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
 CREATE INDEX idx_session_email ON gamebuddy.session USING btree (email);
+
+
+--
+-- Name: idx_unlocked_admirer_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_unlocked_admirer_user ON gamebuddy.unlocked_admirer USING btree (user_id);
 
 
 --
@@ -1241,6 +1494,14 @@ ALTER TABLE ONLY gamebuddy.approved_matches
 
 
 --
+-- Name: gamer_platform fk_gamer_platform_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_platform
+    ADD CONSTRAINT fk_gamer_platform_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+
+
+--
 -- Name: friends fkbopmktch8gic3oxk7t7ec4cb6; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1379,3 +1640,5 @@ ALTER TABLE ONLY gamebuddy.gamer
 --
 -- PostgreSQL database dump complete
 --
+
+

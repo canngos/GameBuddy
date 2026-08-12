@@ -8,6 +8,8 @@ import com.gamebuddy.common.util.Ids;
 import com.gamebuddy.profile.interfaces.dto.CosmeticDto;
 import com.gamebuddy.profile.interfaces.dto.CosmeticsResponseBody;
 import com.gamebuddy.profile.interfaces.response.CosmeticsResponse;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Cosmetic;
 import com.gamebuddy.shared.entity.CosmeticKind;
 import com.gamebuddy.shared.entity.Gamer;
@@ -42,6 +44,7 @@ public class DefaultCosmeticService implements CosmeticService {
     private final GamerCosmeticRepository ownershipRepository;
     private final GamerRepository gamerRepository;
     private final CosmeticUrls cosmeticUrls;
+    private final CoinLedger coins;
 
     @Override
     @Transactional(readOnly = true)
@@ -77,7 +80,7 @@ public class DefaultCosmeticService implements CosmeticService {
             throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
         }
 
-        gamer.setCoin(gamer.getCoin() - cosmetic.getPrice());
+        coins.spend(gamer, cosmetic.getPrice(), CoinReason.COSMETIC);
         ownershipRepository.save(new GamerCosmetic(gamer.getUserId(), cosmetic.getId(), cosmetic.getPrice()));
 
         // The purchase badge is not awarded here. Counting bought cosmetics is what
@@ -179,6 +182,7 @@ public class DefaultCosmeticService implements CosmeticService {
                     dto.setAnimated(c.isAnimated());
                     dto.setPrice(c.getPrice());
                     dto.setOwned(c.isFree() || owned.contains(c.getId()));
+                    dto.setMembershipOnly(c.isMembershipOnly());
                     dto.setEquipped(c.getId().equals(equippedId));
                     return dto;
                 })

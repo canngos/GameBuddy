@@ -4,6 +4,7 @@ import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.BaseModel;
 import com.gamebuddy.common.base.BaseResponse;
 import com.gamebuddy.common.base.Status;
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
@@ -107,6 +108,7 @@ public class DefaultProfileService implements ProfileService {
         body.setBanner(cosmeticUrls.bannerUrl(gamer));
         body.setGames(profileCatalogueMapper.toGameDtos(gamer.getLikedgames()));
         body.setKeywords(profileCatalogueMapper.toKeywordDtos(gamer.getKeywords()));
+        body.setPlatforms(gamer.getPlatforms().stream().map(Platform::label).toList());
         // The three on show, and the total. Not the whole board: that is a screen of its
         // own, and sending thirteen missions with progress to render a number and three
         // pictures would put the badge catalogue on every profile view.

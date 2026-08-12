@@ -261,6 +261,7 @@ class AuthControllerTest {
         request.setAvatar(UUID.randomUUID().toString());
         request.setFavoriteGames(List.of("g1", "g2", "g3"));
         request.setKeywords(List.of("k1", "k2", "k3", "k4", "k5"));
+        request.setPlatforms(List.of("PC", "SWITCH"));
         when(authService.details(any(), any())).thenReturn(ok("User details saved successfully"));
 
         mockMvc.perform(post("/auth/details")
@@ -278,6 +279,7 @@ class AuthControllerTest {
         request.setAvatar(UUID.randomUUID().toString());
         request.setFavoriteGames(List.of("g1"));
         request.setKeywords(List.of("k1", "k2", "k3", "k4", "k5"));
+        request.setPlatforms(List.of("PC"));
 
         mockMvc.perform(post("/auth/details")
                         .contentType("application/json")

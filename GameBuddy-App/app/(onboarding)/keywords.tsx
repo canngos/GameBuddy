@@ -8,6 +8,7 @@ import { useDraft } from '../../src/onboarding/draft';
 import { SelectionCount } from '../../src/onboarding/SelectionCount';
 import { StepHeader } from '../../src/onboarding/StepHeader';
 import { CataloguePicker } from '../../src/pickers/CataloguePicker';
+import { MIN_PLATFORMS } from '../../src/profile/platforms';
 import { useSession } from '../../src/session/store';
 import { Button, ErrorNotice, Screen } from '../../src/ui';
 import { MIN_GAMES, MIN_KEYWORDS, parseBirthDate, toIsoDate } from '../../src/validation';
@@ -43,6 +44,7 @@ export default function Keywords() {
         // an empty one is what "prefer not to say" already sends.
         gender: draft.gender ?? '',
         favoriteGames: draft.gameIds,
+        platforms: draft.platformIds,
         keywords: draft.keywordIds,
       }),
     onSuccess: () => {
@@ -62,7 +64,8 @@ export default function Keywords() {
     !!parseBirthDate(draft.birthDay, draft.birthMonth, draft.birthYear) &&
     !!draft.country &&
     !!draft.avatarId &&
-    draft.gameIds.length >= MIN_GAMES;
+    draft.gameIds.length >= MIN_GAMES &&
+    draft.platformIds.length >= MIN_PLATFORMS;
   if (!draftIntact && !submit.isSuccess) return <Redirect href="/profile" />;
 
   return (
@@ -82,8 +85,8 @@ export default function Keywords() {
       }
     >
       <StepHeader
-        step={5}
-        total={5}
+        step={6}
+        total={6}
         title="How do you play?"
         subtitle={`Pick at least ${MIN_KEYWORDS}. These are the habits and moods we match on.`}
       />

@@ -65,13 +65,17 @@ public class SwipeQuota {
             // has to walk every row to zero a counter.
             gamer.setSwipesUsed(0);
             gamer.setAcceptsUsed(0);
+            // Bought likes belong to the day they were bought for. Carrying them over
+            // would make them a stockpile rather than a consumable, and remove the reason
+            // to buy a second one tomorrow.
+            gamer.setBonusAccepts(0);
             gamer.setQuotaResetAt(now.plus(WINDOW));
         }
 
         if (gamer.getSwipesUsed() >= tier.dailySwipes()) {
             throw new BusinessException(TransactionCode.SWIPE_LIMIT_REACHED);
         }
-        if (accept && gamer.getAcceptsUsed() >= tier.dailyAccepts()) {
+        if (accept && gamer.getAcceptsUsed() >= acceptCap(gamer, tier)) {
             throw new BusinessException(TransactionCode.ACCEPT_LIMIT_REACHED);
         }
 
@@ -79,6 +83,18 @@ public class SwipeQuota {
         if (accept) {
             gamer.setAcceptsUsed(gamer.getAcceptsUsed() + 1);
         }
+    }
+
+    /**
+     * Today's like cap, including any that were bought.
+     *
+     * <p>Bonus likes raise the cap rather than reducing the used count. Both would let one
+     * more like through, but only this one survives a rewind: refunding into
+     * {@code acceptsUsed} after a purchase had decremented it would hand back a like that
+     * was paid for and then quietly grant it twice.
+     */
+    private int acceptCap(Gamer gamer, SubscriptionTier tier) {
+        return tier.dailyAccepts() + Math.max(0, gamer.getBonusAccepts());
     }
 
     /**
@@ -112,11 +128,14 @@ public class SwipeQuota {
 
         int swipesUsed = windowExpired ? 0 : gamer.getSwipesUsed();
         int acceptsUsed = windowExpired ? 0 : gamer.getAcceptsUsed();
+        // Bought likes expire with the window they were bought for, so a stale one must not
+        // be reported as still available.
+        int cap = windowExpired ? tier.dailyAccepts() : acceptCap(gamer, tier);
 
         int swipesLeft = Math.max(0, tier.dailySwipes() - swipesUsed);
         // Accepts left can never exceed swipes left: with three swipes remaining a gamer
         // cannot make four likes, whatever the sub-cap says.
-        int acceptsLeft = Math.min(swipesLeft, Math.max(0, tier.dailyAccepts() - acceptsUsed));
+        int acceptsLeft = Math.min(swipesLeft, Math.max(0, cap - acceptsUsed));
 
         return new SwipeAllowance(tier, swipesLeft, acceptsLeft, false, windowExpired ? now.plus(WINDOW) : resetAt);
     }

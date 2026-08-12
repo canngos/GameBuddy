@@ -139,6 +139,52 @@ public final class CoinFaucet {
         return midnight.minus(Duration.ofDays(sinceMonday));
     }
 
+    // -- Rewarded video ------------------------------------------------------
+
+    /**
+     * What one finished ad pays.
+     *
+     * <p>Twenty, against a daily streak that starts at five. An ad is the only faucet that
+     * costs the gamer something real — thirty seconds they did not want to spend — so
+     * paying less than the free daily claim would make it an insult rather than an option.
+     *
+     * <p>It is also the only faucet that earns us money, and the rate has to stay below
+     * what that is worth. A rewarded impression is worth roughly one to three cents; five a
+     * day at twenty coins is 100 coins for perhaps five to fifteen cents of revenue, which
+     * keeps the cheapest 150-coin frame about two days of watching away and leaves the coin
+     * packs a real shortcut rather than a formality.
+     */
+    public static final int REWARDED_AD_COINS = 20;
+
+    /**
+     * How many may be watched per day.
+     *
+     * <p>Capped for the gamer's sake before ours. Uncapped, the fastest way to afford
+     * anything becomes watching thirty adverts in a row, which is a worse game than the one
+     * we are trying to make and burns out the ad inventory that pays for it. Five is enough
+     * to be a real alternative to buying and short enough that nobody organises their
+     * evening around it.
+     */
+    public static final int REWARDED_AD_DAILY_CAP = 5;
+
+    /**
+     * The UTC day an instant falls in, as the key the daily cap counts against.
+     *
+     * <p>A calendar day rather than a rolling window, unlike {@link #DAILY_COOLDOWN} above.
+     * The streak cooldown exists to protect a habit from drifting; this exists only to
+     * bound a total, and a bound is easier to reason about — and to explain in the app —
+     * when it resets at a time everybody shares.
+     */
+    public static Instant adDay(Instant now) {
+        return now.truncatedTo(ChronoUnit.DAYS);
+    }
+
+    /** How many more ads this gamer may be paid for today. */
+    public static int rewardedAdsLeft(int watchedToday, Instant lastAdDay, Instant now) {
+        boolean sameDay = lastAdDay != null && lastAdDay.equals(adDay(now));
+        return sameDay ? Math.max(0, REWARDED_AD_DAILY_CAP - watchedToday) : REWARDED_AD_DAILY_CAP;
+    }
+
     // -- Gold stipend --------------------------------------------------------
 
     /**

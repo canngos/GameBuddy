@@ -49,7 +49,7 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
   // silently skip the first however-many people in it.
   useEffect(() => {
     setCursor(0);
-  }, [filters.gameId, filters.country, filters.onlineNow]);
+  }, [filters.gameId, filters.country, filters.onlineNow, filters.platform]);
 
   const allowance = useQuery({
     queryKey: ['allowance'],

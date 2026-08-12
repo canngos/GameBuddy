@@ -42,7 +42,7 @@ export default function Profile() {
     <Screen scroll>
       <StepHeader
         step={2}
-        total={5}
+        total={6}
         title="About you"
         subtitle="GameBuddy is for adults. We use your date of birth to confirm you are 18 or over — it is never shown to anyone."
       />

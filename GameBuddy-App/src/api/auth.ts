@@ -77,6 +77,15 @@ export const authApi = {
   changeKeywords: (keywordIds: string[]) =>
     api.put<void>('/auth/change/keywords', { gamesOrKeywordsList: keywordIds }),
 
+  /**
+   * Platform enum names, at least one.
+   *
+   * Shares the games/keywords request shape — the body is a list of identifiers either
+   * way, and the server refuses any name it does not recognise rather than dropping it.
+   */
+  changePlatforms: (platformIds: string[]) =>
+    api.put<void>('/auth/change/platforms', { gamesOrKeywordsList: platformIds }),
+
   /** Requires the password: a stolen token must not be enough to delete an account. */
   deleteAccount: (currentPassword: string) =>
     api.delete<void>('/auth/account', { currentPassword }),

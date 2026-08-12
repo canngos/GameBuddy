@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { profileApi } from '../api/catalogue';
+import { PLATFORMS } from '../profile/platforms';
 import { Button } from '../ui/Button';
 import { Text } from '../ui/Text';
 import { NO_FILTERS, activeCount, isNarrowing, type FeedFilters } from './filters';
@@ -142,6 +143,35 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                     disabled={!unlocked || !myCountry}
                     onChange={(on) => setDraft((d) => ({ ...d, country: on ? myCountry : null }))}
                   />
+                </Section>
+
+                {/* One platform at a time, as chips rather than the multi-select used on
+                    the profile: there the question is "what do you own", here it is "who
+                    can I play with tonight", and that is one answer. Somebody on PC and
+                    Switch shows up under either. */}
+                <Section title="Platform" hint="Whoever you can actually get in a lobby with.">
+                  <View className="flex-row flex-wrap gap-2">
+                    <GameChip
+                      label="Any platform"
+                      selected={draft.platform === null}
+                      disabled={!unlocked}
+                      onPress={() => setDraft((d) => ({ ...d, platform: null }))}
+                    />
+                    {PLATFORMS.map((platform) => (
+                      <GameChip
+                        key={platform.id}
+                        label={platform.label}
+                        selected={draft.platform === platform.id}
+                        disabled={!unlocked}
+                        onPress={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            platform: d.platform === platform.id ? null : platform.id,
+                          }))
+                        }
+                      />
+                    ))}
+                  </View>
                 </Section>
 
                 <Section title="Availability" hint="Active in the last 15 minutes.">

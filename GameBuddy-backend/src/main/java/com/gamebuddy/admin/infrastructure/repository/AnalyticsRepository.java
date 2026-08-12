@@ -102,6 +102,117 @@ public interface AnalyticsRepository extends Repository<Gamer, String> {
                     """, nativeQuery = true)
     long countMutualMatches();
 
+    /**
+     * The monetisation funnel, as far as the data allows.
+     *
+     * <p>One query rather than six, for the same reason the headline counts are one: they
+     * are read together and a dashboard assembled from six moments disagrees with itself.
+     *
+     * <p>Every ratio is returned as its two counts rather than as a percentage. A rate with
+     * a denominator of three is noise, and a screen that shows "33%" without showing the
+     * three invites somebody to act on it — which in the first weeks after launch is
+     * exactly when the denominators are smallest.
+     */
+    @Query(value = """
+                    SELECT
+                      (SELECT COUNT(DISTINCT user_id) FROM funnel_event
+                        WHERE kind = 'PAYWALL_VIEWED' AND created_at >= :since)          AS paywall_viewers,
+                      (SELECT COUNT(DISTINCT user_id) FROM funnel_event
+                        WHERE kind = 'CHECKOUT_STARTED' AND created_at >= :since)        AS checkout_starters,
+
+                      -- Trials and paid months are the same table; period_type is the only
+                      -- thing that tells them apart.
+                      (SELECT COUNT(DISTINCT user_id) FROM purchase
+                        WHERE period_type = 'TRIAL' AND purchased_at >= :since)          AS trials_started,
+                      (SELECT COUNT(DISTINCT user_id) FROM purchase
+                        WHERE period_type IS DISTINCT FROM 'TRIAL'
+                          AND status = 'GRANTED'
+                          AND product_id LIKE 'gamebuddy.gold.%'
+                          AND purchased_at >= :since)                                    AS paid_started,
+                      (SELECT COUNT(DISTINCT user_id) FROM purchase
+                        WHERE event_type = 'RENEWAL' AND purchased_at >= :since)         AS renewals,
+
+                      -- Free to paid at 30 days: of the accounts that turned 30 days old in
+                      -- the window, how many had ever bought Gold by then.
+                      (SELECT COUNT(*) FROM gamer g
+                        WHERE g.deleted_at IS NULL AND g.role <> 'ADMIN'
+                          AND g.created_date <  :thirtyDaysAgo
+                          AND g.created_date >= :sixtyDaysAgo)                           AS cohort30,
+                      (SELECT COUNT(*) FROM gamer g
+                        WHERE g.deleted_at IS NULL AND g.role <> 'ADMIN'
+                          AND g.created_date <  :thirtyDaysAgo
+                          AND g.created_date >= :sixtyDaysAgo
+                          AND EXISTS (SELECT 1 FROM purchase p
+                                       WHERE p.user_id = g.user_id
+                                         AND p.product_id LIKE 'gamebuddy.gold.%'
+                                         AND p.purchased_at < g.created_date + interval '30 days'))
+                                                                                         AS cohort30Paid,
+
+                      -- The economy, over the window. Earned and spent are kept apart
+                      -- rather than netted: a net of zero is produced both by a healthy
+                      -- economy and by one where nothing happens at all.
+                      COALESCE((SELECT SUM(delta) FROM coin_ledger
+                                 WHERE delta > 0 AND created_at >= :since), 0)           AS coins_earned,
+                      COALESCE((SELECT -SUM(delta) FROM coin_ledger
+                                 WHERE delta < 0 AND created_at >= :since), 0)           AS coins_spent
+                    """, nativeQuery = true)
+    FunnelCounts funnel(
+            @Param("since") Instant since,
+            @Param("thirtyDaysAgo") Instant thirtyDaysAgo,
+            @Param("sixtyDaysAgo") Instant sixtyDaysAgo);
+
+    /**
+     * Day-7 retention, split by like-cap cohort.
+     *
+     * <p>The number the analysis says matters most in the first quarter, and the reason the
+     * cohort column exists at all. Retained means active at least seven days after signing
+     * up; only accounts old enough to have had the chance are counted, or every cohort
+     * would be dragged down by yesterday's signups.
+     */
+    @Query(value = """
+                    SELECT
+                      COALESCE(like_cap_cohort, 'UNASSIGNED')                            AS cohort,
+                      COUNT(*)                                                           AS signups,
+                      COUNT(*) FILTER (WHERE last_active_at >= created_date + interval '7 days')
+                                                                                         AS retained
+                    FROM gamer
+                    WHERE deleted_at IS NULL
+                      AND role <> 'ADMIN'
+                      AND created_date <= :cutoff
+                      AND created_date >= :since
+                    GROUP BY 1
+                    ORDER BY 1
+                    """, nativeQuery = true)
+    List<CohortRetention> retentionByCohort(@Param("since") Instant since, @Param("cutoff") Instant cutoff);
+
+    interface FunnelCounts {
+        long getPaywallViewers();
+
+        long getCheckoutStarters();
+
+        long getTrialsStarted();
+
+        long getPaidStarted();
+
+        long getRenewals();
+
+        long getCohort30();
+
+        long getCohort30Paid();
+
+        long getCoinsEarned();
+
+        long getCoinsSpent();
+    }
+
+    interface CohortRetention {
+        String getCohort();
+
+        long getSignups();
+
+        long getRetained();
+    }
+
     /** Projection for {@link #headline}. Spring Data maps the column aliases by name. */
     interface HeadlineCounts {
         long getAccounts();

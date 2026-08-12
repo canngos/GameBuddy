@@ -5,6 +5,8 @@ import com.gamebuddy.billing.infrastructure.entity.PurchasePlatform;
 import com.gamebuddy.billing.infrastructure.entity.PurchaseStatus;
 import com.gamebuddy.billing.infrastructure.repository.PurchaseRepository;
 import com.gamebuddy.common.enums.SubscriptionTier;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
@@ -50,15 +52,23 @@ public class PurchaseService {
     private final PurchaseRepository purchases;
     private final GamerRepository gamers;
     private final Clock clock;
+    private final CoinLedger coins;
 
-    /** What a verified purchase tells us, independent of who verified it. */
+    /**
+     * What a verified purchase tells us, independent of who verified it.
+     *
+     * @param periodType RevenueCat's period_type; TRIAL is what separates a trial from a paid month
+     * @param eventType RevenueCat's event type; RENEWAL is what makes month-2 retention countable
+     */
     public record VerifiedPurchase(
             String userId,
             Product product,
             PurchasePlatform platform,
             String storeTransactionId,
             Instant purchasedAt,
-            Instant expiresAt) {}
+            Instant expiresAt,
+            String periodType,
+            String eventType) {}
 
     /**
      * Grants a purchase, or does nothing if it has already been granted.
@@ -95,6 +105,8 @@ public class PurchaseService {
         purchase.setStoreTransactionId(verified.storeTransactionId());
         purchase.setStatus(PurchaseStatus.GRANTED);
         purchase.setPurchasedAt(verified.purchasedAt() == null ? clock.instant() : verified.purchasedAt());
+        purchase.setPeriodType(verified.periodType());
+        purchase.setEventType(verified.eventType());
 
         try {
             // Flushed here so a unique violation surfaces now, where it is a replay, rather
@@ -108,11 +120,15 @@ public class PurchaseService {
         if (product.isSubscription()) {
             purchase.setEntitlementExpiresAt(grantSubscription(gamer, product, verified.expiresAt()));
         } else {
-            gamer.setCoin(gamer.getCoin() + product.coins());
+            coins.earn(gamer, product.coins(), CoinReason.COIN_PACK);
         }
         gamers.save(gamer);
 
-        log.info("Granted {} to {} (transaction {})", product.storeId(), verified.userId(), verified.storeTransactionId());
+        log.info(
+                "Granted {} to {} (transaction {})",
+                product.storeId(),
+                verified.userId(),
+                verified.storeTransactionId());
         return true;
     }
 
@@ -170,23 +186,25 @@ public class PurchaseService {
      */
     @Transactional
     public void refund(PurchasePlatform platform, String storeTransactionId) {
-        purchases.findByPlatformAndStoreTransactionId(platform, storeTransactionId).ifPresent(purchase -> {
-            purchase.setStatus(PurchaseStatus.REFUNDED);
+        purchases
+                .findByPlatformAndStoreTransactionId(platform, storeTransactionId)
+                .ifPresent(purchase -> {
+                    purchase.setStatus(PurchaseStatus.REFUNDED);
 
-            gamers.findById(purchase.getUserId())
-                    .ifPresent(gamer -> Product.byStoreId(purchase.getProductId()).ifPresent(product -> {
-                        if (product.isSubscription()) {
-                            // The tier is derived from the expiry, so this is enough.
-                            gamer.setSubscriptionExpiresAt(clock.instant());
-                        } else {
-                            // Coins may already be spent, so this can go negative if we let it.
-                            gamer.setCoin(Math.max(0, gamer.getCoin() - product.coins()));
-                        }
-                        gamers.save(gamer);
-                    }));
+                    gamers.findById(purchase.getUserId()).ifPresent(gamer -> Product.byStoreId(purchase.getProductId())
+                            .ifPresent(product -> {
+                                if (product.isSubscription()) {
+                                    // The tier is derived from the expiry, so this is enough.
+                                    gamer.setSubscriptionExpiresAt(clock.instant());
+                                } else {
+                                    // Coins may already be spent, so this can go negative if we let it.
+                                    coins.spend(gamer, product.coins(), CoinReason.REFUND);
+                                }
+                                gamers.save(gamer);
+                            }));
 
-            log.info("Refunded {} for {}", storeTransactionId, purchase.getUserId());
-        });
+                    log.info("Refunded {} for {}", storeTransactionId, purchase.getUserId());
+                });
     }
 
     /**

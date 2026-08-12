@@ -81,11 +81,22 @@ export const billingApi = {
    * straight off the row — see `SubscriptionTier.effective`. So this is the only
    * trustworthy answer to "am I Gold", and the client must not cache its own idea of it.
    *
-   * **This is now the only billing endpoint.** `POST /billing/redeem` is gone: receipts go
-   * to RevenueCat, which verifies them with Apple or Google and tells our backend over a
-   * webhook. There is deliberately no call the app can make to assert that it bought
-   * something — that would have been a free subscription for anyone willing to send the
-   * request by hand.
+   * `POST /billing/redeem` is gone: receipts go to RevenueCat, which verifies them with
+   * Apple or Google and tells our backend over a webhook. There is deliberately no call
+   * the app can make to assert that it bought something — that would have been a free
+   * subscription for anyone willing to send the request by hand.
    */
   subscription: () => api.get<Subscription>('/billing/subscription'),
+
+  /**
+   * Reports that the day-3 prompt was actually put on screen, so it never returns.
+   *
+   * The server does not mark it on the read, because the answer can be fetched and then
+   * thrown away by a navigation or a backgrounded app — and burning the single showing on
+   * a prompt nobody saw is the worse of the two mistakes.
+   *
+   * Grants nothing, so it is safe to fire and forget. A failure here means somebody may
+   * see the prompt once more, which is not worth an error in front of them.
+   */
+  markUpgradePromptSeen: () => api.post<{ message: string }>('/billing/upgrade-prompt/seen'),
 };

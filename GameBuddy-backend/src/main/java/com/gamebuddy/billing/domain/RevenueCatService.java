@@ -52,8 +52,8 @@ public class RevenueCatService {
             // charge and the subscriber keeps access through the grace period. Revoking
             // here would cut off people whose card simply needs updating, and EXPIRATION
             // arrives if the retries fail.
-            case "BILLING_ISSUE", "SUBSCRIPTION_PAUSED", "TEST" -> log.info(
-                    "RevenueCat {} for {} needs no entitlement change", event.type(), event.appUserId());
+            case "BILLING_ISSUE", "SUBSCRIPTION_PAUSED", "TEST" ->
+                log.info("RevenueCat {} for {} needs no entitlement change", event.type(), event.appUserId());
 
             default -> log.info("Ignoring unhandled RevenueCat event type {}", event.type());
         }
@@ -84,9 +84,7 @@ public class RevenueCatService {
         }
 
         log.info(
-                "{} cancelled auto-renew ({}); access continues until expiry",
-                event.appUserId(),
-                event.cancelReason());
+                "{} cancelled auto-renew ({}); access continues until expiry", event.appUserId(), event.cancelReason());
     }
 
     private void grant(RevenueCatWebhook.Event event) {
@@ -124,7 +122,14 @@ public class RevenueCatService {
         String transactionId = event.transactionId() != null ? event.transactionId() : event.id();
 
         purchases.grant(new VerifiedPurchase(
-                event.appUserId(), product, platform, transactionId, event.purchasedAt(), event.expiresAt()));
+                event.appUserId(),
+                product,
+                platform,
+                transactionId,
+                event.purchasedAt(),
+                event.expiresAt(),
+                event.periodType(),
+                event.type()));
     }
 
     private void transfer(RevenueCatWebhook.Event event) {

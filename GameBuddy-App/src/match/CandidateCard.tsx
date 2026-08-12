@@ -72,6 +72,11 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
         nestedScrollEnabled
       >
         <Section title="Plays" items={candidate.favoriteGames?.map((g) => g.gameName) ?? []} accent />
+        {/* Omitted entirely when unknown rather than shown empty — accounts predating the
+            field have nothing here, and "Plays on: —" reads as an answer when it is not
+            one. Above Style because it is a hard constraint on playing together, where
+            style is a preference. */}
+        {!!candidate.platforms?.length && <Section title="Plays on" items={candidate.platforms} />}
         <Section title="Style" items={candidate.selectedKeywords ?? []} />
       </ScrollView>
     </View>

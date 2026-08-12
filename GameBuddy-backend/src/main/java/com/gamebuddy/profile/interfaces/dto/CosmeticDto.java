@@ -33,4 +33,14 @@ public class CosmeticDto {
 
     /** Whether this is what the gamer is currently wearing in this slot. */
     private boolean equipped;
+
+    /**
+     * Whether it comes with membership rather than being for sale.
+     *
+     * <p>Sent because the price alone cannot express it: a membership item is stored at
+     * zero, which is indistinguishable from a free one. Without this the client renders a
+     * Buy button on something {@code DefaultCosmeticService.buy} refuses outright — an
+     * affordance that can only ever fail.
+     */
+    private boolean membershipOnly;
 }

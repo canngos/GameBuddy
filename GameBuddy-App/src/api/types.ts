@@ -84,6 +84,13 @@ export type UserInfo = {
   role?: 'USER' | 'ADMIN';
   games: Game[];
   keywords: Keyword[];
+  /**
+   * What this gamer plays on, as labels ("PlayStation"), not enum names.
+   *
+   * Empty for accounts created before the field existed — the profile omits the section
+   * rather than rendering an empty one, because an absent answer is not information.
+   */
+  platforms: string[];
   /** The three (at most) this gamer chose to display. Empty is normal. */
   badges: ShowcasedBadge[];
   /** How many have been earned in total. */
@@ -113,6 +120,8 @@ export type Candidate = {
   favoriteGames: { gameName: string; gameIcon: string | null }[];
   /** Names, not ids — this DTO flattens keywords to plain strings. */
   selectedKeywords: string[];
+  /** Labels, not enum names. Empty for accounts that pre-date the field. */
+  platforms: string[];
 };
 
 /** Today's swipe budget. One budget with a sub-cap, not two. */
@@ -137,6 +146,21 @@ export type Subscription = {
   dailyAccepts: number;
   canSeeWhoLikedYou: boolean;
   canUseAdvancedFilters: boolean;
+  /**
+   * Whether to show the Season Pass teaser.
+   *
+   * Not an entitlement — nothing is unlocked by it. It rides on this response so the card
+   * can be withdrawn from the server rather than by a store release.
+   */
+  seasonPassTeaser: boolean;
+  /**
+   * Whether the one-time day-3 Gold prompt is due right now.
+   *
+   * Every condition behind it — how old the account is, whether it has produced a match,
+   * whether the prompt has already been shown — is evaluated on the server. The client is
+   * told yes or no and is trusted only to report back when it actually rendered it.
+   */
+  upgradePromptDue: boolean;
 };
 
 /** What POST /match/rewind returns: the swipe that was taken back. */
@@ -190,6 +214,23 @@ export type Earn = {
   /** ISO instant, or null when available now or not a member. */
   stipendReadyAt: string | null;
   coinBalance: number;
+  /**
+   * Rewarded adverts that may still be paid for today.
+   *
+   * Sent even when zero, so the card can say "back tomorrow" rather than vanishing — a
+   * faucet that disappears once spent reads as a bug, and nothing tells the gamer it will
+   * be back.
+   */
+  adsLeftToday: number;
+};
+
+/** What a consumable purchase leaves the gamer holding. */
+export type Consumables = {
+  coinBalance: number;
+  /** Super likes owned. These do not expire. */
+  superLikes: number;
+  /** Extra likes bought for today only, on top of the tier's cap. */
+  bonusAccepts: number;
 };
 
 export type LikedYou = {
@@ -237,6 +278,8 @@ export type ProfileDetails = {
   gender: string;
   /** Game UUIDs. At least 3. */
   favoriteGames: string[];
+  /** Platform enum names, at least 1. See `src/profile/platforms.ts`. */
+  platforms: string[];
   /** Keyword UUIDs. At least 5. */
   keywords: string[];
 };
@@ -334,6 +377,13 @@ export type Cosmetic = {
   price: number;
   owned: boolean;
   equipped: boolean;
+  /**
+   * Comes with Gold rather than being for sale.
+   *
+   * The price alone cannot express this — a membership item is stored at zero, which is
+   * indistinguishable from a free one — and the server refuses to sell it at any price.
+   */
+  membershipOnly: boolean;
 };
 
 /**
@@ -447,6 +497,49 @@ export type Analytics = {
   mutualMatches: number;
   messages: number;
   growth: GrowthPoint[];
+  funnel: Funnel;
+  retention: CohortRetention[];
+};
+
+/**
+ * The monetisation funnel.
+ *
+ * Every ratio arrives as its two counts rather than as a percentage, and is rendered that
+ * way. A rate with a denominator of three is noise, and a screen that shows "33%" without
+ * showing the three invites somebody to act on it — which in the first weeks after launch
+ * is exactly when the denominators are smallest.
+ */
+export type Funnel = {
+  /** Distinct accounts that opened the paywall. */
+  paywallViewers: number;
+  /** Of those, how many asked for a store sheet. */
+  checkoutStarters: number;
+  trialsStarted: number;
+  paidStarted: number;
+  renewals: number;
+  /** Accounts that turned 30 days old in the window — the free-to-paid denominator. */
+  cohort30: number;
+  /** How many of them had bought Gold by day 30. */
+  cohort30Paid: number;
+  /**
+   * Coins in and coins out over the window, kept apart rather than netted: a net of zero
+   * is produced both by a healthy economy and by one where nothing happens at all.
+   */
+  coinsEarned: number;
+  coinsSpent: number;
+};
+
+/**
+ * Day-7 retention, split by the like-cap experiment.
+ *
+ * The point of the cohort column. Retained means active at least seven days after signing
+ * up, and only accounts old enough to have had the chance are counted — so this list is
+ * legitimately empty until the first cohort is a week old.
+ */
+export type CohortRetention = {
+  cohort: string;
+  signups: number;
+  retained: number;
 };
 
 /** An upload waiting on a human verdict. */

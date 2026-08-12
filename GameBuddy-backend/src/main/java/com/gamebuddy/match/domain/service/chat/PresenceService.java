@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.event.EventListener;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +37,7 @@ public class PresenceService {
 
     private final PresenceRegistry registry;
     private final GamerRepository gamerRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final UserMessaging messaging;
 
     /**
      * {@code @Transactional} belongs on the listeners, not on {@link #announce}.
@@ -110,7 +109,7 @@ public class PresenceService {
                 if (!match.getApprovedMatches().contains(gamer)) {
                     continue;
                 }
-                messagingTemplate.convertAndSendToUser(match.getEmail(), "/queue/presence", update);
+                messaging.sendToUser(match.getEmail(), "/queue/presence", update);
             }
 
             log.debug("Presence for {} is now online={} ({} matches)", userId, update.online(), matchIds.size());

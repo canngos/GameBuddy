@@ -41,4 +41,13 @@ public class EarnResponseBody implements BaseModel {
     private Instant stipendReadyAt;
 
     private int coinBalance;
+
+    /**
+     * Rewarded adverts this gamer may still be paid for today.
+     *
+     * <p>Sent even when it is zero, so the card can say "back tomorrow" rather than
+     * disappearing — a faucet that vanishes when it is spent looks like a bug, and the
+     * gamer has no way to learn it exists again.
+     */
+    private int adsLeftToday;
 }

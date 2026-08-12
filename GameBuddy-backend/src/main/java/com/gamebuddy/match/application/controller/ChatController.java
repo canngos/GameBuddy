@@ -6,6 +6,7 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.util.Ids;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import com.gamebuddy.match.domain.service.chat.SentMessage;
+import com.gamebuddy.match.domain.service.chat.UserMessaging;
 import com.gamebuddy.match.interfaces.dto.ChatNotification;
 import com.gamebuddy.match.interfaces.request.ChatMessageRequest;
 import com.gamebuddy.match.interfaces.request.TypingRequest;
@@ -20,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final UserMessaging messaging;
     private final ChatMessageService chatMessageService;
 
     /**
@@ -85,7 +85,7 @@ public class ChatController {
      * recipient who is offline loses nothing.
      */
     private void deliver(SentMessage sent) {
-        messagingTemplate.convertAndSendToUser(
+        messaging.sendToUser(
                 sent.receiverPrincipalName(),
                 "/queue/messages",
                 new ChatNotification(sent.id().toString(), sent.senderId(), sent.senderName(), sent.body()));

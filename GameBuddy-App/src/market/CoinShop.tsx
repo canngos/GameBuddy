@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
+import { trackFunnel } from '../api/funnel';
 import { COIN_PACKS, bonusPercent, type CoinPack } from '../api/billing';
 import { storeAvailable } from '../billing/purchases';
 import { usePurchase } from '../billing/usePurchase';
@@ -7,10 +9,11 @@ import { Card, ErrorNotice, Text } from '../ui';
 /**
  * Coin packs, bought with real money.
  *
- * Coins are earned through badges first and bought second, and the ordering on this screen
- * says so: the shelf of things to spend them on comes above this, not below it. Somebody
- * who has never seen a frame they want has no reason to buy currency, and leading with the
- * currency is how a cosmetics shop starts feeling like a slot machine.
+ * Sits high on the screen, above the earning section, because the Market's job is to sell
+ * and the balance is what everything below is priced in. That is a reversal: this used to
+ * sit under the cosmetics shelf, on the argument that nobody buys currency before seeing
+ * something they want. The copy points down at the free routes so the order does not read
+ * as "pay first" — somebody who wants to earn is told, in this section, exactly where.
  *
  * The packs are consumables. There is no entitlement to check afterwards — only a balance
  * that should have gone up — which is why {@link usePurchase} is told this is a `coins`
@@ -33,6 +36,12 @@ export function CoinShop({
   const buy = usePurchase('coins');
   const canBuy = storeAvailable();
 
+  // Says whether the currency is understood as buyable at all — the Market renders this
+  // section on every visit, so it is a view count rather than an intent signal.
+  useEffect(() => {
+    trackFunnel('COIN_SHOP_VIEWED');
+  }, []);
+
   return (
     <View
       className="gap-3 pb-8"
@@ -42,8 +51,8 @@ export function CoinShop({
         <Text variant="overline">COINS</Text>
         <Text variant="caption">
           {canBuy
-            ? 'Earn them from badges, or top up here.'
-            : 'Earn them from badges. Buying coins is not available in this build yet.'}
+            ? 'Top up now, or earn them below — badges, quests and a daily streak.'
+            : 'Earn them below: badges, quests and a daily streak. Buying is not available in this build yet.'}
         </Text>
       </View>
 

@@ -78,7 +78,7 @@ must match what the model container was started with.
 ### Tests
 
 ```bash
-./gradlew build                                   # 647 tests (579 backend, 68 common)
+./gradlew build                                   # 743 tests (675 backend, 68 common)
 cd GameBuddy-Model && python -m pytest            # 50 model tests
 ```
 
@@ -101,6 +101,32 @@ them.
 
 The model is the only out-of-process dependency, because it is a different runtime.
 Everything that used to be an HTTP call between services is now a method call.
+
+### Running more than one backend
+
+Redis is in the stack for exactly one reason: the STOMP broker and the presence registry
+both live in one process's memory, so a second instance would deliver a message from a
+gamer on instance A to a gamer on instance B *to nobody* — and report everyone on the
+other instance as offline. Neither failure raises anything; the send is a silent no-op,
+indistinguishable from the recipient being genuinely away.
+
+Every push is published to one Redis channel and every instance is subscribed; whichever
+one holds the socket delivers it. Presence is a hash per gamer, keyed by instance, with a
+short TTL each instance re-asserts on a timer — so a killed instance stops re-asserting
+and its people age out rather than appearing online forever.
+
+**The switch is `SPRING_DATA_REDIS_HOST`, and there is no second one.** Set, and delivery
+fans out. Unset, and the backend delivers to its own sockets, which is exactly correct for
+one instance and needs no Redis at all. A Redis outage falls back to the same local
+delivery rather than stopping chat.
+
+To watch it work, run a second instance against the same stack:
+
+```bash
+docker compose run --no-deps -d --name backendB -p 8097:8097 -e SERVER_PORT=8097 backend
+docker compose exec redis redis-cli pubsub numsub gamebuddy:socket   # 2
+docker compose exec redis redis-cli --scan --pattern 'gb:presence:*'
+```
 
 ---
 
@@ -331,7 +357,11 @@ docker compose exec -T postgres psql -U gamebuddy -d scratch \
   -f /dev/stdin < GameBuddy-backend/src/main/resources/db/schema-baseline.sql
 
 # Numeric order, not filename order — `ls` puts upgrade-10 before upgrade-4.
-for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+# Extend this list with every new migration; a number left off here is a table that
+# silently never reaches the baseline. That has already happened once — 21 and 22 were
+# both missing, so a fresh `docker compose up` built a database with no coin_ledger and
+# no funnel_event, and the backend refused to start against it.
+for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do
   f=$(ls GameBuddy-backend/src/main/resources/db/upgrade-2026-$n-*.sql)
   docker compose exec -T postgres psql -U gamebuddy -d scratch -f /dev/stdin < "$f"
 done
@@ -354,7 +384,7 @@ counts.
 **Do not generate it with `ddl-auto=create`.** Pointing Hibernate at an empty database
 produces the same tables and columns, so a diff of table names looks perfect — and the
 result carries **no column DEFAULTs at all**, because Hibernate supplies those values from
-Java instead. All 50 defaults in the baseline came from migrations, and `seed-local.sql`
+Java instead. All 55 defaults in the baseline came from migrations, and `seed-local.sql`
 and `tools/local-gamers.sql` both depend on them. Regenerating this way drops every one,
 and the first symptom is a seed failing on a NOT NULL column several steps later.
 
@@ -365,9 +395,15 @@ compose, and with `DDL_AUTO=create` that drops and recreates every table in it. 
 override `SPRING_DATASOURCE_URL`, and never combine an override with `DDL_AUTO=create`
 without checking which database actually got it.
 
-Recovering from that: rebuild as above, then `seed-local.sql`, then
-`GameBuddy-Model/tools/local-gamers.sql` for the swipeable population. Only the accounts
-you registered by hand are unrecoverable.
+Recovering from that: rebuild as above, then `GameBuddy-Model/tools/local-gamers.sql` for
+the swipeable population. Only the accounts you registered by hand are unrecoverable.
+
+**Order matters, and getting it wrong fails silently.** It is baseline → seed → upgrades,
+which is what compose does (`01-baseline.sql`, `02-seed.sql`, then upgrades by hand). Run
+the upgrades before the seed and every migration that *updates* a seeded row matches
+nothing: `upgrade-2026-18` marks the Gold frame as members-only with an UPDATE, and against
+an empty `cosmetic` table that updates zero rows, reports success, and leaves the frame on
+sale for 400 coins. Nothing errors. Re-running the upgrades after the seed fixes it.
 
 Then re-apply the one thing the entities cannot express: `idx_outbox_pending` is **partial**
 (`WHERE sent_at IS NULL`). The outbox is overwhelmingly delivered rows, and a full index

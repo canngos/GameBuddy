@@ -175,6 +175,14 @@ public enum TransactionCode {
      * to guarantee. A conflict rather than a server error, because nothing is broken.
      */
     CONCURRENT_MODIFICATION(176, "That went through already — check and try again", HttpStatus.CONFLICT),
+    /**
+     * Every admirer has already been revealed.
+     *
+     * <p>Its own code because the alternative was USER_NOT_FOUND, which is true internally
+     * — there is no next admirer to look up — and reads to a gamer as though something is
+     * broken with their account.
+     */
+    NO_ADMIRERS_LEFT(177, "You have already revealed everybody", HttpStatus.CONFLICT),
 
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);
