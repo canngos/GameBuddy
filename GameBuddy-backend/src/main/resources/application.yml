@@ -176,6 +176,13 @@ gamebuddy:
     retention: ${IMPRESSION_RETENTION:P90D}
     cleanup-cron: ${IMPRESSION_CLEANUP_CRON:0 30 3 * * *}
 
+  season-pass:
+    # The teaser card in the Market. On by default; turn it off from the server rather than
+    # a release, because it promises seasons that are an art commitment before they are an
+    # engineering one — six cosmetics every six weeks, forever — and a promise that has to
+    # be withdrawn should not need a store review to withdraw.
+    teaser: ${SEASON_PASS_TEASER:true}
+
   billing:
     revenuecat:
       # The shared secret typed into the Authorization field of the webhook in the

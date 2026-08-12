@@ -60,4 +60,6 @@ public interface AuthService {
     DefaultMessageResponse changeGames(Gamer principal, ChangeDetailRequest changeGamesRequest);
 
     DefaultMessageResponse changeKeywords(Gamer principal, ChangeDetailRequest changeKeywordsRequest);
+
+    DefaultMessageResponse changePlatforms(Gamer principal, ChangeDetailRequest changePlatformsRequest);
 }

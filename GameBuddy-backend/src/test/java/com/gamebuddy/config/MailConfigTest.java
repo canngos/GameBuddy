@@ -112,25 +112,17 @@ class MailConfigTest {
         @DisplayName("a blank sender refuses to start, and says which variable is missing")
         void blankFromIsFatal() {
             smtp.withPropertyValues("gamebuddy.mail.from=")
-                    .run(context -> assertThat(context)
-                            .hasFailed()
-                            .getFailure()
-                            .hasMessageContaining("MAIL_FROM"));
+                    .run(context -> assertThat(context).hasFailed().getFailure().hasMessageContaining("MAIL_FROM"));
         }
 
         @Test
         @DisplayName("blank credentials refuse to start too")
         void blankCredentialsAreFatal() {
             smtp.withPropertyValues("spring.mail.password=")
-                    .run(context -> assertThat(context)
-                            .hasFailed()
-                            .getFailure()
-                            .hasMessageContaining("SMTP_EMAIL_PWD"));
+                    .run(context ->
+                            assertThat(context).hasFailed().getFailure().hasMessageContaining("SMTP_EMAIL_PWD"));
             smtp.withPropertyValues("spring.mail.username=")
-                    .run(context -> assertThat(context)
-                            .hasFailed()
-                            .getFailure()
-                            .hasMessageContaining("SMTP_EMAIL"));
+                    .run(context -> assertThat(context).hasFailed().getFailure().hasMessageContaining("SMTP_EMAIL"));
         }
 
         @Test
@@ -139,10 +131,8 @@ class MailConfigTest {
             // It becomes the From header of every verification email. A relay authenticates
             // the login, not this, so nothing downstream would catch it.
             smtp.withPropertyValues("gamebuddy.mail.from=noreply")
-                    .run(context -> assertThat(context)
-                            .hasFailed()
-                            .getFailure()
-                            .hasMessageContaining("not an email address"));
+                    .run(context ->
+                            assertThat(context).hasFailed().getFailure().hasMessageContaining("not an email address"));
         }
 
         @Test

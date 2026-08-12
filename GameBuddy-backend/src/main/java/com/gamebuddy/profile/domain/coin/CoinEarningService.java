@@ -6,6 +6,8 @@ import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.profile.domain.coin.CoinFaucet.Quest;
 import com.gamebuddy.shared.badge.BadgeMetric;
 import com.gamebuddy.shared.badge.BadgeMetricSource;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
@@ -41,6 +43,7 @@ public class CoinEarningService {
     private final GamerRepository gamers;
     private final List<BadgeMetricSource> metricSources;
     private final Clock clock;
+    private final CoinLedger coins;
 
     /** What a gamer can claim, and what they would get. */
     public record Earnings(
@@ -52,7 +55,9 @@ public class CoinEarningService {
             boolean stipendAvailable,
             int stipendAmount,
             Instant stipendReadyAt,
-            int coinBalance) {}
+            int coinBalance,
+            /** Rewarded adverts this gamer may still be paid for today. */
+            int adsLeftToday) {}
 
     public record QuestProgress(Quest quest, int progress, boolean claimed) {}
 
@@ -86,7 +91,7 @@ public class CoinEarningService {
 
         gamer.setDailyStreak(streak);
         gamer.setDailyClaimedAt(now);
-        gamer.setCoin(gamer.getCoin() + reward);
+        coins.earn(gamer, reward, CoinReason.DAILY_STREAK);
 
         rollWeek(gamer, now);
         gamers.save(gamer);
@@ -110,7 +115,7 @@ public class CoinEarningService {
         }
 
         gamer.setQuestClaimedMask(gamer.getQuestClaimedMask() | quest.bit());
-        gamer.setCoin(gamer.getCoin() + quest.reward());
+        coins.earn(gamer, quest.reward(), CoinReason.WEEKLY_QUEST);
         gamers.save(gamer);
 
         log.info("Quest {} paid {} coins to {}", quest, quest.reward(), gamer.getUserId());
@@ -131,7 +136,7 @@ public class CoinEarningService {
         }
 
         gamer.setStipendClaimedAt(now);
-        gamer.setCoin(gamer.getCoin() + CoinFaucet.STIPEND);
+        coins.earn(gamer, CoinFaucet.STIPEND, CoinReason.GOLD_STIPEND);
 
         rollWeek(gamer, now);
         gamers.save(gamer);
@@ -193,8 +198,7 @@ public class CoinEarningService {
                 .toList();
 
         boolean gold = effectiveTier(gamer, now) == SubscriptionTier.GOLD;
-        int streakIfClaimed =
-                CoinFaucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
+        int streakIfClaimed = CoinFaucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
 
         return new Earnings(
                 CoinFaucet.dailyAvailable(gamer.getDailyClaimedAt(), now),
@@ -207,7 +211,8 @@ public class CoinEarningService {
                 gold && CoinFaucet.stipendAvailable(gamer.getStipendClaimedAt(), now),
                 CoinFaucet.STIPEND,
                 gold ? CoinFaucet.nextStipendAt(gamer.getStipendClaimedAt(), now) : null,
-                gamer.getCoin());
+                gamer.getCoin(),
+                CoinFaucet.rewardedAdsLeft(gamer.getRewardedAdsToday(), gamer.getRewardedAdDay(), now));
     }
 
     private Map<BadgeMetric, Integer> measure(Gamer gamer) {

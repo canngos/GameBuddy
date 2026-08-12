@@ -46,8 +46,7 @@ class BoostPolicyTest {
         @DisplayName("BASIC never gets one, however long it has been")
         void basicNeverFree() {
             assertFalse(BoostPolicy.freeBoostAvailable(SubscriptionTier.BASIC, null, NOW));
-            assertFalse(BoostPolicy.freeBoostAvailable(
-                    SubscriptionTier.BASIC, NOW.minus(Duration.ofDays(365)), NOW));
+            assertFalse(BoostPolicy.freeBoostAvailable(SubscriptionTier.BASIC, NOW.minus(Duration.ofDays(365)), NOW));
         }
 
         @Test

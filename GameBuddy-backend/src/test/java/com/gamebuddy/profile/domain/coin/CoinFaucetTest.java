@@ -185,7 +185,9 @@ class CoinFaucetTest {
             for (int day = 1; day <= 7; day++) {
                 daily += CoinFaucet.dailyReward(day);
             }
-            int quests = java.util.Arrays.stream(Quest.values()).mapToInt(Quest::reward).sum();
+            int quests = java.util.Arrays.stream(Quest.values())
+                    .mapToInt(Quest::reward)
+                    .sum();
 
             assertEquals(125, daily);
             assertEquals(75, quests);

@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { billingApi, GOLD_PLANS, type GoldPlan } from '../../src/api/billing';
+import { trackFunnel } from '../../src/api/funnel';
 import { storeAvailable } from '../../src/billing/purchases';
 import { usePurchase } from '../../src/billing/usePurchase';
 import { BackHeader, Button, Card, ErrorNotice, Screen, SelectRow, Text } from '../../src/ui';
@@ -39,6 +40,13 @@ export default function Gold() {
   // with no RevenueCat key configured.
   const canBuy = storeAvailable();
 
+  // The denominator of "paywall view to trial start". Once per mount rather than per
+  // render, and not gated on tier: a member reopening the paywall is a view too, and
+  // filtering it out here would hide the fact that they keep landing on it.
+  useEffect(() => {
+    trackFunnel('PAYWALL_VIEWED');
+  }, []);
+
   return (
     <Screen
       scroll
@@ -55,7 +63,13 @@ export default function Gold() {
               label={canBuy ? `Continue — ${selected.price}` : 'Purchases not available yet'}
               loading={buy.isPending}
               disabled={!canBuy}
-              onPress={() => buy.buy(selected.productId)}
+              onPress={() => {
+                // Before the sheet opens, so an abandoned purchase still counts as intent.
+                // The gap between this and a granted subscription is the store's own
+                // drop-off, which is worth seeing apart from ours.
+                trackFunnel('CHECKOUT_STARTED');
+                buy.buy(selected.productId);
+              }}
             />
             <Button label="Not now" variant="ghost" onPress={() => router.back()} />
           </View>

@@ -1,6 +1,7 @@
 package com.gamebuddy.shared.entity;
 
 import com.gamebuddy.common.enums.AgeBand;
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.security.RevocableUser;
@@ -282,6 +283,25 @@ public class Gamer implements RevocableUser {
     @Column(name = "quota_reset_at")
     private Instant quotaResetAt;
 
+    /**
+     * Owned super likes. Bought in advance, spent one per highlighted like.
+     *
+     * <p>An inventory, unlike {@link #bonusAccepts} below: these do not expire, because
+     * what was bought is the like itself rather than a window in which to send it.
+     */
+    @Column(name = "super_likes", nullable = false)
+    private int superLikes = 0;
+
+    /**
+     * Extra likes added to <em>today's</em> cap, cleared when the quota window rolls.
+     *
+     * <p>Not an inventory on purpose. Somebody buying more likes wants them for the
+     * evening they are having, and letting them accumulate would turn a consumable into a
+     * stockpile — and remove any reason to buy a second one.
+     */
+    @Column(name = "bonus_accepts", nullable = false)
+    private int bonusAccepts = 0;
+
     // --- Rewind ------------------------------------------------------------
     // The single most recent swipe, so it can be taken back. Cleared once rewound, which
     // is what stops one regret being undone twice. No history is kept: rewind is for the
@@ -327,6 +347,48 @@ public class Gamer implements RevocableUser {
     private Instant stipendClaimedAt;
 
     /**
+     * Rewarded adverts paid for during {@link #rewardedAdDay}, and the day that counts.
+     *
+     * <p>A counter beside its day rather than a nightly reset job: comparing two values
+     * cannot fail halfway and leave the whole population capped, which a scheduled reset
+     * can. Both are meaningless once the stored day has passed — see
+     * {@code CoinFaucet.rewardedAdsLeft}, which treats a stale day as a fresh allowance
+     * rather than reading the count.
+     */
+    @Column(name = "rewarded_ads_today", nullable = false)
+    private int rewardedAdsToday = 0;
+
+    @Column(name = "rewarded_ad_day")
+    private Instant rewardedAdDay;
+
+    /**
+     * Which side of the free like-cap experiment this account is on.
+     *
+     * <p>Assigned once, at registration, and never reassigned — a cohort that moves is not
+     * a cohort, and an account whose history spans two buckets belongs to neither. The cap
+     * itself is still uniform; this is recorded ahead of the decision because a cohort
+     * cannot be assigned retroactively without attributing behaviour to an experiment that
+     * was not running when it happened.
+     */
+    @Column(name = "like_cap_cohort", length = 16)
+    private String likeCapCohort;
+
+    /**
+     * When the one-time day-3 Gold prompt was shown. Null means never.
+     *
+     * <p>Stored here rather than on the device because the device forgets. A reinstall, a
+     * new phone or a cleared cache would all bring the prompt back, and the only people it
+     * would come back for are the ones who have already turned it down — which is the
+     * shape of nagging rather than of marketing.
+     *
+     * <p>Set once and never cleared. There is no second campaign planned; if there ever is
+     * one it gets its own column, because reusing this one would make the history of who
+     * saw what unrecoverable.
+     */
+    @Column(name = "upgrade_prompt_shown_at")
+    private Instant upgradePromptShownAt;
+
+    /**
      * Start of the week the quest baselines below were taken at.
      *
      * <p>The baselines exist because {@code BadgeMetric} counts are lifetime totals, and a
@@ -368,6 +430,26 @@ public class Gamer implements RevocableUser {
             joinColumns = @JoinColumn(name = "gamer_id"),
             inverseJoinColumns = @JoinColumn(name = "game_id"))
     private Set<Games> likedgames = new LinkedHashSet<>();
+
+    /**
+     * What this gamer plays on. Empty means they have not said, not that they play nothing.
+     *
+     * <p>An {@code @ElementCollection} rather than a {@code @ManyToMany}, because unlike
+     * games and keywords there is no catalogue to point at: {@link Platform} is a closed
+     * enum, so the set of legal values is in the code and cannot be extended by inserting a
+     * row. That also means nothing has to be looked up to save one.
+     *
+     * <p>{@code EnumType.STRING}, not ORDINAL. An ordinal column stores the position in the
+     * enum declaration, so inserting a platform in the middle of that list would silently
+     * re-label every existing row — every PlayStation player becoming an Xbox player on a
+     * deploy, with nothing in the diff to suggest it.
+     */
+    @ElementCollection(fetch = FetchType.LAZY)
+    @BatchSize(size = 50)
+    @CollectionTable(name = "gamer_platform", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "platform", length = 16, nullable = false)
+    @Enumerated(EnumType.STRING)
+    private Set<Platform> platforms = new LinkedHashSet<>();
 
     /**
      * When the two collections above last changed, or null if the trained model is still a

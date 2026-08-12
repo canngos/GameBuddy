@@ -53,4 +53,19 @@ public class DetailsRequest {
     @NotNull(message = "Keywords cannot be empty")
     @Size(min = 5, message = "Select at least 5 keywords")
     private List<String> keywords;
+
+    /**
+     * What they play on: {@code Platform} names, at least one.
+     *
+     * <p>Asked at signup rather than left for later because it is one tap and it decides
+     * whether the platform filter is worth having at all — a field most accounts never fill
+     * in produces a filter that hides more people than it finds.
+     *
+     * <p>Accounts created before this existed have an empty set and keep working; see
+     * {@code upgrade-2026-24-platforms.sql} for why they are not backfilled, and
+     * {@code FeedFilters} for why an empty set is never filtered out.
+     */
+    @NotNull(message = "Platforms cannot be empty")
+    @Size(min = 1, message = "Select at least 1 platform")
+    private List<String> platforms;
 }

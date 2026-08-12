@@ -37,7 +37,7 @@ export default function AvatarStep() {
     >
       <StepHeader
         step={3}
-        total={5}
+        total={6}
         title="Pick your look"
         subtitle="This is what people see first. You can upload a real photo later, from your profile."
       />

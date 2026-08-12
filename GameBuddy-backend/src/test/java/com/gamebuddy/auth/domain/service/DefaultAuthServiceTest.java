@@ -8,6 +8,7 @@ import com.gamebuddy.auth.infrastructure.entity.*;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.request.*;
 import com.gamebuddy.auth.interfaces.response.*;
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
@@ -762,6 +763,7 @@ class DefaultAuthServiceTest {
                 keywordIds.add(UUID.randomUUID().toString());
             }
             r.setKeywords(keywordIds);
+            r.setPlatforms(List.of("PC"));
             return r;
         }
 
@@ -800,6 +802,46 @@ class DefaultAuthServiceTest {
             var request = request(2, 5);
             BusinessException ex = assertThrows(BusinessException.class, () -> authService.details(gamer, request));
             assertEquals(148, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("at least one platform is required")
+        void testDetails_whenNoPlatforms_ReturnInvalidRequest() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+
+            var request = request(3, 5);
+            request.setPlatforms(List.of());
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.details(gamer, request));
+            assertEquals(148, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("an unrecognised platform is refused, not quietly dropped")
+        void testDetails_whenUnknownPlatform_ReturnInvalidRequest() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            stubCatalogue();
+
+            var request = request(3, 5);
+            request.setPlatforms(List.of("PC", "DREAMCAST"));
+
+            // Skipping it would let the client appear to succeed while saving less than it
+            // asked for, and the account holder would find a short list with no error.
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.details(gamer, request));
+            assertEquals(148, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("platforms are stored as the enum, case-insensitively, without duplicates")
+        void testDetails_whenPlatformsGiven_StoresThem() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            stubCatalogue();
+
+            var request = request(3, 5);
+            request.setPlatforms(List.of("pc", "SWITCH", "PC"));
+
+            authService.details(gamer, request);
+
+            assertEquals(Set.of(Platform.PC, Platform.SWITCH), gamer.getPlatforms());
         }
 
         @Test

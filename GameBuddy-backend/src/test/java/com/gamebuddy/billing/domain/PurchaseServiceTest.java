@@ -10,6 +10,8 @@ import com.gamebuddy.billing.infrastructure.entity.PurchasePlatform;
 import com.gamebuddy.billing.infrastructure.entity.PurchaseStatus;
 import com.gamebuddy.billing.infrastructure.repository.PurchaseRepository;
 import com.gamebuddy.common.enums.SubscriptionTier;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
@@ -54,11 +56,17 @@ class PurchaseServiceTest {
         when(gamers.findById(USER)).thenReturn(Optional.of(gamer));
         when(purchases.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
-        service = new PurchaseService(purchases, gamers, Clock.fixed(NOW, ZoneOffset.UTC));
+        // A real ledger over a mocked repository rather than a mock ledger: it is what
+        // moves the balance now, and a stubbed one would make every coin assertion below
+        // pass without anything happening.
+        Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+        CoinLedger coins = new CoinLedger(mock(CoinLedgerRepository.class), clock);
+        service = new PurchaseService(purchases, gamers, clock, coins);
     }
 
     private VerifiedPurchase purchase(Product product, Instant expiresAt) {
-        return new VerifiedPurchase(USER, product, PurchasePlatform.GOOGLE_PLAY, "txn-1", NOW, expiresAt);
+        return new VerifiedPurchase(
+                USER, product, PurchasePlatform.GOOGLE_PLAY, "txn-1", NOW, expiresAt, "NORMAL", "INITIAL_PURCHASE");
     }
 
     @Nested

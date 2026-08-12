@@ -14,8 +14,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
@@ -37,7 +35,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * <p>In its own transaction, and failures are swallowed. This is bookkeeping attached to
  * somebody else's request: it must not roll back the swipe that triggered it, and it must
  * not turn a database hiccup into a failed request for a gamer who was only reading their
- * inbox.
+ * inbox. The transaction is declared on {@link GamerRepository#touchLastActive} — see
+ * {@link #touch} for why it cannot be declared here.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -75,14 +74,22 @@ public class LastActiveTracker extends OncePerRequestFilter {
         touch(gamer.getUserId(), now);
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    /**
+     * <b>No {@code @Transactional} here, deliberately.</b> It used to carry one and it did
+     * nothing: this filter is constructed with {@code new} in {@code ApplicationConfig}, so
+     * Spring never proxies it, and {@code doFilterInternal} calls this directly besides.
+     * The update ran without a transaction, threw, and was swallowed by the catch below —
+     * silently, for every request ever made. The transaction now sits on
+     * {@link GamerRepository#touchLastActive}, which is a proxy and can honour it.
+     */
     void touch(String userId, Instant now) {
         try {
             gamerRepository.touchLastActive(userId, now);
         } catch (RuntimeException e) {
             // Deliberately not rethrown. The request has already been answered, and losing
-            // one activity timestamp is worth less than a 500 on a read.
-            log.debug("Could not record activity for {}", userId, e);
+            // one activity timestamp is worth less than a 500 on a read. Logged at warn,
+            // not debug: at debug this hid a total failure of the feature for months.
+            log.warn("Could not record activity for {}", userId, e);
         }
     }
 }

@@ -113,4 +113,15 @@ public class AuthController {
             @AuthenticationPrincipal Gamer principal, @Valid @RequestBody ChangeDetailRequest request) {
         return ResponseEntity.ok(authService.changeKeywords(principal, request));
     }
+
+    /**
+     * Reuses {@code ChangeDetailRequest} — the body is a list of names either way, and a
+     * third single-field request class would differ from the other two only in what the
+     * field is called.
+     */
+    @PutMapping("/change/platforms")
+    public ResponseEntity<DefaultMessageResponse> changePlatforms(
+            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody ChangeDetailRequest request) {
+        return ResponseEntity.ok(authService.changePlatforms(principal, request));
+    }
 }

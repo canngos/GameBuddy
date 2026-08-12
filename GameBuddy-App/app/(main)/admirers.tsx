@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { matchApi } from '../../src/api/match';
@@ -68,33 +68,79 @@ export default function Admirers() {
           </View>
 
           <View className="flex-1 flex-row flex-wrap gap-3 px-6">
-            {locked
-              ? // One blurred card per admirer, up to a sensible number of tiles. The
-                // count above is the real number; these are placeholders for faces we
-                // are deliberately not sending, so there is nothing to fetch per tile.
-                Array.from({ length: Math.min(count, 6) }, (_, index) => (
-                  <AdmirerCard key={`locked-${index}`} locked />
-                ))
-              : data.likedYou.map((candidate: Candidate) => (
-                  <AdmirerCard
-                    key={candidate.userId}
-                    candidate={candidate}
-                    onPress={() => router.push(`/messages/gamer/${candidate.userId}`)}
-                  />
-                ))}
+            {/* Anyone already paid for shows their face, on any tier. */}
+            {data.likedYou.map((candidate: Candidate) => (
+              <AdmirerCard
+                key={candidate.userId}
+                candidate={candidate}
+                onPress={() => router.push(`/messages/gamer/${candidate.userId}`)}
+              />
+            ))}
+
+            {/* One blurred card per admirer still hidden. The count above is the real
+                number; these are placeholders for faces we are deliberately not sending,
+                so there is nothing to fetch per tile. */}
+            {locked &&
+              Array.from(
+                { length: Math.min(count - data.likedYou.length, 6) },
+                (_, index) => <AdmirerCard key={`locked-${index}`} locked />,
+              )}
           </View>
 
-          {locked && (
+          {locked && count > data.likedYou.length && (
             <View className="gap-3 border-t border-line bg-canvas px-6 pb-2 pt-4">
+              {/* Two ways forward, and the cheap one is offered first on purpose. Somebody
+                  who will not subscribe today might still spend 150 coins they earned, and
+                  everyone who does has told us they want the thing Gold is built around.
+                  Hiding the affordable option to push the subscription would convert worse
+                  and read as a squeeze. */}
+              <UnlockOne />
               <Text variant="caption" className="text-center">
-                Gold shows you every face, and removes the daily like limit.
+                Or get Gold: every face, and no daily like limit.
               </Text>
-              <Button label="See who likes you" onPress={() => router.push('/gold')} />
+              <Button
+                label="See who likes you"
+                variant="secondary"
+                onPress={() => router.push('/gold')}
+              />
             </View>
           )}
         </View>
       )}
     </Screen>
+  );
+}
+
+/**
+ * Reveals one face for coins.
+ *
+ * The cheap way in, offered above the subscription rather than below it. Somebody who will
+ * not pay a monthly fee today might still spend coins they earned this week — and everyone
+ * who does has told us, with the only currency that means anything here, that they want
+ * the thing Gold is built around.
+ */
+function UnlockOne() {
+  const queryClient = useQueryClient();
+
+  const unlock = useMutation({
+    mutationFn: matchApi.unlockNextAdmirer,
+    onSuccess: (next) => {
+      // The response is the refreshed list, so the face appears without a second request.
+      queryClient.setQueryData(['admirers'], next);
+      void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
+      void queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+
+  return (
+    <View className="gap-2">
+      <Button
+        label={unlock.isPending ? 'Revealing…' : 'Reveal one for 150 coins'}
+        loading={unlock.isPending}
+        onPress={() => unlock.mutate()}
+      />
+      {unlock.error && <ErrorNotice error={unlock.error} />}
+    </View>
   );
 }
 

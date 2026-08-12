@@ -119,6 +119,73 @@ export default function ConsoleScreen() {
             </View>
           </Card>
 
+          {/* Money, after the product numbers and before the account admin. The order is
+              the argument: how many people the app served, then what that was worth. */}
+          <Card className="mt-4">
+            <Text variant="overline">Funnel · last 30 days</Text>
+
+            {/* Each step and the step before it, side by side, so a drop-off is read
+                across rather than worked out. Percentages are deliberately absent — see
+                the Funnel type for why. */}
+            <View className="mt-3 flex-row">
+              <Stat label="Saw paywall" value={data.funnel.paywallViewers} />
+              <Stat label="Tapped buy" value={data.funnel.checkoutStarters} />
+            </View>
+            <View className="mt-4 flex-row">
+              <Stat label="Trials" value={data.funnel.trialsStarted} />
+              <Stat label="Paid" value={data.funnel.paidStarted} />
+              <Stat label="Renewals" value={data.funnel.renewals} />
+            </View>
+
+            <View className="mt-4">
+              <Text variant="caption">
+                {data.funnel.cohort30 > 0
+                  ? `${data.funnel.cohort30Paid} of ${data.funnel.cohort30} accounts that reached 30 days had bought Gold by then.`
+                  : 'Free-to-paid at 30 days needs accounts that are 30 days old. None yet.'}
+              </Text>
+            </View>
+          </Card>
+
+          <Card className="mt-4">
+            <Text variant="overline">Coin economy · last 30 days</Text>
+            <View className="mt-3 flex-row">
+              <Stat label="Earned" value={data.funnel.coinsEarned} />
+              <Stat label="Spent" value={data.funnel.coinsSpent} />
+            </View>
+            <Text variant="caption" className="mt-3">
+              Faucets against sinks. Earning far ahead of spending means the sinks are too
+              expensive or too dull to bother with; the reverse means coins are scarce
+              enough to be worth buying.
+            </Text>
+          </Card>
+
+          <Card className="mt-4">
+            <Text variant="overline">Day-7 retention · like cap</Text>
+            {data.retention.length === 0 ? (
+              // Not an error and not zero: the question cannot be asked yet. Saying so
+              // beats an empty card that reads as "retention is nothing".
+              <Text variant="caption" className="mt-3">
+                No cohort has reached seven days yet.
+              </Text>
+            ) : (
+              <>
+                <View className="mt-3 flex-row">
+                  {data.retention.map((cohort) => (
+                    <Stat
+                      key={cohort.cohort}
+                      label={`${cohort.cohort.toLowerCase()} · ${cohort.signups}`}
+                      value={cohort.retained}
+                    />
+                  ))}
+                </View>
+                <Text variant="caption" className="mt-3">
+                  Retained of signups, per arm. The arms are assigned at signup and never
+                  move, so a difference here is the cap and not the crowd.
+                </Text>
+              </>
+            )}
+          </Card>
+
           <Card className="mt-4">
             <Text variant="overline">Accounts</Text>
             <View className="mt-3 flex-row">

@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The one repository for {@link Gamer}, merged from the five each service declared.
@@ -124,8 +126,7 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                       AND g.user_id <> ALL(CAST(:excluded AS varchar[]))
                     ORDER BY g.boost_expires_at DESC
                     LIMIT :limit
-                    """,
-            nativeQuery = true)
+                    """, nativeQuery = true)
     List<Gamer> findBoosted(
             @Param("country") String country,
             @Param("minor") boolean minor,
@@ -154,6 +155,13 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
      * <p>A null parameter disables its clause entirely — an unset filter must never
      * exclude anybody. Country is compared case-insensitively and a candidate with no
      * country recorded fails a country filter rather than passing it by accident.
+     *
+     * <p><b>Platform behaves the opposite way, and deliberately.</b> A candidate with no
+     * platform recorded is <em>not</em> excluded, because an empty set means "has not said"
+     * rather than "plays on something else" — every account created before the field
+     * existed has one. The clause must stay the exact mirror of
+     * {@code FeedFilters#matches}: if these two ever disagree, the deck and the count of it
+     * disagree, and the bug looks like the feed randomly dropping people.
      */
     @Query(value = """
                     SELECT g.user_id FROM gamer g
@@ -164,12 +172,16 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                             AND (g.country IS NULL OR lower(g.country) <> lower(CAST(:country AS varchar))))
                        OR (CAST(:activeSince AS timestamptz) IS NOT NULL
                             AND (g.last_active_at IS NULL OR g.last_active_at < CAST(:activeSince AS timestamptz)))
-                    """,
-            nativeQuery = true)
+                       OR (:platform IS NOT NULL
+                            AND EXISTS (SELECT 1 FROM gamer_platform p WHERE p.user_id = g.user_id)
+                            AND NOT EXISTS (SELECT 1 FROM gamer_platform p
+                                             WHERE p.user_id = g.user_id AND p.platform = :platform))
+                    """, nativeQuery = true)
     List<String> findIdsExcludedByFilters(
             @Param("gameId") String gameId,
             @Param("country") String country,
-            @Param("activeSince") Instant activeSince);
+            @Param("activeSince") Instant activeSince,
+            @Param("platform") String platform);
 
     /**
      * Gamers who have swiped yes on this one and are still waiting for an answer.
@@ -189,6 +201,28 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                       AND g.role <> 'ADMIN'
                     """, nativeQuery = true)
     List<Gamer> findPendingAdmirers(@Param("userId") String userId);
+
+    /**
+     * Whether this gamer has ever had a match answered in kind.
+     *
+     * <p>A match is mutual by definition, and {@code approved_matches} stores one row per
+     * direction — so the question is whether a row exists whose mirror also exists. Asking
+     * only "has this gamer swiped yes on anybody" would answer a different and much easier
+     * question, and would be true of nearly every account by its second minute.
+     *
+     * <p>{@code EXISTS} rather than a count: the caller only ever asks whether the number
+     * is above zero, and somebody with four hundred matches should not cost four hundred
+     * rows to answer that.
+     */
+    @Query(value = """
+                    SELECT EXISTS (
+                      SELECT 1
+                        FROM approved_matches a
+                        JOIN approved_matches b
+                          ON b.user_id = a.matched_id AND b.matched_id = a.user_id
+                       WHERE a.user_id = :userId)
+                    """, nativeQuery = true)
+    boolean hasMutualMatch(@Param("userId") String userId);
 
     /**
      * Gamers this one has sent a friend request to, still unanswered.
@@ -250,8 +284,22 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
      * <p>A direct update rather than loading the entity and saving it: this runs on the
      * request path, it must not fight the {@code @Version} column with whatever else the
      * request happens to be doing, and it touches three columns nobody else writes.
+     *
+     * <p><b>The transaction is declared here, on the repository, and that placement is the
+     * whole point.</b> It used to be declared on the calling filter, which could never
+     * work: the filter is constructed with {@code new} in {@code ApplicationConfig} so
+     * Spring never proxies it, and the call was a self-invocation besides. A
+     * {@code @Modifying} query with no transaction throws, the caller swallowed it at
+     * {@code debug}, and so this column was never written once — leaving re-engagement
+     * nudges dormant and every retention figure reading a structural zero. A Spring Data
+     * repository <em>is</em> a proxy, so the annotation takes effect here.
+     *
+     * <p>{@code REQUIRES_NEW} because this is bookkeeping attached to somebody else's
+     * request: it must commit or fail on its own, never roll back the swipe that
+     * triggered it.
      */
     @Modifying
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Query("update Gamer g set g.lastActiveAt = :now, g.nudgeCount = 0, g.lastNudgedAt = null "
             + "where g.userId = :userId")
     void touchLastActive(@Param("userId") String userId, @Param("now") Instant now);

@@ -74,6 +74,31 @@ public class AnalyticsService {
         body.setMutualMatches(analytics.countMutualMatches());
         body.setGrowth(growth(now));
 
+        // A thirty-day window on the funnel, matching the longest headline count. Short
+        // enough that a change in the product shows up, long enough that the denominators
+        // are not single digits.
+        Instant since = now.minus(Duration.ofDays(30));
+        var f = analytics.funnel(since, now.minus(Duration.ofDays(30)), now.minus(Duration.ofDays(60)));
+        body.setFunnel(new AnalyticsResponseBody.Funnel(
+                f.getPaywallViewers(),
+                f.getCheckoutStarters(),
+                f.getTrialsStarted(),
+                f.getPaidStarted(),
+                f.getRenewals(),
+                f.getCohort30(),
+                f.getCohort30Paid(),
+                f.getCoinsEarned(),
+                f.getCoinsSpent()));
+
+        // Only accounts that have had seven days to come back. Including younger ones would
+        // report every cohort as sinking, because a signup from yesterday cannot yet have
+        // returned a week later.
+        body.setRetention(
+                analytics.retentionByCohort(now.minus(Duration.ofDays(90)), now.minus(Duration.ofDays(7))).stream()
+                        .map(r -> new AnalyticsResponseBody.CohortRetention(
+                                r.getCohort(), r.getSignups(), r.getRetained()))
+                        .toList());
+
         AnalyticsResponse response = new AnalyticsResponse();
         response.setBody(new BaseBody<>(body));
         response.setStatus(new Status(TransactionCode.DEFAULT_100));

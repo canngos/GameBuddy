@@ -17,7 +17,8 @@ import org.mockito.ArgumentCaptor;
 @DisplayName("RevenueCatService")
 class RevenueCatServiceTest {
 
-    private static final long PURCHASED_MS = Instant.parse("2026-08-01T12:00:00Z").toEpochMilli();
+    private static final long PURCHASED_MS =
+            Instant.parse("2026-08-01T12:00:00Z").toEpochMilli();
     private static final long EXPIRES_MS = Instant.parse("2026-08-31T12:00:00Z").toEpochMilli();
 
     private PurchaseService purchases;

@@ -1,14 +1,17 @@
 package com.gamebuddy.billing.application.controller;
 
+import com.gamebuddy.billing.domain.UpgradePromptService;
 import com.gamebuddy.billing.interfaces.dto.SubscriptionResponseBody;
 import com.gamebuddy.billing.interfaces.response.SubscriptionResponse;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.enums.TransactionCode;
+import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.shared.entity.Gamer;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +33,17 @@ import org.springframework.web.bind.annotation.*;
 public class BillingController {
 
     private final Clock clock;
+    private final UpgradePromptService upgradePrompts;
+
+    /**
+     * Whether the Season Pass teaser is shown.
+     *
+     * <p>Server-side so the card can be withdrawn in a deploy rather than a store release.
+     * Defaults to on: the slot exists to be seen, and a teaser nobody can switch on is the
+     * same as no teaser.
+     */
+    @Value("${gamebuddy.season-pass.teaser:true}")
+    private boolean seasonPassTeaser;
 
     /**
      * What the gamer currently holds, derived rather than read straight off the row.
@@ -48,11 +62,30 @@ public class BillingController {
                 tier == SubscriptionTier.BASIC ? null : principal.getSubscriptionExpiresAt(),
                 tier.dailyAccepts(),
                 tier.canSeeWhoLikedYou(),
-                tier.canUseAdvancedFilters());
+                tier.canUseAdvancedFilters(),
+                seasonPassTeaser,
+                upgradePrompts.isDue(principal));
 
         SubscriptionResponse response = new SubscriptionResponse();
         response.setBody(new BaseBody<>(body));
         response.setStatus(new Status(TransactionCode.DEFAULT_100));
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * The client reporting that it has actually put the day-3 prompt on screen.
+     *
+     * <p>A write, so it is a POST, and the only write left on this controller. It grants
+     * nothing and takes nothing away — the worst somebody can do by calling it themselves
+     * is decline an offer they were going to be made.
+     *
+     * <p>Always 200, including when the prompt was already marked or was never due. The
+     * client calls this as a side effect of rendering; an error would give it something to
+     * handle at a moment when there is nothing useful it could do.
+     */
+    @PostMapping("/upgrade-prompt/seen")
+    public ResponseEntity<DefaultMessageResponse> upgradePromptSeen(@AuthenticationPrincipal Gamer principal) {
+        upgradePrompts.markShown(principal.getUserId());
+        return ResponseEntity.ok(DefaultMessageResponse.of("Recorded"));
     }
 }

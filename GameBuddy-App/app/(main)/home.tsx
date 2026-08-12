@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AdmirersBadge } from './admirers';
 import { billingApi } from '../../src/api/billing';
+import { UpgradePromptSheet } from '../../src/billing/UpgradePromptSheet';
 import { BoostButton, REWIND_COST_COINS } from '../../src/match/BoostButton';
 import { CandidateCard } from '../../src/match/CandidateCard';
 import { DeckActions } from '../../src/match/DeckActions';
@@ -14,6 +15,7 @@ import { SwipeCard } from '../../src/match/SwipeCard';
 import { NO_FILTERS, activeCount, type FeedFilters } from '../../src/match/filters';
 import { useDeck } from '../../src/match/useDeck';
 import { useThemeColors } from '../../src/theme';
+import { useTutorial } from '../../src/tutorial/store';
 import { Button, ErrorNotice, Screen, Text } from '../../src/ui';
 
 export default function Deck() {
@@ -31,6 +33,19 @@ export default function Deck() {
   // Both overlays freeze the gesture. Swiping the card behind a modal would decide
   // someone's fate invisibly.
   const frozen = !!deck.block || !!deck.matchedWith;
+
+  // The day-3 prompt waits for a quiet moment. It is the one thing on this screen nobody
+  // asked for, so it must not arrive on top of a match they just made or a limit that just
+  // stopped them — both of those are answers to an action, and this would talk over them.
+  //
+  // The tutorial outranks it too, and that is not hypothetical: an account that skipped
+  // through its first session without finishing the tutorial and came back on day three
+  // gets both at once, and the tutorial is mounted in the layout above this screen — so it
+  // wins the paint and the prompt is spent underneath it, seen by nobody. Deferring costs
+  // one app open; not deferring costs the only showing there is.
+  const tutorialStep = useTutorial((s) => s.step);
+  const promptDue =
+    (subscription.data?.upgradePromptDue ?? false) && !frozen && tutorialStep === null;
 
   return (
     // Top only: the tab bar owns the bottom inset now. It briefly did not, and the
@@ -147,6 +162,11 @@ export default function Deck() {
         allowance={deck.allowance}
         onDismiss={deck.dismissBlock}
       />
+
+      {/* Last, so it renders above the other two — but it also waits for them. A match
+          overlay or a limit sheet is a response to something the gamer just did, and
+          landing a pitch on top of either would talk over it. */}
+      <UpgradePromptSheet due={promptDue} />
 
       <MatchOverlay
         candidate={deck.matchedWith}

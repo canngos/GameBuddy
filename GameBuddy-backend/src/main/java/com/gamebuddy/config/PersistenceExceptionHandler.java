@@ -36,8 +36,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class PersistenceExceptionHandler {
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ResponseEntity<DefaultMessageResponse> handleConcurrentModification(
-            OptimisticLockingFailureException ex) {
+    public ResponseEntity<DefaultMessageResponse> handleConcurrentModification(OptimisticLockingFailureException ex) {
         log.info("Concurrent modification rejected: {}", ex.getMessage());
 
         TransactionCode code = TransactionCode.CONCURRENT_MODIFICATION;

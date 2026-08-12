@@ -78,6 +78,20 @@ export default function Settings() {
               position="middle"
             />
             <LinkRow
+              label="Platforms"
+              // Optional-chained through `platforms` as well as `me.data`. The type says
+              // the field is always there and the API agrees — but a profile cached before
+              // this shipped has no such key, and reading `.length` off it is a render
+              // error on the settings screen for anyone upgrading.
+              hint={
+                me.data?.platforms?.length
+                  ? me.data.platforms.join(', ')
+                  : 'Not set — other players filter by this'
+              }
+              href="/settings/platforms"
+              position="middle"
+            />
+            <LinkRow
               label="Keywords"
               hint={`${me.data?.keywords.length ?? 0} selected`}
               href="/settings/keywords"

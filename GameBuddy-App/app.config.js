@@ -24,8 +24,42 @@
  *     --type file --value ./google-services.json \
  *     --visibility sensitive --environment production --environment preview
  */
+/**
+ * Swaps the AdMob test app ids for the real ones when the environment supplies them.
+ *
+ * `app.json` holds Google's published **test** ids, and that is deliberate rather than a
+ * placeholder: they are valid ids, so a build made without any AdMob environment set still
+ * runs and still shows adverts — test ones, which pay nobody and cannot get the account
+ * banned for invalid traffic.
+ *
+ * A `${VAR}` in `app.json` would not have worked. That file is static JSON with no
+ * interpolation, so the literal string would reach `AndroidManifest.xml`, and the Google
+ * Mobile Ads SDK **crashes the app at launch** on a malformed application id — which is
+ * exactly the failure mode a placeholder is supposed to avoid.
+ */
+function adMobPlugin(plugins, androidAppId, iosAppId) {
+  return plugins.map((plugin) => {
+    if (!Array.isArray(plugin) || plugin[0] !== 'react-native-google-mobile-ads') {
+      return plugin;
+    }
+    return [
+      plugin[0],
+      {
+        ...plugin[1],
+        androidAppId: androidAppId ?? plugin[1].androidAppId,
+        iosAppId: iosAppId ?? plugin[1].iosAppId,
+      },
+    ];
+  });
+}
+
 module.exports = ({ config }) => ({
   ...config,
+  plugins: adMobPlugin(
+    config.plugins,
+    process.env.ADMOB_ANDROID_APP_ID,
+    process.env.ADMOB_IOS_APP_ID,
+  ),
   android: {
     ...config.android,
     googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? config.android.googleServicesFile,

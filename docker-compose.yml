@@ -80,6 +80,31 @@ services:
       retries: 10
       start_period: 30s
 
+  # Redis, for fanning WebSocket delivery and presence across backend instances.
+  #
+  # Not needed to run GameBuddy. With one instance the in-process broker reaches every
+  # socket there is, and the backend falls back to that whenever no host is configured —
+  # see ChatMessagingConfig. It is here so the multi-instance path is the one exercised in
+  # development rather than first met in production.
+  #
+  # No volume, and no persistence worth configuring. Everything in here describes sockets
+  # that are open right now; a restart makes all of it false, so keeping it would be worse
+  # than losing it. Presence rebuilds itself within one re-assert cycle.
+  redis:
+    image: redis:8-alpine
+    # --save "" turns off RDB snapshots. Nothing here is worth writing to disk, and the
+    # default snapshotting would fsync a file nobody ever reads.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      # Exposed so you can redis-cli in and watch the fan-out with MONITOR.
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
   backend:
     build:
       context: .
@@ -91,7 +116,14 @@ services:
         # Waits for the model to actually load its artefact. Without this the backend comes
         # up first and the first few recommendation requests fail for no visible reason.
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      # Setting this is what turns the fan-out on; there is no second switch. Unset it and
+      # the backend delivers to its own sockets only, which is correct for one instance.
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-gamebuddy}
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-gamebuddy}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
@@ -144,6 +176,11 @@ services:
       # local work running; set a real one from `openssl rand -base64 32` in .env before
       # pointing a RevenueCat project at this.
       REVENUECAT_WEBHOOK_TOKEN: ${REVENUECAT_WEBHOOK_TOKEN:-local-development-webhook-token}
+
+      # The Season Pass teaser in the Market. Listed here even though it defaults to on in
+      # application.yml: a variable compose does not forward cannot be set at all, so the
+      # switch would look configurable and be inert.
+      SEASON_PASS_TEASER: ${SEASON_PASS_TEASER:-true}
       # Still required even in log mode: with no host configured Boot creates no
       # JavaMailSender and the application will not start.
       MAIL_HOST: ${MAIL_HOST:-}

@@ -3,9 +3,10 @@ package com.gamebuddy.match.domain.service;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.match.interfaces.request.GamerRequest;
 import com.gamebuddy.match.interfaces.response.AcceptResponse;
+import com.gamebuddy.match.interfaces.response.BoostResponse;
+import com.gamebuddy.match.interfaces.response.ConsumableResponse;
 import com.gamebuddy.match.interfaces.response.LikedYouResponse;
 import com.gamebuddy.match.interfaces.response.RecommendationResponse;
-import com.gamebuddy.match.interfaces.response.BoostResponse;
 import com.gamebuddy.match.interfaces.response.RewindResponse;
 import com.gamebuddy.match.interfaces.response.SwipeAllowanceResponse;
 import com.gamebuddy.shared.entity.Gamer;
@@ -60,4 +61,27 @@ public interface MatchService {
 
     /** What the Boost button needs to describe itself: state, cost and balance. */
     BoostResponse boostStatus(Gamer principal);
+
+    /**
+     * Buys a consumable with coins.
+     *
+     * <p>Not {@code UNLOCK_ADMIRER}, which is bought against a person — see
+     * {@link #unlockAdmirer}.
+     */
+    ConsumableResponse buyConsumable(Gamer principal, Consumable item);
+
+    /**
+     * Pays coins to see one particular admirer.
+     *
+     * <p>Returns the refreshed list, so the face appears without a second request.
+     */
+    LikedYouResponse unlockAdmirer(Gamer principal, String admirerId);
+
+    /**
+     * Reveals the newest admirer still hidden, chosen server-side.
+     *
+     * <p>The client cannot name one: locked admirers are sent with no id, and sending ids
+     * so it could choose would give the paid feature away.
+     */
+    LikedYouResponse unlockNextAdmirer(Gamer principal);
 }

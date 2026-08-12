@@ -37,7 +37,7 @@ export default function Username() {
     <Screen scroll>
       <StepHeader
         step={1}
-        total={5}
+        total={6}
         title="Pick a username"
         subtitle="This is what other players see. You can change it later."
       />

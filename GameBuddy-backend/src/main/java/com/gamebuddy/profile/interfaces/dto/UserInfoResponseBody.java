@@ -63,6 +63,19 @@ public class UserInfoResponseBody implements BaseModel {
     private List<KeywordsDto> keywords;
 
     /**
+     * What this gamer plays on, as human-readable labels.
+     *
+     * <p>Public, like the games and keywords above: it is part of how somebody decides
+     * whether they can actually play with this person, which is the whole question the
+     * profile exists to answer.
+     *
+     * <p>Empty for accounts created before the field existed. The screen leaves the section
+     * out rather than rendering an empty one — see {@code upgrade-2026-24-platforms.sql}
+     * for why those are not backfilled with a guess.
+     */
+    private List<String> platforms;
+
+    /**
      * The badges this gamer has chosen to display. Never more than three.
      *
      * <p>Was every earned achievement, as the JPA entity itself — a lazily-loaded

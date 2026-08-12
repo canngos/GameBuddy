@@ -40,7 +40,6 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +68,7 @@ public class ChatMessageService {
     private final ApplicationEventPublisher events;
     private final PresenceService presenceService;
     private final TextModerationService textModeration;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final UserMessaging messaging;
 
     /**
      * How many messages have ever been sent, for the console's dashboard.
@@ -134,7 +133,7 @@ public class ChatMessageService {
             return;
         }
 
-        messagingTemplate.convertAndSendToUser(receiver.getEmail(), "/queue/typing", new TypingNotification(senderId));
+        messaging.sendToUser(receiver.getEmail(), "/queue/typing", new TypingNotification(senderId));
     }
 
     /**

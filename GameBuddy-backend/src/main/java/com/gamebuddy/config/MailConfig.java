@@ -118,10 +118,9 @@ public class MailConfig {
         // other relay authenticates the login, not the From header, so a malformed address
         // here is only discovered when a message is built.
         if (!from.contains("@") || from.startsWith("@") || from.endsWith("@")) {
-            throw new IllegalStateException(
-                    "MAIL_FROM is not an email address: '" + from + "'. It becomes the From"
-                            + " header of every verification email and must be a sender your relay"
-                            + " is allowed to send as.");
+            throw new IllegalStateException("MAIL_FROM is not an email address: '" + from + "'. It becomes the From"
+                    + " header of every verification email and must be a sender your relay"
+                    + " is allowed to send as.");
         }
 
         log.info("Mail: sending over {} as {}", host, from);

@@ -38,7 +38,7 @@ export default function Games() {
           <Button
             label="Continue"
             disabled={gameIds.length < MIN_GAMES}
-            onPress={() => router.push('/keywords')}
+            onPress={() => router.push('/platforms')}
           />
           <Button label="Back" variant="ghost" onPress={() => router.back()} />
         </View>
@@ -46,7 +46,7 @@ export default function Games() {
     >
       <StepHeader
         step={4}
-        total={5}
+        total={6}
         title="What do you play?"
         subtitle={`Pick at least ${MIN_GAMES}. This is most of what the recommendations are built from.`}
       />

@@ -34,6 +34,11 @@ public final class Constants {
     public static final String FRIEND_REQUEST_ACCEPTED_BODY = "%s accepted your friend request.";
 
     /** Sent to both gamers the moment a match becomes mutual. */
+    public static final String SUPER_LIKE_TITLE = "Someone really likes you";
+
+    /** No name: a super like from a stranger is a reason to open the app, not a spoiler. */
+    public static final String SUPER_LIKE_BODY = "You have a Super Like waiting.";
+
     public static final String MATCH_TITLE = "It's a match!";
 
     public static final String MATCH_BODY = "You and %s liked each other. Say hello!";

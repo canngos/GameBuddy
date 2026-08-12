@@ -62,6 +62,51 @@ public class AnalyticsResponseBody implements BaseModel {
     /** Daily signups, oldest first, with no gaps. Drives the growth graph. */
     private List<DailyPoint> growth;
 
+    // --- The monetisation funnel -------------------------------------------
+    //
+    // Counts, never percentages. A rate computed from three people is noise, and a console
+    // that shows "33%" without showing the three invites somebody to act on it — which is
+    // exactly what will happen in the weeks after launch, when the denominators are
+    // smallest and the temptation to read them is highest.
+
+    private Funnel funnel;
+
+    /** Day-7 retention, split by like-cap cohort. Empty until the experiment is running. */
+    private List<CohortRetention> retention;
+
+    /**
+     * The funnel, over the reporting window.
+     *
+     * @param paywallViewers distinct accounts that opened the paywall
+     * @param checkoutStarters of those, how many asked for the store sheet
+     * @param trialsStarted purchases whose period_type was TRIAL
+     * @param paidStarted Gold purchases that were not trials
+     * @param renewals purchases arriving as a RENEWAL event
+     * @param cohort30 accounts that reached 30 days old inside the window
+     * @param cohort30Paid of those, how many had bought Gold by day 30
+     * @param coinsEarned coins from every faucet
+     * @param coinsSpent coins into every sink. Near 1:1 with earned is a healthy economy
+     */
+    public record Funnel(
+            long paywallViewers,
+            long checkoutStarters,
+            long trialsStarted,
+            long paidStarted,
+            long renewals,
+            long cohort30,
+            long cohort30Paid,
+            long coinsEarned,
+            long coinsSpent) {}
+
+    /**
+     * One like-cap cohort's day-7 retention.
+     *
+     * @param cohort CONTROL or VARIANT
+     * @param signups accounts old enough to have had the chance to return
+     * @param retained of those, how many were active seven days in or later
+     */
+    public record CohortRetention(String cohort, long signups, long retained) {}
+
     /**
      * One day on the growth graph.
      *

@@ -7,6 +7,7 @@ import com.gamebuddy.auth.interfaces.request.*;
 import com.gamebuddy.auth.interfaces.response.*;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
@@ -16,6 +17,7 @@ import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
 import com.gamebuddy.shared.event.ProfileChangedEvent;
+import com.gamebuddy.shared.funnel.LikeCapCohort;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
@@ -54,6 +56,16 @@ public class DefaultAuthService implements AuthService {
 
     private static final int MIN_GAMES = 3;
     private static final int MIN_KEYWORDS = 5;
+
+    /**
+     * One is enough, and more than one is the common case.
+     *
+     * <p>Unlike games and keywords, which need a handful before the recommender has
+     * anything to work with, a single platform is a complete and true answer — most people
+     * do play on exactly one. Demanding more would push them into ticking a box that is not
+     * true of them, which is worse than a short list.
+     */
+    private static final int MIN_PLATFORMS = 1;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -172,6 +184,12 @@ public class DefaultAuthService implements AuthService {
             gamer.setUserId(UUID.randomUUID().toString());
             gamer.setEmail(email);
             gamer.setRole(Role.USER);
+            // Assigned here, once, and never again. The free like-cap experiment is not
+            // running yet — every tier still gets the same cap — but a cohort handed out
+            // later is not a cohort: the accounts that already existed would be sorted by a
+            // rule that was not in force while they were forming their habits, and their
+            // retention would be attributed to an experiment they never took part in.
+            gamer.setLikeCapCohort(LikeCapCohort.forUser(gamer.getUserId()));
         }
         gamer.setPwd(passwordEncoder.encode(registerRequest.getPassword()));
         // Stamped on every registration attempt, including a re-claimed unverified one:
@@ -352,6 +370,15 @@ public class DefaultAuthService implements AuthService {
             throw new BusinessException(
                     TransactionCode.INVALID_REQUEST, "select at least " + MIN_KEYWORDS + " keywords");
         }
+        // Checked here with the others rather than left to mapAndSetPlatforms below, so
+        // that every "you have not picked enough" refusal happens before any lookup. Left
+        // where it was mapped, somebody who sent no platforms got whatever error the avatar
+        // or game lookup produced first — a message about the wrong field entirely.
+        if (detailsRequest.getPlatforms() == null
+                || detailsRequest.getPlatforms().size() < MIN_PLATFORMS) {
+            throw new BusinessException(
+                    TransactionCode.INVALID_REQUEST, "select at least " + MIN_PLATFORMS + " platform");
+        }
 
         // The client sends a date, never an age: the number that decides eligibility is
         // computed here or it is not trustworthy.
@@ -370,6 +397,7 @@ public class DefaultAuthService implements AuthService {
         gamer.getLikedgames().clear();
         mapAndSetKeywords(gamer, keywords);
         mapAndSetUserGames(gamer, games);
+        mapAndSetPlatforms(gamer, detailsRequest.getPlatforms());
         gamer.setIsRegistered(true);
         gamerRepository.save(gamer);
 
@@ -595,6 +623,23 @@ public class DefaultAuthService implements AuthService {
         return DefaultMessageResponse.of("Keywords changed successfully");
     }
 
+    /**
+     * Changes what a gamer plays on.
+     *
+     * <p>No {@code refreshRecommenderClusters} call, unlike games and keywords. The model
+     * ranks on taste, and platform is not taste — it is a hard constraint the feed applies
+     * afterwards as a filter. Marking the profile stale here would force a live re-rank for
+     * a change that cannot move a single score.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse changePlatforms(Gamer principal, ChangeDetailRequest changePlatformsRequest) {
+        Gamer gamer = reload(principal);
+        mapAndSetPlatforms(gamer, changePlatformsRequest.getGamesOrKeywordsList());
+        gamerRepository.save(gamer);
+        return DefaultMessageResponse.of("Platforms changed successfully");
+    }
+
     // =======================================================================
     // Helpers
     // =======================================================================
@@ -698,6 +743,32 @@ public class DefaultAuthService implements AuthService {
                     .orElseThrow(() -> new BusinessException(TransactionCode.DB_ERROR, "unknown game " + gameId));
             gamer.getLikedgames().add(game);
         }
+    }
+
+    /**
+     * Replaces the platform set from a list of enum names.
+     *
+     * <p>An unrecognised name is refused rather than skipped. Skipping would let a client
+     * that sends {@code "Playstation5"} appear to succeed while saving nothing, and the
+     * account holder would find an empty platform list with no error to explain it.
+     */
+    private void mapAndSetPlatforms(Gamer gamer, List<String> platformNames) {
+        if (platformNames == null || platformNames.size() < MIN_PLATFORMS) {
+            throw new BusinessException(
+                    TransactionCode.INVALID_REQUEST, "select at least " + MIN_PLATFORMS + " platform");
+        }
+        Set<Platform> platforms = new LinkedHashSet<>();
+        for (String name : platformNames) {
+            Platform platform = Platform.from(name);
+            if (platform == null) {
+                throw new BusinessException(TransactionCode.INVALID_REQUEST, "unknown platform " + name);
+            }
+            platforms.add(platform);
+        }
+        // Cleared and refilled rather than reassigned: Hibernate manages this collection,
+        // and handing it a different Set instance detaches the one it is tracking.
+        gamer.getPlatforms().clear();
+        gamer.getPlatforms().addAll(platforms);
     }
 
     private void mapAndSetKeywords(Gamer gamer, List<String> keywordIds) {

@@ -12,6 +12,8 @@ import com.gamebuddy.profile.interfaces.dto.ShowcasedBadgeDto;
 import com.gamebuddy.profile.interfaces.response.BadgesResponse;
 import com.gamebuddy.shared.badge.BadgeMetric;
 import com.gamebuddy.shared.badge.BadgeMetricSource;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.GamerBadge;
 import com.gamebuddy.shared.event.NotificationKind;
@@ -73,6 +75,8 @@ public class DefaultBadgeService implements BadgeService {
      * new edge in the module graph.
      */
     private final List<BadgeMetricSource> metricSources;
+
+    private final CoinLedger coins;
 
     // =======================================================================
     // Reading
@@ -136,7 +140,7 @@ public class DefaultBadgeService implements BadgeService {
         }
 
         row.setCollectedAt(Instant.now());
-        gamer.setCoin(gamer.getCoin() + badge.getReward());
+        coins.earn(gamer, badge.getReward(), CoinReason.BADGE_REWARD);
         badgeRepository.save(row);
         gamerRepository.save(gamer);
 

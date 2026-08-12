@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import com.gamebuddy.match.domain.service.chat.SentMessage;
+import com.gamebuddy.match.domain.service.chat.UserMessaging;
 import com.gamebuddy.match.interfaces.request.ChatMessageRequest;
 import com.gamebuddy.shared.entity.Gamer;
 import java.security.Principal;
@@ -15,7 +16,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 /**
@@ -34,8 +34,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 class ChatControllerSenderTest {
 
     private final ChatMessageService chatMessageService = mock(ChatMessageService.class);
-    private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
-    private final ChatController controller = new ChatController(messagingTemplate, chatMessageService);
+    private final UserMessaging messaging = mock(UserMessaging.class);
+    private final ChatController controller = new ChatController(messaging, chatMessageService);
 
     private static Gamer gamer(String id, String username) {
         Gamer g = new Gamer();

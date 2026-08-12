@@ -1,8 +1,9 @@
 import { create } from 'zustand';
+import { MIN_PLATFORMS, type PlatformId } from '../profile/platforms';
 import { MIN_GAMES, MIN_KEYWORDS } from '../validation';
 
 /**
- * The profile being assembled across the three onboarding screens.
+ * The profile being assembled across the onboarding screens.
  *
  * `POST /auth/details` takes a date of birth, country, gender, avatar, games and keywords in one
  * call and applies them in one transaction — there is no partial save. So the answers
@@ -34,12 +35,15 @@ export type Draft = {
   gender: string | null;
   avatarId: string | null;
   gameIds: string[];
+  /** Platform enum names, at least one. See `src/profile/platforms.ts`. */
+  platformIds: PlatformId[];
   keywordIds: string[];
 };
 
 type DraftState = Draft & {
   set: (patch: Partial<Draft>) => void;
   toggleGame: (id: string) => void;
+  togglePlatform: (id: PlatformId) => void;
   toggleKeyword: (id: string) => void;
   reset: () => void;
 };
@@ -52,6 +56,7 @@ const empty: Draft = {
   gender: null,
   avatarId: null,
   gameIds: [],
+  platformIds: [],
   keywordIds: [],
 };
 
@@ -59,12 +64,13 @@ export const useDraft = create<DraftState>((set) => ({
   ...empty,
   set: (patch) => set(patch),
   toggleGame: (id) => set((s) => ({ gameIds: toggle(s.gameIds, id) })),
+  togglePlatform: (id) => set((s) => ({ platformIds: toggle(s.platformIds, id) })),
   toggleKeyword: (id) => set((s) => ({ keywordIds: toggle(s.keywordIds, id) })),
   reset: () => set(empty),
 }));
 
-function toggle(list: string[], id: string): string[] {
+function toggle<T extends string>(list: T[], id: T): T[] {
   return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
 }
 
-export const draftRules = { MIN_GAMES, MIN_KEYWORDS };
+export const draftRules = { MIN_GAMES, MIN_KEYWORDS, MIN_PLATFORMS };
