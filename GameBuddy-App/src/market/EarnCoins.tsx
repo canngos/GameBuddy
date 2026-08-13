@@ -1,11 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  Check,
+  Clapperboard,
+  Coins,
+  Crown,
+  Target,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { REWARDED_AD_COINS, adsAvailable, showRewardedAd } from '../ads/rewarded';
 import { earnApi } from '../api/coins';
 import type { Earn, Quest } from '../api/types';
 import { useSession } from '../session/store';
-import { Text, messageOf } from '../ui';
+import { Icon, Text, feedback, messageOf, showToast } from '../ui';
+import { StreakStrip } from './StreakStrip';
 
 const EARN_KEY = ['earn'];
 
@@ -34,11 +43,35 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
    * is an invitation to tap again.
    */
   const applyEarn = (next: Earn) => {
+    // Read before the cache is written, so this is genuinely the figure that was on screen
+    // a moment ago rather than the one that is about to be.
+    const before = earn.data?.coinBalance;
+
     queryClient.setQueryData(EARN_KEY, next);
     // The Market header and the profile both show a balance that has just moved.
     void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
     void queryClient.invalidateQueries({ queryKey: ['me'] });
     onBalanceChange?.(next.coinBalance);
+
+    /*
+     * The gained amount comes from the difference, not from the row that was tapped.
+     *
+     * The rows already show a reward figure, but it is a projection — the daily in
+     * particular pays on the server's streak table, and the strip's own comment is explicit
+     * that the client must not promise a day number. Announcing what actually arrived keeps
+     * that honest, and it is the only figure that is certainly right.
+     */
+    const gained = before === undefined ? 0 : next.coinBalance - before;
+    if (gained <= 0) return;
+
+    feedback.reward();
+    showToast({
+      id: `earned:${next.coinBalance}`,
+      title: `+${gained} coins`,
+      body: 'Spend them on frames, banners or likes.',
+      icon: Coins,
+      tone: 'gold',
+    });
   };
 
   const daily = useMutation({ mutationFn: earnApi.claimDaily, onSuccess: applyEarn });
@@ -55,6 +88,8 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
   async function watchAd() {
     if (!userId) return;
     setWatching(true);
+    const before = earn.data?.coinBalance;
+
     try {
       const outcome = await showRewardedAd(userId);
       if (outcome === 'earned') {
@@ -64,6 +99,24 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
         await queryClient.invalidateQueries({ queryKey: EARN_KEY });
         void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
         void queryClient.invalidateQueries({ queryKey: ['me'] });
+
+        /*
+         * Announced from what the refetch actually returned, for the same reason the fetch
+         * exists at all: Google's server-side callback is what pays, and it can be late or
+         * can decline. Congratulating somebody on coins that never landed is worse than
+         * saying nothing, so this stays silent unless the balance really moved.
+         */
+        const after = queryClient.getQueryData<Earn>(EARN_KEY)?.coinBalance;
+        if (before !== undefined && after !== undefined && after > before) {
+          feedback.reward();
+          showToast({
+            id: `earned:${after}`,
+            title: `+${after - before} coins`,
+            body: 'Thanks for watching.',
+            icon: Coins,
+            tone: 'gold',
+          });
+        }
       }
     } finally {
       setWatching(false);
@@ -92,28 +145,18 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
       )}
 
       {/* The streak is the headline, because it is the one that compounds and the one
-          worth coming back for. */}
-      {/* The title never projects a day number.
-          "Day 4" would be a promise, and a broken streak pays day one however long the
-          old run was — so a gamer who last claimed a week ago would be shown Day 4 and
-          paid 5 coins. The reward beside it is always the server's figure for the streak
-          a claim would actually reach, so that stays honest on its own. */}
-      <ClaimRow
-        icon="📅"
-        title="Daily coins"
-        detail={
-          state.dailyAvailable
-            ? state.streak > 0
-              ? `${state.streak}-day streak so far`
-              : 'Come back every day and this grows'
-            : state.streak > 0
-              ? `Day ${state.streak} · back ${relative(state.dailyReadyAt)}`
-              : `Back ${relative(state.dailyReadyAt)}`
-        }
-        reward={state.dailyReward}
-        ready={state.dailyAvailable}
+          worth coming back for — so it is no longer a row in this list at all. It is the
+          seven-day strip above, which is the shape the backend's reward table has always
+          had. See `src/market/StreakStrip.tsx`.
+
+          The title still never projects a day number. "Day 4" would be a promise, and a
+          broken streak pays day one however long the old run was. The strip shows banked
+          days and the server's own figure for the next claim, so it stays honest. */}
+      <StreakStrip
+        earn={state}
         busy={busy}
-        onPress={() => daily.mutate()}
+        onClaim={() => daily.mutate()}
+        readyIn={relative(state.dailyReadyAt)}
       />
 
       {/* Only where the build can actually show one. An older development build has no
@@ -121,7 +164,7 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
           worse than not offering it. */}
       {adsAvailable() && (
         <ClaimRow
-          icon="🎬"
+          icon={Clapperboard}
           title="Watch a short video"
           detail={
             state.adsLeftToday > 0
@@ -143,7 +186,7 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
           paywall than not mentioning it: it reads as broken rather than as an offer. */}
       {(state.stipendAvailable || state.stipendReadyAt) && (
         <ClaimRow
-          icon="⭐"
+          icon={Crown}
           title="Gold monthly bonus"
           detail={state.stipendAvailable ? 'Yours this month' : `Back ${relative(state.stipendReadyAt)}`}
           reward={state.stipendAmount}
@@ -169,7 +212,7 @@ function QuestRow({
 
   return (
     <ClaimRow
-      icon={quest.claimed ? '✓' : '🎯'}
+      icon={quest.claimed ? Check : Target}
       title={quest.title}
       detail={quest.claimed ? 'Done this week' : `${quest.progress} of ${quest.target}`}
       reward={quest.reward}
@@ -193,7 +236,7 @@ function ClaimRow({
   progress,
   onPress,
 }: {
-  icon: string;
+  icon: LucideIcon;
   title: string;
   detail: string;
   reward: number;
@@ -212,12 +255,15 @@ function ClaimRow({
       accessibilityState={{ disabled: !ready || busy }}
       className={[
         'flex-row items-center gap-3 rounded-card border p-4',
-        ready ? 'border-brand bg-brand/10 active:opacity-70' : 'border-line bg-raised',
+        ready ? 'border-gold/40 bg-gold/5 active:opacity-70' : 'border-line bg-raised',
         dimmed ? 'opacity-50' : '',
       ].join(' ')}
     >
+      {/* Gold when the reward is there to take, muted when it is not — the same signal the
+          row's border and the "+N" already carry, so the glyph is not the only thing
+          saying it. */}
       <View className="h-10 w-10 items-center justify-center rounded-full bg-surface">
-        <Text className="text-[16px] leading-[20px]">{icon}</Text>
+        <Icon as={icon} size={18} tone={ready ? 'gold' : 'muted'} />
       </View>
 
       <View className="flex-1 gap-1">
@@ -227,7 +273,7 @@ function ClaimRow({
         {progress !== undefined && progress < 1 && (
           <View className="mt-1 h-1 overflow-hidden rounded-full bg-line">
             <View
-              className="h-1 rounded-full bg-brand"
+              className="h-1 rounded-full bg-gold"
               style={{ width: `${Math.max(0, Math.min(1, progress)) * 100}%` }}
             />
           </View>
@@ -235,11 +281,11 @@ function ClaimRow({
       </View>
 
       <View className="items-end">
-        <Text className={['font-bold text-[15px] leading-[20px]', ready ? 'text-brand' : 'text-muted'].join(' ')}>
+        <Text className={['font-bold text-[15px] leading-[20px]', ready ? 'text-gold' : 'text-muted'].join(' ')}>
           +{reward}
         </Text>
         {ready && (
-          <Text variant="caption" className="text-brand">
+          <Text variant="caption" className="text-gold">
             Claim
           </Text>
         )}

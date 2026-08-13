@@ -63,7 +63,7 @@ export default function CommunityHome() {
                 onPress={() => router.push('/community/new' as never)}
                 accessibilityRole="button"
                 accessibilityLabel="New community"
-                className="h-11 w-11 items-center justify-center rounded-full bg-brand active:opacity-80"
+                className="h-11 w-11 items-center justify-center rounded-full bg-primary active:opacity-80"
               >
                 <View className="h-4 w-0.5 rounded-full bg-white" />
                 <View className="absolute h-0.5 w-4 rounded-full bg-white" />
@@ -78,7 +78,7 @@ export default function CommunityHome() {
 
             {feed.error && <ErrorNotice error={feed.error} onRetry={() => feed.refetch()} />}
             {(feed.isPending || communities.isPending) && (
-              <ActivityIndicator color={colors.brand} />
+              <ActivityIndicator color={colors.primary} />
             )}
           </View>
         }
@@ -89,7 +89,7 @@ export default function CommunityHome() {
         }
         ListFooterComponent={
           <View className="gap-4 pt-4">
-            {feed.isFetchingNextPage && <ActivityIndicator color={colors.brand} />}
+            {feed.isFetchingNextPage && <ActivityIndicator color={colors.primary} />}
             {posts.length > 0 && (
               <Button
                 label="Find more communities"

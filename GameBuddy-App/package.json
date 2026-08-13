@@ -6,26 +6,32 @@
     "react-dom": "19.2.3"
   },
   "dependencies": {
+    "@expo-google-fonts/chakra-petch": "^0.4.1",
     "@expo-google-fonts/poppins": "^0.4.1",
     "@stomp/stompjs": "^7.3.0",
     "@tanstack/react-query": "^5.101.4",
     "babel-preset-expo": "~57.0.0",
     "clsx": "^2.1.1",
     "expo": "~57.0.9",
+    "expo-audio": "~57.0.3",
     "expo-constants": "~57.0.8",
     "expo-device": "~57.0.1",
     "expo-document-picker": "~57.0.1",
     "expo-file-system": "~57.0.1",
     "expo-font": "~57.0.1",
+    "expo-haptics": "~57.0.1",
     "expo-image": "~57.0.2",
     "expo-image-picker": "~57.0.7",
+    "expo-linear-gradient": "~57.0.1",
     "expo-linking": "~57.0.4",
     "expo-notifications": "~57.0.8",
     "expo-router": "~57.0.9",
     "expo-secure-store": "~57.0.1",
     "expo-splash-screen": "~57.0.5",
     "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.2",
     "expo-updates": "~57.0.12",
+    "lucide-react-native": "^1.31.0",
     "nativewind": "^4.2.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -53,7 +59,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "start:go": "expo start --go"
+    "start:go": "expo start --go",
+    "check:contrast": "node scripts/check-contrast.js",
+    "check": "tsc --noEmit && node scripts/check-contrast.js"
   },
   "private": true
 }

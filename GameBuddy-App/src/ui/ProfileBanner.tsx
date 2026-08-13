@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 import { useThemeColors } from '../theme';
+import { GradientView } from './Gradient';
 
 /**
  * The strip of art behind a profile header.
@@ -14,10 +15,12 @@ import { useThemeColors } from '../theme';
  * it a third of the card's height makes the profile about the decoration instead of the
  * person. The banners were drawn without a focal point for the same reason.
  *
- * <p>When there is no banner this renders a plain tinted strip rather than nothing at
- * all. Collapsing the header would mean the layout jumps the moment someone equips one,
- * and it keeps the avatar's overlap consistent between a decorated profile and a bare
- * one.
+ * <p>When there is no banner this renders the house gradient rather than nothing at all.
+ * Collapsing the header would mean the layout jumps the moment someone equips one, and it
+ * keeps the avatar's overlap consistent between a decorated profile and a bare one. The
+ * gradient is the `primary` one rather than `action`: this is a surface, nothing small and
+ * white sits on it, and it is the one place on the profile where the cyan end gets to
+ * show.
  */
 export function ProfileBanner({ source }: { source: string | null | undefined }) {
   const colors = useThemeColors();
@@ -26,8 +29,16 @@ export function ProfileBanner({ source }: { source: string | null | undefined })
     <View
       // -m-5 cancels Card's p-5; the bottom margin is left for the avatar to overlap into.
       className="-mx-5 -mt-5 h-[96px] overflow-hidden rounded-t-card"
+      // Kept under the gradient as the colour a failed image decode falls back to.
       style={{ backgroundColor: colors.raised }}
     >
+      <GradientView
+        name="primary"
+        direction="diagonal"
+        className="absolute inset-0"
+        pointerEvents="none"
+      />
+
       {source ? (
         <Image
           source={{ uri: source }}

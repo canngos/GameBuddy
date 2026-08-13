@@ -1,8 +1,13 @@
+import { Heart, RotateCcw, X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
-import { brand } from '../theme';
+import { useThemeColors } from '../theme';
 import { cn } from '../ui/cn';
 import { lift } from '../ui/elevation';
+import { GradientView } from '../ui/Gradient';
+import { glow } from '../ui/glow';
+import { commit, tapLight } from '../ui/haptics';
+import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 import type { Decision } from './useDeck';
 
@@ -56,30 +61,36 @@ export function DeckActions({
       <CircleButton
         label="Pass"
         hint="Skip this gamer"
-        onPress={() => onDecide('decline')}
+        onPress={() => {
+          tapLight();
+          onDecide('decline');
+        }}
         disabled={disabled}
         className="border-line bg-surface"
       >
-        {/* An X drawn from two bars: no icon font is bundled. */}
-        <View className="h-6 w-6 items-center justify-center">
-          <View className="absolute h-0.5 w-6 rotate-45 rounded-full bg-muted" />
-          <View className="absolute h-0.5 w-6 -rotate-45 rounded-full bg-muted" />
-        </View>
+        <Icon as={X} size={26} tone="muted" strokeWidth={2.5} />
       </CircleButton>
 
       <CircleButton
         label="Match"
         hint="Say yes to this gamer"
-        onPress={() => onDecide('accept')}
+        // The one button in the app that gets `commit`. Saying yes is the decision that
+        // costs an allowance and cannot be taken back without paying for a rewind, and a
+        // pass is not — feedback of the same weight on both would flatten that difference.
+        onPress={() => {
+          commit();
+          onDecide('accept');
+        }}
         disabled={disabled}
-        className="border-brand bg-brand"
-        style={lift('lg', brand.DEFAULT)}
+        className="border-transparent"
+        gradient
         size={72}
       >
-        {/* A heart is hard to draw without an icon; a filled ring reads as "yes". */}
-        <View className="h-7 w-7 items-center justify-center rounded-full border-[3px] border-white">
-          <View className="h-2.5 w-2.5 rounded-full bg-white" />
-        </View>
+        {/* The pink survives here and only here — this is the like/match colour's one job.
+            Filled rather than outlined: white on the accent ramp measures 3.23:1, which
+            WCAG allows for a graphical element and not for a label. A heart is legal on it.
+            A word would not be. */}
+        <Icon as={Heart} size={30} tone="inverse" fill="#FFFFFF" strokeWidth={0} />
       </CircleButton>
 
       {/* Mirrors the rewind spacer, so Pass and Match stay centred whether or not
@@ -108,7 +119,10 @@ function RewindButton({
 }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        tapLight();
+        onPress();
+      }}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={cost > 0 ? `Undo last swipe, ${cost} coins` : 'Undo last swipe'}
@@ -119,8 +133,7 @@ function RewindButton({
         disabled ? 'opacity-40' : 'active:opacity-70',
       )}
     >
-      {/* A counter-clockwise arrow, drawn rather than iconed: no icon font is bundled. */}
-      <Text className="text-[20px] leading-[24px] text-muted">↺</Text>
+      <Icon as={RotateCcw} size={20} tone="muted" />
       {cost > 0 && (
         <Text className="font-semibold text-[10px] leading-[12px] text-muted">{cost}</Text>
       )}
@@ -135,6 +148,7 @@ function CircleButton({
   disabled,
   className,
   style,
+  gradient = false,
   size = 60,
   children,
 }: {
@@ -145,9 +159,14 @@ function CircleButton({
   className?: string;
   /** Depth, which has to be a style rather than a class. See src/ui/elevation.ts. */
   style?: ViewStyle;
+  /** Fills with the accent ramp and lights it. The Match button, and nothing else. */
+  gradient?: boolean;
   size?: number;
   children: React.ReactNode;
 }) {
+  const colors = useThemeColors();
+  const lit = gradient && !disabled;
+
   return (
     <View className="items-center gap-2">
       <Pressable
@@ -157,13 +176,36 @@ function CircleButton({
         accessibilityLabel={label}
         accessibilityHint={hint}
         accessibilityState={{ disabled: !!disabled }}
-        style={[{ width: size, height: size, borderRadius: size / 2 }, style]}
+        /*
+         * Depth here, clip on the child below. On Android `overflow: hidden` clips a node's
+         * own shadow and elevation, so a single node carrying both draws the gradient and
+         * silently loses the light around it. Same split as `src/ui/Button.tsx`.
+         *
+         * Both depth calls always emit their keys — `'none'` rather than a dropped style —
+         * because a style whose keys appear and disappear across a theme change stops the
+         * subtree painting. See `src/ui/hairline.ts`.
+         */
+        style={[
+          { width: size, height: size, borderRadius: size / 2 },
+          lift(lit ? 'lg' : 'none', colors.accent),
+          glow(lit ? 'strong' : 'none', colors.accent),
+          style,
+        ]}
         className={cn(
           'items-center justify-center border-2 active:scale-95',
           className,
           disabled && 'opacity-40',
         )}
       >
+        {gradient && (
+          <View
+            className="absolute inset-0 overflow-hidden"
+            style={{ borderRadius: size / 2 }}
+            pointerEvents="none"
+          >
+            <GradientView name="accent" direction="diagonal" className="absolute inset-0" />
+          </View>
+        )}
         {children}
       </Pressable>
       <Text variant="caption">{label}</Text>

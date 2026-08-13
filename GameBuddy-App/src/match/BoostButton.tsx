@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Zap } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { matchApi } from '../api/match';
+import { useThemeColors } from '../theme';
 import { messageOf } from '../ui/ErrorNotice';
+import * as feedback from '../ui/feedback';
+import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 
 /** Coins a boost costs when the weekly free one is not available. Mirrors BoostPolicy. */
@@ -24,6 +28,7 @@ export const REWIND_COST_COINS = 50;
  */
 export function BoostButton() {
   const queryClient = useQueryClient();
+  const colors = useThemeColors();
   const [failure, setFailure] = useState<string | null>(null);
 
   const status = useQuery({
@@ -41,6 +46,12 @@ export function BoostButton() {
       // Spending coins moves the Market header and the profile balance.
       void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
       void queryClient.invalidateQueries({ queryKey: ['me'] });
+
+      // A buzz and nothing else — deliberately lighter than the Market's purchases. The
+      // button turning into a countdown is already the acknowledgement, and it is a better
+      // one than a toast because it keeps saying so for the full half hour. A cue on top of
+      // that would be noise on the deck, which is the one screen people stay on.
+      feedback.commit();
     },
     onError: (error) => setFailure(messageOf(error)),
   });
@@ -78,15 +89,22 @@ export function BoostButton() {
         hitSlop={8}
         className={[
           'h-9 flex-row items-center gap-1.5 rounded-full border px-3',
-          active ? 'border-brand bg-brand/15' : 'border-line bg-raised',
+          active ? 'border-primary bg-primary/15' : 'border-line bg-raised',
           start.isPending ? 'opacity-50' : 'active:opacity-70',
         ].join(' ')}
       >
-        <Text className="text-[13px] leading-[17px]">⚡</Text>
+        {/* A running boost fills the bolt rather than only tinting it, so "on" is legible
+            at 15px and to anyone who cannot separate the two colours. */}
+        <Icon
+          as={Zap}
+          size={15}
+          tone={active || boost.freeAvailable ? 'primary' : 'muted'}
+          fill={active ? colors.primary : 'none'}
+        />
         <Text
           className={[
             'font-semibold text-[13px] leading-[17px]',
-            active || boost.freeAvailable ? 'text-brand' : 'text-muted',
+            active || boost.freeAvailable ? 'text-primary' : 'text-muted',
           ].join(' ')}
         >
           {label}

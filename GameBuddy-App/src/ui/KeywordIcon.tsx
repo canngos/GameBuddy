@@ -120,11 +120,15 @@ type KeywordIconProps = {
 /**
  * A keyword's icon, drawn as a stroked path.
  *
- * SVG rather than composed Views, on the instruction in {@link TabIcon} — that file draws
- * five tab glyphs from borders and border-radius and says outright that anything past a
- * handful, or anything needing a curve that is not a circle, should switch to
- * `react-native-svg` instead of getting cleverer. Twelve icons with arcs and diagonals is
- * past both lines.
+ * SVG rather than composed Views, on the instruction {@link TabIcon} used to carry: that
+ * file drew its glyphs from borders and border-radius and said outright that anything past
+ * a handful, or anything needing a curve that is not a circle, should switch to
+ * `react-native-svg` instead of getting cleverer. Twelve icons with arcs and diagonals was
+ * past both lines. `TabIcon` has since taken its own advice and moved to Lucide.
+ *
+ * These stay hand-drawn, and deliberately: the twelve families are this product's own
+ * vocabulary — there is no general-purpose icon set with a glyph for "co-op grinder". They
+ * are drawn to Lucide's spec, which is what keeps them from looking like a second set.
  *
  * Single colour, passed in, so these tint with selection state and theme exactly as the
  * tab icons do — no second asset for the selected state, and nothing to re-export when
@@ -133,8 +137,8 @@ type KeywordIconProps = {
 export function KeywordIcon({ keyword, color, size = 22 }: KeywordIconProps) {
   const family = familyOf(keyword);
 
-  // 24x24 viewBox, 2px strokes, round caps: the proportions the tab icons already use,
-  // so the two sets look like they were drawn by the same hand.
+  // 24x24 viewBox, 2px strokes, round caps: Lucide's spec exactly, which is what lets
+  // these sit beside a Lucide glyph without either looking wrong. Do not change it.
   const stroke = { stroke: color, strokeWidth: 2, strokeLinecap: 'round' as const, fill: 'none' };
 
   return (

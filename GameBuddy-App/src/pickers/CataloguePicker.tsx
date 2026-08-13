@@ -78,7 +78,7 @@ export function CataloguePicker({
         returnKeyType="search"
       />
 
-      {isLoading && <ActivityIndicator color={colors.brand} />}
+      {isLoading && <ActivityIndicator color={colors.primary} />}
       {/* `!!` because `error` is `unknown`: `unknown && <JSX/>` is itself `unknown`,
           which is not a valid child. */}
       {!!error && <ErrorNotice error={error} onRetry={onRetry} />}
@@ -134,7 +134,7 @@ function GameCard({
       style={{ flexBasis: '48%' }}
       className={cn(
         'overflow-hidden rounded-card border-2 bg-surface active:opacity-80',
-        selected ? 'border-brand' : 'border-transparent',
+        selected ? 'border-primary' : 'border-transparent',
       )}
     >
       <View className="aspect-[3/4] w-full bg-raised">
@@ -151,7 +151,7 @@ function GameCard({
         )}
 
         {selected && (
-          <View className="absolute right-2 top-2 h-6 w-6 items-center justify-center rounded-full bg-brand">
+          <View className="absolute right-2 top-2 h-6 w-6 items-center justify-center rounded-full bg-primary">
             <View className="h-2 w-2 rounded-full bg-white" />
           </View>
         )}
@@ -192,13 +192,13 @@ function KeywordRow({
       accessibilityHint={item.detail ?? undefined}
       className={cn(
         'min-h-touch flex-row items-center gap-3 rounded-card border-2 bg-surface px-3 py-2.5 active:opacity-80',
-        selected ? 'border-brand' : 'border-transparent',
+        selected ? 'border-primary' : 'border-transparent',
       )}
     >
       <View
         className={cn(
           'h-10 w-10 items-center justify-center rounded-full',
-          selected ? 'bg-brand' : 'bg-raised',
+          selected ? 'bg-primary' : 'bg-raised',
         )}
       >
         <KeywordIcon

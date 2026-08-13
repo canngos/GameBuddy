@@ -43,7 +43,7 @@ export default function Admirers() {
 
       {admirers.isPending && (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={colors.brand} />
+          <ActivityIndicator color={colors.accent} />
         </View>
       )}
 
@@ -58,7 +58,7 @@ export default function Admirers() {
       {data && count > 0 && (
         <View className="flex-1">
           <View className="gap-1 px-6 pb-4">
-            <Text variant="display" className="text-brand">
+            <Text variant="display" className="text-accent">
               {count}
             </Text>
             <Text variant="body" className="text-muted">
@@ -183,7 +183,7 @@ export function AdmirersBadge() {
       hitSlop={8}
       className="items-center active:opacity-70"
     >
-      <View className="min-w-6 items-center justify-center rounded-full bg-brand px-1.5 py-0.5">
+      <View className="min-w-6 items-center justify-center rounded-full bg-accent px-1.5 py-0.5">
         <Text className="font-semibold text-[13px] leading-[17px] text-white">{count}</Text>
       </View>
       <Text variant="caption">liked you</Text>

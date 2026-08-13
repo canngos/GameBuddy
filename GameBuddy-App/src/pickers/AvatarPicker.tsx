@@ -30,7 +30,7 @@ export function AvatarPicker({ selected, onSelect, size = 64, columns }: AvatarP
 
   return (
     <View className="gap-3">
-      {avatars.isPending && <ActivityIndicator color={colors.brand} />}
+      {avatars.isPending && <ActivityIndicator color={colors.primary} />}
       {avatars.error && (
         <ErrorNotice error={avatars.error} onRetry={() => avatars.refetch()} />
       )}

@@ -3,13 +3,45 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
 /**
+ * Every kind this build knows about. Mirrors `NotificationKind` on the backend.
+ *
+ * <p>Declared as data rather than left implicit in the switch below because three separate
+ * things now need to ask "do we recognise this?": the router, the in-app toast, and
+ * {@code usePushRegistration}, which suppresses the system banner for exactly the kinds the
+ * app draws itself. Re-listing them in three places is how one of them ends up a kind
+ * behind, and the symptom of that is a notification which shows twice or not at all.
+ */
+export const NOTIFICATION_KINDS = [
+  'MESSAGE',
+  'MATCH',
+  'FRIEND_REQUEST',
+  'FRIEND_ACCEPTED',
+  'BADGE',
+  'COMMUNITY_POST',
+  'POST_LIKE',
+  'POST_COMMENT',
+  'COMMENT_LIKE',
+  'RETURN',
+] as const;
+
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export function isKnownKind(kind: string | undefined): kind is NotificationKind {
+  return !!kind && (NOTIFICATION_KINDS as readonly string[]).includes(kind);
+}
+
+/**
  * Where each kind of notification goes when it is tapped.
  *
- * <p>Mirrors `NotificationKind` on the backend. A kind this build does not recognise
- * falls through to the deck rather than doing nothing — an installed app will meet kinds
- * added after it shipped, and a notification that opens nothing looks broken.
+ * <p>A kind this build does not recognise falls through to the deck rather than doing
+ * nothing — an installed app will meet kinds added after it shipped, and a notification
+ * that opens nothing looks broken.
+ *
+ * <p><b>Exported so the in-app toast can reuse it.</b> Tapping a toast must land in exactly
+ * the same place as tapping the notification it replaced; a second mapping written next to
+ * this one would agree on the day it was written and not for much longer.
  */
-function routeFor(kind: string | undefined, targetId: string | undefined, name?: string) {
+export function routeFor(kind: string | undefined, targetId: string | undefined, name?: string) {
   // The chat screen takes the username as a parameter so it can show it immediately,
   // before the conversation has loaded. Arriving from a notification without it left the
   // header reading "Conversation" — and the sender's name was sitting right there in the

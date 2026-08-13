@@ -1,19 +1,20 @@
+import { Coins } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { trackFunnel } from '../api/funnel';
 import { COIN_PACKS, bonusPercent, type CoinPack } from '../api/billing';
 import { storeAvailable } from '../billing/purchases';
 import { usePurchase } from '../billing/usePurchase';
-import { Card, ErrorNotice, Text } from '../ui';
+import { Card, ErrorNotice, Icon, Text } from '../ui';
 
 /**
  * Coin packs, bought with real money.
  *
- * Sits high on the screen, above the earning section, because the Market's job is to sell
- * and the balance is what everything below is priced in. That is a reversal: this used to
- * sit under the cosmetics shelf, on the argument that nobody buys currency before seeing
- * something they want. The copy points down at the free routes so the order does not read
- * as "pay first" — somebody who wants to earn is told, in this section, exactly where.
+ * First thing under Shop, because the balance is what everything else in that tab is priced
+ * in. The copy points at the Earn tab so the order does not read as "pay first" — somebody
+ * who would rather not spend money is told, in this section, exactly where to go instead.
+ * That mattered more when earning was a section further down the same scroll; now that it
+ * is a whole tab of its own, the pointer has to name it.
  *
  * The packs are consumables. There is no entitlement to check afterwards — only a balance
  * that should have gone up — which is why {@link usePurchase} is told this is a `coins`
@@ -51,8 +52,8 @@ export function CoinShop({
         <Text variant="overline">COINS</Text>
         <Text variant="caption">
           {canBuy
-            ? 'Top up now, or earn them below — badges, quests and a daily streak.'
-            : 'Earn them below: badges, quests and a daily streak. Buying is not available in this build yet.'}
+            ? 'Top up now, or earn them free under Earn — a daily streak, quests and badges.'
+            : 'Earn them under Earn: a daily streak, quests and badges. Buying is not available in this build yet.'}
         </Text>
       </View>
 
@@ -109,15 +110,15 @@ function PackRow({
       ].join(' ')}
     >
       <View className="flex-1 flex-row items-center gap-3">
-        <View className="h-10 w-10 items-center justify-center rounded-full bg-brand/15">
-          <Text className="text-[18px] leading-[22px]">🪙</Text>
+        <View className="h-10 w-10 items-center justify-center rounded-full bg-gold/15">
+          <Icon as={Coins} size={18} tone="gold" />
         </View>
         <View className="gap-0.5">
           <View className="flex-row items-center gap-2">
             <Text variant="bodyStrong">{pack.coins.toLocaleString()} coins</Text>
             {bonus !== null && (
-              <View className="rounded-full bg-brand/15 px-2 py-0.5">
-                <Text className="font-semibold text-[11px] leading-[15px] text-brand">
+              <View className="rounded-full bg-gold/15 px-2 py-0.5">
+                <Text className="font-semibold text-[11px] leading-[15px] text-gold">
                   +{bonus}%
                 </Text>
               </View>
@@ -129,7 +130,7 @@ function PackRow({
         </View>
       </View>
 
-      <Text variant="bodyStrong" className="text-brand">
+      <Text variant="bodyStrong" className="text-gold">
         {pack.price}
       </Text>
     </Pressable>

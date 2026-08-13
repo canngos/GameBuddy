@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
+import { ChevronRight } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { cn } from './cn';
+import { Icon } from './Icon';
 import { Text } from './Text';
 
 type LinkRowProps = {
@@ -45,9 +47,10 @@ export function LinkRow({ label, hint, href, onPress, position = 'single' }: Lin
         {hint && <Text variant="caption">{hint}</Text>}
       </View>
 
-      {/* A forward chevron from two borders: top+right rotated gives a corner pointing
-          right. Bottom+left would point down, which is a dropdown, not a "go". */}
-      <View className="h-2 w-2 rotate-45 border-r-2 border-t-2 border-muted" />
+      {/* Was a 8×8 View rotated 45° with two borders. It read as a chevron at exactly one
+          size and one weight, and it could not be given the stroke weight the rest of the
+          icon set now uses. `BackHeader` had the mirrored version of the same trick. */}
+      <Icon as={ChevronRight} size={20} tone="muted" />
     </Pressable>
   );
 }

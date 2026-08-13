@@ -257,6 +257,14 @@ cd GameBuddy-Model && python tools/seed_local_gamers.py
 docker compose exec -T postgres psql -U gamebuddy -d gamebuddy < tools/local-gamers.sql
 ```
 
+**The seed and the trained artefact have to come from the same population.** `/predict`
+ranks over the ids baked into `artifacts/recommender.pkl`, and the backend then keeps only
+the ones its own database knows about — so the deck is the intersection of the two, and if
+they were generated from different seeds that intersection is empty. The symptom is a feed
+that comes back empty and looks exactly like a broken recommender. `SEED` in
+`seed_local_gamers.py` matches the default of `python -m gamebuddy_model generate`; if you
+retrain on a different seed, change it there too.
+
 Every account it creates is marked, and removable in one statement:
 
 ```sql

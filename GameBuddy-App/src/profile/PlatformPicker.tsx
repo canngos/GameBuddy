@@ -1,5 +1,7 @@
+import { Check } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { useThemeColors } from '../theme';
+import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 import { PlatformIcon } from './PlatformIcon';
 import { PLATFORMS, type PlatformId } from './platforms';
@@ -37,7 +39,7 @@ export function PlatformPicker({ selected, onToggle }: PlatformPickerProps) {
             accessibilityLabel={platform.label}
             className={[
               'flex-row items-center gap-3 rounded-card border p-4',
-              on ? 'border-brand bg-brand/10' : 'border-line bg-raised',
+              on ? 'border-primary bg-primary/10' : 'border-line bg-raised',
             ].join(' ')}
           >
             {/* Takes the row's own colour rather than carrying its own: one drawing
@@ -45,12 +47,12 @@ export function PlatformPicker({ selected, onToggle }: PlatformPickerProps) {
                 whether the row is selected. */}
             <PlatformIcon
               platform={platform.id}
-              color={on ? colors.brand : colors.muted}
+              color={on ? colors.primary : colors.muted}
               size={26}
             />
             <Text
               variant="body"
-              className={on ? 'flex-1 font-semibold text-brand' : 'flex-1'}
+              className={on ? 'flex-1 font-semibold text-primary' : 'flex-1'}
             >
               {platform.label}
             </Text>
@@ -60,10 +62,10 @@ export function PlatformPicker({ selected, onToggle }: PlatformPickerProps) {
             <View
               className={[
                 'h-6 w-6 items-center justify-center rounded-md border',
-                on ? 'border-brand bg-brand' : 'border-line',
+                on ? 'border-primary bg-primary' : 'border-line',
               ].join(' ')}
             >
-              {on && <Text className="font-bold text-[14px] leading-[18px] text-white">✓</Text>}
+              {on && <Icon as={Check} size={15} tone="inverse" strokeWidth={3} />}
             </View>
           </Pressable>
         );

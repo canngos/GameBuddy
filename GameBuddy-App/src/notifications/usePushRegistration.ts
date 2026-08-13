@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
 import { authApi } from '../api/auth';
 import { hasBeenPrimed, permissionState } from './permission';
+import { isKnownKind } from './useNotificationRouting';
 
 /**
  * Registers this device for push, and decides whether to ask first.
@@ -23,17 +24,42 @@ import { hasBeenPrimed, permissionState } from './permission';
 /**
  * How a notification behaves while the app is open.
  *
- * <p>Banners are shown in the foreground on purpose. The alternative is a notification
- * that silently does nothing because the app happens to be open on a different screen,
- * which is how people conclude notifications are broken.
+ * <p><b>The app draws its own.</b> A kind this build recognises is presented in-app — a
+ * match raises the full-screen celebration (see {@link useMatchNotifications}), everything
+ * else raises a toast from the top (see {@link useInAppNotifications}) — so the system
+ * banner is suppressed for it. Letting Android draw one as well would be the same news
+ * twice, the second time in the OS's voice instead of ours, sliding down over the thing it
+ * is announcing.
+ *
+ * <p><b>An unrecognised kind still gets the system banner</b>, and that fallback is the
+ * important half of this rule. An installed app will meet kinds added to the backend after
+ * it shipped, and it has no in-app treatment for them; suppressing those would swallow the
+ * notification entirely. Better the OS's voice than silence. This is why the kind list is
+ * exported data in {@link useNotificationRouting} rather than a condition written out here
+ * — a new kind is added in one place or it is inconsistent everywhere.
+ *
+ * <p>Everything reaches the notification list either way, so nothing is lost if a toast or
+ * a celebration is dismissed without being read.
+ *
+ * <p><b>No sound from the OS.</b> The app plays its own cue, paired with its own haptic, at
+ * the moment the toast appears — see {@code src/ui/feedback.ts}. Leaving this true would
+ * play two sounds for one event.
+ *
+ * <p>This only affects the foreground. Anything arriving while the app is backgrounded or
+ * closed is untouched and behaves like any other push.
  */
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const kind = (notification.request.content.data as { kind?: string } | undefined)?.kind;
+    const drawnInApp = isKnownKind(kind);
+
+    return {
+      shouldShowBanner: !drawnInApp,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 /**

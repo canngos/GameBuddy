@@ -1,22 +1,25 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { Gamepad2, SlidersHorizontal } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AdmirersBadge } from './admirers';
 import { billingApi } from '../../src/api/billing';
 import { UpgradePromptSheet } from '../../src/billing/UpgradePromptSheet';
 import { BoostButton, REWIND_COST_COINS } from '../../src/match/BoostButton';
+import type { Candidate } from '../../src/api/types';
 import { CandidateCard } from '../../src/match/CandidateCard';
+import { CandidateSheet } from '../../src/match/CandidateSheet';
 import { DeckActions } from '../../src/match/DeckActions';
 import { FilterSheet } from '../../src/match/FilterSheet';
 import { LimitSheet } from '../../src/match/LimitSheet';
-import { MatchOverlay } from '../../src/match/MatchOverlay';
 import { SwipeCard } from '../../src/match/SwipeCard';
 import { NO_FILTERS, activeCount, type FeedFilters } from '../../src/match/filters';
+import { useCelebration } from '../../src/match/celebration';
 import { useDeck } from '../../src/match/useDeck';
 import { useThemeColors } from '../../src/theme';
 import { useTutorial } from '../../src/tutorial/store';
-import { Button, ErrorNotice, Screen, Text } from '../../src/ui';
+import { Button, EmptyState, ErrorNotice, Icon, Screen, Text } from '../../src/ui';
 
 export default function Deck() {
   const colors = useThemeColors();
@@ -25,14 +28,50 @@ export default function Deck() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const deck = useDeck(filters);
 
+  /*
+   * Hand the match to the app-wide celebration.
+   *
+   * The overlay used to be rendered right here, which meant only the gamer who swiped last
+   * ever saw it — the other side of the match got a push and nothing more. It now lives
+   * above the tab navigator so a push can raise it too; see `src/match/celebration.ts`.
+   *
+   * `deck.matchedWith` stays, because it is also what freezes the swipe gesture while the
+   * celebration is up. Clearing it is handed over as the dismiss callback so the deck
+   * unfreezes when the overlay closes, without the overlay knowing what a deck is.
+   */
+  const celebrate = useCelebration((s) => s.celebrate);
+  useEffect(() => {
+    const matched = deck.matchedWith;
+    if (!matched) return;
+    celebrate(
+      {
+        userId: matched.userId,
+        username: matched.gamerUsername,
+        avatar: matched.avatar,
+        frame: matched.frame,
+      },
+      deck.dismissMatch,
+    );
+  }, [deck.matchedWith, deck.dismissMatch, celebrate]);
+
   // Shared cache with the paywall, so buying Gold there unlocks the controls here without
   // a reload. Only ever advisory — see FilterSheet on why the server is the authority.
   const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
   const unlocked = subscription.data?.canUseAdvancedFilters ?? false;
 
-  // Both overlays freeze the gesture. Swiping the card behind a modal would decide
-  // someone's fate invisibly.
-  const frozen = !!deck.block || !!deck.matchedWith;
+  /**
+   * The candidate whose full profile is open, or null.
+   *
+   * Held here rather than inside the card because the sheet has to outlive the card's own
+   * layout and draw over the deck's actions — and because closing it must leave the deck
+   * exactly as it was, which is the whole reason this is a sheet and not a route.
+   */
+  const [profileOf, setProfileOf] = useState<Candidate | null>(null);
+
+  // All three overlays freeze the gesture. Swiping the card behind a modal would decide
+  // someone's fate invisibly — and the profile sheet is the easiest of the three to open by
+  // accident, so it is also the one most likely to be dismissed with a stray drag.
+  const frozen = !!deck.block || !!deck.matchedWith || !!profileOf;
 
   // The day-3 prompt waits for a quiet moment. It is the one thing on this screen nobody
   // asked for, so it must not arrive on top of a match they just made or a limit that just
@@ -74,7 +113,7 @@ export default function Deck() {
       <View className="flex-1 px-6 py-3">
         {deck.isLoading && (
           <View className="flex-1 items-center justify-center gap-3">
-            <ActivityIndicator color={colors.brand} />
+            <ActivityIndicator color={colors.primary} />
             <Text variant="caption">Finding people who play what you play…</Text>
           </View>
         )}
@@ -119,6 +158,7 @@ export default function Deck() {
               key={deck.current.userId}
               candidate={deck.current}
               onDecide={deck.submit}
+              onOpenProfile={() => setProfileOf(deck.current)}
               frozen={frozen}
             />
           </View>
@@ -157,6 +197,10 @@ export default function Deck() {
         onDismiss={() => setFiltersOpen(false)}
       />
 
+      {/* Below the limit sheet and the match overlay in z-order, because this one is opened
+          on purpose and those two arrive on their own. */}
+      <CandidateSheet candidate={profileOf} onDismiss={() => setProfileOf(null)} />
+
       <LimitSheet
         block={deck.block}
         allowance={deck.allowance}
@@ -168,15 +212,6 @@ export default function Deck() {
           landing a pitch on top of either would talk over it. */}
       <UpgradePromptSheet due={promptDue} />
 
-      <MatchOverlay
-        candidate={deck.matchedWith}
-        onDismiss={deck.dismissMatch}
-        onMessage={() => {
-          // Chat is not built yet. Dismissing at least leaves the deck usable rather
-          // than navigating to a route that does not exist.
-          deck.dismissMatch();
-        }}
-      />
     </Screen>
   );
 }
@@ -188,7 +223,7 @@ function Allowance({ deck }: { deck: ReturnType<typeof useDeck> }) {
 
   return (
     <View className="items-end">
-      <Text className="font-semibold text-[15px] leading-[20px] text-brand">
+      <Text className="font-semibold text-[15px] leading-[20px] text-accent">
         {allowance.remainingAccepts}
       </Text>
       <Text variant="caption">likes left</Text>
@@ -212,15 +247,15 @@ function FilterButton({ count, onPress }: { count: number; onPress: () => void }
       hitSlop={8}
       className={[
         'h-9 flex-row items-center gap-1.5 rounded-full border px-3',
-        count > 0 ? 'border-brand bg-brand/10' : 'border-line bg-raised',
+        count > 0 ? 'border-primary bg-primary/10' : 'border-line bg-raised',
       ].join(' ')}>
-      <Text className={count > 0 ? 'text-[14px] leading-[18px] text-brand' : 'text-[14px] leading-[18px] text-muted'}>
-        ⚙︎
-      </Text>
+      {/* Was the literal character ⚙︎, which renders at whatever weight the platform
+          font feels like and cannot take the active colour. */}
+      <Icon as={SlidersHorizontal} size={15} tone={count > 0 ? 'primary' : 'muted'} />
       <Text
         className={[
           'font-semibold text-[13px] leading-[17px]',
-          count > 0 ? 'text-brand' : 'text-muted',
+          count > 0 ? 'text-primary' : 'text-muted',
         ].join(' ')}>
         {count > 0 ? String(count) : 'Filter'}
       </Text>
@@ -238,21 +273,16 @@ function FilterButton({ count, onPress }: { count: number; onPress: () => void }
  */
 function FiltersLocked({ onUpgrade, onClear }: { onUpgrade: () => void; onClear: () => void }) {
   return (
-    <View className="items-center gap-4 px-4">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-brand/15">
-        <Text className="text-[28px] leading-[34px]">🔍</Text>
-      </View>
-      <Text variant="heading" className="text-center">
-        Filters are part of Gold
-      </Text>
-      <Text variant="body" className="text-center text-muted">
-        Narrow the deck to one game, your region, or people who are online right now.
-      </Text>
-      <View className="w-full gap-2">
-        <Button label="Get Gold" onPress={onUpgrade} />
-        <Button label="Show everyone instead" variant="ghost" onPress={onClear} />
-      </View>
-    </View>
+    <EmptyState
+      icon={SlidersHorizontal}
+      title="Filters are part of Gold"
+      blurb="Narrow the deck to one game, your region, or people who are online right now."
+      // An offer rather than the end of a list, so it gets the lit ring.
+      accent
+    >
+      <Button label="Get Gold" onPress={onUpgrade} />
+      <Button label="Show everyone instead" variant="ghost" onPress={onClear} />
+    </EmptyState>
   );
 }
 
@@ -266,22 +296,21 @@ function Exhausted({
   onClearFilters: () => void;
 }) {
   return (
-    <View className="flex-1 items-center justify-center gap-4 px-4">
-      <View className="h-16 w-16 items-center justify-center rounded-full bg-raised">
-        <Text className="text-[28px] leading-[34px]">🎮</Text>
-      </View>
-      <Text variant="heading" className="text-center">
-        {filtered ? "That's everyone matching your filters" : "That's everyone for now"}
-      </Text>
-      <Text variant="body" className="text-center text-muted">
-        {filtered
-          ? 'Widening them brings more people back into the deck.'
-          : 'New players join all the time, and people you passed on come back around after a while.'}
-      </Text>
-      {/* Offered before "look again", because refetching the same narrow filters is the
-          one thing that will not produce anybody new. */}
-      {filtered && <Button label="Clear filters" onPress={onClearFilters} />}
-      <Button label="Look again" variant="secondary" onPress={onReload} />
+    <View className="flex-1 justify-center">
+      <EmptyState
+        icon={Gamepad2}
+        title={filtered ? "That's everyone matching your filters" : "That's everyone for now"}
+        blurb={
+          filtered
+            ? 'Widening them brings more people back into the deck.'
+            : 'New players join all the time, and people you passed on come back around after a while.'
+        }
+      >
+        {/* Offered before "look again", because refetching the same narrow filters is the
+            one thing that will not produce anybody new. */}
+        {filtered && <Button label="Clear filters" onPress={onClearFilters} />}
+        <Button label="Look again" variant="secondary" onPress={onReload} />
+      </EmptyState>
     </View>
   );
 }

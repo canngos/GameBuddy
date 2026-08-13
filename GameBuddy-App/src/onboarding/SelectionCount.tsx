@@ -22,7 +22,7 @@ export function SelectionCount({ picked, minimum }: SelectionCountProps) {
         {Array.from({ length: minimum }, (_, i) => (
           <View
             key={i}
-            className={cn('h-1.5 w-1.5 rounded-full', i < picked ? 'bg-brand' : 'bg-line')}
+            className={cn('h-1.5 w-1.5 rounded-full', i < picked ? 'bg-primary' : 'bg-line')}
           />
         ))}
       </View>

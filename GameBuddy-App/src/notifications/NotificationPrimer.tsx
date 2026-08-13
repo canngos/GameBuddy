@@ -76,7 +76,7 @@ export function NotificationPrimer({ onDone }: { onDone: () => void }) {
 function Reason({ title, body }: { title: string; body: string }) {
   return (
     <View className="flex-row gap-3">
-      <View className="mt-1.5 h-2 w-2 rounded-full bg-brand" />
+      <View className="mt-1.5 h-2 w-2 rounded-full bg-primary" />
       <View className="flex-1 gap-0.5">
         <Text variant="bodyStrong">{title}</Text>
         <Text variant="caption">{body}</Text>

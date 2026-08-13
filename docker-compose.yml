@@ -53,6 +53,10 @@ services:
     build:
       context: ./GameBuddy-Model
       dockerfile: Dockerfile
+      # Explicit: the Dockerfile has a second stage after this one, and Docker builds
+      # the last stage when no target is given. Without this, `model` runs the retrain
+      # entrypoint and exits 1.
+      target: serve
     environment:
       # Must match the backend's. A mismatch is not a loud failure: the model answers 503
       # and the feed surfaces a generic "Recommendation service unavailable", which looks
@@ -65,8 +69,26 @@ services:
       # them against what the queue actually receives rather than guessing twice.
       NSFW_REJECT_THRESHOLD: ${NSFW_REJECT_THRESHOLD:-0.85}
       NSFW_APPROVE_THRESHOLD: ${NSFW_APPROVE_THRESHOLD:-0.20}
+
+      # Stop recommending the synthetic seed accounts while still ranking with
+      # everything the model learned from them. Off here because in development the
+      # seed accounts ARE the population and hiding them empties the feed; turn it on
+      # at deploy, when real users exist to serve. A restart, not a retrain.
+      HIDE_SEED_ACCOUNTS: ${HIDE_SEED_ACCOUNTS:-false}
     ports:
       - "${MODEL_PORT:-8000}:8000"
+    volumes:
+      # The artefact has to outlive the container now that a nightly job rewrites it.
+      #
+      # Named, not a bind mount, because Docker seeds a named volume from the image the
+      # first time it is used: a fresh install serves the artefact baked into the image and
+      # is never broken, and from the first retrain onwards the volume's copy wins. A bind
+      # mount would instead hide the baked artefact behind an empty host directory and the
+      # service would answer 503 until someone trained one.
+      #
+      # Reset it with `docker compose down -v` or `docker volume rm
+      # gamebuddy_model-artifacts` to fall back to whatever the image ships.
+      - model-artifacts:/app/artifacts
     healthcheck:
       test:
         [
@@ -79,6 +101,59 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+
+  # The nightly retrain: export the live population, train, swap the artefact in, reload.
+  #
+  # This is what makes the recommender track the product rather than a snapshot. /predict
+  # can only ever return gamers that are *inside* the artefact, so without a retrain every
+  # account created since the last one is invisible as a candidate — they can be served
+  # (cold start ranks them against the pool) but nobody is ever served *them*. A day is the
+  # right cadence for that: profile edits are already handled live by the staleness flag,
+  # so this exists to admit new gamers and to refresh the desirability prior.
+  #
+  # Midnight local, which is both quiet and ahead of the backend's 03:30 impression purge,
+  # so training sees the fullest log. Set RETRAIN_TZ to your users' timezone, not the
+  # server's — a container defaults to UTC and "midnight" silently becomes mid-evening.
+  #
+  # Deliberately not `restart: always` on failure semantics alone: the job keeps the old
+  # artefact serving whenever anything goes wrong, so a bad night degrades to a stale
+  # model rather than to no model.
+  model-retrain:
+    build:
+      context: ./GameBuddy-Model
+      dockerfile: Dockerfile
+      target: retrain
+    command:
+      - --schedule=${RETRAIN_AT:-00:00}
+      - --timezone=${RETRAIN_TZ:-UTC}
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-gamebuddy}:${DB_PASSWORD:?set DB_PASSWORD in .env}@postgres:5432/${DB_NAME:-gamebuddy}
+      # Same key the model service checks, so the job can ask it to reload.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env}
+      PREDICT_SERVICE_URL: http://model:8000
+
+      # Train on the seeded accounts as well as the real ones.
+      #
+      # True while the seeded population *is* the candidate pool, which is the situation
+      # until enough real users exist to fill a deck on their own. With it false the job
+      # exports only real accounts, finds a handful, and refuses the retrain every night —
+      # correct behaviour, and useless noise while the answer is known.
+      #
+      # Flip to false once real users can carry the feed, then delete the seed with
+      #   DELETE FROM gamebuddy.gamer WHERE email LIKE '%@bot.gamebuddy.invalid';
+      # and let the next run rebuild the artefact from people alone. Do the two together:
+      # deleting the seed while this is still true simply trains on whoever is left.
+      RETRAIN_INCLUDE_BOTS: ${RETRAIN_INCLUDE_BOTS:-true}
+    volumes:
+      # The same volume the model serves from. The job writes the artefact; the service
+      # reads it after being told to reload.
+      - model-artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      model:
+        condition: service_healthy
+    restart: unless-stopped
 
   # Redis, for fanning WebSocket delivery and presence across backend instances.
   #
@@ -395,6 +470,9 @@ services:
 
 volumes:
   postgres-data:
+  # Written by model-retrain, read by model. Seeded from the image on first use, so the
+  # stack works before the first retrain has ever run.
+  model-artifacts:
   # Only used when R2 is not configured. Named rather than a bind mount so it behaves the
   # same on Windows, macOS and Linux.
   media-data:

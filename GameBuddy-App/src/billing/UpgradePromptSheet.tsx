@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { Check } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -11,6 +12,7 @@ import Animated, {
 import { billingApi } from '../api/billing';
 import { trackFunnel } from '../api/funnel';
 import { Button } from '../ui/Button';
+import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 
 type UpgradePromptSheetProps = {
@@ -139,7 +141,11 @@ export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
 function Benefit({ text }: { text: string }) {
   return (
     <View className="flex-row items-start gap-2">
-      <Text className="text-[14px] leading-[20px] text-brand">✓</Text>
+      {/* Gold, not brand: this is the Gold pitch, and the tick is the only colour on the
+          line. `mt-0.5` puts a 14px glyph on the 20px line rather than above it. */}
+      <View className="mt-0.5">
+        <Icon as={Check} size={14} tone="gold" strokeWidth={3} />
+      </View>
       <Text variant="caption" className="flex-1">
         {text}
       </Text>

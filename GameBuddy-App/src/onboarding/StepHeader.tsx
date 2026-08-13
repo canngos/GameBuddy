@@ -28,7 +28,7 @@ export function StepHeader({ step, total, title, subtitle }: StepHeaderProps) {
             key={i}
             className={cn(
               'h-1.5 flex-1 rounded-full',
-              i < step ? 'bg-brand' : 'bg-line',
+              i < step ? 'bg-primary' : 'bg-line',
             )}
           />
         ))}

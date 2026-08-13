@@ -72,7 +72,7 @@ export function TutorialOverlay() {
             {TUTORIAL_STEPS.map((s, i) => (
               <View
                 key={s.route}
-                className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-brand' : 'bg-line'}`}
+                className={`h-1 flex-1 rounded-full ${i <= step ? 'bg-primary' : 'bg-line'}`}
               />
             ))}
           </View>

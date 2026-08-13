@@ -132,7 +132,7 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
 function Tally({ label, value }: { label: string; value: number }) {
   return (
     <View className="flex-1 items-center gap-0.5 rounded-card bg-raised py-3">
-      <Text className="font-bold text-[22px] leading-[28px] text-brand">{value}</Text>
+      <Text className="font-bold text-[22px] leading-[28px] text-accent">{value}</Text>
       <Text variant="caption">{label}</Text>
     </View>
   );

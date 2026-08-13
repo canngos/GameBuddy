@@ -1,10 +1,13 @@
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { Platform, type ColorValue } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { identify } from '../../src/billing/purchases';
 import { ChatSocketProvider } from '../../src/chat/ChatSocketProvider';
+import { MatchCelebration } from '../../src/match/MatchCelebration';
 import { NotificationPrimer } from '../../src/notifications/NotificationPrimer';
+import { useInAppNotifications } from '../../src/notifications/useInAppNotifications';
+import { useMatchNotifications } from '../../src/notifications/useMatchNotifications';
 import { useNotificationRouting } from '../../src/notifications/useNotificationRouting';
 import { usePushRegistration } from '../../src/notifications/usePushRegistration';
 import { RouteGuard } from '../../src/session/RouteGuard';
@@ -12,8 +15,14 @@ import { useSession } from '../../src/session/store';
 import { TutorialOverlay } from '../../src/tutorial/TutorialOverlay';
 import { useTutorial } from '../../src/tutorial/store';
 import { useThemeColors } from '../../src/theme';
+import { lift } from '../../src/ui/elevation';
+import { useHairline } from '../../src/ui/hairline';
 import { Screen } from '../../src/ui';
 import { TabIcon, type TabIconName } from '../../src/ui/TabIcon';
+import { ToastHost } from '../../src/ui/ToastHost';
+
+/** The floating bar's own height. Its distance off the bottom is computed per-platform. */
+const TAB_BAR_HEIGHT = 64;
 
 /**
  * The app proper. Reachable only once onboarding has actually been completed.
@@ -30,12 +39,26 @@ import { TabIcon, type TabIconName } from '../../src/ui/TabIcon';
 export default function MainLayout() {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
+  const hairline = useHairline();
+
+  /*
+   * The floating bar's geometry, in one place, because two numbers have to agree: how far
+   * the bar sits off the bottom, and how much room every screen leaves for it. Deriving the
+   * second from the first is the only way they cannot drift.
+   */
+  const barInset = (Platform.OS === 'android' ? insets.bottom : insets.bottom * 0.5) + 10;
+  const tabBarSpace = barInset + TAB_BAR_HEIGHT;
 
   // Here rather than at the root: this layout mounts only once a gamer is signed in and
   // onboarded, which is exactly when there is an account to attach a device token to.
   // Asking on the sign-up screen would be asking before there is anything to notify about.
   const { shouldPrime, onPrimerDone } = usePushRegistration(true);
   useNotificationRouting(true);
+  // A match landing while the app is open becomes the celebration rather than a banner.
+  useMatchNotifications(true);
+  // Every other kind becomes a toast from the top. Between them these two cover every kind
+  // this build knows, which is the set `usePushRegistration` suppresses the OS banner for.
+  useInAppNotifications(true);
 
   // Tells RevenueCat which account is buying, before anybody can reach a paywall.
   //
@@ -102,21 +125,66 @@ export default function MainLayout() {
         backBehavior="history"
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.brand,
+          // `primary`, not `brand`. The pink is now the like/match colour and nothing
+          // else — see the gradient table in `src/theme/gradients.ts`. This only tints the
+          // label; the icon derives its own colour from `focused`.
+          tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.muted,
-          sceneStyle: { backgroundColor: colors.canvas },
+          /*
+           * `paddingBottom` is what pays for the floating bar, and it is not optional.
+           *
+           * An absolutely-positioned tab bar is out of flow, so react-navigation stops
+           * reserving height for it and every screen silently grows ~74px taller than the
+           * space it can actually use — the deck's Pass/Match row, the last row of every
+           * list, the compose bar. Doing it here, on `sceneStyle`, fixes all of them at
+           * once instead of per screen; the two screens that hide the bar override it back
+           * to zero where they are declared below.
+           */
+          sceneStyle: { backgroundColor: colors.canvas, paddingBottom: tabBarSpace },
+          /*
+           * A floating bar: detached from the screen edges, rounded, and lifted.
+           *
+           * `position: 'absolute'` is what takes it out of flow — react-navigation then
+           * stops reserving height for it, which is why every screen below already passes
+           * `edges={['top']}` and leaves the bottom to the bar. Screens that scroll pad
+           * their own content (`pb-8` in `Screen`), so nothing ends up trapped underneath.
+           *
+           * The insets are still honoured, just as margin rather than padding — on Android
+           * the gesture bar sits under this, and without the offset the bar lands on top of
+           * it and swallows the swipe-up.
+           *
+           * `elevated`, not `surface`: this is the one element in the app that floats over
+           * content with no scrim behind it, which is exactly the case the fourth depth step
+           * exists for. See `src/theme/tokens.js`.
+           */
           tabBarStyle: {
-            backgroundColor: colors.surface,
-            borderTopColor: colors.line,
-            borderTopWidth: 1,
-            // Android draws its navigation bar over this; without the inset the
-            // labels sit underneath it. iOS gets a little breathing room instead of
-            // the home indicator's full inset, which is already handled.
-            height: 60 + insets.bottom,
-            paddingBottom: Platform.OS === 'android' ? insets.bottom + 6 : insets.bottom,
+            position: 'absolute',
+            /*
+             * Margins, not `left`/`right`/`bottom`.
+             *
+             * React Navigation positions the bar itself once `position: 'absolute'` is set,
+             * and its own `bottom: 0` wins over one passed in here — the first attempt used
+             * offsets and produced a full-width bar welded to the bottom edge, which is
+             * exactly what this was trying not to be. Margins are applied on top of its
+             * positioning rather than competing with it.
+             */
+            marginHorizontal: 12,
+            marginBottom: barInset,
+            height: TAB_BAR_HEIGHT,
+            borderRadius: 24,
+            backgroundColor: colors.elevated,
+            borderTopWidth: 0,
             paddingTop: 8,
+            paddingBottom: 8,
+            // Depth without a class — `shadow-*` is forbidden here, see src/ui/elevation.ts.
+            ...lift('lg'),
+            ...hairline,
           },
-          tabBarLabelStyle: { fontFamily: 'Poppins_500Medium', fontSize: 11 },
+          tabBarItemStyle: { borderRadius: 18, paddingHorizontal: 2 },
+          // 10, not 11: the floating bar is inset from both edges, and at 11 "Community"
+          // truncated to "Communi…". A tab label that cannot show its own word is worse
+          // than a slightly smaller one.
+          tabBarLabelStyle: { fontFamily: 'Poppins_500Medium', fontSize: 10 },
         }}
       >
         <Tabs.Screen name="home" options={tab('Home', 'deck')} />
@@ -134,7 +202,8 @@ export default function MainLayout() {
             flows, and a tab press mid-edit would discard the change without saying so. */}
         <Tabs.Screen
           name="settings"
-          options={{ href: null, tabBarStyle: { display: 'none' } }}
+          // No bar, so no room reserved for one — see `sceneStyle` above.
+          options={{ href: null, tabBarStyle: { display: 'none' }, sceneStyle: { paddingBottom: 0 } }}
         />
         {/* A conversation is no longer a tab. It was one — `href: null`, so no button,
             but a tab all the same — and that is what made backing out of a chat land on
@@ -152,6 +221,11 @@ export default function MainLayout() {
             spend it is the path this is meant to make short. */}
         <Tabs.Screen name="badges" options={{ href: null }} />
 
+        {/* Reached from Profile, and from the Market once something has been bought. Keeps
+            the tab bar: deciding what to wear and going back to the shop for more is the
+            loop these two screens make between them. */}
+        <Tabs.Screen name="inventory" options={{ href: null }} />
+
         {/* Reached from the badge in the deck header rather than a tab of its own. It
             keeps the tab bar: seeing who liked you and going straight back to swiping is
             the loop this screen exists to close. */}
@@ -159,12 +233,27 @@ export default function MainLayout() {
 
         {/* The paywall. Tab bar hidden: it is a decision with a price on it, and a stray
             tab press mid-purchase is not a decision anybody meant to make. */}
-        <Tabs.Screen name="gold" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen
+          name="gold"
+          options={{ href: null, tabBarStyle: { display: 'none' }, sceneStyle: { paddingBottom: 0 } }}
+        />
         </Tabs>
 
       {/* After the tabs, so it draws over them — and inside the guard, so it can never
           appear for an account that has not finished onboarding. */}
       <TutorialOverlay />
+
+      {/* Above the tabs and below the celebration, which is the whole of its z-order
+          argument: a toast must cover the app it is announcing something about, and must
+          never cover a match. Fed by `useInAppNotifications` above and, for purchases, by
+          the Market — see `src/ui/toast.ts`. */}
+      <ToastHost />
+
+      {/* Last, so it draws over everything including the tutorial. A match is the best
+          thing that happens in this app and nothing should cover it. Mounted here rather
+          than on the deck because it is now raised from a push too — see
+          `src/match/celebration.ts`. */}
+      <MatchCelebration />
       </ChatSocketProvider>
     </RouteGuard>
   );
@@ -173,9 +262,8 @@ export default function MainLayout() {
 function tab(title: string, icon: TabIconName) {
   return {
     title,
-    // `color` is a ColorValue, not a string — it can be an opaque platform colour.
-    // TabIcon only ever passes it straight back into a style, so widening the
-    // parameter is honest rather than casting it to something it is not.
-    tabBarIcon: ({ color }: { color: ColorValue }) => <TabIcon name={icon} color={color} />,
+    // `focused`, not `color`. TabIcon owns what an active tab looks like — see the header
+    // comment there for why taking the navigator's tint was the wrong seam.
+    tabBarIcon: ({ focused }: { focused: boolean }) => <TabIcon name={icon} focused={focused} />,
   };
 }

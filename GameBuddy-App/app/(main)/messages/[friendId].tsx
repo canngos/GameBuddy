@@ -98,7 +98,7 @@ export default function Chat() {
 
       {chat.isLoading && (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator color={colors.brand} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       )}
 
@@ -177,7 +177,7 @@ export default function Chat() {
           accessibilityRole="button"
           accessibilityLabel="Send"
           className={cn(
-            'h-touch w-touch items-center justify-center rounded-full bg-brand active:opacity-80',
+            'h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80',
             (draft.trim().length === 0 || chat.sending) && 'opacity-40',
           )}
         >
@@ -263,7 +263,7 @@ function FriendAction({ userId }: { userId: string }) {
         className="h-10 w-10 items-center justify-center"
         accessibilityLabel="Already friends"
       >
-        <PersonIcon color={colors.brand} badge="check" background={colors.canvas} />
+        <PersonIcon color={colors.primary} badge="check" background={colors.canvas} />
       </View>
     );
   }
@@ -284,12 +284,12 @@ function FriendAction({ userId }: { userId: string }) {
       className="h-10 w-10 items-center justify-center active:opacity-60"
     >
       {busy ? (
-        <ActivityIndicator color={colors.brand} />
+        <ActivityIndicator color={colors.primary} />
       ) : (
         <PersonIcon
           // Waiting reads as inert rather than disabled-looking: same glyph, muted, with
           // the plus replaced by a dot so it does not look like it can still be pressed.
-          color={youAsked ? colors.muted : colors.brand}
+          color={youAsked ? colors.muted : colors.primary}
           badge={theyAsked ? 'check' : youAsked ? 'dot' : 'plus'}
           background={colors.canvas}
         />
@@ -406,7 +406,7 @@ function StatusLabel({
 
   if (isTyping) {
     return (
-      <Text variant="caption" className="text-brand">
+      <Text variant="caption" className="text-primary">
         typing…
       </Text>
     );
@@ -418,7 +418,7 @@ function StatusLabel({
 
   if (presence.online) {
     return (
-      <Text variant="caption" className="text-brand">
+      <Text variant="caption" className="text-primary">
         Online
       </Text>
     );
@@ -469,7 +469,7 @@ function Bubble({
       <View
         className={cn(
           'rounded-card px-4 py-2.5',
-          mine ? 'rounded-br-sm bg-brand' : 'rounded-bl-sm bg-raised',
+          mine ? 'rounded-br-sm bg-primary' : 'rounded-bl-sm bg-raised',
         )}
       >
         <Text className={mine ? 'text-white' : 'text-content'}>{message.message}</Text>

@@ -41,3 +41,23 @@ export const MIN_PLATFORMS = 1;
 export function platformLabel(id: string): string {
   return PLATFORMS.find((p) => p.id === id)?.label ?? id;
 }
+
+/**
+ * The reverse lookup, for drawing a glyph next to a platform the server named.
+ *
+ * Accepts an id *or* a label, deliberately: the profile DTO sends enum names
+ * (`"PLAYSTATION"`) and the match DTO sends labels (`"PlayStation"`) — see the two
+ * `platforms` fields in `src/api/types.ts`, which disagree and say so. A lookup that
+ * handled only one of them would silently drop every icon on whichever screen used the
+ * other.
+ *
+ * Returns null for anything unrecognised rather than guessing, so a platform added to the
+ * backend before this list shows as a plain label instead of the wrong picture.
+ */
+export function platformIdOf(value: string): PlatformId | null {
+  const needle = value.trim().toLowerCase();
+  const hit = PLATFORMS.find(
+    (p) => p.id.toLowerCase() === needle || p.label.toLowerCase() === needle,
+  );
+  return hit?.id ?? null;
+}

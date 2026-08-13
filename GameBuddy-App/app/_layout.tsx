@@ -14,6 +14,7 @@ import { queryClient } from '../src/query';
 import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
+import { useSoundEnabled } from '../src/ui/sound';
 
 // Hold the native splash until fonts are parsed, the stored token has been read, and
 // the theme preference is known. Without this the app flashes blank, then Roboto, then
@@ -46,11 +47,17 @@ export default function RootLayout() {
   const restore = useSession((s) => s.restore);
   const schemeHydrated = useScheme((s) => s.hydrated);
   const loadScheme = useScheme((s) => s.load);
+  const loadSound = useSoundEnabled((s) => s.load);
 
   useEffect(() => {
     void restore();
     void loadScheme();
-  }, [restore, loadScheme]);
+    // Deliberately not part of `ready` below. A theme read late repaints the whole app, so
+    // launch waits for it; a sound preference read late costs at most one unwanted blip in
+    // the first moments of a session — and gating the splash on it would delay every launch
+    // for a setting almost nobody changes. See `src/ui/sound.ts`.
+    void loadSound();
+  }, [restore, loadScheme, loadSound]);
 
   const ready = (fontsLoaded || !!fontError) && status !== 'loading' && schemeHydrated;
 

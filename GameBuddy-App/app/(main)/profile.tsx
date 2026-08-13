@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { Crown, Settings, Shirt } from 'lucide-react-native';
 import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { billingApi } from '../../src/api/billing';
 import { profileApi } from '../../src/api/catalogue';
 import { socialApi } from '../../src/api/social';
 import type { GamerSummary } from '../../src/api/types';
@@ -11,6 +13,7 @@ import {
   Card,
   ErrorNotice,
   FramedAvatar,
+  Icon,
   ProfileBanner,
   Screen,
   Text,
@@ -24,6 +27,12 @@ export default function Profile() {
   const requests = useQuery({ queryKey: ['friendRequests'], queryFn: socialApi.pendingRequests });
   const friends = useQuery({ queryKey: ['friends'], queryFn: socialApi.friends });
 
+  // Same key the Market, the deck and the paywall use, so react-query serves all of them
+  // from one request rather than this adding a fourth call on a screen that already makes
+  // three.
+  const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
+  const isGold = subscription.data?.tier === 'GOLD';
+
   return (
     <Screen scroll edges={['top']}>
       <View className="flex-row items-center justify-between pb-6 pt-8">
@@ -31,21 +40,33 @@ export default function Profile() {
           <Text variant="overline">YOU</Text>
           <Text variant="title">Profile</Text>
         </View>
-        <Pressable
-          onPress={() => router.push('/settings')}
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
-        >
-          <View className="gap-1">
-            {[0, 1, 2].map((i) => (
-              <View key={i} className="h-1 w-1 rounded-full bg-content" />
-            ))}
-          </View>
-        </Pressable>
+        <View className="flex-row items-center gap-2">
+          {/* Inventory before Settings, because it is the one people come back to. A
+              wardrobe is visited whenever something new is bought; settings are visited
+              roughly once. */}
+          <Pressable
+            onPress={() => router.push('/inventory')}
+            accessibilityRole="button"
+            accessibilityLabel="Inventory"
+            className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
+          >
+            <Icon as={Shirt} size={20} tone="content" />
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/settings')}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
+          >
+            {/* A cog, not the three dots that used to be here. The dots said "there is a
+                menu behind this", and there is not — it goes straight to Settings. */}
+            <Icon as={Settings} size={20} tone="content" />
+          </Pressable>
+        </View>
       </View>
 
-      {me.isPending && <ActivityIndicator color={colors.brand} />}
+      {me.isPending && <ActivityIndicator color={colors.primary} />}
       {me.error && <ErrorNotice error={me.error} onRetry={() => me.refetch()} />}
 
       <View className="gap-6">
@@ -65,7 +86,16 @@ export default function Profile() {
                 size={72}
               />
               <View className="flex-1 gap-0.5 pb-1">
-                <Text variant="heading">{me.data.username}</Text>
+                {/* The name shrinks and truncates so the tag beside it is never pushed off
+                    the row. A long username losing its tail is a smaller loss than a
+                    membership badge that silently disappears for exactly the people who
+                    have one. */}
+                <View className="flex-row items-center gap-2">
+                  <Text variant="heading" numberOfLines={1} className="shrink">
+                    {me.data.username}
+                  </Text>
+                  {isGold && <GoldTag />}
+                </View>
                 <Text variant="caption">
                   {[me.data.age, me.data.country].filter(Boolean).join(' · ')}
                 </Text>
@@ -107,6 +137,35 @@ export default function Profile() {
   );
 }
 
+/**
+ * The membership badge that sits beside your own name.
+ *
+ * Small on purpose. It is a status marker, not an advert — the person reading it has already
+ * paid, so it only has to be recognisable at a glance, and a tag competing with the username
+ * for the top of the screen would read as the app still selling to somebody who has bought.
+ *
+ * The shape is the saving badge from the paywall's plan rows (`app/(main)/gold.tsx`): a
+ * gold-tinted pill with 11px semibold gold text. Reused rather than reinvented so the app
+ * has one "small gold badge" instead of two that nearly match.
+ *
+ * A filled crown rather than an outlined one: at 12px an outline closes up into a blob, and
+ * the crown is the mark the whole Gold screen is built around.
+ */
+function GoldTag() {
+  const colors = useThemeColors();
+
+  return (
+    <View
+      className="shrink-0 flex-row items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5"
+      accessibilityRole="text"
+      accessibilityLabel="GameBuddy Gold member"
+    >
+      <Icon as={Crown} size={12} tone="gold" fill={colors.gold} strokeWidth={2} />
+      <Text className="font-semibold text-[11px] leading-[15px] text-gold">Gold</Text>
+    </View>
+  );
+}
+
 function Stat({
   label,
   value,
@@ -130,7 +189,7 @@ function Stat({
           : 'flex-1 items-center gap-0.5 rounded-card bg-raised py-3 active:opacity-100'
       }
     >
-      <Text className="font-bold text-[20px] leading-[26px] text-brand">{value}</Text>
+      <Text className="font-bold text-[20px] leading-[26px] text-primary">{value}</Text>
       <Text variant="caption">{label}</Text>
     </Pressable>
   );
@@ -206,11 +265,11 @@ function Tags({
               key={item}
               className={
                 accent
-                  ? 'rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5'
+                  ? 'rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5'
                   : 'rounded-full bg-raised px-3 py-1.5'
               }
             >
-              <Text variant="caption" className={accent ? 'text-brand' : 'text-content'}>
+              <Text variant="caption" className={accent ? 'text-primary' : 'text-content'}>
                 {item}
               </Text>
             </View>

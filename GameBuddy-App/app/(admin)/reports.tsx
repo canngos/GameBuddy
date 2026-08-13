@@ -124,7 +124,7 @@ export default function ReportsScreen() {
             )}
 
             {item.authorOpenReportCount != null && item.authorOpenReportCount > 1 && (
-              <Text variant="caption" className="mt-3 text-brand">
+              <Text variant="caption" className="mt-3 text-primary">
                 {item.authorOpenReportCount} open reports against this account
               </Text>
             )}

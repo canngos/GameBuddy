@@ -40,7 +40,7 @@ export function GrowthChart({ points, height = 120 }: GrowthChartProps) {
             style={{ paddingHorizontal: 1 }}
           >
             <View
-              className="rounded-t-[2px] bg-brand"
+              className="rounded-t-[2px] bg-primary"
               style={{
                 height: Math.max(1, (point.signups / scale) * height),
                 // Quiet days stay visible but read as background rather than as data.
