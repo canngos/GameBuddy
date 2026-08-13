@@ -1,6 +1,8 @@
+import { TriangleAlert } from 'lucide-react-native';
 import { View } from 'react-native';
 import { ApiError } from '../api/envelope';
 import { Button } from './Button';
+import { Icon } from './Icon';
 import { Text } from './Text';
 
 type ErrorNoticeProps = {
@@ -31,9 +33,21 @@ export function ErrorNotice({ error, onRetry }: ErrorNoticeProps) {
       className="gap-3 rounded-card border border-danger/40 bg-danger/10 p-4"
       accessibilityRole="alert"
     >
-      <Text variant="bodyStrong" className="text-danger">
-        {message}
-      </Text>
+      {/* The glyph is decorative: `accessibilityRole="alert"` above already tells a screen
+          reader what this is, and a second announcement of "warning" before the message
+          would just be noise. */}
+      <View className="flex-row gap-3">
+        {/* Nudged down by a wrapper rather than a prop: an 18px glyph aligned to the top of
+            22px leading floats above the line it belongs to. `Icon` takes no className by
+            design — it forwards a fixed prop set to Lucide, and giving it a style passthrough
+            would reopen every question the wrapper exists to close. */}
+        <View className="mt-0.5">
+          <Icon as={TriangleAlert} size={18} tone="danger" />
+        </View>
+        <Text variant="bodyStrong" className="flex-1 text-danger">
+          {message}
+        </Text>
+      </View>
       {retryable && (
         <Button label="Try again" variant="secondary" size="md" onPress={onRetry} />
       )}

@@ -217,7 +217,7 @@ type StatProps = {
 function Stat({ label, value, emphasis }: StatProps) {
   return (
     <View className="flex-1">
-      <Text variant="title" className={emphasis && value > 0 ? 'text-brand' : undefined}>
+      <Text variant="title" className={emphasis && value > 0 ? 'text-primary' : undefined}>
         {value.toLocaleString()}
       </Text>
       <Text variant="caption">{label}</Text>

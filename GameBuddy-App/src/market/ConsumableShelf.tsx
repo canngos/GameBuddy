@@ -1,22 +1,23 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { Heart, Sparkles } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { matchApi } from '../api/match';
 import type { Consumables } from '../api/types';
-import { Text, messageOf } from '../ui';
+import { Icon, Text, feedback, messageOf, showToast } from '../ui';
 
 /** Mirrors Consumable.java and BoostPolicy. A price shown wrong is worse than not shown. */
 const ITEMS = [
   {
     code: 'SUPER_LIKE' as const,
-    icon: '💫',
+    icon: Sparkles,
     title: 'Super Like',
     detail: 'They are told straight away, and it stands out.',
     cost: 100,
   },
   {
     code: 'EXTRA_LIKES' as const,
-    icon: '❤️',
+    icon: Heart,
     title: '5 more likes today',
     detail: 'On top of your daily cap. Today only.',
     cost: 200,
@@ -41,13 +42,33 @@ export function ConsumableShelf({ balance }: { balance: number }) {
 
   const buy = useMutation({
     mutationFn: matchApi.buyConsumable,
-    onSuccess: (next: Consumables) => {
+    onSuccess: (next: Consumables, code: (typeof ITEMS)[number]['code']) => {
       // Everything that shows a balance or an allowance has just moved.
       void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       void queryClient.invalidateQueries({ queryKey: ['allowance'] });
       void queryClient.invalidateQueries({ queryKey: ['earn'] });
       void queryClient.setQueryData(['consumables'], next);
+
+      /*
+       * These are the one purchase with nothing to show for it afterwards.
+       *
+       * A frame appears on the shelf as owned and a boost turns its button into a
+       * countdown, so both leave evidence. A super like sits in an inventory nobody is
+       * looking at — the coins simply left. Without this the tap was indistinguishable from
+       * a tap that did nothing, which is why it needs saying out loud more than the others
+       * do, not less.
+       */
+      const item = ITEMS.find((candidate) => candidate.code === code);
+
+      feedback.purchase();
+      showToast({
+        id: `consumable:${code}:${Date.now()}`,
+        title: item ? `${item.title} added` : 'Added',
+        body: 'Use it from the deck.',
+        icon: item?.icon ?? Sparkles,
+        tone: 'accent',
+      });
     },
   });
 
@@ -82,8 +103,10 @@ export function ConsumableShelf({ balance }: { balance: number }) {
               affordable ? 'active:opacity-70' : 'opacity-60',
             ].join(' ')}
           >
+            {/* Both of these buy a *like*, so both take the accent — the one colour in the
+                palette that is allowed to mean that. */}
             <View className="h-10 w-10 items-center justify-center rounded-full bg-surface">
-              <Text className="text-[16px] leading-[20px]">{item.icon}</Text>
+              <Icon as={item.icon} size={18} tone="accent" />
             </View>
 
             <View className="flex-1 gap-0.5">
@@ -94,7 +117,7 @@ export function ConsumableShelf({ balance }: { balance: number }) {
             <Text
               className={[
                 'font-bold text-[15px] leading-[20px]',
-                affordable ? 'text-brand' : 'text-muted',
+                affordable ? 'text-gold' : 'text-muted',
               ].join(' ')}
             >
               {item.cost}
@@ -111,7 +134,7 @@ export function ConsumableShelf({ balance }: { balance: number }) {
         accessibilityRole="button"
         className="items-center rounded-card py-2 active:opacity-70"
       >
-        <Text variant="caption" className="text-brand">
+        <Text variant="caption" className="text-gold">
           Buying likes often? Gold removes the limit
         </Text>
       </Pressable>

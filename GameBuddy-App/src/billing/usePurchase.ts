@@ -1,7 +1,10 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { Coins, Crown } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { billingApi } from '../api/billing';
 import { cosmeticsApi } from '../api/cosmetics';
+import * as feedback from '../ui/feedback';
+import { showToast } from '../ui/toast';
 import { PurchaseCancelledError, entitlementArrived, purchase as openStoreSheet } from './purchases';
 
 /**
@@ -110,8 +113,41 @@ export function usePurchase(kind: PurchaseKind = 'subscription') {
       // exactly the second purchase we must avoid.
       return { granted: false, cancelled: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       void refresh();
+
+      /*
+       * The success moment, fired on the entitlement *arriving* rather than on the sheet
+       * closing.
+       *
+       * That distinction is the whole reason this sits here and not next to the `buy` call
+       * on the paywall. The sheet closing means the store took the money; it does not mean
+       * the account owns anything yet, because only RevenueCat's webhook grants it.
+       * Celebrating at the sheet is celebrating a payment, and if the webhook is slow the
+       * next thing the user sees is a card saying their purchase is still on its way — a
+       * congratulation followed by a wait.
+       *
+       * `onSuccess` runs for all three outcomes, including a cancel, which is why this is
+       * gated on `granted` rather than on merely having got here.
+       *
+       * **Note this path is untested.** RevenueCat is not configured for this project yet,
+       * so nothing reaches it in practice; it is wired now because it costs one branch and
+       * because the coin-spending moments it mirrors are verified. Exercise it when the
+       * store is live before trusting it.
+       */
+      if (!result.granted) return;
+
+      feedback.purchase();
+      showToast({
+        id: `entitlement:${kind}`,
+        title: kind === 'coins' ? 'Coins added' : 'Gold is yours',
+        body:
+          kind === 'coins'
+            ? 'They are in your balance now.'
+            : 'No daily limit, advanced filters, and the Gold frame.',
+        icon: kind === 'coins' ? Coins : Crown,
+        tone: 'gold',
+      });
     },
   });
 
@@ -121,6 +157,8 @@ export function usePurchase(kind: PurchaseKind = 'subscription') {
     error: buy.error,
     /** True when the sheet completed but the purchase had not arrived before the timeout. */
     awaitingEntitlement: buy.data?.granted === false && !buy.data.cancelled,
+    /** True once the entitlement is genuinely ours. Was previously computed and thrown away. */
+    granted: buy.data?.granted === true,
     reset: buy.reset,
   };
 }

@@ -2,6 +2,7 @@ import { type Ref, useState } from 'react';
 import { Pressable, TextInput, type TextInputProps, View } from 'react-native';
 import { useThemeColors } from '../theme';
 import { cn } from './cn';
+import { glow } from './glow';
 import { Text } from './Text';
 
 type TextFieldProps = TextInputProps & {
@@ -48,10 +49,14 @@ export function TextField({
       <View
         className={cn(
           'min-h-touch flex-row items-center gap-2 rounded-field border-2 bg-field px-4',
-          focused && 'border-brand bg-field-focus',
+          focused && 'border-primary bg-field-focus',
           !focused && !error && 'border-transparent',
           error && 'border-danger bg-field-focus',
         )}
+        // A lit ring on focus, which on a near-black canvas is what tells you where the
+        // keyboard is pointed. Error outranks focus: a field that is both should look
+        // wrong, not active.
+        style={glow(error ? 'soft' : focused ? 'soft' : 'none', error ? colors.danger : colors.primary)}
       >
         <TextInput
           ref={ref}
@@ -81,7 +86,7 @@ export function TextField({
             accessibilityRole="button"
             accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
           >
-            <Text variant="label" className="text-brand">
+            <Text variant="label" className="text-primary">
               {revealed ? 'Hide' : 'Show'}
             </Text>
           </Pressable>

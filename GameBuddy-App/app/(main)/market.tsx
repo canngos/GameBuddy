@@ -1,18 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { Sparkles } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import { ApiError, Code } from '../../src/api/envelope';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
+import { CoinBalance } from '../../src/market/CoinBalance';
 import { CoinShop } from '../../src/market/CoinShop';
 import { ConsumableShelf } from '../../src/market/ConsumableShelf';
 import { SeasonPassTeaser } from '../../src/market/SeasonPassTeaser';
 import { EarnCoins } from '../../src/market/EarnCoins';
 import { useThemeColors } from '../../src/theme';
-import { Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
+import {
+  Card,
+  ErrorNotice,
+  Screen,
+  Segment,
+  SegmentRow,
+  Text,
+  feedback,
+  messageOf,
+  showToast,
+} from '../../src/ui';
 
 const STORE_KEY = ['cosmetics'];
 
@@ -26,7 +38,9 @@ const STORE_KEY = ['cosmetics'];
  */
 export default function Market() {
   const colors = useThemeColors();
+  const router = useRouter();
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState<'EARN' | 'SHOP'>('EARN');
   const [kind, setKind] = useState<'FRAME' | 'BANNER'>('FRAME');
   const [failure, setFailure] = useState<string | null>(null);
   /** Set when a purchase was refused for want of coins, which has its own way out. */
@@ -42,13 +56,13 @@ export default function Market() {
   const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
 
   /**
-   * Buy, equip and unequip all answer with the whole refreshed store, so the response
-   * is written straight into the cache instead of triggering a refetch. Refetching
-   * would leave a window where the balance had dropped but the item still showed as
-   * buyable — the shelf disagreeing with itself for a frame or two.
+   * Buying answers with the whole refreshed store, so the response is written straight into
+   * the cache instead of triggering a refetch. Refetching would leave a window where the
+   * balance had dropped but the item still showed as buyable — the shelf disagreeing with
+   * itself for a frame or two.
    *
-   * The profile is invalidated rather than written, because what changed there is the
-   * worn frame and the coin count, and it is not on screen to flicker.
+   * The profile is invalidated rather than written, because what changed there is the coin
+   * count, and it is not on screen to flicker.
    */
   const applyStore = (next: CosmeticStore) => {
     setFailure(null);
@@ -82,17 +96,55 @@ export default function Market() {
     scrollRef.current?.scrollTo({ y: Math.max(0, coinShopY.current - 24), animated: true });
   };
 
-  const buy = useMutation({ mutationFn: cosmeticsApi.buy, onSuccess: applyStore, onError });
-  const equip = useMutation({ mutationFn: cosmeticsApi.equip, onSuccess: applyStore, onError });
-  const unequip = useMutation({
-    mutationFn: cosmeticsApi.unequip,
-    onSuccess: applyStore,
+  /**
+   * Buying is the only mutation left on this screen.
+   *
+   * Equip and unequip moved to the Inventory. They were never the same kind of act as a
+   * purchase — one spends coins, the other changes how you look — and having a single
+   * control in a single column do either depending on a flag meant the shelf could not be
+   * read at a glance. See `app/(main)/inventory.tsx`.
+   *
+   * react-query hands `onSuccess` the mutation's variables alongside the response, so the
+   * bought id is available to name the item — and the name is read from the *returned*
+   * store rather than from the row that was tapped, because the response is the server's
+   * account of what happened and the row is only what the client believed beforehand.
+   */
+  const buy = useMutation({
+    mutationFn: cosmeticsApi.buy,
+    onSuccess: (next: CosmeticStore, id: string) => {
+      applyStore(next);
+
+      const bought = [...next.frames, ...next.banners].find((item) => item.id === id);
+
+      feedback.purchase();
+      showToast({
+        id: `bought:${id}`,
+        title: bought ? `${bought.name} is yours` : 'Bought',
+        // Says where it went, and goes there. Buying no longer puts the thing on, so
+        // without this the purchase ends with an item the buyer cannot find.
+        body: 'Put it on from your Inventory.',
+        icon: Sparkles,
+        tone: 'gold',
+        onPress: () => router.push('/inventory'),
+      });
+    },
     onError,
   });
 
-  const busy = buy.isPending || equip.isPending || unequip.isPending;
-  const items = kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? []);
-  const wearingOne = items.some((item) => item.equipped);
+  const busy = buy.isPending;
+  const all = kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? []);
+
+  /*
+   * Membership items are not on this shelf.
+   *
+   * The Gold frame and banner are not merchandise — the server refuses to sell them at any
+   * price — so a shop was the wrong place to meet them. Every row here answers "what can I
+   * buy"; theirs answered "not this", which is a worse advert for Gold than not appearing
+   * at all, and it cost the shelf two of its slots to say so. They now live on the Gold
+   * screen, where the art is a reason to subscribe rather than a locked row. See
+   * `GoldCosmetics` in `app/(main)/gold.tsx`.
+   */
+  const items = all.filter((item) => !item.membershipOnly);
 
   return (
     <Screen scroll edges={['top']} scrollRef={scrollRef}>
@@ -102,150 +154,137 @@ export default function Market() {
           <Text variant="title">Show off</Text>
         </View>
         {/* The balance goes in the header rather than beside each price: the one
-            question a gamer has on this screen is what they can afford. */}
-        <View className="items-end">
-          <Text className="font-bold text-[22px] leading-[28px] text-brand">
-            {store.data?.coins ?? 0}
-          </Text>
-          <Text variant="caption">coins</Text>
-        </View>
+            question a gamer has on this screen is what they can afford. It counts to its
+            new value rather than jumping — see `src/market/CoinBalance.tsx`. */}
+        <CoinBalance />
       </View>
 
-      {/* Section order is the analysis's, not an accident: what the app is selling first,
-          then what it is about to sell, then the currency, then how to earn it, then what
-          it spends on, and the shelf last.
-
-          It is the opposite of what this screen used to do, which led with the cosmetics.
-          The argument for that was that somebody has no reason to buy currency before they
-          have seen something they want. The argument against — and the one that won — is
-          that a Market tab exists to sell, and burying the subscription under a shelf of
-          150-coin frames sells the cheapest thing on the screen. */}
-
+      {/*
+        Two halves, not one scroll.
+        
+        This screen was doing four jobs at once — selling coins for money, selling the
+        subscription, *giving* coins away, and selling cosmetics — stacked into seven
+        sections. The tab is called "Show off" and the cosmetics were last, below
+        everything; the streak, which is the only reason to come back tomorrow, was the
+        third of five identical rows.
+        
+        Earn and Shop are genuinely different intents, so they are genuinely different
+        views. Gold stays above both because it is the one thing that belongs to each:
+        it is bought (Shop) and it pays a monthly stipend (Earn).
+      */}
       <GoldCard />
 
-      {/* Server-switchable. Absent, not empty, when the flag is off. */}
-      {subscription.data?.seasonPassTeaser && <SeasonPassTeaser />}
-
-      <CoinShop
-        balance={store.data?.coins ?? 0}
-        onLayoutY={(y) => {
-          coinShopY.current = y;
-        }}
-      />
-
-      <EarnCoins />
-
-      <ConsumableShelf balance={store.data?.coins ?? 0} />
-
-      {/* Cosmetics last. Everything above is bought to be spent; this is what it is spent
-          on, and it is the one section that keeps working with an empty balance — the free
-          frames are here. */}
-      <View className="gap-1 pb-3">
-        <Text variant="overline">FRAMES AND BANNERS</Text>
-        <Text variant="caption">Worn on your profile, and on every card you appear in.</Text>
+      <View className="flex-row gap-2 pb-6">
+        <Segment label="Earn" active={tab === 'EARN'} onPress={() => setTab('EARN')} />
+        <Segment label="Shop" active={tab === 'SHOP'} onPress={() => setTab('SHOP')} />
       </View>
 
-      <View className="flex-row gap-2 pb-5">
-        <Segment label="Frames" active={kind === 'FRAME'} onPress={() => setKind('FRAME')} />
-        <Segment label="Banners" active={kind === 'BANNER'} onPress={() => setKind('BANNER')} />
-      </View>
+      {tab === 'EARN' && <EarnCoins />}
 
-      {store.isPending && <ActivityIndicator color={colors.brand} />}
-      {store.error && <ErrorNotice error={store.error} onRetry={() => store.refetch()} />}
-
-      {failure && (
-        <Card className="mb-3">
-          <Text variant="body" className="text-danger">
-            {failure}
-          </Text>
-        </Card>
-      )}
-
-      {shortOfCoins && (
-        <Card className="mb-3">
-          <Text variant="bodyStrong">Not enough coins</Text>
-          <Text variant="caption" className="mt-1">
-            You have {store.data?.coins ?? 0}. Badges earn coins, or you can top up.
-          </Text>
-          <Pressable
-            onPress={showCoinPacks}
-            accessibilityRole="button"
-            className="mt-3 self-start rounded-full bg-brand/15 px-4 py-2 active:opacity-70"
-          >
-            <Text variant="label" className="text-brand">
-              See coin packs
-            </Text>
-          </Pressable>
-        </Card>
-      )}
-
-      <View className="gap-3 pb-8">
-        {items.map((item) => (
-          <Row
-            key={item.id}
-            item={item}
-            busy={busy}
-            onBuy={() => buy.mutate(item.id)}
-            onEquip={() => equip.mutate(item.id)}
+      {tab === 'SHOP' && (
+        <>
+          <CoinShop
+            balance={store.data?.coins ?? 0}
+            onLayoutY={(y) => {
+              coinShopY.current = y;
+            }}
           />
-        ))}
 
-        {/* Last, not first: taking something off is the rarest thing done here, and a
-            destructive-looking control above the shelf would read as the point of the
-            screen. Shown only when there is something on. */}
-        {wearingOne && (
-          <Pressable
-            disabled={busy}
-            onPress={() => unequip.mutate(kind)}
-            accessibilityRole="button"
-            className="items-center rounded-card py-3 active:opacity-70"
-          >
-            <Text variant="label" className="text-muted">
-              Take off my {kind === 'FRAME' ? 'frame' : 'banner'}
-            </Text>
-          </Pressable>
-        )}
-      </View>
+          <ConsumableShelf balance={store.data?.coins ?? 0} />
+
+          {/* Cosmetics are what everything else is spent on, and the one section that
+              keeps working with an empty balance — the free frames are here. */}
+          <View className="gap-1 pb-3">
+            <Text variant="overline">FRAMES AND BANNERS</Text>
+            <Text variant="caption">Worn on your profile, and on every card you appear in.</Text>
+          </View>
+
+          <View className="pb-5">
+            <SegmentRow>
+              <Segment label="Frames" active={kind === 'FRAME'} onPress={() => setKind('FRAME')} />
+              <Segment label="Banners" active={kind === 'BANNER'} onPress={() => setKind('BANNER')} />
+            </SegmentRow>
+          </View>
+
+          {store.isPending && <ActivityIndicator color={colors.primary} />}
+          {store.error && <ErrorNotice error={store.error} onRetry={() => store.refetch()} />}
+
+          {failure && (
+            <Card className="mb-3">
+              <Text variant="body" className="text-danger">
+                {failure}
+              </Text>
+            </Card>
+          )}
+
+          {shortOfCoins && (
+            <Card className="mb-3">
+              <Text variant="bodyStrong">Not enough coins</Text>
+              <Text variant="caption" className="mt-1">
+                You have {store.data?.coins ?? 0}. Badges earn coins, or you can top up.
+              </Text>
+              <Pressable
+                onPress={showCoinPacks}
+                accessibilityRole="button"
+                className="mt-3 self-start rounded-full bg-primary/15 px-4 py-2 active:opacity-70"
+              >
+                <Text variant="label" className="text-primary">
+                  See coin packs
+                </Text>
+              </Pressable>
+            </Card>
+          )}
+
+          {/* Conditionally *mounted*, never conditionally classed. Swapping this between
+              `hidden` and `gap-3 pb-8` would change which class keys exist between renders,
+              which is the defect `src/ui/hairline.ts` documents. */}
+          <View className="gap-3 pb-8">
+            {items.map((item) => (
+              <Row
+                key={item.id}
+                item={item}
+                balance={store.data?.coins ?? 0}
+                busy={busy}
+                onBuy={() => buy.mutate(item.id)}
+              />
+            ))}
+
+            {/* The way to the other half of this. Wearing moved out of the shop, so the
+                shop has to say where it went — a shelf full of "Owned" with no exit is how
+                somebody concludes their purchase did nothing. */}
+            <Pressable
+              onPress={() => router.push('/inventory')}
+              accessibilityRole="button"
+              className="items-center rounded-card py-3 active:opacity-70"
+            >
+              <Text variant="label" className="text-primary">
+                Equip what you own in your Inventory
+              </Text>
+            </Pressable>
+
+            {/* Last, not second. It says "Coming soon", and a placeholder above the things
+                that actually work was the single biggest waste of space on this screen.
+                Server-switchable: absent, not empty, when the flag is off. */}
+            {subscription.data?.seasonPassTeaser && <SeasonPassTeaser />}
+          </View>
+        </>
+      )}
     </Screen>
-  );
-}
-
-function Segment({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      // Both branches carry the same class keys and only the values move. A class that
-      // appears on one state and not the other stops NativeWind painting the subtree —
-      // see `src/ui/hairline.ts`, which is the same defect twice over.
-      className={
-        active
-          ? 'flex-1 items-center rounded-full bg-brand py-2.5'
-          : 'flex-1 items-center rounded-full bg-raised py-2.5'
-      }
-    >
-      <Text variant="label" className={active ? 'text-white' : 'text-muted'}>
-        {label}
-      </Text>
-    </Pressable>
   );
 }
 
 /**
  * One item on the shelf.
  *
- * Three states, and they are the whole interaction: not owned shows a price and Buy,
- * owned shows Equip, worn shows a label rather than a button — there is nothing left to
- * do to something already on.
+ * Three states, and they are the whole interaction: Buy when it is for sale and affordable,
+ * a disabled "Not enough coins" when it is not, and a disabled "Owned" when there is nothing
+ * left to sell. Nothing here changes how anybody looks — this is a shop, and putting things
+ * on happens in the Inventory.
+ *
+ * **"Owned" is a disabled button rather than no button.** A bare label in the column every
+ * other row fills with a control reads as a rendering gap; a greyed-out button says the
+ * control exists and is spent. It is the same shape as the unaffordable state for the same
+ * reason — both mean "not this one, and not because something is broken".
  *
  * `owned` comes from the server and is not re-derived from `price`, because a free
  * cosmetic is owned by everyone without any purchase existing. Deciding that here as
@@ -254,16 +293,50 @@ function Segment({
  */
 function Row({
   item,
+  balance,
   busy,
   onBuy,
-  onEquip,
 }: {
   item: Cosmetic;
+  balance: number;
   busy: boolean;
   onBuy: () => void;
-  onEquip: () => void;
 }) {
   const isBanner = item.kind === 'BANNER';
+
+  /*
+   * Affordability only decides between Buy and "Not enough coins" — owned items never reach
+   * that question, because there is nothing to charge for.
+   *
+   * This does **not** replace the server's refusal. `COIN_NOT_ENOUGH` is still handled in
+   * `onError` above and still raises the "Not enough coins" card, because the balance here
+   * is a cached figure and the server is the only thing that actually knows: a boost bought
+   * on the deck in another tab, or a price that moved, both land between this render and
+   * the tap. Disabling the button is the courtesy; the server check is the rule.
+   */
+  const affordable = item.price <= balance;
+
+  /*
+   * No membership case here any more: those items are filtered out above and shown on the
+   * Gold screen instead, so everything reaching this row is genuinely for sale or already
+   * free. If that filter is ever loosened, this has to learn "With Gold" again — a
+   * membership item is stored at price zero and would otherwise read as "Free", which is
+   * the one thing it is not.
+   */
+  const cost = item.price === 0 ? 'Free' : `${item.price} coins`;
+
+  /*
+   * The price wears the money colour, like every other price in the Market.
+   *
+   * It was `muted` — the same grey as the "Animated" tag beside it — which made the one
+   * number a shopper is actually looking for the least legible thing in the row. Gold is
+   * already what `ConsumableShelf` uses for its costs and `EarnCoins` for its rewards, so
+   * this is the shelf catching up with the rest of the screen rather than a new idea.
+   *
+   * "Free" stays muted. Gold means coins here, and a free frame costs none — colouring it
+   * like a price would be the same mistake in the other direction.
+   */
+  const costClass = cost === 'Free' ? 'text-muted' : 'font-medium text-gold';
 
   return (
     <Card>
@@ -286,49 +359,72 @@ function Row({
           />
         </View>
 
-        <View className="flex-1 gap-0.5">
-          <Text variant="bodyStrong">{item.name}</Text>
-          <Text variant="caption">
-            {[
-              item.animated ? 'Animated' : null,
-              // A membership item is stored at price zero, so without this it reads as
-              // "Free" — which is the one thing it is not.
-              item.membershipOnly ? 'With Gold' : item.price === 0 ? 'Free' : `${item.price} coins`,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+        {/*
+          Both lines truncate rather than wrap, which they now can afford to do: this column
+          is about 105dp when the control reads "Not enough coins", and a bare price fits
+          in that on one line where "Animated · 600 coins" did not.
+
+          The "Animated" tag is gone from here on purpose — the preview to the left is
+          *playing*, so the word was captioning something already on screen, and it was
+          crowding the one thing that does need reading. It survives in the control's
+          accessibility label below, where the animation cannot be seen.
+        */}
+        <View className="min-w-0 flex-1 gap-0.5">
+          <Text variant="bodyStrong" numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text variant="caption" numberOfLines={1} className={costClass}>
+            {cost}
           </Text>
         </View>
 
-        {item.equipped ? (
-          <Text variant="label" className="text-brand">
-            Worn
-          </Text>
-        ) : item.membershipOnly && !item.owned ? (
-          // No button at all. The server refuses to sell these at any price, so a Buy
-          // control here could only ever fail — and a locked padlock would imply it is
-          // purchasable if you find the right screen. It is not; it arrives with the
-          // membership and leaves with it.
-          <Text variant="label" className="text-muted">
-            Members only
-          </Text>
-        ) : (
-          <Pressable
-            disabled={busy}
-            onPress={item.owned ? onEquip : onBuy}
-            accessibilityRole="button"
-            accessibilityLabel={`${item.owned ? 'Equip' : 'Buy'} ${item.name}`}
-            className={
-              item.owned
-                ? 'rounded-full border-2 border-brand px-4 py-2 active:opacity-70'
-                : 'rounded-full bg-brand px-4 py-2 active:opacity-70'
-            }
+        <Pressable
+          // Owned is as disabled as unaffordable, and for a better reason: there is simply
+          // nothing left to sell. The tap does nothing either way, so neither state pretends
+          // otherwise.
+          disabled={busy || item.owned || !affordable}
+          onPress={onBuy}
+          accessibilityRole="button"
+          // "animated" is carried here and nowhere else on the row. Dropping the visible
+          // tag was right — the preview is playing, so sighted people can see it — but
+          // that is exactly the argument for keeping it in the label, because it is the
+          // one difference between two frames that a screen reader could not otherwise
+          // report.
+          accessibilityLabel={
+            item.owned
+              ? `${item.name}${item.animated ? ', animated' : ''}, owned. Equip it from your Inventory.`
+              : affordable
+                ? `Buy ${item.name}${item.animated ? ', animated' : ''}, ${item.price} coins`
+                : `${item.name}${item.animated ? ', animated' : ''}, ${item.price} coins, not enough coins`
+          }
+          // Spelled out for the screen reader as well as greyed for everyone else. A
+          // control that is only *visually* disabled is announced as tappable and then
+          // does nothing, which is worse than one that was never offered.
+          accessibilityState={{ disabled: busy || item.owned || !affordable }}
+          /*
+           * One key set across all three branches, only the values moving. An earlier
+           * version swapped `bg-primary` for `border-2 border-primary`, which is the
+           * appearing-and-disappearing class-key defect `src/ui/hairline.ts` documents —
+           * it happened to survive because the two states rarely alternate in place, but
+           * it is the same bug. Every branch now carries a border and a background, and
+           * the transparent ones are declared rather than omitted, which also makes the
+           * three pills exactly the same height.
+           */
+          className={[
+            'shrink-0 rounded-full border-2 px-4 py-2 active:opacity-70',
+            item.owned || !affordable
+              ? 'border-line bg-transparent'
+              : 'border-transparent bg-primary',
+          ].join(' ')}
+        >
+          <Text
+            variant="label"
+            numberOfLines={1}
+            className={item.owned || !affordable ? 'text-muted' : 'text-white'}
           >
-            <Text variant="label" className={item.owned ? 'text-brand' : 'text-white'}>
-              {item.owned ? 'Equip' : 'Buy'}
-            </Text>
-          </Pressable>
-        )}
+            {item.owned ? 'Owned' : affordable ? 'Buy' : 'Not enough coins'}
+          </Text>
+        </Pressable>
       </View>
     </Card>
   );
@@ -365,7 +461,7 @@ function GoldCard() {
       <Card>
         <View className="flex-row items-center justify-between gap-4">
           <View className="flex-1 gap-1">
-            <Text variant="overline" className="text-brand">
+            <Text variant="overline" className="text-gold">
               GAMEBUDDY GOLD
             </Text>
             <Text variant="heading">{isGold ? 'You are a member' : 'See who likes you'}</Text>

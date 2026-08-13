@@ -33,7 +33,7 @@ export default function BlockedUsers() {
         </Text>
       </View>
 
-      {blocked.isPending && <ActivityIndicator color={colors.brand} />}
+      {blocked.isPending && <ActivityIndicator color={colors.primary} />}
       {blocked.error && <ErrorNotice error={blocked.error} onRetry={() => blocked.refetch()} />}
 
       {!blocked.isPending && people.length === 0 && (

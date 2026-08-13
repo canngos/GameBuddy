@@ -1,0 +1,135 @@
+# The nightly retrain, as a Kubernetes CronJob.
+#
+# The compose stack runs the same job as a long-lived container with `--schedule`, because
+# the image has no cron daemon and adding one means running something as root in a
+# container that deliberately does not. Here the scheduler already exists, so the job runs
+# once and exits and `--schedule` is left off.
+#
+# WHAT THIS ASSUMES, AND WHAT IS NOT HERE YET
+# -------------------------------------------
+# There is no Deployment for the model service in this repository — `k8s/` currently holds
+# only the ingress and the network policies, and its README points at
+# `GameBuddy-*/deploy-to-minikube.yml` files that do not exist. So this manifest is
+# correct but not yet sufficient. Before it can run, the model Deployment must:
+#
+#   1. mount `model-artifacts` at `/app/artifacts` (the same claim below), and
+#   2. use `ReadWriteMany` if the Deployment has more than one replica, because the job
+#      and every serving pod need the volume at once. `ReadWriteOnce` is fine for a single
+#      replica and is what most default storage classes give you; on a managed cluster
+#      ReadWriteMany usually means switching to a file-backed class (EFS, Azure Files,
+#      Filestore). If ReadWriteMany is not available, the alternative is to stop sharing a
+#      volume: have the job push the artefact to object storage and have each pod pull it
+#      on reload.
+#
+# A single replica sharing ReadWriteOnce is the simplest thing that works, and given the
+# measured throughput — ~580 requests/second from one container against a 20,000-gamer
+# artefact — one replica is not the constraint. Two replicas would be for availability,
+# not for load, and that is the change that forces the storage decision.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-artifacts
+  labels:
+    app.kubernetes.io/name: gamebuddy-model
+spec:
+  accessModes:
+    # ReadWriteOnce assumes a single model replica. See the note above before scaling up.
+    - ReadWriteOnce
+  resources:
+    requests:
+      # The artefact is ~1.1 KB per gamer: 10 MB at twenty thousand, 100 MB at two hundred
+      # thousand. The rest is headroom for the seven previous artefacts the job keeps for
+      # rollback, plus room to grow without a resize.
+      storage: 2Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: gamebuddy-model-retrain
+  labels:
+    app.kubernetes.io/name: gamebuddy-model
+    app.kubernetes.io/component: retrain
+spec:
+  # Midnight, in the users' timezone rather than the cluster's. `timeZone` needs Kubernetes
+  # 1.27+; without it this is UTC, and for a Turkey-weighted population "midnight" would
+  # quietly become 03:00 local — which collides with the backend's own 03:30 impression
+  # purge and would train against a log that is being deleted underneath it.
+  schedule: "0 0 * * *"
+  timeZone: "Europe/Istanbul"
+
+  # Never run two at once. They would race on the same artefact file, and the second would
+  # train on an export taken while the first was still writing.
+  concurrencyPolicy: Forbid
+
+  # If the cluster was down at midnight, skip the run rather than firing late into the
+  # morning. A stale model for one day is not worth a retrain landing at 09:00 under load.
+  startingDeadlineSeconds: 3600
+
+  successfulJobsHistoryLimit: 3
+  # Kept deeper than the successes: a failed run is the one you want the logs for, and the
+  # job is designed to fail safe rather than loudly, so nothing else records why.
+  failedJobsHistoryLimit: 7
+
+  jobTemplate:
+    spec:
+      # No retries. Every failure mode this job has is one that will still be true five
+      # minutes later — a broken export, a database that is down, a population that
+      # collapsed — and the old artefact keeps serving throughout, so there is nothing to
+      # rescue by trying again. Tomorrow's run is the retry.
+      backoffLimit: 0
+      # An hour is generous: a 200,000-gamer retrain measured 15s of training on top of the
+      # export. This is here to stop a wedged job holding `concurrencyPolicy: Forbid`
+      # against tomorrow's run, not because the work is slow.
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+          containers:
+            - name: retrain
+              # Built from GameBuddy-Model/Dockerfile with `--target retrain`: the same
+              # code and the same pinned scikit-learn as the serving image, plus psycopg.
+              # Training with a different scikit-learn than the one that will unpickle the
+              # result is the version skew the artefact's build stamp exists to catch.
+              image: gamebuddy-model-retrain:latest
+              imagePullPolicy: IfNotPresent
+              args:
+                - --artifacts=/app/artifacts
+                - --model-url=http://gamebuddy-model:8000
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: gamebuddy-secrets
+                      key: database-url
+                - name: INTERNAL_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: gamebuddy-secrets
+                      key: internal-api-key
+              volumeMounts:
+                - name: artifacts
+                  mountPath: /app/artifacts
+              resources:
+                requests:
+                  cpu: "500m"
+                  memory: "1Gi"
+                limits:
+                  # Training holds the feature matrix, the reduced matrix and the
+                  # candidate artefact at once. Measured at ~220 MB of model for 200,000
+                  # gamers, several times that in transient training memory; 4Gi is
+                  # comfortable to a few hundred thousand and is the number to revisit
+                  # first if the job starts being OOMKilled.
+                  memory: "4Gi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: false  # writes CSVs to a temp dir
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: artifacts
+              persistentVolumeClaim:
+                claimName: model-artifacts

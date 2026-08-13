@@ -250,8 +250,8 @@ function Section({
 
 function GoldPill() {
   return (
-    <View className="rounded-full bg-brand/15 px-3 py-1">
-      <Text className="font-semibold text-[12px] leading-[16px] text-brand">GOLD</Text>
+    <View className="rounded-full bg-gold/15 px-3 py-1">
+      <Text className="font-semibold text-[12px] leading-[16px] text-gold">GOLD</Text>
     </View>
   );
 }
@@ -275,16 +275,26 @@ function GameChip({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ selected, disabled }}
+      // `max-w-full` caps the chip at the row's width. Without it a long game name — "Atelier
+      // Ryza 3: Alchemist of the End & the Secret Key" is the one that exposed this — makes a
+      // chip wider than the sheet, and `flex-wrap` overflows it off the right edge rather
+      // than wrapping, because a single item cannot be wrapped against itself.
       className={[
-        'flex-row items-center gap-2 rounded-full border px-3 py-2',
-        selected ? 'border-brand bg-brand/10' : 'border-line bg-raised',
+        'max-w-full flex-row items-center gap-2 rounded-full border px-3 py-2',
+        selected ? 'border-primary bg-primary/10' : 'border-line bg-raised',
         disabled ? 'opacity-50' : '',
       ].join(' ')}>
       {icon ? <Image source={{ uri: icon }} className="h-5 w-5 rounded" /> : null}
       <Text
+        numberOfLines={1}
         className={[
-          'font-medium text-[14px] leading-[18px]',
-          selected ? 'text-brand' : 'text-ink',
+          'shrink font-medium text-[14px] leading-[18px]',
+          // `text-content`, not `text-ink`. There is no bare `ink` colour — the palette
+          // defines `ink-500/700/900` and nothing else — so `text-ink` compiled to nothing,
+          // NativeWind dropped it, and the label fell through to the platform's default
+          // black. On a light chip that passes for deliberate; on `raised` in dark mode it is
+          // black on near-black, which is how this shipped unreadable in one theme only.
+          selected ? 'text-primary' : 'text-content',
         ].join(' ')}>
         {label}
       </Text>
@@ -317,14 +327,16 @@ function Toggle({
       accessibilityState={{ checked: value, disabled }}
       className={[
         'flex-row items-center justify-between gap-4 rounded-card border p-4',
-        value ? 'border-brand bg-brand/10' : 'border-line bg-raised',
+        value ? 'border-primary bg-primary/10' : 'border-line bg-raised',
         disabled ? 'opacity-50' : '',
       ].join(' ')}>
-      <Text className="flex-1 font-medium text-[15px] leading-[20px] text-ink">{label}</Text>
+      {/* `text-content` for the same reason as the chip above — `text-ink` was not a real
+          class and left this label rendering in the platform's default black. */}
+      <Text className="flex-1 font-medium text-[15px] leading-[20px] text-content">{label}</Text>
       <View
         className={[
           'h-6 w-10 justify-center rounded-full px-0.5',
-          value ? 'bg-brand' : 'bg-line',
+          value ? 'bg-primary' : 'bg-line',
         ].join(' ')}>
         <View className={['h-5 w-5 rounded-full bg-surface', value ? 'self-end' : ''].join(' ')} />
       </View>

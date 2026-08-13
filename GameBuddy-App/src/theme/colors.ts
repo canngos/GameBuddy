@@ -1,62 +1,65 @@
 import { useColorScheme } from 'nativewind';
+import { brand as brandTokens, semantic } from './tokens';
 
 /**
  * The brand palette, from the original Android app's `colors.xml`. Names match so the
  * two can be compared without translation.
  */
-export const brand = {
-  DEFAULT: '#FF4D67',
-  soft: '#E98090',
-  deep: '#D93E56',
-} as const;
+export const brand = brandTokens;
 
 /**
- * JS-side copies of the semantic tokens declared in `global.css`.
+ * JS-side view of the semantic tokens.
  *
  * Styling goes through `className`. This exists for the handful of React Native props
  * that take a colour *value* and cannot be reached by a class at all —
  * `placeholderTextColor`, `ActivityIndicator`'s `color`, the status-bar style,
- * `Stack`'s `contentStyle`. Those must match the CSS or the seams show, so any change
- * here belongs in `global.css` too.
+ * `Stack`'s `contentStyle`.
+ *
+ * These used to be a hand-maintained second copy of the values in `global.css`, with a
+ * comment asking whoever changed one to remember the other. Both are now derived from
+ * `tokens.js`, so there is nothing left to remember.
+ *
+ * The one translation still done here is the key name: CSS wants `--field-focus`, JS
+ * callers want `colors.fieldFocus`.
  */
 type Palette = {
   canvas: string;
   surface: string;
   raised: string;
+  elevated: string;
   line: string;
   content: string;
   muted: string;
   field: string;
   fieldFocus: string;
+  primary: string;
+  accent: string;
+  gold: string;
+  online: string;
   danger: string;
   success: string;
 };
 
-const light: Palette = {
-  canvas: '#FFFFFF',
-  surface: '#FFFFFF',
-  raised: '#F6F7F9',
-  line: '#E4E5EA',
-  content: '#23252F',
-  muted: '#6E7180',
-  field: '#F0F1F4',
-  fieldFocus: '#FFF1F3',
-  danger: '#D93025',
-  success: '#1E8E3E',
-};
+const paletteFor = (scheme: 'light' | 'dark'): Palette => ({
+  canvas: semantic.canvas[scheme],
+  surface: semantic.surface[scheme],
+  raised: semantic.raised[scheme],
+  elevated: semantic.elevated[scheme],
+  line: semantic.line[scheme],
+  content: semantic.content[scheme],
+  muted: semantic.muted[scheme],
+  field: semantic.field[scheme],
+  fieldFocus: semantic['field-focus'][scheme],
+  primary: semantic.primary[scheme],
+  accent: semantic.accent[scheme],
+  gold: semantic.gold[scheme],
+  online: semantic.online[scheme],
+  danger: semantic.danger[scheme],
+  success: semantic.success[scheme],
+});
 
-const dark: Palette = {
-  canvas: '#131419',
-  surface: '#1A1B22',
-  raised: '#23252F',
-  line: '#323440',
-  content: '#F0F1F5',
-  muted: '#9699A8',
-  field: '#23252F',
-  fieldFocus: '#30262C',
-  danger: '#FF6B61',
-  success: '#4CC470',
-};
+const light = paletteFor('light');
+const dark = paletteFor('dark');
 
 export type ThemeColors = Palette & { brand: string; onBrand: string };
 

@@ -16,7 +16,22 @@ const twMerge = extendTailwindMerge({
     // and without them it treats `rounded-card` and `rounded-field` as unrelated to
     // each other, leaving both in place.
     classGroups: {
-      'font-family': [{ font: ['sans', 'medium', 'semibold', 'bold'] }],
+      // All six must be in one group: they are mutually exclusive families, so a caller
+      // passing `font-display-bold` has to displace the variant's `font-semibold`
+      // rather than sit alongside it and lose the specificity race.
+      'font-family': [
+        {
+          font: [
+            'sans',
+            'medium',
+            'semibold',
+            'bold',
+            'display',
+            'display-semibold',
+            'display-bold',
+          ],
+        },
+      ],
       rounded: [{ rounded: ['card', 'field'] }],
     },
   },

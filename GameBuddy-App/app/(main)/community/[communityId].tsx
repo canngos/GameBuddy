@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { EllipsisVertical } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, View } from 'react-native';
 import { communityApi, PAGE_SIZE } from '../../../src/api/community';
@@ -8,7 +9,7 @@ import { PostCard } from '../../../src/community/PostCard';
 import { usePostLike } from '../../../src/community/usePostLike';
 import { useSession } from '../../../src/session/store';
 import { useThemeColors } from '../../../src/theme';
-import { Avatar, BackHeader, Button, Card, ErrorNotice, Screen, Text } from '../../../src/ui';
+import { Avatar, BackHeader, Button, Card, ErrorNotice, Icon, Screen, Text } from '../../../src/ui';
 
 /**
  * One community: what it is, who runs it, and everything posted in it.
@@ -112,11 +113,7 @@ export default function CommunityPage() {
               hitSlop={10}
               className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
             >
-              <View className="gap-1">
-                {[0, 1, 2].map((i) => (
-                  <View key={i} className="h-1 w-1 rounded-full bg-content" />
-                ))}
-              </View>
+              <Icon as={EllipsisVertical} size={20} tone="content" />
             </Pressable>
           }
         />
@@ -198,7 +195,7 @@ export default function CommunityPage() {
               }
             />
 
-            {posts.isPending && <ActivityIndicator color={colors.brand} />}
+            {posts.isPending && <ActivityIndicator color={colors.primary} />}
             {posts.error && <ErrorNotice error={posts.error} onRetry={() => posts.refetch()} />}
           </View>
         }
@@ -213,7 +210,7 @@ export default function CommunityPage() {
         ListFooterComponent={
           posts.isFetchingNextPage ? (
             <View className="pt-4">
-              <ActivityIndicator color={colors.brand} />
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : null
         }

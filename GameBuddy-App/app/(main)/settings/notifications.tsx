@@ -11,7 +11,15 @@ import {
 import { registerDeviceToken } from '../../../src/notifications/usePushRegistration';
 import { useFocusEffect } from 'expo-router';
 import { useThemeColors } from '../../../src/theme';
-import { BackHeader, Button, Card, ErrorNotice, Screen, Text } from '../../../src/ui';
+import {
+  BackHeader,
+  Button,
+  Card,
+  ErrorNotice,
+  Screen,
+  Text,
+  useSoundEnabled,
+} from '../../../src/ui';
 
 const KEY = ['notificationPreferences'];
 
@@ -78,7 +86,7 @@ export default function NotificationSettings() {
     <Screen scroll edges={['top']}>
       <BackHeader title="Notifications" />
 
-      {prefs.isPending && <ActivityIndicator color={colors.brand} />}
+      {prefs.isPending && <ActivityIndicator color={colors.primary} />}
       {prefs.error && <ErrorNotice error={prefs.error} onRetry={() => prefs.refetch()} />}
       {save.error && <ErrorNotice error={save.error} />}
 
@@ -160,7 +168,48 @@ export default function NotificationSettings() {
           </Text>
         </View>
       )}
+
+      <SoundSetting />
     </Screen>
+  );
+}
+
+/**
+ * The sound switch, in its own group below the four above.
+ *
+ * **Separated on purpose, because it is a different kind of setting.** The four above are
+ * account preferences: they live on the server, travel with the account, and decide what the
+ * backend *sends*. This one is stored on the device and decides what this phone *plays* —
+ * someone with a work phone and a personal one will reasonably want it on for one and off
+ * for the other, which an account-level flag cannot express. Putting it in the same card
+ * would imply it behaves like its neighbours.
+ *
+ * It is also not a fifth field on `NotificationPreferences`: that endpoint sends all four
+ * values on every write rather than a delta, so adding to it is a backend change, and this
+ * needs none.
+ */
+function SoundSetting() {
+  const enabled = useSoundEnabled((s) => s.enabled);
+  const setEnabled = useSoundEnabled((s) => s.setEnabled);
+
+  return (
+    <View className="gap-3 pb-8">
+      <Text variant="overline">ON THIS PHONE</Text>
+
+      <Card className="gap-1">
+        <Row
+          title="Sounds"
+          body="A short cue when something happens in the app — a match, a purchase, a message."
+          value={enabled}
+          onToggle={() => setEnabled(!enabled)}
+        />
+      </Card>
+
+      <Text variant="caption">
+        Cues never play over the silent switch, and they never interrupt music you are already
+        listening to.
+      </Text>
+    </View>
   );
 }
 
@@ -187,7 +236,7 @@ function Row({
         value={value}
         onValueChange={onToggle}
         accessibilityLabel={title}
-        trackColor={{ true: colors.brand, false: colors.line }}
+        trackColor={{ true: colors.primary, false: colors.line }}
         thumbColor={colors.surface}
       />
     </View>

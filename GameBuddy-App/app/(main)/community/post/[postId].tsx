@@ -133,7 +133,7 @@ export default function PostScreen() {
         <BackHeader title={post.data?.communityName ?? 'Post'} />
       </View>
 
-      {post.isPending && <ActivityIndicator color={colors.brand} />}
+      {post.isPending && <ActivityIndicator color={colors.primary} />}
       {post.error && (
         <View className="px-6">
           <ErrorNotice error={post.error} onRetry={() => post.refetch()} />
@@ -214,7 +214,7 @@ export default function PostScreen() {
                 {post.data.commentCount === 1 ? '1 COMMENT' : `${post.data.commentCount} COMMENTS`}
               </Text>
 
-              {comments.isPending && <ActivityIndicator color={colors.brand} />}
+              {comments.isPending && <ActivityIndicator color={colors.primary} />}
               {comments.error && (
                 <ErrorNotice error={comments.error} onRetry={() => comments.refetch()} />
               )}
@@ -312,7 +312,7 @@ function CommentRow({
             hitSlop={10}
             className="active:opacity-60"
           >
-            <Text variant="caption" className={cn(comment.isLiked && 'text-brand')}>
+            <Text variant="caption" className={cn(comment.isLiked && 'text-accent')}>
               {comment.isLiked ? 'Liked' : 'Like'}
               {comment.likeCount > 0 ? ` · ${comment.likeCount}` : ''}
             </Text>

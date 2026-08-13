@@ -85,11 +85,11 @@ export default function Register() {
             <Text variant="body">
               I confirm I am <Text variant="bodyStrong">18 years of age or older</Text> and I
               accept the{' '}
-              <Text variant="bodyStrong" className="text-brand" onPress={openTerms}>
+              <Text variant="bodyStrong" className="text-primary" onPress={openTerms}>
                 Terms of Service
               </Text>{' '}
               and{' '}
-              <Text variant="bodyStrong" className="text-brand" onPress={openPrivacy}>
+              <Text variant="bodyStrong" className="text-primary" onPress={openPrivacy}>
                 Privacy Policy
               </Text>
               .

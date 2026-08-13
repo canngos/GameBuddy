@@ -64,7 +64,7 @@ export default function CommunityMembers() {
     <Screen edges={['top']}>
       <BackHeader title="Members" subtitle={name || undefined} />
 
-      {members.isPending && <ActivityIndicator color={colors.brand} />}
+      {members.isPending && <ActivityIndicator color={colors.primary} />}
       {members.error && <ErrorNotice error={members.error} onRetry={() => members.refetch()} />}
       {!!transfer.error && (
         <View className="pb-3">

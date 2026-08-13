@@ -146,7 +146,7 @@ export default function Messages() {
         <Text variant="title">Your conversations</Text>
       </View>
 
-      {loading && <ActivityIndicator color={colors.brand} />}
+      {loading && <ActivityIndicator color={colors.primary} />}
       {inbox.error && <ErrorNotice error={inbox.error} onRetry={() => inbox.refetch()} />}
 
       <View className="gap-4 pb-4">
@@ -205,7 +205,7 @@ function Section({
         </Text>
 
         {unread > 0 && (
-          <View className="min-w-[20px] items-center rounded-full bg-brand px-1.5">
+          <View className="min-w-[20px] items-center rounded-full bg-primary px-1.5">
             <Text variant="caption" className="text-white">
               {unread}
             </Text>
@@ -270,7 +270,7 @@ function ConversationRow({ row }: { row: Row }) {
         </View>
 
         {row.unreadCount > 0 && (
-          <View className="min-w-[24px] items-center rounded-full bg-brand px-2 py-1">
+          <View className="min-w-[24px] items-center rounded-full bg-primary px-2 py-1">
             <Text variant="caption" className="text-white">
               {row.unreadCount}
             </Text>

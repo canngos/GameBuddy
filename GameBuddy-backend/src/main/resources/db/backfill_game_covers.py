@@ -400,8 +400,21 @@ def main() -> int:
             # IGDB's title replaces the seeded one. The catalogue was typed by hand and
             # carries its own spellings — "REPO" for R.E.P.O., "Civilization VII" without
             # the "Sid Meier's" — while IGDB is a maintained database of what these games
-            # are actually called. The id never changes, so nothing that references a game
-            # is affected: not the join tables, not a trained model, not anyone's profile.
+            # are actually called.
+            #
+            # The id never changes, so the join tables and everyone's profile are fine.
+            # **The trained model is not**, and this comment used to claim otherwise.
+            # The recommender is keyed on game *names*, not ids: `features.py` builds its
+            # vocabulary from the strings, and the backend's cold-start path sends
+            # `Games::getGameName` — this value — to `/predict/cold-start`. Rename a game
+            # here without retraining and the model silently stops recognising it, because
+            # `transform` drops unknown vocabulary rather than raising. Running this once
+            # renamed 17 of 100 titles and cost every affected game its entire contribution
+            # to cold-start ranking, with nothing anywhere reporting a problem.
+            #
+            # So: after applying this, update `gamebuddy_model/catalogue.py` to match and
+            # retrain. `tests/test_pipeline.py::test_catalogue_names_match_the_database_seed`
+            # fails if the two drift apart again.
             with connection.cursor() as cursor:
                 cursor.execute(
                     """

@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
+import { Icon } from './Icon';
 import { Text } from './Text';
 
 type BackHeaderProps = {
@@ -29,7 +31,9 @@ export function BackHeader({ title, subtitle, right }: BackHeaderProps) {
         hitSlop={12}
         className="h-10 w-10 items-center justify-center active:opacity-60"
       >
-        <View className="h-2.5 w-2.5 rotate-45 border-b-2 border-l-2 border-content" />
+        {/* Was a rotated two-border View — the mirror of the trick in `LinkRow`. Both
+            were replaced together so the two chevrons cannot drift apart. */}
+        <Icon as={ChevronLeft} size={24} tone="content" />
       </Pressable>
 
       <View className="flex-1">

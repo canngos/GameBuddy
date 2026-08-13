@@ -60,7 +60,7 @@ export default function BrowseCommunities() {
         autoCapitalize="none"
       />
 
-      {communities.isPending && <ActivityIndicator color={colors.brand} className="mt-6" />}
+      {communities.isPending && <ActivityIndicator color={colors.primary} className="mt-6" />}
       {communities.error && (
         <View className="pt-4">
           <ErrorNotice error={communities.error} onRetry={() => communities.refetch()} />

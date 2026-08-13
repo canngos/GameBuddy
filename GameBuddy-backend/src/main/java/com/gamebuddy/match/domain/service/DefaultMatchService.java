@@ -935,12 +935,15 @@ public class DefaultMatchService implements MatchService {
                 gamer.getLikedgames().stream().map(Games::getGameName).toList();
         List<String> keywords =
                 gamer.getKeywords().stream().map(Keywords::getKeywordName).toList();
+        // Enum names, matching PLATFORM_IDS in the model's catalogue.
+        List<String> platforms =
+                gamer.getPlatforms().stream().map(Enum::name).toList();
         if (games.isEmpty() && keywords.isEmpty()) {
             return List.of();
         }
         return predictClient
-                .predictColdStart(
-                        new ColdStartRequest(gamer.getUserId(), games, keywords, exclude, RECOMMENDATION_FETCH_SIZE))
+                .predictColdStart(new ColdStartRequest(
+                        gamer.getUserId(), games, keywords, platforms, exclude, RECOMMENDATION_FETCH_SIZE))
                 .similarUsers();
     }
 

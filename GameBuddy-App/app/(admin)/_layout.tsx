@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform, type ColorValue } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RouteGuard } from '../../src/session/RouteGuard';
 import { useThemeColors } from '../../src/theme';
@@ -33,7 +33,7 @@ export default function AdminLayout() {
         backBehavior="history"
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.brand,
+          tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.muted,
           sceneStyle: { backgroundColor: colors.canvas },
           tabBarStyle: {
@@ -65,6 +65,6 @@ export default function AdminLayout() {
 function tab(title: string, icon: TabIconName) {
   return {
     title,
-    tabBarIcon: ({ color }: { color: ColorValue }) => <TabIcon name={icon} color={color} />,
+    tabBarIcon: ({ focused }: { focused: boolean }) => <TabIcon name={icon} focused={focused} />,
   };
 }

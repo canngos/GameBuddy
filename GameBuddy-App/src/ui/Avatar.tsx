@@ -1,7 +1,8 @@
 import { Image, View } from 'react-native';
-import { avatarColor, avatarUri, initialsOf } from '../avatars';
-import { brand } from '../theme';
+import { avatarColor, avatarGradient, avatarUri, initialsOf } from '../avatars';
+import { useThemeColors } from '../theme';
 import { cn } from './cn';
+import { GradientView } from './Gradient';
 import { Text } from './Text';
 
 type AvatarProps = {
@@ -33,7 +34,9 @@ export function Avatar({
   selected = false,
   className,
 }: AvatarProps) {
+  const colors = useThemeColors();
   const uri = avatarUri(source);
+  const seed = colorSeed ?? name ?? source ?? '?';
   // Size is a runtime number, so it stays inline — an arbitrary Tailwind value cannot
   // be built from a variable, since the class list is extracted at build time.
   const frame = { width: size, height: size, borderRadius: size / 2 };
@@ -55,11 +58,25 @@ export function Avatar({
         frame,
         {
           borderWidth: selected ? 3 : 0,
-          borderColor: selected ? brand.DEFAULT : 'transparent',
-          backgroundColor: avatarColor(colorSeed ?? name ?? source ?? '?'),
+          borderColor: selected ? colors.primary : 'transparent',
+          backgroundColor: avatarColor(seed),
         },
       ]}
     >
+      {/*
+        The gradient sits on top of that backgroundColor rather than replacing it, and both
+        are unconditional. It renders before the image so the image paints over it, which is
+        also why it is a sibling and not a wrapper — a slow-loading avatar shows its own
+        colour rather than a grey box, and a broken URL degrades to the monogram's backdrop
+        instead of to nothing.
+      */}
+      <GradientView
+        colors={avatarGradient(seed)}
+        direction="diagonal"
+        className="absolute inset-0"
+        pointerEvents="none"
+      />
+
       {uri ? (
         <Image source={{ uri }} style={frame} resizeMode="cover" />
       ) : (

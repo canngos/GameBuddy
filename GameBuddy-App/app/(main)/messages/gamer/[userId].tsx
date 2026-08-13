@@ -129,7 +129,7 @@ export default function GamerProfile() {
       >
         <BackHeader title={gamer.data?.username ?? username ?? 'Profile'} />
 
-        {gamer.isPending && <ActivityIndicator color={colors.brand} />}
+        {gamer.isPending && <ActivityIndicator color={colors.primary} />}
         {gamer.error && <ErrorNotice error={gamer.error} onRetry={() => gamer.refetch()} />}
 
         {gamer.data && (
@@ -269,11 +269,11 @@ function Tags({
               key={item}
               className={
                 accent
-                  ? 'rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5'
+                  ? 'rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5'
                   : 'rounded-full bg-raised px-3 py-1.5'
               }
             >
-              <Text variant="caption" className={accent ? 'text-brand' : 'text-content'}>
+              <Text variant="caption" className={accent ? 'text-primary' : 'text-content'}>
                 {item}
               </Text>
             </View>

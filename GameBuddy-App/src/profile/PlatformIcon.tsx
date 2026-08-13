@@ -22,10 +22,13 @@ type PlatformIconProps = {
  * D-pad, a handheld with detachable side rails, a phone. Nobody needs a logo to know which
  * row is the Switch when it is the only one shaped like a Switch.
  *
- * 24x24 viewBox, 2px strokes, round caps — the proportions {@link KeywordIcon} and
- * {@link TabIcon} already use, so all three sets look drawn by the same hand. Monochrome,
- * so one asset serves both the selected and unselected states by taking the colour it is
- * given.
+ * 24x24 viewBox, 2px strokes, round caps — Lucide's spec, which is also what
+ * {@link KeywordIcon} is drawn to, so the bought set and the two hand-drawn ones look like
+ * one. Monochrome, so one asset serves both the selected and unselected states by taking
+ * the colour it is given.
+ *
+ * Not replaceable by Lucide: it has a `Gamepad2`, but not a Switch, a DualSense and an
+ * Xbox pad as five distinguishable silhouettes, which is the entire job here.
  */
 export function PlatformIcon({ platform, color, size = 24 }: PlatformIconProps) {
   const stroke = {

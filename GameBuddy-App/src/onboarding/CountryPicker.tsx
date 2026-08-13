@@ -83,7 +83,7 @@ export function CountryPicker({ value, onChange, error }: CountryPickerProps) {
               >
                 <Text variant={item === value ? 'bodyStrong' : 'body'}>{item}</Text>
                 {item === value && (
-                  <View className="h-2.5 w-2.5 rounded-full bg-brand" />
+                  <View className="h-2.5 w-2.5 rounded-full bg-primary" />
                 )}
               </Pressable>
             )}

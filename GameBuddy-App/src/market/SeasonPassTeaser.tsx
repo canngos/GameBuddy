@@ -1,5 +1,6 @@
+import { CalendarClock } from 'lucide-react-native';
 import { View } from 'react-native';
-import { Text } from '../ui';
+import { Icon, Text } from '../ui';
 
 /**
  * The Season Pass slot, before there is a Season Pass.
@@ -42,7 +43,7 @@ export function SeasonPassTeaser() {
             purpose: this card should read as furniture with a future, not as the
             brightest thing on the screen. */}
         <View className="h-12 w-12 items-center justify-center rounded-full bg-surface">
-          <Text className="text-[20px] leading-[24px]">🗓️</Text>
+          <Icon as={CalendarClock} size={20} tone="muted" />
         </View>
       </View>
     </View>

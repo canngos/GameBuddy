@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
+import { Gamepad2, MessagesSquare, ShieldCheck } from 'lucide-react-native';
 import { View } from 'react-native';
-import { Button, Screen, Text } from '../../src/ui';
+import { Button, Icon, Screen, Text } from '../../src/ui';
 
 /**
  * Three claims, each tied to something the product actually does — the recommender,
@@ -8,9 +9,9 @@ import { Button, Screen, Text } from '../../src/ui';
  * writing a cheque the app has to cash on the next screen.
  */
 const PITCH = [
-  { emoji: '🎮', title: 'Matched on taste', body: 'Ranked by what you play, not who is nearby.' },
-  { emoji: '🛡️', title: 'Age-separated', body: 'Under-18 and over-18 are never shown to each other.' },
-  { emoji: '💬', title: 'Chat after a match', body: 'Both of you have to say yes first.' },
+  { icon: Gamepad2, title: 'Matched on taste', body: 'Ranked by what you play, not who is nearby.' },
+  { icon: ShieldCheck, title: 'Age-separated', body: 'Under-18 and over-18 are never shown to each other.' },
+  { icon: MessagesSquare, title: 'Chat after a match', body: 'Both of you have to say yes first.' },
 ];
 
 export default function Welcome() {
@@ -20,7 +21,10 @@ export default function Welcome() {
     <Screen scroll>
       <View className="flex-1 justify-center gap-10 py-12">
         <View className="gap-3">
-          {/* Two weights on one line: the brand reads as a mark rather than a heading. */}
+          {/* Two weights on one line: the brand reads as a mark rather than a heading.
+              This keeps `brand` — the wordmark is the one use of the pink that is identity
+              rather than a role, so it survives the demotion described in
+              `src/theme/gradients.ts`. Everything else on this screen moved to `primary`. */}
           <Text variant="display" className="text-content">
             Find your
           </Text>
@@ -41,8 +45,8 @@ export default function Welcome() {
               key={item.title}
               className="flex-row items-center gap-4 rounded-card bg-raised p-4"
             >
-              <View className="h-11 w-11 items-center justify-center rounded-full bg-brand/10">
-                <Text className="text-[20px] leading-[24px]">{item.emoji}</Text>
+              <View className="h-11 w-11 items-center justify-center rounded-full bg-primary/10">
+                <Icon as={item.icon} size={20} tone="primary" />
               </View>
               <View className="flex-1 gap-0.5">
                 <Text variant="bodyStrong">{item.title}</Text>

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { Pressable, View } from 'react-native';
 import type { Post } from '../api/types';
-import { brand, useThemeColors } from '../theme';
+import { useThemeColors } from '../theme';
 import { shortAgo } from '../time';
 import { Avatar, Card, cn, Text } from '../ui';
 
@@ -11,9 +11,9 @@ import { Avatar, Card, cn, Text } from '../ui';
  * Both keys are always present and only the values move. A class that appears and
  * disappears on tap is what blanked the avatar picker; see `src/ui/Avatar.tsx`.
  */
-function fill(liked: boolean, outline: string) {
+function fill(liked: boolean, accent: string, outline: string) {
   return {
-    backgroundColor: liked ? brand.DEFAULT : 'transparent',
+    backgroundColor: liked ? accent : 'transparent',
     borderWidth: liked ? 0 : 2,
     borderColor: liked ? 'transparent' : outline,
   };
@@ -110,17 +110,17 @@ function LikeButton({
           blanked the avatar picker — see src/ui/Avatar.tsx. This is the other tap target
           in the app shaped the same way. */}
       <View className="h-4 w-4 items-center justify-center">
-        <View className="h-2.5 w-2.5 rotate-45" style={fill(liked, colors.muted)} />
+        <View className="h-2.5 w-2.5 rotate-45" style={fill(liked, colors.accent, colors.muted)} />
         <View
           className="absolute left-0 top-0.5 h-2 w-2 rounded-full"
-          style={fill(liked, colors.muted)}
+          style={fill(liked, colors.accent, colors.muted)}
         />
         <View
           className="absolute right-0 top-0.5 h-2 w-2 rounded-full"
-          style={fill(liked, colors.muted)}
+          style={fill(liked, colors.accent, colors.muted)}
         />
       </View>
-      <Text variant="caption" style={{ color: liked ? brand.DEFAULT : colors.muted }}>
+      <Text variant="caption" style={{ color: liked ? colors.accent : colors.muted }}>
         {count}
       </Text>
     </Pressable>

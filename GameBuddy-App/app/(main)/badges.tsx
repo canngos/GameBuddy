@@ -129,7 +129,7 @@ export default function Badges() {
         }
       />
 
-      {board.isPending && <ActivityIndicator color={colors.brand} />}
+      {board.isPending && <ActivityIndicator color={colors.primary} />}
       {board.error && <ErrorNotice error={board.error} onRetry={() => board.refetch()} />}
 
       {failure && (
@@ -197,7 +197,7 @@ function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
       {badge.earned ? (
         <Text
           variant="caption"
-          className={badge.collected ? 'text-center text-muted' : 'text-center text-brand'}
+          className={badge.collected ? 'text-center text-muted' : 'text-center text-gold'}
         >
           {badge.collected ? 'Earned' : `+${badge.reward}`}
         </Text>
@@ -207,7 +207,7 @@ function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
         </Text>
       )}
 
-      {badge.showcased && <View className="mt-1 h-1 w-6 rounded-full bg-brand" />}
+      {badge.showcased && <View className="mt-1 h-1 w-6 rounded-full bg-primary" />}
     </Pressable>
   );
 }
@@ -263,7 +263,7 @@ function Detail({
             </Text>
 
             {badge.earned ? (
-              <Text variant="label" className="text-brand">
+              <Text variant="label" className="text-primary">
                 Earned
               </Text>
             ) : (
@@ -303,7 +303,7 @@ function Progress({ value, target }: { value: number; target: number }) {
   return (
     <View className="w-full items-center gap-1.5 pt-1">
       <View className="h-2 w-full overflow-hidden rounded-full bg-raised">
-        <View className="h-full rounded-full bg-brand" style={{ width: `${percent}%` }} />
+        <View className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
       </View>
       <Text variant="caption">
         {value} of {target}

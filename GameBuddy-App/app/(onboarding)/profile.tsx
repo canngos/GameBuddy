@@ -84,7 +84,7 @@ export default function Profile() {
                   accessibilityState={{ selected }}
                   className={cn(
                     'rounded-full border-2 px-4 py-2.5 active:opacity-80',
-                    selected ? 'border-brand bg-brand' : 'border-line bg-raised',
+                    selected ? 'border-primary bg-primary' : 'border-line bg-raised',
                   )}
                 >
                   <Text
