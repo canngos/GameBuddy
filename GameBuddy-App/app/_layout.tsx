@@ -5,13 +5,15 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { identifyForCrashReports } from '../src/diagnostics/crashReporting';
 import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
+import { AnimatedSplash } from '../src/ui/AnimatedSplash';
 import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
@@ -44,6 +46,9 @@ export { AppErrorBoundary as ErrorBoundary };
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
+  // Whether the animated draw-on splash has finished. It plays once per cold start, on
+  // top of the already-mounted shell, continuing where the static native splash stops.
+  const [introDone, setIntroDone] = useState(false);
   const status = useSession((s) => s.status);
   const restore = useSession((s) => s.restore);
   const schemeHydrated = useScheme((s) => s.hydrated);
@@ -84,7 +89,14 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
-  return <Shell />;
+  // The shell mounts underneath the overlay, so by the time the animation lifts the app
+  // is already rendered and interactive — the splash never makes anyone wait for it.
+  return (
+    <View style={{ flex: 1 }}>
+      <Shell />
+      {!introDone && <AnimatedSplash onDone={() => setIntroDone(true)} />}
+    </View>
+  );
 }
 
 /**
