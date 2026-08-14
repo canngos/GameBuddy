@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { identifyForCrashReports } from '../src/diagnostics/crashReporting';
 import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
 import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
@@ -48,6 +49,16 @@ export default function RootLayout() {
   const schemeHydrated = useScheme((s) => s.hydrated);
   const loadScheme = useScheme((s) => s.load);
   const loadSound = useSoundEnabled((s) => s.load);
+  const userId = useSession((s) => s.userId);
+
+  // Ties crash reports to an account. Native crash capture is already running by the time
+  // any of this executes — it is installed by the Crashlytics NDK handler at process start,
+  // which is the whole reason it can see a segfault that no JavaScript handler can. This
+  // only adds the identity, so a report has something to correlate on: one intermittent
+  // crash is noise, whereas "always the same accounts" or "always a first launch" is a lead.
+  useEffect(() => {
+    if (userId) identifyForCrashReports(userId);
+  }, [userId]);
 
   useEffect(() => {
     void restore();

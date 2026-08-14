@@ -322,7 +322,7 @@ CREATE TABLE gamebuddy.gamer (
     subscription_tier character varying(16) NOT NULL,
     country character varying(255),
     email character varying(255) NOT NULL,
-    fcm_token character varying(255),
+    fcm_token character varying(512),
     gender character varying(255),
     pwd character varying(255),
     role character varying(255) NOT NULL,
@@ -368,6 +368,13 @@ CREATE TABLE gamebuddy.gamer (
     CONSTRAINT gamer_role_check CHECK (((role)::text = ANY (ARRAY[('USER'::character varying)::text, ('ADMIN'::character varying)::text]))),
     CONSTRAINT gamer_subscription_tier_check CHECK (((subscription_tier)::text = ANY (ARRAY[('BASIC'::character varying)::text, ('GOLD'::character varying)::text])))
 );
+
+
+--
+-- Name: COLUMN gamer.subscription_tier; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.subscription_tier IS 'NOT the effective tier. A tier counts only while subscription_expires_at is in the future; this column is not cleared when that passes, so it reads GOLD for lapsed subscribers. Always filter on subscription_expires_at as well — see SubscriptionTier.effective().';
 
 
 --

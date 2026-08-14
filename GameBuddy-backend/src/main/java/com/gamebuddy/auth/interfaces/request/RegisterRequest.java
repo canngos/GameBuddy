@@ -13,6 +13,7 @@ public class RegisterRequest {
 
     @Email(message = "Email is not valid")
     @NotBlank(message = "Email field cannot be empty")
+    @Size(max = 255, message = "Email is not valid")
     private String email;
 
     // Length is checked here for a fast 400; PasswordPolicy applies the full rules.
@@ -33,6 +34,7 @@ public class RegisterRequest {
      * still validates; a device is registered after sign-in, through
      * {@code PUT /auth/fcm-token}.
      */
+    @Size(max = 512, message = "Token is too long")
     private String fcmToken;
 
     /**

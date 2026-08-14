@@ -8,6 +8,8 @@
   "dependencies": {
     "@expo-google-fonts/chakra-petch": "^0.4.1",
     "@expo-google-fonts/poppins": "^0.4.1",
+    "@react-native-firebase/app": "^26.2.0",
+    "@react-native-firebase/crashlytics": "^26.2.0",
     "@stomp/stompjs": "^7.3.0",
     "@tanstack/react-query": "^5.101.4",
     "babel-preset-expo": "~57.0.0",
@@ -61,7 +63,18 @@
     "web": "expo start --web",
     "start:go": "expo start --go",
     "check:contrast": "node scripts/check-contrast.js",
-    "check": "tsc --noEmit && node scripts/check-contrast.js"
+    "check": "tsc --noEmit && node scripts/check-contrast.js",
+    "eas-build-pre-install": "node scripts/eas-enable-crashlytics.js"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "autolinking": {
+      "android": {
+        "exclude": [
+          "@react-native-firebase/app",
+          "@react-native-firebase/crashlytics"
+        ]
+      }
+    }
+  }
 }

@@ -140,9 +140,13 @@ services:
       # correct behaviour, and useless noise while the answer is known.
       #
       # Flip to false once real users can carry the feed, then delete the seed with
-      #   DELETE FROM gamebuddy.gamer WHERE email LIKE '%@bot.gamebuddy.invalid';
+      #   psql ... -f db/delete-seed.sql
       # and let the next run rebuild the artefact from people alone. Do the two together:
       # deleting the seed while this is still true simply trains on whoever is left.
+      #
+      # A script rather than the one-line DELETE that used to be documented here — that
+      # statement fails on the first foreign key, and the seed owns communities that a
+      # blind cascade would take real users' posts with. See the script's own header.
       RETRAIN_INCLUDE_BOTS: ${RETRAIN_INCLUDE_BOTS:-true}
     volumes:
       # The same volume the model serves from. The job writes the artefact; the service
@@ -243,7 +247,7 @@ services:
       # Prints verification codes to `docker compose logs backend` instead of sending them.
       # Without this, registration rolls its transaction back when SMTP is unreachable and
       # no account can be created at all.
-      MAIL_MODE: smtp
+      MAIL_MODE: log
 
       # The shared secret RevenueCat sends in the Authorization header of its webhook, and
       # the only thing that can grant a paid entitlement now that receipt verification is

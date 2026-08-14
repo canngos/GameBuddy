@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
@@ -403,7 +404,8 @@ class DefaultMatchServiceTest {
             when(predictClient.predict(any(PredictRequest.class)))
                     .thenReturn(new PredictResponse(gamer.getUserId(), ids));
             when(gamerRepository.findAllById(anyIterable())).thenReturn(ranked);
-            when(gamerRepository.findRandomPairable(anyBoolean(), any(String[].class), anyInt()))
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
                     .thenReturn(List.of(explored));
 
             List<String> page =
@@ -435,14 +437,16 @@ class DefaultMatchServiceTest {
             when(predictClient.predict(any(PredictRequest.class)))
                     .thenReturn(new PredictResponse(gamer.getUserId(), ids));
             when(gamerRepository.findAllById(anyIterable())).thenReturn(ranked);
-            when(gamerRepository.findRandomPairable(anyBoolean(), any(String[].class), anyInt()))
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
                     .thenReturn(List.of());
 
             matchService.getRecommendations(gamer);
 
             ArgumentCaptor<Boolean> minor = ArgumentCaptor.forClass(Boolean.class);
             ArgumentCaptor<String[]> excluded = ArgumentCaptor.forClass(String[].class);
-            verify(gamerRepository).findRandomPairable(minor.capture(), excluded.capture(), anyInt());
+            verify(gamerRepository)
+                    .findRandomPairable(minor.capture(), excluded.capture(), any(), any(), any(), any(), anyInt());
 
             assertTrue(minor.getValue(), "a minor must only ever be shown other minors");
             List<String> skip = List.of(excluded.getValue());
@@ -472,7 +476,8 @@ class DefaultMatchServiceTest {
                     .thenReturn(new PredictResponse(gamer.getUserId(), ids));
             when(gamerRepository.findAllById(anyIterable())).thenReturn(ranked);
             // The SQL cannot see the block join table, so an unfiltered row comes back.
-            when(gamerRepository.findRandomPairable(anyBoolean(), any(String[].class), anyInt()))
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
                     .thenReturn(List.of(blocked));
 
             List<String> page =
@@ -502,7 +507,8 @@ class DefaultMatchServiceTest {
             when(predictClient.predict(any(PredictRequest.class)))
                     .thenReturn(new PredictResponse(gamer.getUserId(), ids));
             when(gamerRepository.findAllById(anyIterable())).thenReturn(ranked);
-            when(gamerRepository.findRandomPairable(anyBoolean(), any(String[].class), anyInt()))
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
                     .thenReturn(List.of(explored));
 
             matchService.getRecommendations(gamer);
@@ -582,6 +588,184 @@ class DefaultMatchServiceTest {
             // The old code called remove() on the managed set, which deletes the row
             // from gamer_games_join.
             assertEquals(2, game.getGamers().size(), "the entity collection must not be modified");
+        }
+    }
+
+    /**
+     * The Gold filters, and how they reach the model.
+     *
+     * <p>Every test here exists because of one production defect: the backend used to send
+     * the model everybody the filter ruled <em>out</em>, which in a 20,001-gamer database
+     * was past the model's ten-thousand cap. The model refused the request, the backend
+     * reported it as {@code RECOMMENDER_SERVICE_ERROR}, and three of the four filters
+     * answered 503 to the only people who had paid to use them.
+     */
+    @Nested
+    class AdvancedFilters {
+
+        private Gamer subscriber;
+
+        @BeforeEach
+        void goldSubscriber() {
+            subscriber = gamer;
+            subscriber.setSubscriptionTier(SubscriptionTier.GOLD);
+            subscriber.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+        }
+
+        /** Stubs the model to echo back whatever it is allowed to rank. */
+        private void modelRanks(List<String> ids, List<Gamer> rows) {
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenReturn(new PredictResponse(subscriber.getUserId(), ids));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(rows);
+        }
+
+        private PredictRequest captureRequest() {
+            ArgumentCaptor<PredictRequest> captor = ArgumentCaptor.forClass(PredictRequest.class);
+            verify(predictClient).predict(captor.capture());
+            return captor.getValue();
+        }
+
+        @Test
+        @DisplayName("a narrowed feed sends the eligible set, not its complement")
+        void testGetRecommendations_sendsAnIncludeList() {
+            Gamer eligible = newGamer("fi@example.com", "fi");
+            eligible.setCountry("FI");
+            when(gamerRepository.findIdsMatchingFilters(isNull(), eq("FI"), isNull(), isNull()))
+                    .thenReturn(List.of(eligible.getUserId()));
+            modelRanks(List.of(eligible.getUserId()), List.of(eligible));
+
+            matchService.getRecommendations(subscriber, new FeedFilters(null, "FI", null, null));
+
+            PredictRequest sent = captureRequest();
+            assertEquals(List.of(eligible.getUserId()), sent.include());
+            assertFalse(
+                    sent.exclude().contains(eligible.getUserId()),
+                    "the filter must not reach the model as an exclusion — that is the shape that broke");
+        }
+
+        @Test
+        @DisplayName("an unfiltered feed sends no include list at all")
+        void testGetRecommendations_unfilteredSendsNoInclude() {
+            modelRanks(List.of(candidate.getUserId()), List.of(candidate));
+
+            matchService.getRecommendations(subscriber);
+
+            assertNull(captureRequest().include(), "null is 'rank over everybody'");
+            verify(gamerRepository, never()).findIdsMatchingFilters(any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("a filter that matches nobody produces an empty deck, not an unfiltered one")
+        void testGetRecommendations_emptyEligibleSetIsNotUnfiltered() {
+            when(gamerRepository.findIdsMatchingFilters(any(), any(), any(), any()))
+                    .thenReturn(List.of());
+
+            RecommendationResponse response =
+                    matchService.getRecommendations(subscriber, new FeedFilters(null, "AQ", null, null));
+
+            // Empty and null are opposite answers. Treating empty as "not filtering" would
+            // rank over the whole population and show somebody who asked for people in
+            // Antarctica a page of people who are not — the filter apparently ignored.
+            assertTrue(response.getBody().getData().getRecommendedGamers().isEmpty());
+            // And nobody is asked, because the answer is already known. An empty result from
+            // the model normally means "never met this gamer" and triggers the cold-start
+            // fallback; here it would mean something else with the same shape, so both round
+            // trips would be spent learning nothing.
+            verify(predictClient, never()).predict(any());
+            verify(predictClient, never()).predictColdStart(any());
+        }
+
+        @Test
+        @DisplayName("an eligible set past the model's cap falls back to ranking unfiltered")
+        void testGetRecommendations_overTheCapDegradesRatherThanFailing() {
+            List<String> everybody = new ArrayList<>();
+            for (int i = 0; i < 50_001; i++) {
+                everybody.add("g" + i);
+            }
+            when(gamerRepository.findIdsMatchingFilters(any(), any(), any(), any()))
+                    .thenReturn(everybody);
+
+            Gamer onPlatform = newGamer("pc@example.com", "pc");
+            onPlatform.getPlatforms().add(Platform.PC);
+            Gamer elsewhere = newGamer("ps@example.com", "ps");
+            elsewhere.getPlatforms().add(Platform.PLAYSTATION);
+            modelRanks(List.of(onPlatform.getUserId(), elsewhere.getUserId()), List.of(onPlatform, elsewhere));
+
+            RecommendationResponse response =
+                    matchService.getRecommendations(subscriber, new FeedFilters(null, null, null, Platform.PC));
+
+            // No 503, and no include list — a set this size means the filter excluded almost
+            // nobody, so the ranking is very nearly the filtered one already.
+            assertNull(captureRequest().include());
+            // And the answer is still narrowed, by the in-memory check.
+            List<String> page = response.getBody().getData().getRecommendedGamers().stream()
+                    .map(GamerDto::getUserId)
+                    .toList();
+            assertEquals(List.of(onPlatform.getUserId()), page);
+        }
+
+        @Test
+        @DisplayName("exploration draws from the filtered pool rather than filtering afterwards")
+        void testGetRecommendations_explorationIsFilteredInTheQuery() {
+            List<String> ids = new ArrayList<>();
+            List<Gamer> ranked = new ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                Gamer g = newGamer("r" + i + "@example.com", "r" + i);
+                g.setCountry("FI");
+                ranked.add(g);
+                ids.add(g.getUserId());
+            }
+            when(gamerRepository.findIdsMatchingFilters(any(), any(), any(), any()))
+                    .thenReturn(ids);
+            modelRanks(ids, ranked);
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of());
+
+            matchService.getRecommendations(subscriber, new FeedFilters(null, "FI", null, null));
+
+            // Without this the exploration slots would be drawn from the whole population and
+            // then discarded by `filtered`, so a narrow filter would silently lose them —
+            // the same failure one layer down.
+            ArgumentCaptor<String> country = ArgumentCaptor.forClass(String.class);
+            verify(gamerRepository)
+                    .findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), country.capture(), any(), any(), anyInt());
+            assertEquals("FI", country.getValue());
+        }
+
+        @Test
+        @DisplayName("the cold-start path carries the filter too")
+        void testGetRecommendations_coldStartSendsTheIncludeList() {
+            givenTasteFor(subscriber, "VALORANT", "competitive");
+            subscriber.setRecommenderProfileChangedAt(NOW);
+
+            Gamer eligible = newGamer("fi@example.com", "fi");
+            when(gamerRepository.findIdsMatchingFilters(any(), any(), any(), any()))
+                    .thenReturn(List.of(eligible.getUserId()));
+            when(predictClient.predictColdStart(any(ColdStartRequest.class)))
+                    .thenReturn(new PredictResponse(subscriber.getUserId(), List.of(eligible.getUserId())));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(List.of(eligible));
+
+            matchService.getRecommendations(subscriber, new FeedFilters(null, "FI", null, null));
+
+            // A subscriber who signed up since the last retrain is served here, and their
+            // filters have to work on day one rather than after the next nightly run.
+            ArgumentCaptor<ColdStartRequest> captor = ArgumentCaptor.forClass(ColdStartRequest.class);
+            verify(predictClient).predictColdStart(captor.capture());
+            assertEquals(List.of(eligible.getUserId()), captor.getValue().include());
+        }
+
+        @Test
+        @DisplayName("a non-subscriber is refused before any of this work is done")
+        void testGetRecommendations_filtersStillNeedGold() {
+            subscriber.setSubscriptionTier(SubscriptionTier.BASIC);
+            subscriber.setSubscriptionExpiresAt(null);
+
+            assertThrows(
+                    BusinessException.class,
+                    () -> matchService.getRecommendations(subscriber, new FeedFilters(null, "FI", null, null)));
+            verify(gamerRepository, never()).findIdsMatchingFilters(any(), any(), any(), any());
         }
     }
 

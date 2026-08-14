@@ -165,6 +165,14 @@ public class PurchaseService {
      *
      * <p>For expiry: the paid period simply ran out. The row stays {@code GRANTED} because
      * it was — the gamer had every day they paid for.
+     *
+     * <p>The tier column is cleared alongside the expiry. Nothing in the application needs
+     * it — every reader goes through {@link SubscriptionTier#effective} — but a stored
+     * {@code GOLD} on somebody who is not a member reads as true to anyone querying the
+     * table directly, and support tools and ad-hoc counts are written against exactly that
+     * column. This only covers the paths that pass through here; a subscription whose expiry
+     * quietly passes with no webhook is never revisited, which is why the column also
+     * carries a comment saying it is not the source of truth.
      */
     @Transactional
     public void expire(String userId) {
@@ -172,6 +180,7 @@ public class PurchaseService {
             if (gamer.getSubscriptionExpiresAt() != null
                     && gamer.getSubscriptionExpiresAt().isAfter(clock.instant())) {
                 gamer.setSubscriptionExpiresAt(clock.instant());
+                gamer.setSubscriptionTier(SubscriptionTier.BASIC);
                 gamers.save(gamer);
                 log.info("Subscription for {} expired", userId);
             }

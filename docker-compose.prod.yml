@@ -1,0 +1,267 @@
+# GameBuddy in production, on a 2 vCPU / 4 GB box (Hetzner CX23).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Read the differences from the development stack as a list of decisions, because that is
+# what they are:
+#
+#   1. Nothing but Caddy is published to the internet. Postgres, Redis and the model are
+#      reachable only over the compose network — in development they are published so you
+#      can psql and redis-cli into them, and on a public IP that same line is an open
+#      database.
+#   2. Elasticsearch, Kibana and Filebeat are not started. Measured, they cost 2.9 GB
+#      against 1.8 GB for the whole application; they do not fit in 4 GB. See
+#      QA_PERFORMANCE.md, and the "reading the logs" section of DEPLOY.md for what to do
+#      instead.
+#   3. Caddy terminates TLS. Android blocks cleartext HTTP by default, so this is not
+#      optional for the app to work at all.
+#   4. Every container has a memory limit and a bounded log file. Both exist so that one
+#      misbehaving component cannot take the box down by exhausting RAM or the 40 GB disk.
+#
+# Set the real values in .env first — see DEPLOY.md. This file assumes DOMAIN and
+# ACME_EMAIL are set.
+
+services:
+  # --- the reverse proxy, and the only thing the internet can reach --------------------
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and ACME account keys. Losing this volume means re-issuing
+      # certificates on every restart, and Let's Encrypt rate-limits that to five per week
+      # per domain — which is enough to lock yourself out of your own API for days.
+      - caddy-data:/data
+      - caddy-config:/config
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 128m
+    logging: &logging
+      driver: json-file
+      options:
+        # Docker's default json-file driver is unbounded. On a 40 GB disk a chatty
+        # container will eventually fill it, and a full disk stops Postgres writing —
+        # which is a database outage caused by logging.
+        max-size: "10m"
+        max-file: "3"
+
+  postgres:
+    restart: unless-stopped
+    # No `ports`. The development stack publishes 5432 so you can psql in; on a public IP
+    # that is an internet-reachable database. The backend reaches it as `postgres:5432`
+    # over the compose network, which needs no publishing at all.
+    #
+    # To get a psql prompt on the server:
+    #   docker compose exec postgres psql -U gamebuddy -d gamebuddy
+    # From your laptop, tunnel it rather than opening it:
+    #   ssh -L 5432:localhost:5432 user@server   # with the line below uncommented
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    ports: !reset []
+    volumes:
+      # Only the baseline, and only on an empty volume. The local seed catalogue is not
+      # mounted: `seed-local.sql` is development fixture data.
+      #
+      # Migrations are applied deliberately, before the new version starts — the backend
+      # runs ddl-auto=validate and will refuse to boot against a schema it disagrees with,
+      # which is the behaviour you want.
+      - postgres-data:/var/lib/postgresql/data
+      - ./GameBuddy-backend/src/main/resources/db/schema-baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
+    # 4 GB total, and Postgres was measured at 66% of all CPU under load — it is the
+    # component that most rewards memory. 1 GB limit, with shared_buffers at a quarter of
+    # that and the rest left to the OS page cache, which is where Postgres does its real
+    # caching.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=768MB
+      - -c
+      - work_mem=8MB
+      - -c
+      - max_connections=50
+      # Logs any statement over a second. With Elasticsearch gone this is the cheapest
+      # slow-query signal you have, and it costs nothing until something is slow.
+      - -c
+      - log_min_duration_statement=1000
+    # Measured at 470 MB peak under load, with shared_buffers at 256 MB above.
+    mem_limit: 768m
+    logging: *logging
+
+  redis:
+    restart: unless-stopped
+    ports: !reset []
+    # A password even though it is not published. Defence in depth: the day somebody adds
+    # a `ports:` line back, or a container on the same network is compromised, this is the
+    # difference between an incident and a nuisance.
+    command:
+      ["redis-server", "--save", "", "--appendonly", "no",
+       "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    # Measured at 14 MB. Nothing is persisted and everything in it describes sockets that
+    # are open right now, so it has no working set to speak of.
+    mem_limit: 128m
+    logging: *logging
+
+  model:
+    restart: unless-stopped
+    ports: !reset []
+    environment:
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env}
+      NSFW_REJECT_THRESHOLD: ${NSFW_REJECT_THRESHOLD:-0.85}
+      NSFW_APPROVE_THRESHOLD: ${NSFW_APPROVE_THRESHOLD:-0.20}
+      # ON in production. The seeded accounts are fixtures; serving them to real users is
+      # the thing this flag exists to prevent. Flip it only once real users can fill a
+      # deck — the model still ranks with everything it learned from the seed.
+      HIDE_SEED_ACCOUNTS: ${HIDE_SEED_ACCOUNTS:-true}
+    # Measured at 380 MB once the NSFW classifier loads its weights, 138 MB before. The
+    # limit has to cover the loaded state or the first avatar upload OOM-kills the service.
+    mem_limit: 700m
+    logging: *logging
+
+  model-retrain:
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-gamebuddy}:${DB_PASSWORD:?set DB_PASSWORD in .env}@postgres:5432/${DB_NAME:-gamebuddy}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      PREDICT_SERVICE_URL: http://model:8000
+      # False once the seed is deleted and real users can carry the feed. Until then the
+      # seeded population IS the candidate pool and training without it finds nothing.
+      # Flip this and delete the seed together — see DEPLOY.md.
+      RETRAIN_INCLUDE_BOTS: ${RETRAIN_INCLUDE_BOTS:-true}
+    # NOT MEASURED — the one limit here that is a considered guess rather than a
+    # measurement, because the retrain was out of scope for the load tests. It trains on
+    # the whole population, so it is the memory spike of the day, and at 00:00 it has to
+    # fit alongside a backend that is already holding ~1.2 GB.
+    #
+    # Watch the first night: `docker stats gamebuddy-model-retrain-1` around midnight, or
+    # check afterwards for an OOM kill with
+    #   docker inspect gamebuddy-model-retrain-1 --format '{{.State.OOMKilled}}'
+    # A kill here is not an outage — the job keeps the previous artefact serving — but it
+    # means the model silently stops learning about new users, which nothing else reports.
+    mem_limit: 640m
+    logging: *logging
+
+  backend:
+    restart: unless-stopped
+    # Not published. Caddy reaches it as `backend:8080` over the compose network and is
+    # the only thing that can. Publishing 8080 here would let anyone bypass TLS by asking
+    # for the IP directly.
+    ports: !reset []
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-gamebuddy}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-gamebuddy}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      DB_SCHEMA: gamebuddy
+      DDL_AUTO: validate
+
+      # Postgres is capped at 50 connections and this is the only client. 20 is the
+      # development default and was never the bottleneck under load — active connections
+      # peaked at 16 of 20 with nothing blocked.
+      DB_POOL_MAX: ${DB_POOL_MAX:-20}
+
+      PREDICT_SERVICE_URL: http://model:8000
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+
+      # Object storage. Uploads must NOT go to the local disk here: the box has 40 GB, the
+      # images are user-supplied, and losing the volume loses every avatar.
+      R2_ENDPOINT: ${R2_ENDPOINT:?set R2_ENDPOINT in .env}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:?set R2_ACCESS_KEY_ID in .env}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:?set R2_SECRET_ACCESS_KEY in .env}
+      R2_UPLOADS_BUCKET: ${R2_UPLOADS_BUCKET:-gamebuddy-uploads}
+      R2_MEDIA_BUCKET: ${R2_MEDIA_BUCKET:-gamebuddy-media}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:?set R2_PUBLIC_URL in .env}
+
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env}
+
+      # Real mail. MAIL_MODE is deliberately NOT set — the default is smtp, and the only
+      # value that changes it is the exact word "log", which would let anyone reading the
+      # logs verify any address they liked.
+      MAIL_HOST: ${MAIL_HOST:?set MAIL_HOST in .env}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      SMTP_EMAIL: ${SMTP_EMAIL:?set SMTP_EMAIL in .env}
+      SMTP_EMAIL_PWD: ${SMTP_EMAIL_PWD:?set SMTP_EMAIL_PWD in .env}
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM in .env}
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+
+      FIREBASE_ENABLED: ${FIREBASE_ENABLED:-true}
+      FIREBASE_CONFIG_PATH: /run/secrets/firebase-service-account.json
+
+      REVENUECAT_WEBHOOK_TOKEN: ${REVENUECAT_WEBHOOK_TOKEN:?set REVENUECAT_WEBHOOK_TOKEN in .env}
+      SEASON_PASS_TEASER: ${SEASON_PASS_TEASER:-true}
+
+      # Empty, deliberately. Mobile clients are not subject to CORS, so nothing legitimate
+      # needs this in production — and the development value allows any page on localhost,
+      # including one an attacker asks a victim to open.
+      CORS_ALLOWED_ORIGINS: ""
+      WS_ALLOWED_ORIGINS: "https://${DOMAIN}"
+
+      # The API surface is not documentation for the public.
+      SPRINGDOC_API_DOCS_ENABLED: "false"
+      SPRINGDOC_SWAGGER_UI_ENABLED: "false"
+
+      # WARN, not INFO. The access log is one line per request and by far the loudest
+      # logger; at this volume it is the difference between a readable log file and a
+      # rotation every few hours. Failed requests are still recorded — which is what you
+      # actually need when a user reports a bug. Raise it to INFO temporarily when you
+      # need the full picture; see DEPLOY.md.
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ACCESS_LOG_LEVEL: ${ACCESS_LOG_LEVEL:-WARN}
+
+      LOG_FILE: /app/logs/gamebuddy.json
+      ENVIRONMENT: production
+      SERVICE_VERSION: ${SERVICE_VERSION:-1.0.0}
+
+      # Rotation, so the log cannot fill the disk. 200 MB total is roughly a week at this
+      # traffic with the access log at WARN.
+      LOG_MAX_FILE_SIZE: ${LOG_MAX_FILE_SIZE:-20MB}
+      LOG_MAX_HISTORY: ${LOG_MAX_HISTORY:-10}
+      LOG_TOTAL_SIZE_CAP: ${LOG_TOTAL_SIZE_CAP:-200MB}
+
+      # A container gets UTC, and "midnight" then silently becomes mid-evening for your
+      # users. Set this to where your users are, not where the server is.
+      TZ: ${TZ:-Europe/Helsinki}
+    volumes:
+      - ${FIREBASE_SERVICE_ACCOUNT:?set FIREBASE_SERVICE_ACCOUNT in .env}:/run/secrets/firebase-service-account.json:ro
+      # Named, and kept: this is where you read from when somebody reports a bug.
+      - backend-logs:/app/logs
+    # 1.18 GB measured under load — though the JVM grows its heap to fill whatever it is
+    # given, so that figure was itself a function of the 4 GB limit it ran under.
+    # MaxRAMPercentage=75 of 1280m gives ~960 MB of heap, which is comfortably more than
+    # the working set needed at 208 req/s, plus room for metaspace and thread stacks.
+    mem_limit: 1280m
+    logging: *logging
+
+  # Not started. Kept declared so `docker compose config` still resolves and the reason is
+  # visible here rather than remembered. To run the log stack you need a bigger box:
+  #   docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile logs up -d
+  elasticsearch:
+    profiles: ["logs"]
+  kibana:
+    profiles: ["logs"]
+  filebeat:
+    profiles: ["logs"]
+  kibana-setup:
+    profiles: ["logs"]
+
+volumes:
+  caddy-data:
+  caddy-config:

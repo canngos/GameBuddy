@@ -15,6 +15,7 @@ public class ChangePwdRequest {
      * the strength of the bearer token alone, so a leaked token was a permanent takeover.
      */
     @NotBlank(message = "Current password cannot be empty")
+    @Size(max = PasswordPolicy.MAX_LENGTH, message = "Current password is not valid")
     private String currentPassword;
 
     @NotBlank(message = "New password cannot be empty")

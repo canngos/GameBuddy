@@ -1,0 +1,31 @@
+{
+  "plan": "warmup",
+  "dau": 72000,
+  "durationSeconds": 30,
+  "offered": {
+    "sessionsPerSecond": 3,
+    "requestsPerSecond": 39,
+    "concurrent": 1080
+  },
+  "achieved": {
+    "requests": 1165,
+    "requestsPerSecond": 38.59653521946001,
+    "iterations": 91,
+    "droppedIterations": 0,
+    "failedRate": 0
+  },
+  "latencyMs": {
+    "avg": 19.99378742918454,
+    "med": 11.507572,
+    "p95": 83.62293360000001,
+    "p99": 121.93918559999997,
+    "max": 507.209681
+  },
+  "feedLatencyMs": {
+    "avg": 96.72402823076924,
+    "med": 84.67054,
+    "p95": 132.651404,
+    "p99": 307.96252939999874,
+    "max": 507.209681
+  }
+}

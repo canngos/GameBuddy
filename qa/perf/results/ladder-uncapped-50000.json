@@ -1,0 +1,31 @@
+{
+  "plan": "uncapped",
+  "dau": 50000,
+  "durationSeconds": 60,
+  "offered": {
+    "sessionsPerSecond": 2.0833333333333335,
+    "requestsPerSecond": 27.083333333333336,
+    "concurrent": 750
+  },
+  "achieved": {
+    "requests": 1650,
+    "requestsPerSecond": 27.443146066767866,
+    "iterations": 126,
+    "droppedIterations": 0,
+    "failedRate": 0
+  },
+  "latencyMs": {
+    "avg": 10.668376098787869,
+    "med": 5.326824,
+    "p95": 71.5238158,
+    "p99": 82.50861916,
+    "max": 93.721723
+  },
+  "feedLatencyMs": {
+    "avg": 75.08204226984128,
+    "med": 73.5264655,
+    "p95": 86.82949375000001,
+    "p99": 93.01287024999999,
+    "max": 93.721723
+  }
+}
