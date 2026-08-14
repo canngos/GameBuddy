@@ -234,9 +234,11 @@ public class DefaultAuthService implements AuthService {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
         }
 
+        // An unknown address returns exactly what a wrong code does (below), so verify cannot
+        // be used to tell a registered email from an unregistered one.
         Gamer gamer = gamerRepository
                 .findByEmail(email)
-                .orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
 
         VerificationCode verification = verificationCodeRepository
                 .findByEmailAndCodeAndIsValidTrue(email, code)
@@ -298,10 +300,13 @@ public class DefaultAuthService implements AuthService {
         if (!rateLimiters.sendCode().tryAcquire(email)) {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
         }
-        gamerRepository.findByEmail(email).orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
-
-        issueAndSendCode(email, Boolean.TRUE.equals(sendCodeRequest.getIsRegister()));
-        return DefaultMessageResponse.of("Verification code sent successfully");
+        // Uniform response whether or not the address has an account, so this endpoint
+        // cannot be used to enumerate registered emails or to mail-bomb a known one: a real
+        // account is sent a code, an unknown address gets the same reply and nothing is sent.
+        gamerRepository
+                .findByEmail(email)
+                .ifPresent(g -> issueAndSendCode(email, Boolean.TRUE.equals(sendCodeRequest.getIsRegister())));
+        return DefaultMessageResponse.of("If an account exists for that address, a verification code has been sent");
     }
 
     @Override

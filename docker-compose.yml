@@ -1,13 +1,11 @@
 # GameBuddy, locally.
 #
-#   cp .env.example .env && docker compose up --build
+#   cp .env.example .env      # then set the REPLACE_ME secrets (openssl commands are in .env)
+#   docker compose up --build
 #
-# Brings up Postgres, the Python recommender, the backend and the log stack
-# (Elasticsearch, Kibana, Filebeat) wired together:
+# Brings up Postgres, the Python recommender and the backend:
 #
 #   API      http://localhost:8080/swagger-ui
-#   Logs     http://localhost:5601/app/discover      (Kibana)
-#   Indices  http://localhost:9200/_cat/indices?v    (Elasticsearch)
 #
 # The schema is
 # created from db/schema-baseline.sql on first start and the backend runs with
@@ -27,9 +25,11 @@ services:
       POSTGRES_DB: ${DB_NAME:-gamebuddy}
       POSTGRES_USER: ${DB_USER:-gamebuddy}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # Passed to 99-app-role.sh so it can create the least-privileged app login on first init.
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
     ports:
       # Exposed so you can psql in and inspect what the app did.
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # Runs once, on an empty data directory. Numbered so the baseline lands before the
@@ -39,6 +39,8 @@ services:
       # upgrade script and apply it by hand, or `docker compose down -v` and start over.
       - ./GameBuddy-backend/src/main/resources/db/schema-baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
       - ./GameBuddy-backend/src/main/resources/db/seed-local.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      # Runs last: creates the least-privileged app login (non-superuser) the backend uses. See C3.
+      - ./GameBuddy-backend/src/main/resources/db/99-app-role.sh:/docker-entrypoint-initdb.d/99-app-role.sh:ro
     healthcheck:
       # -d and -U matter: without them pg_isready checks the default database and reports
       # healthy while the init scripts are still running, and the backend starts against a
@@ -76,7 +78,7 @@ services:
       # at deploy, when real users exist to serve. A restart, not a retrain.
       HIDE_SEED_ACCOUNTS: ${HIDE_SEED_ACCOUNTS:-false}
     ports:
-      - "${MODEL_PORT:-8000}:8000"
+      - "127.0.0.1:${MODEL_PORT:-8000}:8000"
     volumes:
       # The artefact has to outlive the container now that a nightly job rewrites it.
       #
@@ -176,7 +178,7 @@ services:
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     ports:
       # Exposed so you can redis-cli in and watch the fan-out with MONITOR.
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -204,8 +206,10 @@ services:
       SPRING_DATA_REDIS_PORT: 6379
 
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-gamebuddy}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER:-gamebuddy}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # The backend connects as the least-privileged, NON-superuser app role, never the
+      # bootstrap superuser — a superuser DB login would be RCE via COPY ... FROM PROGRAM. See C3.
+      SPRING_DATASOURCE_USERNAME: gamebuddy_app
+      SPRING_DATASOURCE_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
       DB_SCHEMA: gamebuddy
 
       # The schema is owned by SQL. 'validate' means a mismatch stops the application
@@ -293,8 +297,7 @@ services:
 
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
 
-      # Where the ECS JSON log file is written. Filebeat reads this same file from the
-      # shared volume below. The console keeps its human-readable format, so
+      # Where the ECS JSON log file is written. The console keeps its human-readable format, so
       # `docker compose logs backend` is unchanged.
       LOG_FILE: /app/logs/gamebuddy.json
       ENVIRONMENT: ${ENVIRONMENT:-local}
@@ -311,7 +314,7 @@ services:
       # present so that running without credentials does not lose every upload on the
       # next `docker compose up`.
       - media-data:/app/.media
-      # The log file, shared with Filebeat. A volume rather than a bind mount so the
+      # The log file. A volume rather than a bind mount so the
       # non-root user in the image owns it on every host — a bind mount from Windows
       # arrives root-owned and the JVM silently falls back to console-only logging.
       - backend-logs:/app/logs
@@ -325,153 +328,6 @@ services:
       retries: 12
       start_period: 40s
 
-  # --- logging -------------------------------------------------------------------------
-  #
-  # Elasticsearch stores the logs, Kibana reads them, Filebeat moves them from the
-  # backend's log file into Elasticsearch. Nothing in the application talks to any of the
-  # three: the backend writes a file and is done, so the search cluster can be stopped,
-  # restarted or left out entirely without the API noticing. `docker compose up backend`
-  # still brings up only Postgres, the model and the backend.
-  #
-  # Open http://localhost:5601/app/discover once it is up.
-
-  elasticsearch:
-    # All three Elastic images are pinned to the same patch release. Filebeat refuses to
-    # index into a cluster newer than itself, so a version skew here is not a subtle
-    # degradation — it is a shipper that starts, connects and then drops everything.
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.4
-    environment:
-      # One node, so no master election and no waiting for a quorum that will never form.
-      discovery.type: single-node
-
-      # No authentication and no TLS. That is acceptable *here* and nowhere else: this
-      # cluster is reachable only from this compose network and from localhost, and the
-      # alternative for a local stack is a certificate dance that ends with everyone
-      # disabling verification anyway. A deployed cluster turns this on and gets real
-      # credentials — see the README.
-      xpack.security.enabled: "false"
-      xpack.license.self_generated.type: basic
-
-      # Elasticsearch sizes its heap from the host's memory by default and will happily
-      # reserve several gigabytes on a development machine. Half a gigabyte indexes a
-      # local application's logs without noticing.
-      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-
-      # Refuses to start rather than silently disabling the disk-based shard allocator on
-      # a nearly-full disk, which is the failure that presents as "indexing stopped and
-      # nothing in the logs says why".
-      cluster.routing.allocation.disk.threshold_enabled: "true"
-    volumes:
-      - elasticsearch-data:/usr/share/elasticsearch/data
-    ports:
-      # Exposed so the indices can be queried directly:
-      #   curl localhost:9200/gamebuddy-logs-*/_search?pretty
-      - "${ELASTICSEARCH_PORT:-9200}:9200"
-    healthcheck:
-      # yellow, not green: a single node cannot allocate replica shards, so a
-      # perfectly healthy one-node cluster never reaches green and waiting for it
-      # would hang the stack forever.
-      test:
-        [
-          "CMD-SHELL",
-          "curl -fsS http://127.0.0.1:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
-
-  kibana:
-    image: docker.elastic.co/kibana/kibana:9.4.4
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    environment:
-      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
-      SERVER_PUBLICBASEURL: http://localhost:${KIBANA_PORT:-5601}
-
-      # Throwaway keys, and they have to be set: without them Kibana generates new ones on
-      # every start, which invalidates saved objects encrypted by the previous run — so a
-      # saved search survives a restart only by accident. 32 characters is the minimum.
-      XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY: gamebuddy-local-dev-kibana-key-01
-      XPACK_REPORTING_ENCRYPTIONKEY: gamebuddy-local-dev-kibana-key-02
-      XPACK_SECURITY_ENCRYPTIONKEY: gamebuddy-local-dev-kibana-key-03
-    ports:
-      - "${KIBANA_PORT:-5601}:5601"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl -fsS http://127.0.0.1:5601/api/status | grep -q '\"level\":\"available\"'",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 40
-      start_period: 90s
-
-  filebeat:
-    image: docker.elastic.co/beats/filebeat:9.4.4
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-    # Root because it reads a file written by another container's user and a config file
-    # mounted from the host. Filebeat has no network exposure and runs no application
-    # code, so this is a smaller concession than the alternative — matching uids across
-    # three images and hoping the host agrees.
-    user: root
-    # --strict.perms=false is not optional on Windows or macOS: Filebeat refuses to load a
-    # config file that is group- or world-writable, and a bind mount from either host is
-    # always 0777 as far as the container is concerned. The check is worth having on
-    # Linux; here it only ever produces a false positive.
-    command: ["filebeat", "-e", "--strict.perms=false"]
-    volumes:
-      - ./observability/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
-      # The backend's log file. Read-only — Filebeat has no business writing here.
-      - backend-logs:/var/log/gamebuddy:ro
-      # The registry: how far into each file Filebeat has read. Without persisting it,
-      # every restart re-indexes the whole log directory from the beginning and Kibana
-      # fills with duplicates.
-      - filebeat-data:/usr/share/filebeat/data
-    healthcheck:
-      # --strict.perms=false again, for the same reason as the command above: this is a
-      # second Filebeat invocation and it reads the same bind-mounted config, so without
-      # the flag the healthcheck fails on file permissions while the shipper it is checking
-      # is running perfectly.
-      test: ["CMD-SHELL", "filebeat test output --strict.perms=false | grep -q 'talk to server... OK'"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 30s
-
-  # Creates the Kibana data view once, so Discover has something to show the first time it
-  # is opened instead of an onboarding wizard. Runs to completion and exits; `docker
-  # compose ps` showing it as "exited (0)" is the success case.
-  kibana-setup:
-    image: curlimages/curl:8.15.0
-    depends_on:
-      kibana:
-        condition: service_healthy
-    restart: "no"
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        code=$$(curl -s -o /tmp/out -w '%{http_code}' -X POST \
-          "http://kibana:5601/api/data_views/data_view" \
-          -H 'kbn-xsrf: true' \
-          -H 'Content-Type: application/json' \
-          -d '{"data_view":{"title":"gamebuddy-logs*","name":"GameBuddy logs","timeFieldName":"@timestamp"}}')
-        if [ "$$code" = "200" ]; then
-          echo "Kibana data view created"
-        # Every run after the first lands here. Note it is a 400, not the 409 you would
-        # expect — Kibana reports a duplicate saved object as a bad request — so the status
-        # code alone cannot tell "already done" from "genuinely wrong" and the body has to
-        # be read. Getting this wrong leaves the service permanently red on a healthy stack.
-        elif grep -q "Duplicate data view" /tmp/out; then
-          echo "Kibana data view already exists"
-        else
-          echo "Could not create the Kibana data view (HTTP $$code):"; cat /tmp/out; exit 1
-        fi
-
 volumes:
   postgres-data:
   # Written by model-retrain, read by model. Seeded from the image on first use, so the
@@ -480,9 +336,5 @@ volumes:
   # Only used when R2 is not configured. Named rather than a bind mount so it behaves the
   # same on Windows, macOS and Linux.
   media-data:
-  # The backend writes here, Filebeat reads. Shared rather than each holding its own copy
-  # so there is exactly one log file and no question of which one is current.
+  # The backend writes its JSON log file here; console logging is unaffected.
   backend-logs:
-  elasticsearch-data:
-  # Filebeat's read positions. Losing this volume means re-indexing, not losing logs.
-  filebeat-data:
