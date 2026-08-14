@@ -25,7 +25,20 @@
       },
       "environment": "preview",
       "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.findgamebuddy.com",
         "EXPO_PUBLIC_REVENUECAT_API_KEY": "test_VVPmkcbxscVCUltzvloqUXiAfvx"
+      }
+    },
+    "gate": {
+      "extends": "production",
+      "distribution": "internal",
+      "channel": "gate",
+      "android": {
+        "buildType": "apk"
+      },
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080"
       }
     },
     "production": {

@@ -13,12 +13,17 @@ import { Linking } from 'react-native';
  * the server stamps its own value, because a client is not a trustworthy witness to what
  * it displayed. It is here so the two can be compared when they drift.
  *
- * The source documents are in `documentation/legal/`. These URLs must serve those
- * documents before the first submission; until the site exists they resolve to nothing,
- * which is a launch blocker rather than a bug.
+ * The source documents are in `documentation/legal/`, and `GameBuddy-Web` renders those exact
+ * files at the URLs below — imported, not copied, so the app, the website and the version the
+ * server records cannot drift apart.
+ *
+ * These defaults used to point at `gamebuddy.app`, a domain nobody involved owned, so both
+ * links resolved to nothing. That was the launch blocker this file's earlier note described;
+ * it is closed now that `findgamebuddy.com` exists.
  */
-export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://gamebuddy.app/terms';
-export const PRIVACY_URL = process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://gamebuddy.app/privacy';
+export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://findgamebuddy.com/terms';
+export const PRIVACY_URL =
+  process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://findgamebuddy.com/privacy';
 
 export const TERMS_VERSION = '2026-08-07';
 

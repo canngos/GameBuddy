@@ -1,0 +1,233 @@
+@import 'tailwindcss';
+
+/*
+ * The palette, generated from the app's tokens. See scripts/generate-tokens-css.mjs —
+ * this file is written before every dev and build, so editing it by hand is wasted work.
+ */
+@import './tokens.css';
+
+/*
+ * Fonts, self-hosted.
+ *
+ * Not Google's CDN, for two reasons that both matter here. It is a third-party request on
+ * the critical path, which is the opposite of what a site built for Core Web Vitals wants;
+ * and a German court has already held that passing an EU visitor's IP to Google Fonts
+ * without consent breaches the GDPR. Self-hosting removes the request and the question
+ * together, and these files are served from the same CDN as the rest of the site anyway.
+ *
+ * Only the weights actually used. Every extra weight is a font file a first-time visitor
+ * downloads before the page settles.
+ */
+@import '@fontsource/chakra-petch/600.css';
+@import '@fontsource/chakra-petch/700.css';
+@import '@fontsource/poppins/400.css';
+@import '@fontsource/poppins/500.css';
+@import '@fontsource/poppins/600.css';
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* The dark canvas has to own the whole viewport, including the area past the end of
+       the content — otherwise over-scroll on iOS shows white behind a black page. */
+    background-color: var(--color-canvas);
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-content);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  /* A visible focus ring, in the app's own primary. Removing outlines is the most common
+     way a site becomes unusable by keyboard, and this page has to pass an accessibility
+     audit as part of its own definition of done. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* Respect a stated preference for less motion. Everything that moves on this site is
+     decorative — nothing conveys meaning through movement alone — so all of it can stop.
+
+     This block comes last on purpose: it has to override the reveal and float rules below,
+     and `!important` inside a later `@layer base` rule is what guarantees it does. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    /* Reduced motion must not mean invisible content — see the note in Reveal.astro. */
+    .reveal {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+}
+
+@layer components {
+  /*
+   * Scroll reveal.
+   *
+   * **One mechanism, an IntersectionObserver, and that is a deliberate retreat.** The first
+   * version also used CSS scroll-driven animation (`animation-timeline: view()`) where
+   * supported, on the reasoning that the compositor does it for free. It hid every element
+   * on the page and brought none of them back — a site with no text on it. Rather than tune
+   * `animation-range` until it behaved, the second mechanism is gone: fifteen lines of
+   * observer are cheap, universally supported, and can be reasoned about completely.
+   *
+   * The guard that survived is the important part. The hidden state is scoped to
+   * `[data-reveal='on']`, which the inline script in `Base.astro` sets **only when it is
+   * about to run the observer**. No JavaScript, no attribute, nothing hidden — the page is
+   * simply unanimated, which is the correct degradation for content that has to be readable.
+   */
+  .reveal {
+    transition:
+      opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  [data-reveal='on'] .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  [data-reveal='on'] .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /*
+   * The hero's entrance, which is not a scroll reveal.
+   *
+   * It is above the fold, so there is nothing to scroll into — and animating the Largest
+   * Contentful Paint element on a timer would delay the moment the page counts as painted.
+   * A plain load animation costs nothing, cannot depend on script, and is the reason the
+   * hero is excluded from `.reveal` entirely.
+   */
+  .hero-in {
+    animation: hero-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--hero-delay, 0ms);
+  }
+
+  @keyframes hero-in {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /*
+   * The hero phones drift, slowly and out of phase with each other.
+   *
+   * Deliberately small — 10px over nine seconds. Large or fast movement behind a headline
+   * competes with reading it, and this is meant to register as depth rather than as an
+   * animation somebody will notice twice and then find irritating.
+   */
+  .float-a > div {
+    animation: float-a 9s ease-in-out infinite;
+  }
+
+  .float-b > div {
+    animation: float-b 11s ease-in-out infinite;
+  }
+
+  @keyframes float-a {
+    0%,
+    100% {
+      transform: rotate(var(--frame-rotate, 0deg)) translateY(0);
+    }
+    50% {
+      transform: rotate(var(--frame-rotate, 0deg)) translateY(-10px);
+    }
+  }
+
+  @keyframes float-b {
+    0%,
+    100% {
+      transform: rotate(var(--frame-rotate, 0deg)) translateY(0);
+    }
+    50% {
+      transform: rotate(var(--frame-rotate, 0deg)) translateY(10px);
+    }
+  }
+}
+
+@layer components {
+  /*
+   * The two gradients, carried over from the app with their rule intact.
+   *
+   * `.gradient-surface` runs violet into cyan and is the identity. It goes behind large
+   * shapes and never under small text: white on #00E5FF measures 1.54:1, which no amount
+   * of weight or shadow rescues.
+   *
+   * `.gradient-action` is the one that goes under a label. It gives up the cyan and keeps
+   * the violet, and every stop clears 4.5:1 against white.
+   */
+  .gradient-surface {
+    background-image: linear-gradient(135deg, var(--color-primary-from), var(--color-primary-to));
+  }
+
+  .gradient-action {
+    background-image: linear-gradient(135deg, var(--color-action-from), var(--color-action-to));
+  }
+
+  .gradient-accent {
+    background-image: linear-gradient(135deg, var(--color-accent-from), var(--color-accent-to));
+  }
+
+  /* Violet→cyan as text. Legible because it sits at display size on the dark canvas, where
+     both stops clear 4.5:1 — the rule above is about white *on* the gradient, not the
+     gradient on near-black. */
+  .gradient-text {
+    background-image: linear-gradient(120deg, var(--color-primary-from), var(--color-primary-to));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/*
+ * Print, which exists for exactly one reason: people print terms and privacy policies, and
+ * a near-black page wastes a cartridge and comes out unreadable.
+ */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  a::after {
+    /* A printed page cannot be clicked, so the destination has to be on it. */
+    content: ' (' attr(href) ')';
+    font-size: 0.85em;
+    word-break: break-all;
+  }
+
+  header nav,
+  footer,
+  .no-print {
+    display: none !important;
+  }
+}

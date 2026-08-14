@@ -1,0 +1,52 @@
+---
+/**
+ * The FAQ, which earns its place twice.
+ *
+ * For a reader it answers the questions that decide whether they install. For search it is
+ * the page's only real body of text — a landing page is mostly headlines, and headlines give
+ * a crawler very little to match a query against. These answers are where the long-tail
+ * phrases live, in seven languages, which is most of what makes the localised pages worth
+ * indexing at all.
+ *
+ * Built on `<details>`, so it collapses with no JavaScript. The content is in the HTML
+ * whether or not a panel is open — `<details>` hides it visually, it does not remove it from
+ * the document — so it is indexable and reachable by a screen reader either way.
+ */
+import { dict, t, type Lang } from '../i18n';
+import Reveal from './Reveal.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const d = dict(lang);
+const faqs = [d.faq.q1, d.faq.q2, d.faq.q3, d.faq.q4, d.faq.q5, d.faq.q6, d.faq.q7];
+---
+
+<section id="faq" class="mx-auto max-w-3xl scroll-mt-20 px-5 py-16">
+  <Reveal>
+    <h2 class="font-display text-3xl font-bold sm:text-4xl">{t(lang, 'faq.title')}</h2>
+  </Reveal>
+
+  <div class="mt-8 divide-y divide-line/60 border-y border-line/60">
+    {
+      faqs.map((faq, i) => (
+        <Reveal delay={i * 40}>
+          <details class="group/faq py-4">
+            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-left font-medium">
+              <span>{faq.q}</span>
+              <span
+                class="shrink-0 text-muted transition-transform duration-300 group-open/faq:rotate-45"
+                aria-hidden="true"
+              >
+                +
+              </span>
+            </summary>
+            <p class="mt-3 pr-8 text-sm leading-relaxed text-muted">{faq.a}</p>
+          </details>
+        </Reveal>
+      ))
+    }
+  </div>
+</section>

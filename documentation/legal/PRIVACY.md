@@ -2,11 +2,6 @@
 
 **Version 2026-08-07.**
 
-> **Before you publish this:** the controller details in section 9 are placeholders and a
-> lawyer should read it. The rest describes what the software actually stores, and was
-> written from the schema rather than from a template — if the code changes, this needs to
-> change with it.
-
 GameBuddy is operated from Finland and is subject to the GDPR.
 
 ---
@@ -113,8 +108,12 @@ you believe a child is using GameBuddy, write to the address below and we will a
 
 ## 9. Who we are
 
-**Controller:** _[legal entity name]_, Finland
-**Data protection contact:** _[contact email]_
+**Controller:** Can Baturlar, Finland
+**Data protection contact:** contact@findgamebuddy.com
+
+GameBuddy is run by one person, not a company. There is no data protection officer, because
+the scale of processing does not require one under Article 37 — the address above reaches the
+controller directly.
 
 ## 10. Changes
 

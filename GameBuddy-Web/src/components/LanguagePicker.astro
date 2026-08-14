@@ -1,0 +1,96 @@
+---
+/**
+ * Language switcher.
+ *
+ * A `<details>` disclosure rather than a scripted dropdown, for the same reason the FAQ is:
+ * the browser already implements it, it works with no JavaScript, and it is keyboard
+ * accessible without any of it being written here.
+ *
+ * **Every option is a real link to the equivalent page**, not a button that rewrites the
+ * URL. So switching language from `/fi/support` lands on `/support`, the browser history is
+ * sensible, and the links are crawlable — which is half the point of having hreflang.
+ */
+import { LANGS, LANG_NAMES, localeUrl, t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  /** Path without a locale prefix, so the switcher stays on the same page. */
+  path: string;
+}
+
+const { lang, path } = Astro.props;
+---
+
+<details class="group relative">
+  {/*
+    No `aria-label` here, deliberately — it used to say "Language" and Lighthouse caught it
+    as a WCAG 2.5.3 (Label in Name) failure. An `aria-label` *replaces* the accessible name,
+    so the control was announced as "Language" while showing "Suomi": a voice-control user
+    saying "click Suomi" would not match anything.
+
+    The visually hidden span gives the same context by being *part* of the name instead, so
+    it reads "Language: Suomi" — which contains the visible text and satisfies both.
+  */}
+  <summary
+    class="flex cursor-pointer list-none items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted transition-colors hover:border-primary/40 hover:text-content"
+  >
+    <span class="sr-only">{t(lang, 'nav.language')}: </span>
+    <svg
+      class="h-3.5 w-3.5"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18"></path>
+    </svg>
+    <span>{LANG_NAMES[lang]}</span>
+  </summary>
+
+  <ul
+    class="absolute right-0 z-50 mt-2 min-w-36 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-xl shadow-black/20"
+  >
+    {
+      LANGS.map((l) => (
+        <li>
+          <a
+            href={localeUrl(l, path)}
+            hreflang={l}
+            lang={l}
+            class:list={[
+              'block px-3 py-2 text-sm transition-colors hover:bg-raised',
+              l === lang ? 'font-semibold text-primary' : 'text-muted hover:text-content',
+            ]}
+            aria-current={l === lang ? 'true' : undefined}
+          >
+            {LANG_NAMES[l]}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</details>
+
+<script>
+  /**
+   * Closes the menu on an outside click or Escape.
+   *
+   * `<details>` does neither on its own — it stays open until its own summary is clicked
+   * again, which feels broken for something shaped like a dropdown. Twelve lines to fix, and
+   * the menu still works completely without them.
+   */
+  const menus = document.querySelectorAll<HTMLDetailsElement>('details.group');
+
+  document.addEventListener('click', (event) => {
+    for (const menu of menus) {
+      if (menu.open && !menu.contains(event.target as Node)) menu.open = false;
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+    for (const menu of menus) menu.open = false;
+  });
+</script>

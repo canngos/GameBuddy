@@ -3,10 +3,6 @@
 **Version 2026-08-07.** This version string is recorded against your account when you accept
 these terms. It matches `TermsPolicy.CURRENT_VERSION` in the application.
 
-> **Before you publish this:** the operator details in section 12 are placeholders and a
-> lawyer should read the whole document. Everything else describes what the software
-> actually does, and was written alongside it.
-
 ---
 
 ## 1. Who may use GameBuddy
@@ -121,8 +117,9 @@ app, and the version recorded against your account tells us which version you ag
 
 ## 12. Who we are, and how to reach us
 
-**Operator:** _[legal entity name]_, Finland
-**Contact for reports, complaints and legal notices:** _[contact email]_
+**Operator:** Can Baturlar, Finland — an individual, not a company.
+**Contact for reports, complaints and legal notices:** contact@findgamebuddy.com
+**Help with the app:** support@findgamebuddy.com
 
 These terms are governed by Finnish law. Nothing here removes rights you have as a consumer
 under the mandatory law of the country you live in.

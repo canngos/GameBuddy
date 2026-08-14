@@ -1,0 +1,63 @@
+---
+/**
+ * Support, in whichever language. See `Landing.astro` for why this is a component.
+ *
+ * Deliberately not a contact form: a form needs a backend to receive it, which would give an
+ * otherwise-static site a server-side dependency and a spam problem, in exchange for nothing
+ * a `mailto:` does not already do.
+ */
+import { CONTACT, SITE } from '../config';
+import { dict, t, type Lang } from '../i18n';
+import Reveal from './Reveal.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const d = dict(lang);
+const answers = [d.support.a1, d.support.a2, d.support.a3, d.support.a4, d.support.a5, d.support.a6];
+---
+
+<article class="mx-auto max-w-3xl px-5 py-16">
+  <h1 class="font-display text-4xl font-bold tracking-tight">{t(lang, 'support.title')}</h1>
+  <p class="mt-4 text-lg text-muted">{t(lang, 'support.intro')}</p>
+
+  <div class="mt-8 flex flex-wrap gap-3">
+    <a
+      href={`mailto:${CONTACT.support}`}
+      class="gradient-action inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-transform hover:scale-[1.02]"
+    >
+      {t(lang, 'support.emailCta')} {CONTACT.support}
+    </a>
+  </div>
+
+  <section class="mt-14">
+    <h2 class="font-display text-2xl font-bold">{t(lang, 'support.tryFirst')}</h2>
+    <div class="mt-6 space-y-5">
+      {
+        answers.map((item, i) => (
+          <Reveal delay={i * 40}>
+            <div class="rounded-2xl border border-line bg-surface/60 p-5">
+              <h3 class="font-semibold">{item.q}</h3>
+              <p class="mt-2 text-sm leading-relaxed text-muted">{item.a}</p>
+            </div>
+          </Reveal>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="mt-14">
+    <h2 class="font-display text-2xl font-bold">{t(lang, 'support.writingIn')}</h2>
+    <p class="mt-3 text-[15px] leading-relaxed text-content/90">
+      <a class="text-primary underline" href={`mailto:${CONTACT.support}`}>{CONTACT.support}</a>.
+      {' '}{t(lang, 'support.writingInBody')}
+    </p>
+    <p class="mt-4 text-sm leading-relaxed text-muted">{t(lang, 'support.reportFaster')}</p>
+    <p class="mt-4 text-sm leading-relaxed text-muted">
+      {t(lang, 'support.legalRoute')}{' '}
+      <a class="underline hover:text-content" href={`mailto:${CONTACT.legal}`}>{CONTACT.legal}</a>
+    </p>
+  </section>
+</article>

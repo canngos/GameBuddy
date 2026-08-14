@@ -1,0 +1,10 @@
+# Everything here is meant to be found — this is a five-page public site with no accounts,
+# no search results and nothing behind a login. So there is nothing to disallow, and adding
+# rules "just in case" is how a page ends up excluded by accident.
+
+User-agent: *
+Allow: /
+
+# The sitemap is what turns "published" into "indexed" quickly. @astrojs/sitemap emits
+# sitemap-index.xml (which points at sitemap-0.xml), and it is the index that belongs here.
+Sitemap: https://findgamebuddy.com/sitemap-index.xml

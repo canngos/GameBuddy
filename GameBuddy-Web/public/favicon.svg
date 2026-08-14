@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="GameBuddy">
+  <!--
+    The mark: a controller silhouette on the app's violet-to-cyan gradient.
+
+    Drawn rather than exported so it stays a few hundred bytes and scales to any tab size.
+    The rounded square repeats the app icon's shape, and the stops are the same two colours
+    as `gradients.primary.dark` in the app — see GameBuddy-App/src/theme/gradients.ts.
+  -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C4DFF" />
+      <stop offset="100%" stop-color="#00E5FF" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#g)" />
+  <g fill="none" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Controller body. -->
+    <path d="M20 25h24a10 10 0 0 1 9.6 12.8l-2.4 8A6 6 0 0 1 40 47l-3-4H27l-3 4a6 6 0 0 1-10.8-1.2l-2.4-8A10 10 0 0 1 20 25Z" />
+    <!-- D-pad. -->
+    <path d="M21 33v6M18 36h6" />
+    <!-- Buttons. -->
+    <circle cx="43" cy="34" r="1.6" fill="#FFFFFF" />
+    <circle cx="47" cy="38" r="1.6" fill="#FFFFFF" />
+  </g>
+</svg>

@@ -1,0 +1,36 @@
+---
+/**
+ * The terms, rendered from the same document the app links to.
+ *
+ * See `privacy.astro` for why this imports rather than copies. There is an extra reason
+ * here: `TERMS_VERSION` in the app's `src/legal.ts` and `TermsPolicy.CURRENT_VERSION` on the
+ * server both mirror the version string in this file, and the server records it against an
+ * account at registration. Three things agreeing about one date only works while there is
+ * one date.
+ */
+import { Content } from '../../../documentation/legal/TERMS.md';
+import LegalNotice from '../components/LegalNotice.astro';
+import Prose from '../components/Prose.astro';
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  lang="en"
+  englishOnly
+  title="Terms of Service"
+  description="The agreement between you and GameBuddy: who may use it, what is not allowed, how accounts end, and what happens to what you bought."
+>
+  <article class="mx-auto max-w-3xl px-5 py-16">
+    <h1 class="font-display text-4xl font-bold tracking-tight">Terms of Service</h1>
+    <p class="mt-3 text-sm text-muted">
+      Also the End User Licence Agreement. GameBuddy is for adults only — you must be 18 or
+      over to hold an account.
+    </p>
+
+    <LegalNotice lang="en" />
+
+    <Prose>
+      <Content />
+    </Prose>
+  </article>
+</Base>
