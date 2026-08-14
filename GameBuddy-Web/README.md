@@ -125,6 +125,21 @@ Free, and the account already exists because R2 serves the app's images.
    - **Root directory: `GameBuddy-Web`** — this is a monorepo, and the default of `/` builds
      nothing and reports success.
 3. Node version: set `NODE_VERSION` to `22` or newer in the environment variables.
+
+   **`package-lock.json` must be written by npm 10, not npm 11.** Cloudflare's build image
+   runs `npm ci` with the npm bundled into Node — 10.9.2 — and the two versions disagree
+   about whether the optional wasm builds of sharp and Tailwind's oxide hoist their
+   `@emnapi/core` and `@emnapi/runtime` peers to the top level. npm 11 omits them, npm 10
+   demands them, and `npm ci` fails the sync check rather than installing anything. Setting
+   `NPM_VERSION` does *not* help: the v2 build image ignores it. So after any dependency
+   change, regenerate the lock with the older npm:
+
+   ```bash
+   npx npm@10.9.2 install --package-lock-only
+   ```
+
+   The result installs cleanly under both versions; a lockfile written by npm 11 installs
+   only under npm 11, and fails in CI with `Missing: @emnapi/runtime from lock file`.
 4. **Custom domains**: add `findgamebuddy.com` and `www.findgamebuddy.com`, then add a
    redirect rule sending `www` to the apex so only one URL is indexed.
 
