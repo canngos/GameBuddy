@@ -46,12 +46,22 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${
   <rect width="${WIDTH}" height="${HEIGHT}" fill="#0B0B12"/>
   <ellipse cx="880" cy="120" rx="520" ry="360" fill="url(#glow)"/>
 
-  <!-- Mark. Same rounded square and controller as the favicon. -->
-  <rect x="80" y="82" width="72" height="72" rx="18" fill="url(#brand)"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"
-     transform="translate(80 82) scale(1.125)">
-    <path d="M20 25h24a10 10 0 0 1 9.6 12.8l-2.4 8A6 6 0 0 1 40 47l-3-4H27l-3 4a6 6 0 0 1-10.8-1.2l-2.4-8A10 10 0 0 1 20 25Z"/>
-    <path d="M21 33v6M18 36h6"/>
+  <!-- Mark. Same Duo-Grip drawing as public/favicon.svg — change them together. The whole
+       mark is drawn in the favicon's 64-box coordinates inside one transformed group, with
+       a userSpaceOnUse gradient pinned to that box: the D-pad and buttons are "cut out" by
+       painting them in the same gradient as the tile, no mask needed. -->
+  <linearGradient id="markg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="64">
+    <stop offset="0" stop-color="#7C4DFF"/>
+    <stop offset="1" stop-color="#00E5FF"/>
+  </linearGradient>
+  <g transform="translate(80 82) scale(1.125)">
+    <rect width="64" height="64" rx="16" fill="url(#markg)"/>
+    <circle cx="20" cy="17.5" r="5" fill="#FFFFFF"/>
+    <circle cx="44" cy="17.5" r="5" fill="#FFFFFF"/>
+    <path d="M20 25h24a10 10 0 0 1 9.6 12.8l-2.4 8A6 6 0 0 1 40 47l-3-4H27l-3 4a6 6 0 0 1-10.8-1.2l-2.4-8A10 10 0 0 1 20 25Z" fill="#FFFFFF"/>
+    <path d="M21 32.5v7M17.5 36h7" fill="none" stroke="url(#markg)" stroke-width="2.8" stroke-linecap="round"/>
+    <circle cx="43" cy="34" r="1.9" fill="url(#markg)"/>
+    <circle cx="47" cy="38" r="1.9" fill="url(#markg)"/>
   </g>
   <text x="172" y="132" font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif"
         font-size="34" font-weight="700" fill="#ECECF5">GameBuddy</text>
