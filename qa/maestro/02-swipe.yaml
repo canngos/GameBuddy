@@ -1,0 +1,93 @@
+# The swipe deck.
+#
+# The one thing here that no API test can reach: whether the gesture actually moves the
+# card. `/match/decline` returning 200 says nothing about whether a thumb dragging left
+# reached it — that is animation, gesture handler and state, and it is where a swipe deck
+# usually breaks.
+#
+# The allowance counter is used as the oracle. It is on screen ("N likes left"), it comes
+# from the same SwipeQuota the API suite asserts against, and it only moves when a swipe
+# was really recorded — so a card that animates away without calling the backend is caught.
+
+appId: com.gamebuddy.app
+name: 02 swipe
+---
+- runFlow: _login.yaml
+
+- assertVisible: "Who's playing"
+- assertVisible: "likes left"
+- takeScreenshot: artifacts/02-01-deck
+
+# The deck has to have somebody in it. An empty deck passes every gesture assertion below
+# by doing nothing at all — the swipes land on a background and nothing contradicts them.
+#
+# Asserted on the card's own content rather than on an id: CandidateCard has no testID, so
+# the `id: gamer-card` this used to look for could never match and the assertion was dead —
+# it was marked optional, so it warned and passed on an empty deck, which is precisely the
+# case it existed to catch. "Tap for full profile" is rendered by the card and by nothing
+# else on this screen.
+- assertVisible: "Tap for full profile"
+
+# Swipe left — a pass. Slow enough that the gesture handler sees a drag rather than a
+# flick, which is what a person's thumb produces.
+- swipe:
+    start: "80%,55%"
+    end: "10%,55%"
+    duration: 600
+- takeScreenshot: artifacts/02-02-after-pass
+
+# Swipe right — a like.
+- swipe:
+    start: "20%,55%"
+    end: "90%,55%"
+    duration: 600
+- takeScreenshot: artifacts/02-03-after-like
+
+# The counter must have moved. If the cards animated but nothing reached the backend, this
+# is the assertion that notices.
+- assertVisible: "likes left"
+
+# The filter entry point is on this screen, and for a free account it is a paywall rather
+# than a filter. 402 SUBSCRIPTION_REQUIRED is asserted on the API side; here the question
+# is whether the app routes that to something a user can act on instead of an error.
+# The button carries accessibilityLabel="Filters" while rendering the word "Filter", so the
+# label is the selector. The sheet's own title is "Filters" too — hence the section header
+# below, which only exists once the sheet is actually open.
+- tapOn:
+    text: "Filters"
+- extendedWaitUntil:
+    visible: "GAME"
+    timeout: 10000
+- takeScreenshot: artifacts/02-04-filter-sheet
+
+# GAME, not AVAILABILITY. All four sections are always rendered, but they sit in the
+# sheet's own inner ScrollView under `max-h-[80%]` — Availability is the last of them and
+# is below that fold on arrival. The first section is the one that is actually on screen.
+
+# The sheet's footer is outside that ScrollView, so it is always visible, and for a free
+# account it is the paywall rather than an Apply button. The deck itself must never cost a
+# 402 — that is asserted on the API side; here the question is whether the app turns the
+# refusal into something a user can act on. Optional only because a Gold account would see
+# "Show everyone" instead, and this flow should not depend on the tier it happens to run
+# with.
+- assertVisible:
+    text: "Unlock filters with Gold"
+    optional: true
+- assertVisible:
+    text: "Filters"
+
+# Closed by tapping its backdrop, **not** with `back`.
+#
+# FilterSheet is a positioned sibling rather than a `Modal` (it says so at the top of
+# src/match/FilterSheet.tsx), so it has no onRequestClose and Android's back button is not
+# routed to it — a `back` here leaves the sheet open and pops the navigator instead, which
+# is why the deck was gone by the next assertion. The backdrop is a Pressable with
+# accessibilityLabel="Close".
+- tapOn: "Close"
+- waitForAnimationToEnd:
+    timeout: 3000
+- extendedWaitUntil:
+    visible: "DISCOVER"
+    timeout: 10000
+- assertVisible: "Who's playing"
+- takeScreenshot: artifacts/02-05-deck-returned

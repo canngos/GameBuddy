@@ -1,6 +1,7 @@
 package com.gamebuddy.match.interfaces.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,5 +17,6 @@ import lombok.Setter;
 public class TypingRequest {
 
     @NotBlank(message = "Receiver is required")
+    @Size(max = 255, message = "Receiver is not valid")
     private String receiver;
 }

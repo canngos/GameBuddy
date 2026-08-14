@@ -23,6 +23,21 @@ type TextFieldProps = TextInputProps & {
   ref?: Ref<TextInput>;
 };
 
+/**
+ * A stable handle for UI tests, derived from the label.
+ *
+ * The label itself is not usable as a selector: it renders as its own Text node above the
+ * field, so an automated tap on "Password" hits the caption and the typing goes into
+ * whichever input still had focus. That is not hypothetical — it put an email address and a
+ * password into the same box on the first run of the sign-in flow, and the failure looked
+ * like a broken login screen rather than a bad selector.
+ *
+ * Derived rather than passed per screen, so every field in the app gets one from this one
+ * place and no caller has to remember. An explicit `testID` still wins.
+ */
+const fieldTestId = (label?: string) =>
+  label ? `field-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}` : undefined;
+
 export function TextField({
   label,
   error,
@@ -32,6 +47,7 @@ export function TextField({
   onFocus,
   onBlur,
   ref,
+  testID,
   ...rest
 }: TextFieldProps) {
   const colors = useThemeColors();
@@ -60,6 +76,7 @@ export function TextField({
       >
         <TextInput
           ref={ref}
+          testID={testID ?? fieldTestId(label)}
           className="flex-1 py-3 font-sans text-[15px] leading-[22px] text-content"
           // Not reachable by a class — this is a colour value, not a style.
           placeholderTextColor={colors.muted}

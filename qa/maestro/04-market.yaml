@@ -1,0 +1,84 @@
+# The Market, and the paywall behind it.
+#
+# Money is the part of a product where a UI bug is most expensive, and the coin balance is
+# the number a user will notice being wrong. The purchase itself is not driven — the build
+# carries a RevenueCat *test store* key (it says so in the log on every launch), so a tap
+# on "buy" exercises a simulator, not billing. Entitlement granting is asserted through the
+# webhook in the API suite instead, which is the path that actually grants Gold.
+#
+# The screen is two views behind one header, not one long scroll: Earn and Shop are
+# separate segments and **Earn is the default**. Everything to do with cosmetics —
+# FRAMES AND BANNERS, the Frames/Banners switch, the coin shop — is mounted only while
+# Shop is selected, so it has to be selected before any of it can be asserted.
+
+appId: com.gamebuddy.app
+name: 04 market
+---
+- runFlow: _login.yaml
+
+# The tab bar labels are title case ("Market"), not the screen's own MARKET overline.
+- tapOn: "Market"
+- extendedWaitUntil:
+    visible: "Show off"
+    timeout: 15000
+
+# Gold sits above both segments because it belongs to each: it is bought in Shop and it
+# pays a monthly stipend in Earn.
+- assertVisible: "GAMEBUDDY GOLD"
+- takeScreenshot: artifacts/04-01-market
+
+- assertVisible: "Earn"
+- assertVisible: "Shop"
+
+# --- Earn, which is what the screen opens on ---------------------------------------------
+- assertVisible: "EARN"
+- takeScreenshot: artifacts/04-02-earn
+
+# --- Shop --------------------------------------------------------------------------------
+- tapOn: "Shop"
+# Scrolled to, because Shop opens on the coin packs and the consumables shelf — cosmetics
+# are the third section down and are off-screen when the tab is selected.
+- scrollUntilVisible:
+    element:
+      text: "FRAMES AND BANNERS"
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: artifacts/04-03-shop
+
+- assertVisible: "Frames"
+- assertVisible: "Banners"
+
+# The Season Pass teaser is server-controlled (SEASON_PASS_TEASER), so it is asserted as
+# optional: its absence is a configuration choice, not a defect.
+- assertVisible:
+    text: "Season Pass"
+    optional: true
+
+# Both cosmetic kinds render. A free account owns none of the paid ones, so this is only
+# asserting that the grid draws — what an unaffordable item does is checked below.
+- tapOn: "Banners"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: artifacts/04-04-banners
+
+- tapOn: "Frames"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: artifacts/04-05-frames
+
+- scroll
+- takeScreenshot: artifacts/04-06-shop-scrolled
+
+# Back to Earn, which also proves the segment is a real toggle rather than a one-way trip.
+# Scrolled back up first: the segments live under the header, and by this point the screen
+# has been scrolled well past them.
+- scrollUntilVisible:
+    element:
+      text: "Earn"
+    direction: UP
+    timeout: 20000
+- tapOn: "Earn"
+- extendedWaitUntil:
+    visible: "EARN"
+    timeout: 10000
+- takeScreenshot: artifacts/04-07-earn-again

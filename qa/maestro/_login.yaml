@@ -1,0 +1,61 @@
+# Signs in as the provisioned MEMBER account and waits for the deck.
+#
+# A subflow rather than five copies: every flow below 01 needs a signed-in app, and a
+# sign-in written five times is a selector change that has to be made five times.
+#
+# Called with `runFlow: _login.yaml`. The leading underscore keeps it out of
+# `maestro test .` — it is a step, not a test.
+
+appId: com.gamebuddy.app
+---
+- launchApp:
+    clearState: true
+# 60s, because this is a debug build with no bundle in the APK: the first launch of a run
+# fetches one from Metro and the splash — which also says "GameBuddy" — is up for the whole
+# 18 seconds a cold bundle takes. A warm one arrives in about two.
+- extendedWaitUntil:
+    visible: "I already have one"
+    timeout: 60000
+- tapOn: "I already have one"
+- assertVisible: "Welcome back"
+
+- tapOn:
+    id: "field-username-or-email"
+- inputText: ${MEMBER_EMAIL}
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn:
+    id: "field-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn: "Sign in"
+
+# 40s: the first screen after sign-in loads the profile and the deck, and the deck is a
+# model call plus 264 database statements — the slowest request in the product.
+- extendedWaitUntil:
+    visible: "Find someone to play with"
+    timeout: 40000
+    optional: true
+
+# A fresh account lands on a five-step tutorial overlay that covers the whole home screen,
+# so "DISCOVER" is not visible until it is dismissed. Optional, because an account that has
+# already seen it goes straight to the deck — and a flow that *requires* the tutorial would
+# then fail on the second run.
+- tapOn:
+    text: "Skip"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- extendedWaitUntil:
+    visible: "DISCOVER"
+    timeout: 40000
+
+# Last, because it is the tab bar that these notifications cover and nothing before this
+# point touches it. See _dismiss-logbox.yaml — this is a debug-build overlay, not a defect.
+- runFlow: _dismiss-logbox.yaml

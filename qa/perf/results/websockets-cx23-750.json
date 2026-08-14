@@ -1,0 +1,11 @@
+{
+  "plan": "cx23",
+  "sockets": 750,
+  "holdSeconds": 60,
+  "sessions": 750,
+  "connectingMs": {
+    "p95": 1671.68071055,
+    "max": 1712.945369
+  },
+  "checksPassed": 1
+}

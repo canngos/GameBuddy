@@ -25,6 +25,7 @@ public class DetailsRequest {
     private LocalDate birthDate;
 
     @NotBlank(message = "Country field cannot be empty")
+    @Size(max = 255, message = "Country is not valid")
     private String country;
 
     /**
@@ -39,6 +40,7 @@ public class DetailsRequest {
      * <p>Still accepted, and still validated when present, so an existing client that
      * sends a catalogue id keeps working until the catalogue is retired.
      */
+    @Size(max = 255, message = "Avatar is not valid")
     private String avatar;
 
     @Size(max = 1, message = "Gender must be a single character")
@@ -46,13 +48,16 @@ public class DetailsRequest {
 
     // The requirements specify at least 3 games and 5 keywords; the previous
     // annotations enforced 1 and 3, so under-specified profiles reached the matcher.
+    // The upper bounds are not a product rule, they are the same guard as everywhere else:
+    // an unbounded list becomes an unbounded IN clause, and an unbounded element becomes a
+    // megabyte inside one.
     @NotNull(message = "Favourite games cannot be empty")
-    @Size(min = 3, message = "Select at least 3 games")
-    private List<String> favoriteGames;
+    @Size(min = 3, max = 100, message = "Select between 3 and 100 games")
+    private List<@Size(max = 255, message = "Game is not valid") String> favoriteGames;
 
     @NotNull(message = "Keywords cannot be empty")
-    @Size(min = 5, message = "Select at least 5 keywords")
-    private List<String> keywords;
+    @Size(min = 5, max = 100, message = "Select between 5 and 100 keywords")
+    private List<@Size(max = 255, message = "Keyword is not valid") String> keywords;
 
     /**
      * What they play on: {@code Platform} names, at least one.
@@ -66,6 +71,6 @@ public class DetailsRequest {
      * {@code FeedFilters} for why an empty set is never filtered out.
      */
     @NotNull(message = "Platforms cannot be empty")
-    @Size(min = 1, message = "Select at least 1 platform")
-    private List<String> platforms;
+    @Size(min = 1, max = 16, message = "Select at least 1 platform")
+    private List<@Size(max = 32, message = "Platform is not valid") String> platforms;
 }

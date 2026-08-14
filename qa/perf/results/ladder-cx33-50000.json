@@ -1,0 +1,31 @@
+{
+  "plan": "cx33",
+  "dau": 50000,
+  "durationSeconds": 90,
+  "offered": {
+    "sessionsPerSecond": 2.0833333333333335,
+    "requestsPerSecond": 27.083333333333336,
+    "concurrent": 750
+  },
+  "achieved": {
+    "requests": 2470,
+    "requestsPerSecond": 27.445811478840536,
+    "iterations": 188,
+    "droppedIterations": 0,
+    "failedRate": 0
+  },
+  "latencyMs": {
+    "avg": 10.313046990688289,
+    "med": 5.6229165000000005,
+    "p95": 64.8067439,
+    "p99": 73.44353725,
+    "max": 110.119717
+  },
+  "feedLatencyMs": {
+    "avg": 67.65792902127657,
+    "med": 66.4825565,
+    "p95": 76.83518135,
+    "p99": 87.32081916999998,
+    "max": 110.119717
+  }
+}

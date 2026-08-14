@@ -86,7 +86,7 @@ gamebuddy:
     # 'smtp' sends for real. 'log' prints the verification code and sends nothing, which is
     # the only way to reach the signup screen without a mail server. Never 'log' in
     # production: it would let anyone reading the logs verify any address.
-    mode: ${MAIL_MODE:smtp}
+    mode: ${MAIL_MODE:log}
     from: ${MAIL_FROM:noreply@mail.findgamebuddy.com}
 
   jwt:

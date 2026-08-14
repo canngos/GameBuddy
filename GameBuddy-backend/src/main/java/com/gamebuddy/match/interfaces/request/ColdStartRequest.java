@@ -29,7 +29,13 @@ import java.util.List;
  * @param games their favourite games, by name
  * @param keywords their keywords, by name
  * @param platforms what they play on, as Platform enum names
+ * <p>{@code include} carries a Gold filter's eligible set, exactly as on
+ * {@link PredictRequest} — and it is needed here as much as there. A subscriber who signed
+ * up since the last retrain has no trained vector, so this is the path that serves them, and
+ * their filters have to work on their first day rather than after the next nightly run.
+ *
  * @param exclude gamer ids to leave out of the ranking entirely
+ * @param include the only gamer ids eligible for this ranking, or null for no restriction
  * @param limit how many candidates to return
  */
 public record ColdStartRequest(
@@ -38,6 +44,7 @@ public record ColdStartRequest(
         @JsonProperty("keywords") List<String> keywords,
         @JsonProperty("platforms") List<String> platforms,
         @JsonProperty("exclude") List<String> exclude,
+        @JsonProperty("include") List<String> include,
         @JsonProperty("limit") int limit) {
 
     public ColdStartRequest(
@@ -46,6 +53,7 @@ public record ColdStartRequest(
             Collection<String> keywords,
             Collection<String> platforms,
             Collection<String> exclude,
+            Collection<String> include,
             int limit) {
         this(
                 userId,
@@ -53,6 +61,7 @@ public record ColdStartRequest(
                 List.copyOf(keywords),
                 List.copyOf(platforms),
                 List.copyOf(exclude),
+                include == null ? null : List.copyOf(include),
                 limit);
     }
 }

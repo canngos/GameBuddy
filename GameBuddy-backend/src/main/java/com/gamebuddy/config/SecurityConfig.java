@@ -110,8 +110,22 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                // 401 rather than a redirect to a login page that does not exist.
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                // Two handlers, because the two cases mean different things to the client.
+                //
+                // The entry point answers "no usable credentials" with 401 rather than a
+                // redirect to a login page that does not exist.
+                //
+                // The access-denied handler answers "credentials are fine, you may not do
+                // this" with 403 — and without it the AccessDeniedException raised by the
+                // /admin/** rule above fell through to the entry point instead. The app maps
+                // an empty 401 to onSessionExpired (src/api/client.ts), so an ordinary gamer
+                // who reached an admin route was signed out rather than refused. It also put
+                // the two admin surfaces in disagreement: /community/admin/reports already
+                // returns 403, because its @PreAuthorize denial is handled inside the
+                // dispatcher and never reaches here.
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(
+                                (request, response, denied) -> response.setStatus(HttpStatus.FORBIDDEN.value())))
                 .build();
     }
 }

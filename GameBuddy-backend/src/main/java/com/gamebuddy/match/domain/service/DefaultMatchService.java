@@ -55,6 +55,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 
 @Slf4j
 @Service
@@ -142,20 +143,14 @@ public class DefaultMatchService implements MatchService {
         // its target, so the pool refills instead of shrinking to nothing.
         decided.addAll(declinedMatches.findActiveExclusions(gamer.getUserId(), declineHorizon()));
 
-        // Anybody the filters rule out goes into the same exclusion set, for exactly the
-        // reason above: the model returns its top N by similarity and a filter applied to
-        // the answer can only remove from those N. It can never reach the person ranked
-        // 300th who is the only one online in your country — so the filter that sounds
+        // Who the filters allow, sent to the model as the pool it may rank within — for
+        // exactly the reason above: the model returns its top N by similarity and a filter
+        // applied to the answer can only remove from those N. It can never reach the person
+        // ranked 300th who is the only one online in your country, so the filter that sounds
         // most valuable is the one that most reliably returned nothing.
-        if (filters.narrowing()) {
-            decided.addAll(gamerRepository.findIdsExcludedByFilters(
-                    filters.gameId(),
-                    filters.country(),
-                    filters.activeSince(clock),
-                    filters.platform() == null ? null : filters.platform().name()));
-        }
+        List<String> eligible = eligibleFor(filters);
 
-        List<String> candidates = predict(gamer, decided);
+        List<String> candidates = predict(gamer, decided, eligible);
 
         // findAllById rather than one findById per candidate, and a candidate the model
         // knows about but the database no longer does is skipped rather than turned into
@@ -166,14 +161,62 @@ public class DefaultMatchService implements MatchService {
         }
 
         List<Gamer> ranked = filtered(pairable(gamer, rankedAsModelOrdered(candidates, recommended)), filters);
-        // Exploration is filtered too. It exists to surface people the model would never
-        // rank, and a filtered feed that quietly injects somebody playing a different game
-        // is not showing an overlooked candidate — it is ignoring the request.
-        List<Gamer> explored = filtered(exploration(gamer, ranked, decided), filters);
+        // Exploration is filtered too, in its own query and again here. It exists to surface
+        // people the model would never rank, and a filtered feed that quietly injects
+        // somebody playing a different game is not showing an overlooked candidate — it is
+        // ignoring the request.
+        List<Gamer> explored = filtered(exploration(gamer, ranked, decided, filters), filters);
         List<Gamer> page = boostedFirst(gamer, merge(ranked, explored), decided, filters);
 
         recordImpressions(gamer, page, explored);
         return recommendationResponse(page);
+    }
+
+    /**
+     * The largest eligible set worth sending to the model.
+     *
+     * <p>Must not exceed {@code MAX_INCLUSIONS} in the model service, which rejects a longer
+     * list outright — the whole failure being fixed here was a list the model had already
+     * declared too large, reported to the user as the recommender being down.
+     *
+     * <p>Crossing it is not an error and must never become one. A set this large means the
+     * filter has excluded hardly anybody, so ranking unfiltered and applying
+     * {@link #filtered} to the answer gives very nearly the same deck — the top candidates
+     * are overwhelmingly eligible when almost everyone is. That is the whole reason this
+     * direction is the right one: the fallback is only ever needed where it costs nothing.
+     */
+    private static final int MAX_ELIGIBLE = 50_000;
+
+    /**
+     * The gamers a narrowed feed may draw from, or null when nothing was asked for.
+     *
+     * <p>Null and empty are different answers and the difference is load-bearing. Null is
+     * "not filtering" and the model ranks over everybody. Empty is "the filter matched
+     * nobody" and must produce an empty deck — answering it with an unfiltered one would
+     * show a gamer who asked for people online in their country a page of people who are
+     * neither, which looks like the filter being ignored.
+     */
+    private List<String> eligibleFor(FeedFilters filters) {
+        if (!filters.narrowing()) {
+            return null;
+        }
+
+        List<String> eligible = gamerRepository.findIdsMatchingFilters(
+                filters.gameId(),
+                filters.country(),
+                filters.activeSince(clock),
+                filters.platform() == null ? null : filters.platform().name());
+
+        if (eligible.size() > MAX_ELIGIBLE) {
+            log.warn(
+                    "Filter {} matches {} gamers, past the {} the model accepts; ranking"
+                            + " unfiltered and narrowing the answer instead",
+                    filters,
+                    eligible.size(),
+                    MAX_ELIGIBLE);
+            return null;
+        }
+        return eligible;
     }
 
     /**
@@ -287,7 +330,7 @@ public class DefaultMatchService implements MatchService {
      * so fitting the prior on those alone measures the model's own past opinions. This is
      * the cheapest available fix for both problems at once.
      */
-    private List<Gamer> exploration(Gamer gamer, List<Gamer> ranked, Set<String> decided) {
+    private List<Gamer> exploration(Gamer gamer, List<Gamer> ranked, Set<String> decided, FeedFilters filters) {
         int slots = Math.round(ranked.size() * EXPLORATION_RATE);
         if (slots == 0) {
             return List.of();
@@ -296,9 +339,21 @@ public class DefaultMatchService implements MatchService {
         Set<String> alreadyOnPage = new HashSet<>(decided);
         ranked.forEach(candidate -> alreadyOnPage.add(candidate.getUserId()));
 
+        // The filters go into the query rather than onto its result, and this is a trap worth
+        // naming: exploration used to be filter-correct by accident, because `decided`
+        // carried every gamer the filter ruled out and the query could not return one.
+        // Sending the eligible set to the model instead ended that. Drawing at random from
+        // the whole population and discarding the misses afterwards would leave the
+        // exploration slots empty under exactly the narrow filters that make them valuable.
         return gamerRepository
                 .findRandomPairable(
-                        AgeBand.of(gamer.getAge()) == AgeBand.MINOR, alreadyOnPage.toArray(String[]::new), slots)
+                        AgeBand.of(gamer.getAge()) == AgeBand.MINOR,
+                        alreadyOnPage.toArray(String[]::new),
+                        filters.gameId(),
+                        filters.country(),
+                        filters.activeSince(clock),
+                        filters.platform() == null ? null : filters.platform().name(),
+                        slots)
                 .stream()
                 // The SQL cannot see the block graph, which lives in a join table on both
                 // sides, so the same filter every other path uses is applied here too.
@@ -888,12 +943,21 @@ public class DefaultMatchService implements MatchService {
      * since the artefact was trained. Their vector exists, so {@code /predict} answers
      * confidently — with the games and keywords they have since replaced. An out-of-date
      * answer is worse than the cold-start one, which is computed from what they like now.
+     *
+     * <p><b>An empty eligible set short-circuits both calls.</b> That interaction is worth
+     * spelling out: an empty result normally means "the model has not met this gamer" and
+     * triggers the cold-start fallback, but under a filter that matched nobody it means
+     * "nobody qualifies" — a different answer with the same shape. Without this the service
+     * would make two round trips to be told the same thing twice.
      */
-    private List<String> predict(Gamer gamer, Set<String> exclude) {
+    private List<String> predict(Gamer gamer, Set<String> exclude, List<String> include) {
         String userId = gamer.getUserId();
+        if (include != null && include.isEmpty()) {
+            return List.of();
+        }
         try {
             if (gamer.getRecommenderProfileChangedAt() != null) {
-                List<String> fresh = coldStart(gamer, exclude);
+                List<String> fresh = coldStart(gamer, exclude, include);
                 if (!fresh.isEmpty()) {
                     return fresh;
                 }
@@ -903,14 +967,27 @@ public class DefaultMatchService implements MatchService {
             }
 
             List<String> ranked = predictClient
-                    .predict(new PredictRequest(userId, exclude, RECOMMENDATION_FETCH_SIZE))
+                    .predict(new PredictRequest(userId, exclude, include, RECOMMENDATION_FETCH_SIZE))
                     .similarUsers();
             if (!ranked.isEmpty()) {
                 return ranked;
             }
 
             log.debug("Model has no vector for {}; ranking from the profile instead", userId);
-            return coldStart(gamer, exclude);
+            return coldStart(gamer, exclude, include);
+        } catch (HttpClientErrorException e) {
+            // Kept apart from the case below, and not because the user sees anything
+            // different. A 4xx means *we* built a request the model had already declared
+            // invalid — the last one was an exclusion list past the model's cap, logged for
+            // a day as "recommendation model unavailable" while the model was perfectly
+            // healthy. Anything that hides which side is at fault costs exactly that.
+            log.error(
+                    "The model refused our request for {}: {} {}",
+                    userId,
+                    e.getStatusCode(),
+                    e.getResponseBodyAsString(),
+                    e);
+            throw new BusinessException(TransactionCode.RECOMMENDER_SERVICE_ERROR, e);
         } catch (RuntimeException e) {
             log.warn("Recommendation model unavailable for {}", userId, e);
             throw new BusinessException(TransactionCode.RECOMMENDER_SERVICE_ERROR, e);
@@ -928,7 +1005,7 @@ public class DefaultMatchService implements MatchService {
      *
      * @return the ranking, or empty when there is nothing to rank from
      */
-    private List<String> coldStart(Gamer gamer, Set<String> exclude) {
+    private List<String> coldStart(Gamer gamer, Set<String> exclude, List<String> include) {
         // Names, not ids: the model was trained on the catalogue's names and has never
         // seen our UUIDs.
         List<String> games =
@@ -936,14 +1013,13 @@ public class DefaultMatchService implements MatchService {
         List<String> keywords =
                 gamer.getKeywords().stream().map(Keywords::getKeywordName).toList();
         // Enum names, matching PLATFORM_IDS in the model's catalogue.
-        List<String> platforms =
-                gamer.getPlatforms().stream().map(Enum::name).toList();
+        List<String> platforms = gamer.getPlatforms().stream().map(Enum::name).toList();
         if (games.isEmpty() && keywords.isEmpty()) {
             return List.of();
         }
         return predictClient
                 .predictColdStart(new ColdStartRequest(
-                        gamer.getUserId(), games, keywords, platforms, exclude, RECOMMENDATION_FETCH_SIZE))
+                        gamer.getUserId(), games, keywords, platforms, exclude, include, RECOMMENDATION_FETCH_SIZE))
                 .similarUsers();
     }
 

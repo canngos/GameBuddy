@@ -90,6 +90,16 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
      * would drop them afterwards, so this is not the only guard — but filtering in Java
      * costs an exploration slot every time the moderator is drawn, which silently shortens
      * the page. See {@link Gamer#isDiscoverable()}.
+     *
+     * <p><b>The filter parameters are the same four as {@link #findIdsMatchingFilters}</b>
+     * and mean the same thing; null disables the clause. They have to be here rather than
+     * applied to the result, and the reason is a trap: exploration used to get filter
+     * correctness for free, because the caller's exclusion set happened to contain every
+     * gamer the filter ruled out and this query could not return one. Sending the eligible
+     * set to the model instead removed that, and without these clauses a narrowed feed would
+     * draw its exploration slots from the whole population and then discard nearly all of
+     * them — the slots would come back empty under exactly the filters that make exploration
+     * worth having.
      */
     @Query(value = """
                     SELECT * FROM gamer g
@@ -98,11 +108,30 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                       AND g.role <> 'ADMIN'
                       AND (COALESCE(g.age, 0) < 18) = :minor
                       AND g.user_id <> ALL(CAST(:excluded AS varchar[]))
+                      AND (:gameId IS NULL
+                            OR EXISTS (SELECT 1 FROM gamer_games_join j
+                                        WHERE j.gamer_id = g.user_id AND j.game_id = :gameId))
+                      AND (:country IS NULL
+                            OR (g.country IS NOT NULL
+                                 AND lower(g.country) = lower(CAST(:country AS varchar))))
+                      AND (CAST(:activeSince AS timestamptz) IS NULL
+                            OR (g.last_active_at IS NOT NULL
+                                 AND g.last_active_at >= CAST(:activeSince AS timestamptz)))
+                      AND (:platform IS NULL
+                            OR NOT EXISTS (SELECT 1 FROM gamer_platform p WHERE p.user_id = g.user_id)
+                            OR EXISTS (SELECT 1 FROM gamer_platform p
+                                        WHERE p.user_id = g.user_id AND p.platform = :platform))
                     ORDER BY RANDOM()
                     LIMIT :limit
                     """, nativeQuery = true)
     List<Gamer> findRandomPairable(
-            @Param("minor") boolean minor, @Param("excluded") String[] excluded, @Param("limit") int limit);
+            @Param("minor") boolean minor,
+            @Param("excluded") String[] excluded,
+            @Param("gameId") String gameId,
+            @Param("country") String country,
+            @Param("activeSince") Instant activeSince,
+            @Param("platform") String platform,
+            @Param("limit") int limit);
 
     /**
      * Gamers currently boosted in one country.
@@ -135,49 +164,67 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
             @Param("limit") int limit);
 
     /**
-     * Everyone a narrowed feed must not show, so the model can rank <em>past</em> them.
+     * Everyone a narrowed feed <em>may</em> show — the eligible set for a Gold filter.
      *
-     * <p>Filtering the model's answer is not enough, and the reason is the same one that
-     * made the feed run dry before declines were sent to the model: the model returns its
-     * top N by similarity, and a filter applied afterwards can only remove from those N —
-     * it can never reach the person who ranks 300th but is the only one online in your
+     * <p>Filtering the model's answer instead is not enough, and the reason is the same one
+     * that made the feed run dry before declines were sent to the model: the model returns
+     * its top N by similarity, and a filter applied afterwards can only remove from those
+     * N — it can never reach the person who ranks 300th but is the only one online in your
      * country. Measured on the development population: 25 accounts active inside the
      * window, none of them in the 37 the model returned, so "online now" — the headline
      * Gold filter — returned an empty deck every time while 25 people sat there matching.
+     * So the filter has to be applied <em>before</em> the model's cut, which means telling
+     * the model who is eligible.
      *
-     * <p>Returns the complement rather than the eligible set because the model's request
-     * only carries an exclusion list. That makes the result grow with the population, not
-     * with the answer, which is the wrong way round and is fine only while the population
-     * is small: a country filter on a million accounts would ship most of them over the
-     * wire. The fix when that day comes is an inclusion list in {@code PredictRequest},
-     * not a bigger array here.
+     * <p><b>This used to return the complement</b>, because the model's request only
+     * carried an exclusion list, and it is why three of the four Gold filters answered 503
+     * in a 20,001-gamer database: the model caps that list at ten thousand entries and
+     * refused the request, which the backend then reported as the recommender being down.
      *
-     * <p>A null parameter disables its clause entirely — an unset filter must never
-     * exclude anybody. Country is compared case-insensitively and a candidate with no
-     * country recorded fails a country filter rather than passing it by accident.
+     * <p>Both directions have a ceiling; what makes this one right is when it is reached. A
+     * complement is longest when the filter is <em>most</em> narrowing — precisely when
+     * there is no way to recover, since post-filtering the top N is the broken behaviour
+     * above. An eligible set is longest when the filter narrows almost nothing, and then
+     * the caller can simply drop it and post-filter, because almost everyone qualifies
+     * anyway. The degraded path is only ever taken where degrading is harmless.
+     *
+     * <p>A null parameter disables its clause entirely — an unset filter must never narrow
+     * anything. Country is compared case-insensitively, and a candidate with no country
+     * recorded fails a country filter rather than passing it by accident.
      *
      * <p><b>Platform behaves the opposite way, and deliberately.</b> A candidate with no
-     * platform recorded is <em>not</em> excluded, because an empty set means "has not said"
+     * platform recorded <em>is</em> eligible, because an empty set means "has not said"
      * rather than "plays on something else" — every account created before the field
-     * existed has one. The clause must stay the exact mirror of
-     * {@code FeedFilters#matches}: if these two ever disagree, the deck and the count of it
+     * existed has one. Every clause here must stay the exact mirror of
+     * {@code FeedFilters#matches}: if these two ever disagree, the deck and the check on it
      * disagree, and the bug looks like the feed randomly dropping people.
+     *
+     * <p>The three discoverability columns are applied here as well, which is not
+     * duplication of policy but a smaller list: a deleted, banned or admin account can
+     * never be shown, so carrying them over the wire only brings the cap closer. Age band
+     * is deliberately <em>not</em> here — that predicate's meaning lives in {@code AgeBand},
+     * and {@code pairable} applies it authoritatively a moment later.
      */
     @Query(value = """
                     SELECT g.user_id FROM gamer g
-                    WHERE (:gameId IS NOT NULL
-                            AND NOT EXISTS (SELECT 1 FROM gamer_games_join j
-                                             WHERE j.gamer_id = g.user_id AND j.game_id = :gameId))
-                       OR (:country IS NOT NULL
-                            AND (g.country IS NULL OR lower(g.country) <> lower(CAST(:country AS varchar))))
-                       OR (CAST(:activeSince AS timestamptz) IS NOT NULL
-                            AND (g.last_active_at IS NULL OR g.last_active_at < CAST(:activeSince AS timestamptz)))
-                       OR (:platform IS NOT NULL
-                            AND EXISTS (SELECT 1 FROM gamer_platform p WHERE p.user_id = g.user_id)
-                            AND NOT EXISTS (SELECT 1 FROM gamer_platform p
-                                             WHERE p.user_id = g.user_id AND p.platform = :platform))
+                    WHERE g.deleted_at IS NULL
+                      AND g.is_blocked = false
+                      AND g.role <> 'ADMIN'
+                      AND (:gameId IS NULL
+                            OR EXISTS (SELECT 1 FROM gamer_games_join j
+                                        WHERE j.gamer_id = g.user_id AND j.game_id = :gameId))
+                      AND (:country IS NULL
+                            OR (g.country IS NOT NULL
+                                 AND lower(g.country) = lower(CAST(:country AS varchar))))
+                      AND (CAST(:activeSince AS timestamptz) IS NULL
+                            OR (g.last_active_at IS NOT NULL
+                                 AND g.last_active_at >= CAST(:activeSince AS timestamptz)))
+                      AND (:platform IS NULL
+                            OR NOT EXISTS (SELECT 1 FROM gamer_platform p WHERE p.user_id = g.user_id)
+                            OR EXISTS (SELECT 1 FROM gamer_platform p
+                                        WHERE p.user_id = g.user_id AND p.platform = :platform))
                     """, nativeQuery = true)
-    List<String> findIdsExcludedByFilters(
+    List<String> findIdsMatchingFilters(
             @Param("gameId") String gameId,
             @Param("country") String country,
             @Param("activeSince") Instant activeSince,

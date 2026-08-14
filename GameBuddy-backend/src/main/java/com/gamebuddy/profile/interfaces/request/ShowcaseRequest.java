@@ -20,5 +20,5 @@ public class ShowcaseRequest {
 
     @NotNull
     @Size(max = 3, message = "You can show at most three badges")
-    private List<String> codes;
+    private List<@Size(max = 64, message = "Badge code is not valid") String> codes;
 }

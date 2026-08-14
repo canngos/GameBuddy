@@ -1,0 +1,67 @@
+# TLS and the only door into the box.
+#
+# Caddy gets and renews Let's Encrypt certificates automatically; there is no certbot cron
+# to forget. The one prerequisite is that DOMAIN's A record already points at this server
+# before the container starts, because the ACME challenge is answered on port 80.
+
+{
+	email {$ACME_EMAIL}
+	# Uncomment to test certificate issuance without burning Let's Encrypt's rate limit —
+	# five failures per domain per week is easy to hit while a DNS record is still wrong,
+	# and it locks you out for days.
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# The API. `backend` resolves over the compose network; the port is not published to
+	# the host at all, so this is the only route to it.
+	reverse_proxy backend:8080 {
+		# Spring reads these to reconstruct the original scheme and client IP —
+		# `forward-headers-strategy: framework` in application.yml is what consumes them.
+		# Without them every client looks like it came from the proxy's address, which
+		# makes the rate limiters useless and the access log misleading.
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Real-IP {remote_host}
+
+		# The chat socket is a long-lived connection; the default 30s would cut it.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	# Actuator is for you, not the internet. Health is exposed for uptime monitoring;
+	# everything else under /actuator is refused here as well as by Spring.
+	@actuator path /actuator/*
+	handle @actuator {
+		@health path /actuator/health
+		handle @health {
+			reverse_proxy backend:8080
+		}
+		respond 404
+	}
+
+	# Swagger is disabled in the application too. Belt and braces: if that flag is ever
+	# lost in a config change, this still refuses.
+	@docs path /swagger-ui* /api-docs*
+	respond @docs 404
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output file /data/access.log {
+			roll_size 10MB
+			roll_keep 3
+		}
+		format json
+	}
+}

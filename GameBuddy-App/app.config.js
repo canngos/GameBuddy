@@ -53,15 +53,105 @@ function adMobPlugin(plugins, androidAppId, iosAppId) {
   });
 }
 
-module.exports = ({ config }) => ({
-  ...config,
-  plugins: adMobPlugin(
-    config.plugins,
-    process.env.ADMOB_ANDROID_APP_ID,
-    process.env.ADMOB_IOS_APP_ID,
-  ),
-  android: {
-    ...config.android,
-    googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? config.android.googleServicesFile,
-  },
-});
+/**
+ * Whether this build can compile Crashlytics.
+ *
+ * True on EAS, false on a local Windows machine, and that split is not a preference — it is
+ * a hard limit. React Native's CMake build shells out to `ninja`, which is capped at
+ * Windows' 260-character `MAX_PATH` because it does not declare `longPathAware` in its
+ * manifest, and the file Crashlytics' codegen emits is 283 characters at this repo's
+ * location:
+ *
+ *   …/node_modules/@react-native-firebase/crashlytics/android/src/main/java/io/invertase/
+ *   firebase/crashlytics/generated/jni/react/renderer/components/
+ *   RNFBCrashlyticsTurboModules/RNFBCrashlyticsTurboModulesJSI-generated.cpp
+ *
+ * The machine's `LongPathsEnabled` registry key is already `1` and makes no difference,
+ * because that setting only lifts the limit for executables that opt in. Mapping the repo to
+ * a short drive with `subst` makes no difference either: CMake resolves the virtual drive
+ * back to its real target. EAS builds on Linux, which has no such limit.
+ *
+ * So the store build gets crash reporting and the local development build does not. The cost
+ * of that is real and worth stating: the two builds no longer contain the same native
+ * modules, so a fault in Crashlytics' own initialisation would first appear on EAS. It is
+ * accepted here because the alternative is shipping with no way at all to see the native
+ * crash this exists to catch — see QA_FINDINGS.md #6.
+ *
+ * **This is only half the switch, and the other half is not optional.** Autolinking finds a
+ * native module from `package.json` alone, so dropping the config plugin here changes
+ * nothing on its own — that was verified the expensive way, with a build that still failed.
+ * `package.json` carries `expo.autolinking.android.exclude` for the same two packages, and
+ * `scripts/eas-enable-crashlytics.js` removes it on the builder via the
+ * `eas-build-pre-install` hook. Change one and you must change the other: the plugin without
+ * the module configures Firebase for something that is not there, and the module without the
+ * plugin has no `google-services.json` wired in.
+ *
+ * `EAS_BUILD` is set to "true" by the EAS builder itself.
+ */
+const crashReportingBuildable = process.env.EAS_BUILD === 'true';
+
+const CRASHLYTICS_PLUGINS = ['@react-native-firebase/app', '@react-native-firebase/crashlytics'];
+
+/**
+ * Whether iOS has what Firebase needs.
+ *
+ * Android is configured: `google-services.json` is uploaded to EAS as a file environment
+ * variable and referenced through `android.googleServicesFile`. **iOS is not.** There is no
+ * `GoogleService-Info.plist` and no `ios.googleServicesFile`, and the two are not
+ * interchangeable — a Firebase project needs an iOS app registered separately, which
+ * produces a different file with a different bundle id inside it.
+ *
+ * Without it the `@react-native-firebase/app` plugin does not skip iOS quietly, it throws:
+ *
+ *     Path to GoogleService-Info.plist is not defined.
+ *     Please specify the `expo.ios.googleServicesFile` field in app.json.
+ *
+ * — so an iOS build would fail outright rather than simply ship without crash reporting.
+ * This check turns that into a warning and an iOS build that still works, because the
+ * failure would otherwise land on whoever first runs `eas build --platform ios`, long after
+ * the reason was fresh in anyone's mind.
+ *
+ * To finish it: register an iOS app in the Firebase console under the bundle id
+ * `com.gamebuddy.app`, download `GoogleService-Info.plist`, upload it to EAS the same way as
+ * the Android one, and set `ios.googleServicesFile`. Android-first is the plan, so this is a
+ * task for the Apple release rather than a gap in this one.
+ */
+function iosFirebaseConfigured(config) {
+  return Boolean(process.env.GOOGLE_SERVICES_INFO_PLIST || config.ios?.googleServicesFile);
+}
+
+module.exports = ({ config }) => {
+  const buildingForIos = process.env.EAS_BUILD_PLATFORM === 'ios';
+  const crashReporting =
+    crashReportingBuildable && !(buildingForIos && !iosFirebaseConfigured(config));
+
+  if (crashReportingBuildable && !crashReporting) {
+    console.warn(
+      '[crashlytics] iOS has no GoogleService-Info.plist, so crash reporting is being left ' +
+        'out of this build. Register an iOS app in the Firebase console for bundle id ' +
+        'com.gamebuddy.app, then set expo.ios.googleServicesFile. See app.config.js.',
+    );
+  }
+
+  return {
+    ...config,
+    plugins: [
+      ...adMobPlugin(
+        config.plugins,
+        process.env.ADMOB_ANDROID_APP_ID,
+        process.env.ADMOB_IOS_APP_ID,
+      ),
+      ...(crashReporting ? CRASHLYTICS_PLUGINS : []),
+    ],
+    android: {
+      ...config.android,
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? config.android.googleServicesFile,
+    },
+    ios: {
+      ...config.ios,
+      ...(process.env.GOOGLE_SERVICES_INFO_PLIST
+        ? { googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST }
+        : {}),
+    },
+  };
+};

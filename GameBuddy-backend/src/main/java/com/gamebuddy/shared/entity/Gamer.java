@@ -172,6 +172,16 @@ public class Gamer implements RevocableUser {
     @Column(nullable = false)
     private Boolean isVerified = Boolean.FALSE;
 
+    /**
+     * The Firebase device token.
+     *
+     * <p>512 rather than the default 255. {@code FcmTokenRequest} has always accepted 512,
+     * so a token longer than 255 passed validation and then broke the insert — the same
+     * shape of defect as the unbounded community and post fields, and closer than it looks:
+     * FCM tokens have grown over time and current ones already run past 160 characters.
+     * See {@code upgrade-2026-26-column-bounds.sql}.
+     */
+    @Column(length = 512)
     private String fcmToken;
 
     @Column(nullable = false)

@@ -237,7 +237,16 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-16-keyword-descriptions.sql` | Real explanations for the keyword catalogue. |
 | `db/upgrade-2026-17-row-timestamps.sql` | created_at everywhere, updated_at where rows change. |
 | `db/upgrade-2026-18-membership-cosmetics.sql` | The Gold frame and banner come with membership. |
+| `db/upgrade-2026-19-boost-and-rewind.sql` | Boost windows and the last swipe, for Rewind. |
+| `db/upgrade-2026-20-coin-faucets.sql` | Daily claim, streak, stipend and weekly quests. |
+| `db/upgrade-2026-21-consumables.sql` | Super likes, bonus accepts, the coin ledger. |
+| `db/upgrade-2026-22-funnel-instrumentation.sql` | The monetization funnel event log.  |
+| `db/upgrade-2026-23-upgrade-prompt.sql` | When the day-3 upgrade prompt was last shown. |
+| `db/upgrade-2026-24-platforms.sql` | What each gamer plays on.                        |
+| `db/upgrade-2026-25-rewarded-ads.sql` | Rewarded-ad grants and the daily cap.          |
+| `db/upgrade-2026-26-column-bounds.sql` | fcm_token widened; a warning on subscription_tier. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
+| `db/delete-seed.sql`              | Removes the synthetic accounts. Not a migration — see above. |
 
 They live in `GameBuddy-backend/src/main/resources/db/`. On a fresh database apply the
 baseline and then any upgrade files newer than it, in filename order. Compose does this
@@ -265,16 +274,32 @@ that comes back empty and looks exactly like a broken recommender. `SEED` in
 `seed_local_gamers.py` matches the default of `python -m gamebuddy_model generate`; if you
 retrain on a different seed, change it there too.
 
-Every account it creates is marked, and removable in one statement:
+Every account it creates is marked, and removed by one script:
 
-```sql
-DELETE FROM gamebuddy.gamer WHERE email LIKE '%@bot.gamebuddy.invalid';
+```bash
+docker compose exec -T postgres psql -U gamebuddy -d gamebuddy -v ON_ERROR_STOP=1 \
+  -f /dev/stdin < GameBuddy-backend/src/main/resources/db/delete-seed.sql
 ```
 
 `.invalid` is reserved by RFC 2606 so those addresses can never be real, and the stored
 password is not a valid bcrypt hash so none of them can be signed into. **They are
-fixtures, not users** — never run this against production. A fake profile a real person
-can swipe on and message is the thing matching apps get investigated for.
+fixtures, not users** — and clearing them out is what has to happen before real users
+arrive. A fake profile a real person can swipe on and message is the thing matching apps
+get investigated for.
+
+This used to be documented as a single `DELETE FROM gamebuddy.gamer WHERE email LIKE …`,
+and that statement has never worked: fifteen of the sixteen foreign keys pointing at
+`gamer` are `NO ACTION`, so it stops on the first join table. The children have to go
+first, in dependency order — and two of them key on `gamer_id` where everything else uses
+`user_id`, which is most of why writing it by hand goes wrong.
+
+The script also handles the case a plain cascade would get wrong. The seed **owns
+communities** (570 in the development database, which was a surprise), so deleting the
+accounts naively would take those communities and every post inside them. Instead it
+follows the rule the product already uses when an owner leaves: a community with a
+surviving member passes to the longest-standing one, a community with none is removed, and
+posts or comments a real person wrote are never touched. Run it together with flipping
+`RETRAIN_INCLUDE_BOTS` to false, and in that order.
 
 It seeds 1200 by default, which is more than it sounds like it needs: the recommender
 ranks against the population it was *trained* on, and only ids that also exist in this
@@ -369,7 +394,7 @@ docker compose exec -T postgres psql -U gamebuddy -d scratch \
 # silently never reaches the baseline. That has already happened once — 21 and 22 were
 # both missing, so a fresh `docker compose up` built a database with no coin_ledger and
 # no funnel_event, and the backend refused to start against it.
-for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25; do
+for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26; do
   f=$(ls GameBuddy-backend/src/main/resources/db/upgrade-2026-$n-*.sql)
   docker compose exec -T postgres psql -U gamebuddy -d scratch -f /dev/stdin < "$f"
 done

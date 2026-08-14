@@ -1,0 +1,101 @@
+# The load-testing stack.
+#
+#   docker compose -p gamebuddy-perf -f docker-compose.yml -f qa/perf/docker-compose.perf.yml \
+#     up -d postgres model redis backend
+#
+# Same images as the real thing, different ports and its own volumes, so the development
+# stack and its data are untouched. Ports are shifted by 100 (8180, 8100, 5532, 6479) —
+# which also means a load script pointed at the wrong port fails loudly instead of quietly
+# hammering the stack you were using to develop.
+#
+# What is deliberately NOT here
+# -----------------------------
+# Elasticsearch, Kibana and Filebeat. Measured idle they cost 2.9 GB, against 1.14 GB for
+# the entire application, and every candidate Hetzner plan has 4-8 GB in total. They cannot
+# share a box with the application on any of them, so co-locating them here would make the
+# generator and the system under test fight over memory to measure a configuration nobody
+# can deploy. Their cost is reported separately in the QA report.
+#
+# The backend still writes its ECS log file exactly as it does in production, so the
+# application-side cost of logging is still being measured. Only the shipping and indexing
+# tier is absent.
+#
+# Resource caps
+# -------------
+# `cpuset` and `mem_limit` are applied per plan by qa/perf/plan.js, which writes
+# qa/perf/plan.override.yml. The generator is pinned to the cores the SUT does not have —
+# without that, k6 and the backend compete for the same silicon and every number is a
+# measurement of the laptop rather than of the application.
+
+name: gamebuddy-perf
+
+services:
+  postgres:
+    ports:
+      - "${PERF_DB_PORT:-5532}:5432"
+    volumes:
+      # Only the baseline. The seed catalogue is NOT mounted, because the whole database is
+      # restored from a data-only dump of the development stack immediately afterwards —
+      # letting the seed run first would collide with the catalogue rows in that dump.
+      #
+      # Restoring rather than regenerating matters: /predict ranks over the ids baked into
+      # the artefact, and the backend keeps only the ones its own database knows about. A
+      # population generated separately would intersect the artefact's barely at all and
+      # the feed would come back empty, which looks exactly like a broken recommender.
+      #
+      # The path is relative to the PROJECT directory — the workspace root, set by the
+      # first -f — not to this file. Writing it relative to this file resolves to nothing,
+      # and Docker's response to a bind source that does not exist is to create a
+      # directory, so the init step fails with "could not read from input file: Is a
+      # directory" rather than "no such file".
+      - perf-postgres-data:/var/lib/postgresql/data
+      - ./GameBuddy-backend/src/main/resources/db/schema-baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
+
+  model:
+    ports:
+      - "${PERF_MODEL_PORT:-8100}:8000"
+    volumes:
+      - perf-model-artifacts:/app/artifacts
+
+  redis:
+    ports:
+      - "${PERF_REDIS_PORT:-6479}:6379"
+
+  backend:
+    ports:
+      - "${PERF_BACKEND_PORT:-8180}:8080"
+    environment:
+      # Mail is never sent during a load test. Registration is not in the workload — the
+      # load scripts authenticate with minted tokens — but a stray call must not reach a
+      # real relay from a machine generating hundreds of requests a second.
+      MAIL_MODE: log
+      # Off: no service-account key is mounted here, and a load test that fired real push
+      # notifications at real devices would be worse than useless.
+      FIREBASE_ENABLED: "false"
+      ENVIRONMENT: perf
+      # The access log is one line per request. At 200 req/s that is the loudest thing in
+      # the system and it competes with the work being measured, so only failures are kept.
+      # The application's own logging is untouched.
+      ACCESS_LOG_LEVEL: WARN
+    volumes:
+      - perf-media:/app/.media
+      - perf-logs:/app/logs
+
+  # The log stack is disabled rather than deleted, so `docker compose config` still
+  # resolves and the difference from the real stack is visible in one place.
+  elasticsearch:
+    profiles: ["logs"]
+  kibana:
+    profiles: ["logs"]
+  filebeat:
+    profiles: ["logs"]
+  kibana-setup:
+    profiles: ["logs"]
+  model-retrain:
+    profiles: ["retrain"]
+
+volumes:
+  perf-postgres-data:
+  perf-model-artifacts:
+  perf-media:
+  perf-logs:
