@@ -1,0 +1,59 @@
+---
+/**
+ * The site header.
+ *
+ * No mobile menu, deliberately. Three links, a language picker and a theme toggle fit on a
+ * 360px screen at this size, and a hamburger would mean shipping a menu implementation for a
+ * nav that is already visible.
+ */
+import { localeUrl, t, type Lang } from '../i18n';
+import { SITE } from '../config';
+import LanguagePicker from './LanguagePicker.astro';
+import ThemeToggle from './ThemeToggle.astro';
+
+interface Props {
+  lang: Lang;
+  path: string;
+}
+
+const { lang, path } = Astro.props;
+const home = localeUrl(lang);
+
+const links = [
+  { href: `${home === '/' ? '' : home}/#features`, label: t(lang, 'nav.features') },
+  { href: `${home === '/' ? '' : home}/#how`, label: t(lang, 'nav.how') },
+  { href: localeUrl(lang, 'support'), label: t(lang, 'nav.support') },
+];
+---
+
+<header class="sticky top-0 z-40 border-b border-line/60 bg-canvas/80 backdrop-blur-md">
+  <nav
+    class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3.5"
+    aria-label="Primary"
+  >
+    <a href={home} class="flex shrink-0 items-center gap-2.5 font-display text-lg font-bold tracking-tight">
+      <span
+        class="gradient-surface flex h-8 w-8 items-center justify-center rounded-lg text-base"
+        aria-hidden="true">🎮</span
+      >
+      <span>{SITE.name}</span>
+    </a>
+
+    <div class="flex items-center gap-2 sm:gap-4">
+      <ul class="hidden items-center gap-5 text-sm text-muted sm:flex">
+        {
+          links.map((link) => (
+            <li>
+              <a href={link.href} class="transition-colors hover:text-content">
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+
+      <LanguagePicker lang={lang} path={path} />
+      <ThemeToggle lang={lang} />
+    </div>
+  </nav>
+</header>

@@ -1,0 +1,40 @@
+---
+/**
+ * Fades and lifts its contents into view on scroll.
+ *
+ * ## Why CSS scroll-driven animation, with a JavaScript fallback
+ *
+ * `animation-timeline: view()` does this in the compositor with no script at all, which is
+ * both smoother than an observer and free. It is not universal yet, so `@supports` picks it
+ * where available and a ~20-line IntersectionObserver covers the rest.
+ *
+ * **The order matters and is easy to get backwards.** The element starts at `opacity: 0`, so
+ * if neither mechanism runs the content is invisible — a broken page rather than an
+ * unanimated one. So the fallback script sets `data-reveal-js` on `<html>` *before* first
+ * paint (see `Base.astro`) and the hidden state is scoped to that attribute. No JS and no
+ * scroll-timeline support means everything is simply visible, which is the correct
+ * degradation for content that has to be readable above all.
+ *
+ * ## Why not just animate everything
+ *
+ * The hero is deliberately excluded from the observer path: it is above the fold, and
+ * animating the Largest Contentful Paint element delays the moment the page counts as
+ * painted. It gets a plain CSS entrance instead.
+ */
+interface Props {
+  /** Rendered element. `li` where the parent is a list, so the markup stays valid. */
+  as?: 'div' | 'li' | 'section';
+  /** Milliseconds, for staggering a row of cards. Kept small — 60–90ms reads as one motion. */
+  delay?: number;
+  class?: string;
+}
+
+const { as: Tag = 'div', delay = 0, class: className = '' } = Astro.props;
+---
+
+<Tag
+  class:list={['reveal', className]}
+  style={delay ? `--reveal-delay: ${delay}ms` : undefined}
+>
+  <slot />
+</Tag>

@@ -1,0 +1,68 @@
+---
+/**
+ * The store links, and the honest state when there are none.
+ *
+ * `STORES.play` and `STORES.appStore` are empty until the listings exist, and this renders a
+ * waiting state rather than a link to nowhere. **A fabricated store URL would be a dead link
+ * on the first thing a visitor sees**, which is worse than saying "not yet" — and the moment
+ * either string is filled in, this becomes a real button with no other change.
+ *
+ * Android first, deliberately: that is the launch order, and the iOS build is not yet
+ * configured for Firebase (see app.config.js).
+ */
+import { STORES } from '../config';
+import { t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  /** Tightens the layout where the buttons sit inside a card rather than under the hero. */
+  compact?: boolean;
+}
+
+const { lang, compact = false } = Astro.props;
+
+const stores = [
+  { name: 'Google Play', href: STORES.play, note: 'Android', icon: 'play' },
+  { name: 'App Store', href: STORES.appStore, note: 'iPhone', icon: 'apple' },
+] as const;
+---
+
+<div class:list={['flex flex-wrap gap-3', compact ? '' : 'justify-center sm:justify-start']}>
+  {
+    stores.map((store) =>
+      store.href ? (
+        <a
+          href={store.href}
+          class="gradient-action inline-flex items-center gap-3 rounded-xl px-5 py-3 font-medium text-white shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02]"
+        >
+          <span aria-hidden="true">{store.icon === 'play' ? '▶' : ''}</span>
+          <span class="text-left leading-tight">
+            <span class="block text-[11px] text-white/70">{t(lang, 'hero.comingSoon')}</span>
+            <span class="block text-sm font-semibold">{store.name}</span>
+          </span>
+        </a>
+      ) : (
+        <div
+          class="inline-flex cursor-default items-center gap-3 rounded-xl border border-line bg-raised/60 px-5 py-3"
+          aria-label={`${store.name}: not released yet`}
+        >
+          <span aria-hidden="true" class="text-muted">
+            {store.icon === 'play' ? '▶' : ''}
+          </span>
+          <span class="text-left leading-tight">
+            <span class="block text-[11px] text-muted">{t(lang, 'hero.comingSoon')}</span>
+            <span class="block text-sm font-semibold text-content/80">{store.name}</span>
+          </span>
+        </div>
+      ),
+    )
+  }
+</div>
+
+{
+  !STORES.play && !STORES.appStore && (
+    <p class:list={['text-xs text-muted', compact ? 'mt-3' : 'mt-4']}>
+      {t(lang, 'hero.releaseNote')}
+    </p>
+  )
+}

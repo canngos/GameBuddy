@@ -1,0 +1,201 @@
+---
+/**
+ * The shell every page uses: head, header, footer.
+ *
+ * The `<head>` here is most of the site's SEO, and the inline script is most of what stops
+ * the theme and the reveal animation misbehaving. Both are worth reading before editing.
+ */
+import '../styles/global.css';
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import { CONTACT, SITE } from '../config';
+import { DEFAULT_LANG, LANGS, dict, localeUrl, type Lang } from '../i18n';
+
+interface Props {
+  title: string;
+  description: string;
+  lang: Lang;
+  /** Path without a locale prefix — `support`, `''` for the landing page. Drives hreflang. */
+  path?: string;
+  /** True on /terms and /privacy, which exist in English only. */
+  englishOnly?: boolean;
+  noindex?: boolean;
+}
+
+const {
+  title,
+  description,
+  lang,
+  path = '',
+  englishOnly = false,
+  noindex = false,
+} = Astro.props;
+
+const d = dict(lang);
+const canonical = new URL(Astro.url.pathname, Astro.site).href;
+const ogImage = new URL('/og.png', Astro.site).href;
+
+/**
+ * hreflang.
+ *
+ * This is what tells Google the seven copies of a page are the same page in different
+ * languages rather than seven pages competing with each other — and it is what makes a
+ * Finnish searcher get the Finnish URL instead of the English one.
+ *
+ * `x-default` points at English: it is what a search engine serves when it cannot match the
+ * visitor to any of the seven.
+ *
+ * Not emitted for the legal pages, which exist once, in English. Claiming alternates that do
+ * not exist is worse than claiming none.
+ */
+const alternates = englishOnly
+  ? []
+  : LANGS.map((l) => ({
+      hreflang: dict(l).meta.htmlLang,
+      href: new URL(localeUrl(l, path), Astro.site).href,
+    }));
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: SITE.name,
+  applicationCategory: 'SocialNetworkingApplication',
+  operatingSystem: 'Android',
+  description: SITE.tagline,
+  url: SITE.url,
+  inLanguage: LANGS.map((l) => dict(l).meta.htmlLang),
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+  author: { '@type': 'Person', name: 'Can Baturlar' },
+};
+---
+
+<!doctype html>
+<html lang={d.meta.htmlLang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonical} />
+
+    {
+      alternates.map((alt) => (
+        <link rel="alternate" hreflang={alt.hreflang} href={alt.href} />
+      ))
+    }
+    {
+      alternates.length > 0 && (
+        <link rel="alternate" hreflang="x-default" href={new URL(localeUrl(DEFAULT_LANG, path), Astro.site).href} />
+      )
+    }
+
+    <title>{title} · {SITE.name}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={`${title} · ${SITE.name}`} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={d.meta.ogLocale} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={`${title} · ${SITE.name}`} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+
+    {/*
+      Runs before the first paint, and both jobs it does have to happen there.
+
+      **Theme.** Applied after paint means a flash of the wrong theme on every navigation —
+      a white page for one frame before it turns dark. Blocking and inline is the only way
+      to avoid that, which is why this is not in an external file.
+
+      **Reveal.** `.reveal` starts invisible, so the CSS that hides it is scoped to an
+      attribute this script sets — and it only sets it once it knows the content can be
+      brought back. If scripting is off, or the browser is old, nothing is ever hidden.
+      Getting this backwards produces a page with no visible text, which is the failure this
+      ordering exists to make impossible.
+
+      `theme-color` is set from here too, so the browser chrome matches on mobile.
+    */}
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+
+        try {
+          var saved = localStorage.getItem('gamebuddy-theme');
+          var system = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          root.dataset.theme = saved || (system ? 'dark' : 'light');
+        } catch (e) {
+          // Storage blocked. The system preference is still a better guess than a default.
+          root.dataset.theme = window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? 'dark'
+            : 'light';
+        }
+
+        var meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        meta.content = root.dataset.theme === 'dark' ? '#0B0B12' : '#F7F7FB';
+        document.head.appendChild(meta);
+
+        // Only set when the observer below will actually run. This attribute is what the
+        // CSS hides `.reveal` behind, so setting it optimistically is how a page ends up
+        // with no visible text — which is exactly what happened when this also tried to use
+        // CSS scroll-driven animation.
+        if (
+          !window.matchMedia('(prefers-reduced-motion: reduce)').matches &&
+          'IntersectionObserver' in window
+        ) {
+          root.dataset.reveal = 'on';
+        }
+      })();
+    </script>
+  </head>
+
+  <body class="min-h-screen bg-canvas text-content antialiased">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-white"
+    >
+      Skip to content
+    </a>
+
+    <Header lang={lang} path={path} />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer lang={lang} contactEmail={CONTACT.support} />
+
+    <script>
+      /**
+       * The scroll reveal. Does nothing at all unless the inline script set `data-reveal`,
+       * which it only does when this is going to run.
+       *
+       * `unobserve` after the first intersection is deliberate: these are entrances, not
+       * something to replay every time an element scrolls past. Re-animating on the way back
+       * up is what makes a page feel restless.
+       */
+      if (document.documentElement.dataset.reveal === 'on') {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              entry.target.classList.add('is-visible');
+              observer.unobserve(entry.target);
+            }
+          },
+          // A little before the element arrives, so it is settled by the time it is read.
+          { rootMargin: '0px 0px -12% 0px', threshold: 0.05 },
+        );
+
+        for (const el of document.querySelectorAll('.reveal')) observer.observe(el);
+      }
+    </script>
+  </body>
+</html>

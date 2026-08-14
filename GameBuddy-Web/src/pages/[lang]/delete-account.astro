@@ -1,0 +1,20 @@
+---
+import DeletePage from '../../components/DeletePage.astro';
+import { LANGS, DEFAULT_LANG, t, type Lang } from '../../i18n';
+import Base from '../../layouts/Base.astro';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => lang !== DEFAULT_LANG).map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+---
+
+<Base
+  lang={lang}
+  path="delete-account"
+  title={t(lang, 'del.title')}
+  description={t(lang, 'del.intro')}
+>
+  <DeletePage lang={lang} />
+</Base>

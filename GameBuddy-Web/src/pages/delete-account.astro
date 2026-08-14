@@ -1,0 +1,14 @@
+---
+import DeletePage from '../components/DeletePage.astro';
+import { t } from '../i18n';
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  lang="en"
+  path="delete-account"
+  title={t('en', 'del.title')}
+  description={t('en', 'del.intro')}
+>
+  <DeletePage lang="en" />
+</Base>

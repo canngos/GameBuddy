@@ -1,0 +1,38 @@
+---
+/**
+ * The privacy policy, rendered from the document the app itself links to.
+ *
+ * `documentation/legal/PRIVACY.md` is imported rather than copied. That file was written
+ * from the database schema rather than from a template, and its own note says it has to
+ * change when the code does — so a second copy living here would be wrong the first time
+ * somebody amended one and not the other. See `astro.config.mjs` for the Vite permission
+ * that lets a file above the project root be read.
+ *
+ * Both stores require this page to be reachable without installing anything, and the app's
+ * `src/legal.ts` links straight to it.
+ */
+import { Content } from '../../../documentation/legal/PRIVACY.md';
+import LegalNotice from '../components/LegalNotice.astro';
+import Prose from '../components/Prose.astro';
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  lang="en"
+  englishOnly
+  title="Privacy Policy"
+  description="What GameBuddy stores about you, why, how long for, and how to get it deleted. Written from the actual database schema rather than from a template."
+>
+  <article class="mx-auto max-w-3xl px-5 py-16">
+    <h1 class="font-display text-4xl font-bold tracking-tight">Privacy Policy</h1>
+    <p class="mt-3 text-sm text-muted">
+      GameBuddy is operated from Finland and is subject to the GDPR.
+    </p>
+
+    <LegalNotice lang="en" />
+
+    <Prose>
+      <Content />
+    </Prose>
+  </article>
+</Base>

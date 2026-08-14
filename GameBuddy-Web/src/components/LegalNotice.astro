@@ -1,0 +1,27 @@
+---
+/**
+ * Says, on the page, that this document is English only.
+ *
+ * The site is in seven languages and these two pages are not, so a Finnish or Turkish
+ * visitor arrives at English text with no explanation. That is the kind of gap people read
+ * as neglect rather than as a decision — so the reason is stated, in their language, at the
+ * top of the document.
+ *
+ * The *reason* is worth stating too, not just the fact: these are binding agreements, and a
+ * translated clause that shifts meaning is a document saying something nobody intended.
+ */
+import { t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+---
+
+<aside
+  class="mt-8 rounded-2xl border border-line bg-raised/40 p-5 text-sm leading-relaxed text-muted"
+  lang={lang}
+>
+  {t(lang, 'legal.englishOnly')}
+</aside>

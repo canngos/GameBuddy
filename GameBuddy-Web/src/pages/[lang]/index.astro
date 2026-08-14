@@ -1,0 +1,28 @@
+---
+/**
+ * The landing page in the six non-default languages.
+ *
+ * English is excluded because it lives at `/` — `prefixDefaultLocale: false` means there is
+ * no `/en/`, and generating one would create a second URL for the same content competing
+ * with the first in search.
+ */
+import Landing from '../../components/Landing.astro';
+import { LANGS, DEFAULT_LANG, dict, t, type Lang } from '../../i18n';
+import Base from '../../layouts/Base.astro';
+
+export function getStaticPaths() {
+  return LANGS.filter((lang) => lang !== DEFAULT_LANG).map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Lang;
+const d = dict(lang);
+---
+
+<Base
+  lang={lang}
+  path=""
+  title={`${d.hero.titleBefore} ${d.hero.titleHighlight} ${d.hero.titleAfter}`}
+  description={t(lang, 'hero.subtitle')}
+>
+  <Landing lang={lang} />
+</Base>
