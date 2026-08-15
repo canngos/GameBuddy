@@ -22,11 +22,8 @@ public class NotificationPreferencesDto implements BaseModel {
     /** Chat messages. */
     private boolean messages;
 
-    /** Matches, friend requests and answers, badges earned. */
+    /** Matches, friend requests and answers, badges earned — lobby activity included. */
     private boolean social;
-
-    /** Posts, comments and likes in communities they joined. */
-    private boolean communities;
 
     /** "Come back" nudges. */
     private boolean reminders;

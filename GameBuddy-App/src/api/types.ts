@@ -95,7 +95,6 @@ export type UserInfo = {
   badges: ShowcasedBadge[];
   /** How many have been earned in total. */
   badgeCount: number;
-  joinedCommunities: { id: string; name: string }[];
   /** Own profile only. */
   friends?: GamerSummary[];
 };
@@ -146,6 +145,8 @@ export type Subscription = {
   dailyAccepts: number;
   canSeeWhoLikedYou: boolean;
   canUseAdvancedFilters: boolean;
+  /** Whether opening a game lobby is included. Gold's perk; joining is free for everyone. */
+  canCreateLobby: boolean;
   /**
    * Whether to show the Season Pass teaser.
    *
@@ -284,69 +285,74 @@ export type ProfileDetails = {
   keywords: string[];
 };
 
-/**
- * One community in the directory.
- *
- * `isJoined` is computed per-caller by the backend, so the same community is a
- * different object for two different gamers. It is the only thing that decides whether
- * the posts endpoint will answer: a non-member gets 403, not an empty list.
- */
-export type Community = {
-  communityId: string;
-  name: string;
-  description: string;
-  communityAvatar: string | null;
-  wallpaper: string | null;
-  /** ISO instant. */
-  createdDate: string;
-  memberCount: number;
-  postCount: number;
-  isJoined: boolean;
-};
+export type LobbyTone = 'COMPETITIVE' | 'CHILL' | 'CASUAL' | 'LEARNING';
 
 /**
- * One post.
- *
- * There is no author id here, only `username` — so "did I write this" is a comparison
- * against your own username rather than an id. That works because usernames are unique
- * (the backend refuses a duplicate with USERNAME_EXISTS), but it is also why a post
- * cannot link to its author's profile.
+ * OPEN takes requests; LOCKED is "team found, stop asking" and starts no timer; ENDED and
+ * CANCELLED keep the chat readable (read-only); ARCHIVED never reaches the client — the
+ * backend answers 404 for it.
  */
-export type Post = {
-  postId: string;
-  username: string;
-  avatar: string | null;
-  communityName: string;
+export type LobbyStatus = 'OPEN' | 'LOCKED' | 'ENDED' | 'CANCELLED' | 'ARCHIVED';
+
+/** REJECTED is final for that lobby; LEFT and KICKED may request again. */
+export type LobbyMemberStatus = 'OWNER' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'LEFT' | 'KICKED';
+
+/** One lobby: the card in the browse feed and the header of the detail screen. */
+export type Lobby = {
+  id: string;
+  ownerId: string;
+  ownerUsername: string | null;
+  ownerAvatar: string | null;
+  gameId: string;
+  gameName: string | null;
+  gameIcon: string | null;
   title: string;
-  body: string | null;
-  picture: string | null;
-  /** ISO instant. */
-  updatedDate: string;
-  likeCount: number;
-  commentCount: number;
-  isLiked: boolean;
+  description: string | null;
+  /** Free text the owner wrote: mic, rank, in-game chat. Screened, not enforced. */
+  requirements: string | null;
+  tone: LobbyTone;
+  /** Including the owner. */
+  maxPlayers: number;
+  /** Seats taken, owner included — the card's "3/5". */
+  playerCount: number;
+  /** ISO instant. The planned start, per the owner. */
+  startsAt: string;
+  status: LobbyStatus;
+  /** The caller's own standing, or null for a stranger browsing. */
+  myStatus: LobbyMemberStatus | null;
+  /** Chat messages newer than the caller's watermark. Only filled on `mine`. */
+  unreadCount: number;
+  createdAt: string;
 };
 
-export type Comment = {
-  commentId: string;
-  username: string;
-  avatar: string | null;
-  message: string;
-  likeCount: number;
-  isLiked: boolean;
-  /** ISO instant. */
-  updatedDate: string;
-};
-
-/** A member of a community. `isOwner` marks the one who can delete or hand it on. */
-export type CommunityMember = {
+export type LobbyMember = {
   userId: string;
-  gamerUsername: string;
+  username: string | null;
   avatar: string | null;
-  /** The worn frame's URL, or null for none — the common case, and not an error. */
-  frame: string | null;
-  isOwner: boolean;
+  status: LobbyMemberStatus;
+  requestedAt: string;
 };
+
+export type LobbyMessage = {
+  id: string;
+  senderId: string;
+  senderUsername: string | null;
+  message: string;
+  /** ISO instant. */
+  date: string;
+};
+
+export type LobbyDetail = {
+  lobby: Lobby;
+  /** The team: OWNER and ACCEPTED. */
+  members: LobbyMember[];
+  /** PENDING requests — filled only for the owner, empty otherwise. */
+  pendingRequests: LobbyMember[];
+};
+
+
+
+
 
 /**
  * The result of uploading an avatar.
@@ -445,10 +451,8 @@ export type BadgeBoard = {
 export type NotificationPreferences = {
   /** Chat messages. */
   messages: boolean;
-  /** Matches, friend requests and answers, badges earned. */
+  /** Matches, friend requests and answers, badges earned — lobby activity included. */
   social: boolean;
-  /** Posts, comments and likes in communities you joined. */
-  communities: boolean;
   /** "Come back" reminders when you have been away. */
   reminders: boolean;
 };

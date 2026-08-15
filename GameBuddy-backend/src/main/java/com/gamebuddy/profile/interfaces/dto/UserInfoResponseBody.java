@@ -89,8 +89,6 @@ public class UserInfoResponseBody implements BaseModel {
     /** How many badges have been earned in total. The number on the profile. */
     private Integer badgeCount;
 
-    private List<CommunityDto> joinedCommunities;
-
     /** Own profile only. */
     private List<GamerDto> friends;
 }

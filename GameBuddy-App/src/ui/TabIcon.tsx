@@ -17,7 +17,7 @@ import { Icon } from './Icon';
 
 export type TabIconName =
   | 'deck'
-  | 'community'
+  | 'lobby'
   | 'messages'
   | 'market'
   | 'profile'
@@ -55,7 +55,10 @@ export type TabIconName =
  */
 const GLYPHS: Record<TabIconName, LucideIcon> = {
   deck: Layers,
-  community: Users,
+  // A group of people, not a controller. A lobby is who you are playing with — the deck
+  // already carries the "games" meaning, and two game-shaped glyphs in one bar read as
+  // the same destination twice.
+  lobby: Users,
   messages: MessageCircle,
   market: ShoppingBasket,
   profile: User,

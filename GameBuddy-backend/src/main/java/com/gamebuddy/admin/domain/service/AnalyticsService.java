@@ -7,7 +7,7 @@ import com.gamebuddy.admin.interfaces.response.AnalyticsResponse;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.TransactionCode;
-import com.gamebuddy.community.domain.service.ModerationService;
+import com.gamebuddy.moderation.domain.service.ModerationService;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import java.time.Clock;
 import java.time.Duration;

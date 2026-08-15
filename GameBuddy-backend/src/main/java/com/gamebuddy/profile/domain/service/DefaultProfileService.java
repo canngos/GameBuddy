@@ -9,7 +9,6 @@ import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.util.Constants;
-import com.gamebuddy.community.domain.service.CommunityMembership;
 import com.gamebuddy.profile.application.mapper.ProfileCatalogueMapper;
 import com.gamebuddy.profile.application.mapper.ProfileMapper;
 import com.gamebuddy.profile.interfaces.dto.*;
@@ -41,7 +40,6 @@ public class DefaultProfileService implements ProfileService {
     private final CosmeticUrls cosmeticUrls;
     private final ProfileCatalogueMapper profileCatalogueMapper;
     private final ProfileMapper profileMapper;
-    private final CommunityMembership communityMembership;
     private final BadgeService badges;
     private final ApplicationEventPublisher events;
 
@@ -114,7 +112,6 @@ public class DefaultProfileService implements ProfileService {
         // pictures would put the badge catalogue on every profile view.
         body.setBadges(badges.showcasedFor(gamer));
         body.setBadgeCount((int) badges.earnedCount(gamer));
-        body.setJoinedCommunities(toCommunityDtos(gamer));
 
         if (own) {
             body.setEmail(gamer.getEmail());
@@ -433,27 +430,6 @@ public class DefaultProfileService implements ProfileService {
                     GamerDto dto = profileMapper.toDto(friend);
                     dto.setAvatar(avatars.get(friend.getUserId()));
                     dto.setFrame(cosmeticUrls.frameUrl(friend));
-                    return dto;
-                })
-                .toList();
-    }
-
-    /**
-     * The communities on a profile, asked of the module that owns them.
-     *
-     * <p>This used to map {@code community} with a second entity of its own and walk
-     * {@code Gamer.joinedCommunities} — one module reading another's tables through a
-     * duplicate mapping of the same join table, which is how the two ends came to disagree
-     * about which of them owned it.
-     */
-    private List<CommunityDto> toCommunityDtos(Gamer gamer) {
-        return communityMembership.findJoinedBy(gamer).stream()
-                .map(joined -> {
-                    CommunityDto dto = new CommunityDto();
-                    dto.setCommunityId(joined.id().toString());
-                    dto.setName(joined.name());
-                    dto.setCommunityAvatar(joined.avatar());
-                    dto.setIsOwner(joined.owned());
                     return dto;
                 })
                 .toList();

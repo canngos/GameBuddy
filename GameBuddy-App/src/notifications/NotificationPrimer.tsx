@@ -56,7 +56,10 @@ export function NotificationPrimer({ onDone }: { onDone: () => void }) {
       <Card className="gap-4">
         <Reason title="When you match" body="Both of you said yes — that is when a conversation can start." />
         <Reason title="When someone messages you" body="So a reply does not wait until you next happen to open the app." />
-        <Reason title="What your communities are doing" body="New posts, and replies to yours." />
+        <Reason
+          title="When somebody wants into your lobby"
+          body="And when the owner of one lets you in."
+        />
       </Card>
 
       <View className="gap-2">

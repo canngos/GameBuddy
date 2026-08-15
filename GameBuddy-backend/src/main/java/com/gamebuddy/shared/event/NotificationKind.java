@@ -38,17 +38,28 @@ public enum NotificationKind {
     /** A mission was completed. No target — the badges screen shows them all. */
     BADGE,
 
-    /** Somebody posted in a community this gamer belongs to. {@code targetId} is the post. */
-    COMMUNITY_POST,
+    // COMMUNITY_POST, POST_LIKE, POST_COMMENT and COMMENT_LIKE retired with the Community
+    // feature. Safe to remove outright: notification_outbox stores the kind as a plain
+    // varchar, so old rows survive, and an installed app meeting an unknown kind routes
+    // to home by design.
 
-    /** Somebody liked this gamer's post. {@code targetId} is the post. */
-    POST_LIKE,
+    /** Somebody asked to join this gamer's lobby. {@code targetId} is the lobby. */
+    LOBBY_JOIN_REQUEST,
 
-    /** Somebody commented on this gamer's post. {@code targetId} is the post. */
-    POST_COMMENT,
+    /** The owner said yes. {@code targetId} is the lobby. */
+    LOBBY_REQUEST_ACCEPTED,
 
-    /** Somebody liked this gamer's comment. {@code targetId} is the post it is on. */
-    COMMENT_LIKE,
+    /**
+     * A message in a lobby this gamer is in. {@code targetId} is the lobby.
+     *
+     * <p>There is deliberately no LOBBY_REQUEST_REJECTED — a rejection push is an invitation
+     * to retaliate and carries nothing actionable — and no LOBBY_LOCKED: locking exists to
+     * make things quieter, so announcing it would be the feature contradicting itself.
+     */
+    LOBBY_MESSAGE,
+
+    /** A lobby this gamer was accepted into is off. {@code targetId} is the lobby. */
+    LOBBY_CANCELLED,
 
     /**
      * A nudge to somebody who has not opened the app in a while.
@@ -68,9 +79,14 @@ public enum NotificationKind {
      */
     public NotificationCategory category() {
         return switch (this) {
-            case MESSAGE -> NotificationCategory.MESSAGES;
-            case MATCH, SUPER_LIKE, FRIEND_REQUEST, FRIEND_ACCEPTED, BADGE -> NotificationCategory.SOCIAL;
-            case COMMUNITY_POST, POST_LIKE, POST_COMMENT, COMMENT_LIKE -> NotificationCategory.COMMUNITIES;
+            case MESSAGE, LOBBY_MESSAGE -> NotificationCategory.MESSAGES;
+            // Lobby kinds sit under SOCIAL/MESSAGES rather than a category of their own:
+            // the existing toggles already carry the right meaning, and the retired
+            // COMMUNITIES category was not reused because it held people's old "mute
+            // community noise" choice, which must not silently apply to a new feature.
+            case MATCH, SUPER_LIKE, FRIEND_REQUEST, FRIEND_ACCEPTED, BADGE, LOBBY_JOIN_REQUEST,
+                    LOBBY_REQUEST_ACCEPTED, LOBBY_CANCELLED ->
+                NotificationCategory.SOCIAL;
             case RETURN -> NotificationCategory.REMINDERS;
         };
     }

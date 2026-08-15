@@ -94,10 +94,12 @@ const PRESENTATION: Record<NotificationKind, { icon: LucideIcon; tone: Tone }> =
   FRIEND_REQUEST: { icon: UserPlus, tone: 'primary' },
   FRIEND_ACCEPTED: { icon: UserPlus, tone: 'primary' },
   BADGE: { icon: Award, tone: 'gold' },
-  COMMUNITY_POST: { icon: Users, tone: 'primary' },
-  POST_LIKE: { icon: Users, tone: 'primary' },
-  POST_COMMENT: { icon: Users, tone: 'primary' },
-  COMMENT_LIKE: { icon: Users, tone: 'primary' },
+  // Lobby traffic is about other people wanting to play with you, not about being liked,
+  // so it sits with messages and friends on `primary`.
+  LOBBY_JOIN_REQUEST: { icon: Users, tone: 'primary' },
+  LOBBY_REQUEST_ACCEPTED: { icon: Users, tone: 'primary' },
+  LOBBY_MESSAGE: { icon: Users, tone: 'primary' },
+  LOBBY_CANCELLED: { icon: Users, tone: 'muted' },
   RETURN: { icon: Bell, tone: 'muted' },
 };
 
@@ -108,9 +110,11 @@ const REFRESH_ON: Record<NotificationKind, readonly string[]> = {
   FRIEND_REQUEST: ['me'],
   FRIEND_ACCEPTED: ['me', 'conversations'],
   BADGE: ['badges', 'cosmetics'],
-  COMMUNITY_POST: [],
-  POST_LIKE: [],
-  POST_COMMENT: [],
-  COMMENT_LIKE: [],
+  // The lobby screens refetch on focus and on socket frames; the list is the one thing a
+  // push should freshen so the tab is right when they get there.
+  LOBBY_JOIN_REQUEST: ['my-lobbies'],
+  LOBBY_REQUEST_ACCEPTED: ['my-lobbies'],
+  LOBBY_MESSAGE: [],
+  LOBBY_CANCELLED: ['my-lobbies'],
   RETURN: [],
 };

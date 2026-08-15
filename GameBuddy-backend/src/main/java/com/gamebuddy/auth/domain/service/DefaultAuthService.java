@@ -666,8 +666,58 @@ public class DefaultAuthService implements AuthService {
         return gamer;
     }
 
+    /**
+     * Issues a fresh token for the session the caller already holds.
+     *
+     * <p>Deliberately does almost nothing else. It does not re-check the password (the
+     * bearer token is the credential), and it does not re-run the login gates — the JWT
+     * filter has already loaded the account and refused a blocked or deleted one, and
+     * {@code tokensValidFrom} kills every outstanding token the moment a password
+     * changes, so a session cannot be refreshed past a revocation.
+     */
+    @Override
+    @Transactional
+    public LoginResponse refreshSession(Gamer principal, String bearerToken) {
+        Gamer gamer = gamerRepository
+                .findById(principal.getUserId())
+                .orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
+
+        Instant sessionStart = jwtService.extractSessionStart(bearerToken);
+        if (!jwtService.withinMaxSessionAge(sessionStart, Instant.now())) {
+            // The ceiling. Reported as an invalid token because that is what it is from
+            // here on, and because the client already knows to ask for the password when
+            // it sees this rather than showing an error nobody can act on.
+            log.info("Session for {} reached its maximum age; a new login is required", gamer.getUserId());
+            throw new BusinessException(TransactionCode.TOKEN_INVALID);
+        }
+
+        String token = issueSession(gamer, sessionStart);
+
+        LoginResponse response = new LoginResponse();
+        LoginResponseBody body = new LoginResponseBody();
+        body.setAccessToken(token);
+        body.setUserId(gamer.getUserId());
+        response.setBody(new BaseBody<>(body));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
+    }
+
+    /** Starts a new session: the token's clock, and the ceiling's, both begin now. */
     private String issueSession(Gamer gamer) {
-        String token = jwtService.generateToken(gamer);
+        return issueSession(gamer, Instant.now());
+    }
+
+    /**
+     * Records a token against the account, replacing whatever was there.
+     *
+     * <p>{@code sessionStart} is what separates a login from a refresh: a login passes
+     * now, a refresh passes the moment the session originally began, so extending a
+     * session never resets its age.
+     */
+    private String issueSession(Gamer gamer, Instant sessionStart) {
+        String token = jwtService.generateToken(gamer, sessionStart);
+        // One row per account, as before — a refresh replaces its predecessor rather
+        // than piling up a row a week for every gamer who keeps playing.
         sessionRepository.deleteAllByEmail(gamer.getEmail());
 
         Session session = new Session();

@@ -6,7 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
 import { AnimatedSplash } from '../src/ui/AnimatedSplash';
 import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
+import { useLangStore } from '../src/i18n/store';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
 import { useSoundEnabled } from '../src/ui/sound';
@@ -54,6 +55,8 @@ export default function RootLayout() {
   const schemeHydrated = useScheme((s) => s.hydrated);
   const loadScheme = useScheme((s) => s.load);
   const loadSound = useSoundEnabled((s) => s.load);
+  const langHydrated = useLangStore((s) => s.hydrated);
+  const loadLang = useLangStore((s) => s.load);
   const userId = useSession((s) => s.userId);
 
   // Ties crash reports to an account. Native crash capture is already running by the time
@@ -65,17 +68,36 @@ export default function RootLayout() {
     if (userId) identifyForCrashReports(userId);
   }, [userId]);
 
+  /*
+   * Renew the session whenever the app comes back to the foreground.
+   *
+   * `restore` covers cold starts, but a phone can keep this process alive for days —
+   * iOS especially — so a launch-only renewal would let a heavy user's token expire
+   * underneath them while the app was never actually closed. `renewIfStale` is a no-op
+   * until the token is past half its life, so this costs one comparison per resume.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void useSession.getState().renewIfStale();
+    });
+    return () => subscription.remove();
+  }, []);
+
   useEffect(() => {
     void restore();
     void loadScheme();
+    // Before the first frame, like the theme: showing English and then swapping it is
+    // a flicker only the people who need this feature would ever see.
+    void loadLang();
     // Deliberately not part of `ready` below. A theme read late repaints the whole app, so
     // launch waits for it; a sound preference read late costs at most one unwanted blip in
     // the first moments of a session — and gating the splash on it would delay every launch
     // for a setting almost nobody changes. See `src/ui/sound.ts`.
     void loadSound();
-  }, [restore, loadScheme, loadSound]);
+  }, [restore, loadScheme, loadSound, loadLang]);
 
-  const ready = (fontsLoaded || !!fontError) && status !== 'loading' && schemeHydrated;
+  const ready =
+    (fontsLoaded || !!fontError) && status !== 'loading' && schemeHydrated && langHydrated;
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();

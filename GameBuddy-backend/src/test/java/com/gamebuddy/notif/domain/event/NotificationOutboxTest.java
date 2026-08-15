@@ -82,11 +82,11 @@ class NotificationOutboxTest {
         @DisplayName("a category the gamer switched off is not queued")
         void respectsPreferences() {
             Gamer gamer = new Gamer();
-            gamer.setNotifyCommunities(false);
+            gamer.setNotifySocial(false);
             when(gamers.findById("gamer-1")).thenReturn(Optional.of(gamer));
 
             dispatcher.onNotificationRequested(
-                    new NotificationRequestedEvent("gamer-1", "dev-1", "T", "B", NotificationKind.POST_LIKE));
+                    new NotificationRequestedEvent("gamer-1", "dev-1", "T", "B", NotificationKind.LOBBY_JOIN_REQUEST));
 
             // Enforced here rather than at the nine places that raise notifications: a
             // rule that has to be remembered nine times gets forgotten once, and the

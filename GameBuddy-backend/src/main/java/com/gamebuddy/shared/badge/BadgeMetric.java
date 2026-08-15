@@ -23,11 +23,15 @@ public enum BadgeMetric {
     /** Chat messages this gamer has sent, over all rooms. */
     MESSAGES_SENT,
 
-    /** Communities this gamer is a member of, including ones they own. */
-    COMMUNITIES_JOINED,
-
-    /** Posts written, in any community. */
-    POSTS_WRITTEN,
+    /**
+     * Lobby teams this gamer is part of — opened, or accepted into. Standing, not
+     * history: leaving or being removed un-counts it.
+     *
+     * <p>Replaced COMMUNITIES_JOINED and POSTS_WRITTEN when the Community feature retired;
+     * the badges over those metrics were retired with it (earned rows survive — see
+     * {@code Badge.byCode}).
+     */
+    LOBBIES_JOINED,
 
     /** Frames and banners bought. Free ones do not count — nothing was achieved. */
     COSMETICS_OWNED,

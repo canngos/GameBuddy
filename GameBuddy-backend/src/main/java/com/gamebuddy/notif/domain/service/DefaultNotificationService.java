@@ -153,7 +153,6 @@ public class DefaultNotificationService implements NotificationService {
         Gamer gamer = reloadGamer(principal);
         gamer.setNotifyMessages(wanted.isMessages());
         gamer.setNotifySocial(wanted.isSocial());
-        gamer.setNotifyCommunities(wanted.isCommunities());
         gamer.setRemindersEnabled(wanted.isReminders());
 
         // Turning reminders back on clears the count, so somebody who switched them off
@@ -170,10 +169,7 @@ public class DefaultNotificationService implements NotificationService {
 
     private NotificationPreferencesResponse preferencesResponse(Gamer gamer) {
         NotificationPreferencesDto dto = new NotificationPreferencesDto(
-                gamer.isNotifyMessages(),
-                gamer.isNotifySocial(),
-                gamer.isNotifyCommunities(),
-                gamer.isRemindersEnabled());
+                gamer.isNotifyMessages(), gamer.isNotifySocial(), gamer.isRemindersEnabled());
 
         NotificationPreferencesResponse response = new NotificationPreferencesResponse();
         response.setBody(new BaseBody<>(dto));

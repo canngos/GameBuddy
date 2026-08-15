@@ -102,14 +102,11 @@ function deleteGamers(emailLike) {
     `delete from gamebuddy.declined_matches where user_id in ${ids} or declined_id in ${ids}`,
     `delete from gamebuddy.unlocked_admirer where user_id in ${ids} or admirer_id in ${ids}`,
 
-    `delete from gamebuddy.comment_likes_join where user_id in ${ids}`,
-    `delete from gamebuddy.post_likes_join where user_id in ${ids}`,
-    `delete from gamebuddy.comment where owner in ${ids}`,
-    `delete from gamebuddy.comment where post_id in (select post_id from gamebuddy.post where owner in ${ids})`,
-    `delete from gamebuddy.post_likes_join where post_id in (select post_id from gamebuddy.post where owner in ${ids})`,
-    `delete from gamebuddy.post where owner in ${ids}`,
-    `delete from gamebuddy.community_members_join where user_id in ${ids}`,
-    `delete from gamebuddy.community where owner in ${ids}`,
+    // Lobby content: messages before members before lobbies, and other people's
+    // memberships in a doomed lobby have to go with the lobby itself.
+    `delete from gamebuddy.lobby_message where sender_id in ${ids} or lobby_id in (select id from gamebuddy.lobby where owner_id in ${ids})`,
+    `delete from gamebuddy.lobby_member where user_id in ${ids} or lobby_id in (select id from gamebuddy.lobby where owner_id in ${ids})`,
+    `delete from gamebuddy.lobby where owner_id in ${ids}`,
 
     `delete from gamebuddy.content_report where reporter_id in ${ids} or author_id in ${ids} or reviewed_by in ${ids}`,
     `delete from gamebuddy.coin_ledger where user_id in ${ids}`,

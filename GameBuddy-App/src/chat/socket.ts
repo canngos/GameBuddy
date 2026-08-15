@@ -24,6 +24,28 @@ export type PresenceUpdate = {
 export type TypingNotification = { senderId: string };
 
 /**
+ * One frame about a lobby, on `/user/queue/lobby`. Mirrors the backend's `LobbyEvent`:
+ * a single destination with a discriminator, because the three event types share a
+ * lifetime and a consumer — the lobby screen — unlike messages/presence/typing above.
+ *
+ * - `MESSAGE`: a chat line, in `message`.
+ * - `MEMBER`: the roster changed (request, accept, leave, kick) — refetch it.
+ * - `STATE`: the lifecycle moved; the new status rides along.
+ */
+export type LobbyEvent = {
+  type: 'MESSAGE' | 'MEMBER' | 'STATE';
+  lobbyId: string;
+  message: {
+    id: string;
+    senderId: string;
+    senderUsername: string | null;
+    message: string;
+    date: string;
+  } | null;
+  status: string | null;
+};
+
+/**
  * Gap between keepalive frames. Comfortably inside the server's window — it allows three
  * times the 10s we declare, so two of these can be lost without a disconnection.
  */
@@ -36,6 +58,7 @@ type Listeners = {
   onStatus: (status: SocketStatus) => void;
   onPresence: (update: PresenceUpdate) => void;
   onTyping: (notification: TypingNotification) => void;
+  onLobby: (event: LobbyEvent) => void;
 };
 
 /**
@@ -161,6 +184,9 @@ export function createChatSocket(token: string, listeners: Listeners) {
       subscribe('/user/queue/messages', listeners.onMessage);
       subscribe('/user/queue/presence', listeners.onPresence);
       subscribe('/user/queue/typing', listeners.onTyping);
+      // Lobby traffic is one multiplexed queue, unlike the three above — its events all
+      // feed the same screen, so a discriminator beats a fourth and fifth destination.
+      subscribe('/user/queue/lobby', listeners.onLobby);
     },
 
     onWebSocketClose: () => {

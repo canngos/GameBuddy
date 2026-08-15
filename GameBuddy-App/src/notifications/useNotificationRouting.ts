@@ -17,10 +17,13 @@ export const NOTIFICATION_KINDS = [
   'FRIEND_REQUEST',
   'FRIEND_ACCEPTED',
   'BADGE',
-  'COMMUNITY_POST',
-  'POST_LIKE',
-  'POST_COMMENT',
-  'COMMENT_LIKE',
+  // The four COMMUNITY_* kinds retired with the Community feature. A late-arriving push
+  // or an old stored notification with one of them falls to the default '/home' branch,
+  // which is the designed behaviour for any kind a build does not know.
+  'LOBBY_JOIN_REQUEST',
+  'LOBBY_REQUEST_ACCEPTED',
+  'LOBBY_MESSAGE',
+  'LOBBY_CANCELLED',
   'RETURN',
 ] as const;
 
@@ -72,13 +75,18 @@ export function routeFor(kind: string | undefined, targetId: string | undefined,
     case 'BADGE':
       return '/badges';
 
-    case 'COMMUNITY_POST':
-    case 'POST_LIKE':
-    case 'POST_COMMENT':
-    case 'COMMENT_LIKE':
+    case 'LOBBY_JOIN_REQUEST':
+    case 'LOBBY_REQUEST_ACCEPTED':
+    case 'LOBBY_MESSAGE':
+      // The lobby screen answers all three: the owner's pending inbox, the accepted
+      // member's new team, and the chat are all on it. LOBBY_CANCELLED deliberately does
+      // not go there — the lobby is gone; the list shows what remains.
       return targetId
-        ? { pathname: '/community/post/[postId]', params: { postId: targetId } }
-        : '/community';
+        ? { pathname: '/lobby/[lobbyId]', params: { lobbyId: targetId } }
+        : '/lobby';
+
+    case 'LOBBY_CANCELLED':
+      return '/lobby';
 
     case 'RETURN':
       // Whatever was waiting is what the copy promised, and both of the things it can

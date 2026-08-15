@@ -12,6 +12,7 @@ import com.gamebuddy.match.interfaces.dto.ReportedMessagesResponseBody;
 import com.gamebuddy.match.interfaces.response.ReportedMessagesResponse;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
+import com.gamebuddy.shared.messaging.MessageCipher;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;

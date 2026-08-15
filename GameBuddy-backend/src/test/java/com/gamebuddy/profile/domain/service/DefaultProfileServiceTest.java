@@ -6,7 +6,6 @@ import static org.mockito.Mockito.*;
 
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
-import com.gamebuddy.community.domain.service.CommunityMembership;
 import com.gamebuddy.profile.application.mapper.*;
 import com.gamebuddy.profile.interfaces.request.FriendRequest;
 import com.gamebuddy.profile.interfaces.response.*;
@@ -36,10 +35,6 @@ class DefaultProfileServiceTest {
 
     @InjectMocks
     private DefaultProfileService profileService;
-
-    /** Profile asks the community module rather than reading its tables; see #16. */
-    @Mock
-    private CommunityMembership communityMembership;
 
     @Mock
     private KeywordsRepository keywordsRepository;

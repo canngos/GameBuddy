@@ -34,6 +34,8 @@ import com.gamebuddy.shared.moderation.TextSurface;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
+import com.gamebuddy.shared.messaging.MessageCipher;
+import com.gamebuddy.shared.messaging.UserMessaging;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;

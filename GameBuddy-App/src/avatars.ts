@@ -26,13 +26,16 @@ export function avatarUri(avatar: string | null | undefined): string | null {
  *
  * Grapheme-naive — it takes code points, so an emoji username gives one emoji rather
  * than half a surrogate pair, but a combining accent may be dropped.
+ *
+ * `toLocaleUpperCase` rather than `toUpperCase`: a Turkish reader's initial for "İlkay"
+ * is `İ`, and the locale-less version silently gives them `I` — a different letter.
  */
 export function initialsOf(name: string | null | undefined): string {
   if (!name) return '?';
   const words = name.trim().split(/[\s_.-]+/).filter(Boolean);
   if (words.length === 0) return '?';
-  if (words.length === 1) return [...words[0]].slice(0, 2).join('').toUpperCase();
-  return ([...words[0]][0] + [...words[1]][0]).toUpperCase();
+  if (words.length === 1) return [...words[0]].slice(0, 2).join('').toLocaleUpperCase();
+  return ([...words[0]][0] + [...words[1]][0]).toLocaleUpperCase();
 }
 
 /**

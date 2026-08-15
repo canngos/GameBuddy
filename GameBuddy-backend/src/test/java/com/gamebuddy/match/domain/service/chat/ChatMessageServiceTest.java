@@ -16,6 +16,7 @@ import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
+import com.gamebuddy.shared.messaging.MessageCipher;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;

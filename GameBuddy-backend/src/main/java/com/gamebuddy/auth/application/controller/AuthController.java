@@ -47,6 +47,22 @@ public class AuthController {
         return ResponseEntity.ok(authService.sendVerificationEmail(request));
     }
 
+    /**
+     * Extends the caller's session, returning a token with a later expiry.
+     *
+     * <p>Header-based for the same reason {@code validateToken} is: the session's start
+     * is a claim inside the presented token, and the principal alone does not carry it.
+     * The filter has already verified the token by the time this runs — an expired one
+     * never reaches here, it is refused as 401 upstream, which is the correct answer to
+     * "refresh a session that is already over".
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(
+            @AuthenticationPrincipal Gamer principal,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(authService.refreshSession(principal, BearerToken.require(authorization)));
+    }
+
     /** Kept header-based: this endpoint's whole job is to inspect a supplied token. */
     @PostMapping("/validateToken")
     public ResponseEntity<TokenResponse> validateToken(

@@ -7,7 +7,7 @@ import static org.mockito.Mockito.*;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import com.gamebuddy.match.domain.service.chat.SentMessage;
-import com.gamebuddy.match.domain.service.chat.UserMessaging;
+import com.gamebuddy.shared.messaging.UserMessaging;
 import com.gamebuddy.match.interfaces.request.ChatMessageRequest;
 import com.gamebuddy.shared.entity.Gamer;
 import java.security.Principal;

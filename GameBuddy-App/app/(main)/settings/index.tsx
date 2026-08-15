@@ -1,13 +1,19 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { authApi } from '../../../src/api/auth';
 import { profileApi } from '../../../src/api/catalogue';
+import { LanguagePicker } from '../../../src/i18n/LanguagePicker';
+import { Flag } from '../../../src/i18n/Flag';
+import { LANG_NAMES } from '../../../src/i18n/languages';
+import { useLangStore } from '../../../src/i18n/store';
+import { useUpper } from '../../../src/i18n/case';
+import { useT } from '../../../src/i18n/useT';
 import { openPrivacy, openTerms } from '../../../src/legal';
 import { useTutorial } from '../../../src/tutorial/store';
 import { useSession } from '../../../src/session/store';
-import { THEME_OPTIONS, useScheme } from '../../../src/theme';
+import { useScheme } from '../../../src/theme';
 import {
   Button,
   Card,
@@ -29,6 +35,19 @@ import {
  * when they want to change something, so that is where the rows are.
  */
 export default function Settings() {
+  const [pickingLanguage, setPickingLanguage] = useState(false);
+  const lang = useLangStore((s) => s.lang);
+  const t = useT();
+  const upper = useUpper();
+
+  // Built from the catalogue rather than imported as a module constant: a `const` array
+  // of labels is evaluated once at import time, long before anybody has chosen a
+  // language, so it would stay in whatever language it was written in.
+  const themeOptions = [
+    { value: 'system' as const, label: t.settings.themeSystem, hint: t.settings.themeSystemHint },
+    { value: 'light' as const, label: t.settings.themeLight, hint: t.settings.themeLightHint },
+    { value: 'dark' as const, label: t.settings.themeDark, hint: t.settings.themeDarkHint },
+  ];
   const router = useRouter();
   const preference = useScheme((s) => s.preference);
   const setPreference = useScheme((s) => s.setPreference);
@@ -51,34 +70,34 @@ export default function Settings() {
   return (
     <Screen scroll edges={['top', 'bottom']}>
       <View className="gap-1 pb-8 pt-8">
-        <Text variant="title">Settings</Text>
+        <Text variant="title">{t.settings.title}</Text>
       </View>
 
       <View className="gap-8">
         <View className="gap-3">
-          <Text variant="overline">PROFILE</Text>
+          <Text variant="overline">{upper(t.settings.sectionProfile)}</Text>
 
           <RowGroup>
             <LinkRow
-              label="Avatar"
-              hint="Change your picture"
+              label={t.settings.avatar}
+              hint={t.settings.avatarHint}
               href="/settings/avatar"
               position="first"
             />
             <LinkRow
-              label="Date of birth"
-              hint="Confirms you are 18 or over"
+              label={t.settings.birthDate}
+              hint={t.settings.birthDateHint}
               href="/settings/age"
               position="middle"
             />
             <LinkRow
-              label="Games"
-              hint={`${me.data?.games.length ?? 0} selected`}
+              label={t.settings.games}
+              hint={t.settings.selected(me.data?.games.length ?? 0)}
               href="/settings/games"
               position="middle"
             />
             <LinkRow
-              label="Platforms"
+              label={t.settings.platforms}
               // Optional-chained through `platforms` as well as `me.data`. The type says
               // the field is always there and the API agrees — but a profile cached before
               // this shipped has no such key, and reading `.length` off it is a render
@@ -86,14 +105,14 @@ export default function Settings() {
               hint={
                 me.data?.platforms?.length
                   ? me.data.platforms.join(', ')
-                  : 'Not set — other players filter by this'
+                  : t.settings.platformsUnset
               }
               href="/settings/platforms"
               position="middle"
             />
             <LinkRow
-              label="Keywords"
-              hint={`${me.data?.keywords.length ?? 0} selected`}
+              label={t.settings.keywords}
+              hint={t.settings.selected(me.data?.keywords.length ?? 0)}
               href="/settings/keywords"
               position="last"
             />
@@ -101,11 +120,11 @@ export default function Settings() {
         </View>
 
         <View className="gap-3">
-          <Text variant="overline">APPEARANCE</Text>
+          <Text variant="overline">{upper(t.settings.sectionAppearance)}</Text>
 
           {/* One group, hairlines between rows, rounded only at the ends. */}
           <RowGroup>
-            {THEME_OPTIONS.map((option, index) => (
+            {themeOptions.map((option, index) => (
               <SelectRow
                 key={option.value}
                 label={option.label}
@@ -113,24 +132,47 @@ export default function Settings() {
                 selected={preference === option.value}
                 onPress={() => setPreference(option.value)}
                 position={
-                  index === 0 ? 'first' : index === THEME_OPTIONS.length - 1 ? 'last' : 'middle'
+                  index === 0 ? 'first' : index === themeOptions.length - 1 ? 'last' : 'middle'
                 }
               />
             ))}
           </RowGroup>
 
           <Text variant="caption" className="px-1">
-            The theme applies immediately and is remembered on this device.
+            {t.settings.themeNote}
           </Text>
+
+          {/* Language sits under Appearance rather than in a section of its own: both
+              are "how the app presents itself on this device", and both are remembered
+              here rather than on the account. */}
+          <RowGroup>
+            <Pressable
+              onPress={() => setPickingLanguage(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`Language, currently ${LANG_NAMES[lang]}`}
+              className="flex-row items-center gap-3 px-4 py-3.5 active:opacity-70"
+            >
+              <Flag lang={lang} size={28} />
+              <View className="flex-1">
+                <Text variant="body">{t.language.label}</Text>
+              </View>
+              <Text variant="caption">{LANG_NAMES[lang]}</Text>
+            </Pressable>
+          </RowGroup>
         </View>
 
+        <LanguagePicker
+          visible={pickingLanguage}
+          onClose={() => setPickingLanguage(false)}
+        />
+
         <View className="gap-3">
-          <Text variant="overline">NOTIFICATIONS</Text>
+          <Text variant="overline">{upper(t.settings.sectionNotifications)}</Text>
 
           <RowGroup>
             <LinkRow
-              label="What we send you"
-              hint="Messages, matches, communities, reminders"
+              label={t.settings.notificationsRow}
+              hint={t.settings.notificationsHint}
               href="/settings/notifications"
               position="single"
             />
@@ -138,15 +180,15 @@ export default function Settings() {
         </View>
 
         <View className="gap-3">
-          <Text variant="overline">ABOUT</Text>
+          <Text variant="overline">{upper(t.settings.sectionAbout)}</Text>
 
           {/* Both stores want these reachable from inside the app, not only from the
               listing page — somebody who already installed it will never see that page
               again. */}
           <RowGroup>
             <LinkRow
-              label="Show the tutorial again"
-              hint="Walks you through the five tabs"
+              label={t.settings.tutorial}
+              hint={t.settings.tutorialHint}
               onPress={() => {
                 // Back to the deck first: the overlay navigates from wherever it starts,
                 // and starting it from inside Settings would leave the settings stack
@@ -160,14 +202,14 @@ export default function Settings() {
 
           <RowGroup>
             <LinkRow
-              label="Terms of Service"
-              hint="Including the rules on content and conduct"
+              label={t.settings.terms}
+              hint={t.settings.termsHint}
               onPress={() => void openTerms()}
               position="first"
             />
             <LinkRow
-              label="Privacy Policy"
-              hint="What we collect, and what we do with it"
+              label={t.settings.privacy}
+              hint={t.settings.privacyHint}
               onPress={() => void openPrivacy()}
               position="last"
             />
@@ -186,30 +228,30 @@ export default function Settings() {
         </View>
 
         <View className="gap-3">
-          <Text variant="overline">ACCOUNT</Text>
+          <Text variant="overline">{upper(t.settings.sectionAccount)}</Text>
 
           <RowGroup>
             <LinkRow
-              label="Password"
-              hint="Signs you out everywhere"
+              label={t.settings.password}
+              hint={t.settings.passwordHint}
               href="/settings/password"
               position="first"
             />
             <LinkRow
-              label="Blocked"
-              hint="Who you have blocked"
+              label={t.settings.blocked}
+              hint={t.settings.blockedHint}
               href="/settings/blocked"
               position="last"
             />
           </RowGroup>
 
-          <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
+          <Button label={t.settings.signOut} variant="secondary" onPress={() => void signOut()} />
 
           {/* Deleting from inside the app is a Play Store requirement for anything
               that lets people create an account, not a nicety. */}
           {!confirmingDelete ? (
             <Button
-              label="Delete my account"
+              label={t.settings.deleteAccount}
               variant="danger"
               onPress={() => setConfirmingDelete(true)}
             />
@@ -217,16 +259,15 @@ export default function Settings() {
             <Card className="gap-4 border border-danger/40">
               <View className="gap-1">
                 <Text variant="bodyStrong" className="text-danger">
-                  This cannot be undone
+                  {t.settings.deleteTitle}
                 </Text>
                 <Text variant="caption">
-                  Your profile, matches and messages are removed. Enter your password to confirm
-                  — a stolen phone should not be enough to do this.
+                  {t.settings.deleteBody}
                 </Text>
               </View>
 
               <TextField
-                label="Password"
+                label={t.settings.password}
                 value={password}
                 onChangeText={setPassword}
                 secure
@@ -237,14 +278,14 @@ export default function Settings() {
               {deleteAccount.error && <ErrorNotice error={deleteAccount.error} />}
 
               <Button
-                label="Delete my account"
+                label={t.settings.deleteAccount}
                 variant="danger"
                 loading={deleteAccount.isPending}
                 disabled={password.length === 0}
                 onPress={() => deleteAccount.mutate()}
               />
               <Button
-                label="Keep my account"
+                label={t.settings.keepAccount}
                 variant="ghost"
                 onPress={() => {
                   setConfirmingDelete(false);
@@ -257,7 +298,7 @@ export default function Settings() {
       </View>
 
       <View className="mt-auto pt-10">
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
+        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
       </View>
     </Screen>
   );

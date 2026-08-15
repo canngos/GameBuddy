@@ -1,32 +1,12 @@
 --
--- GameBuddy baseline schema.
+-- PostgreSQL database dump
 --
--- Creates an empty database from nothing. Apply this first, then any upgrade-*.sql newer
--- than it, in numeric order (4, 5, ... 20 — NOT filename order, which puts 10 before 4).
---
--- Generated from the JPA entities and then committed, rather than left to Hibernate at
--- startup. The point is that both environments can run ddl-auto=validate: the schema is
--- built by SQL that can be reviewed and rolled forward, and the application's job is to
--- refuse to start if what it finds does not match what it expects. With ddl-auto=update
--- the application silently reshapes the database instead, which is convenient exactly
--- until it quietly diverges from production.
---
--- HOW TO REGENERATE, AND THE MISTAKE NOT TO REPEAT
---
--- Dump a database built by replaying THIS FILE PLUS EVERY UPGRADE — never one built by
--- pointing Hibernate at an empty database with ddl-auto=create.
---
--- Both produce the same tables and columns, so the difference is invisible in a diff of
--- table names, and it is not invisible at runtime: an entity-generated schema carries no
--- column DEFAULTs at all. Hibernate does not emit them, because it supplies those values
--- from Java. Every DEFAULT in this file — 55 of them — came from a migration, and the
--- seed scripts and the synthetic population loader both rely on them. Regenerating from
--- the entities drops all 48, and the first symptom is `seed-local.sql` failing on a NOT
--- NULL column three steps later.
---
--- The procedure is in the README under "Regenerating the baseline schema". Prove the
--- result by loading it into an empty database and booting with ddl-auto=validate.
---
+
+\restrict j3axqcaIlb7v5HzSVenIbKHr19TPatJiAlABfsUuxtghtBqANDMKTlNavrp9uWe
+
+-- Dumped from database version 17.10
+-- Dumped by pg_dump version 17.10
+
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
@@ -165,59 +145,6 @@ COMMENT ON TABLE gamebuddy.coin_ledger IS 'Every coin movement, signed. Positive
 
 
 --
--- Name: comment; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.comment (
-    created_date timestamp(6) with time zone NOT NULL,
-    updated_date timestamp(6) with time zone NOT NULL,
-    comment_id uuid NOT NULL,
-    post_id uuid NOT NULL,
-    message character varying(255),
-    owner character varying(255),
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: comment_likes_join; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.comment_likes_join (
-    comment_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: community; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.community (
-    created_date timestamp(6) with time zone NOT NULL,
-    community_id uuid NOT NULL,
-    description character varying(2000),
-    community_avatar character varying(255),
-    name character varying(255) NOT NULL,
-    owner character varying(255) NOT NULL,
-    wallpaper character varying(255),
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: community_members_join; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.community_members_join (
-    community_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
 -- Name: content_report; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -338,7 +265,6 @@ CREATE TABLE gamebuddy.gamer (
     reminders_enabled boolean DEFAULT true NOT NULL,
     notify_messages boolean DEFAULT true NOT NULL,
     notify_social boolean DEFAULT true NOT NULL,
-    notify_communities boolean DEFAULT true NOT NULL,
     recommender_profile_changed_at timestamp(6) with time zone,
     avatar_score double precision,
     avatar_uploaded_at timestamp(6) with time zone,
@@ -356,7 +282,7 @@ CREATE TABLE gamebuddy.gamer (
     quest_week_started_at timestamp with time zone,
     quest_base_messages integer DEFAULT 0 NOT NULL,
     quest_base_matches integer DEFAULT 0 NOT NULL,
-    quest_base_posts integer DEFAULT 0 NOT NULL,
+    quest_base_lobbies integer DEFAULT 0 NOT NULL,
     quest_claimed_mask integer DEFAULT 0 NOT NULL,
     super_likes integer DEFAULT 0 NOT NULL,
     bonus_accepts integer DEFAULT 0 NOT NULL,
@@ -573,6 +499,113 @@ CREATE TABLE gamebuddy.keywords (
 
 
 --
+-- Name: lobby; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.lobby (
+    id uuid NOT NULL,
+    owner_id character varying(255) NOT NULL,
+    game_id character varying(255) NOT NULL,
+    title character varying(80) NOT NULL,
+    description character varying(500),
+    requirements character varying(300),
+    tone character varying(16) NOT NULL,
+    max_players integer NOT NULL,
+    starts_at timestamp with time zone NOT NULL,
+    status character varying(16) DEFAULT 'OPEN'::character varying NOT NULL,
+    locked_at timestamp with time zone,
+    ended_at timestamp with time zone,
+    version bigint DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT lobby_max_players_check CHECK (((max_players >= 2) AND (max_players <= 5))),
+    CONSTRAINT lobby_status_check CHECK (((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('LOCKED'::character varying)::text, ('ENDED'::character varying)::text, ('CANCELLED'::character varying)::text, ('ARCHIVED'::character varying)::text]))),
+    CONSTRAINT lobby_tone_check CHECK (((tone)::text = ANY (ARRAY[('COMPETITIVE'::character varying)::text, ('CHILL'::character varying)::text, ('CASUAL'::character varying)::text, ('LEARNING'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE lobby; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.lobby IS 'An open game lobby: one game, one owner, up to five players, a planned time.';
+
+
+--
+-- Name: COLUMN lobby.requirements; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.lobby.requirements IS 'Owner''s free-text entry bar (mic, rank, in-game chat). Informational only — the owner screens every join request by hand, so nothing enforces this.';
+
+
+--
+-- Name: COLUMN lobby.starts_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.lobby.starts_at IS 'The planned start, per the owner. The lifecycle sweeper cancels a still-OPEN lobby 24h past this, and ends a LOCKED one 48h past it. Locking itself schedules nothing.';
+
+
+--
+-- Name: COLUMN lobby.status; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.lobby.status IS 'OPEN takes requests; LOCKED is "team found, stop asking" and starts NO timer; ENDED/CANCELLED are terminal; ARCHIVED is swept out of the app after 30 days.';
+
+
+--
+-- Name: lobby_member; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.lobby_member (
+    lobby_id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    status character varying(16) NOT NULL,
+    requested_at timestamp with time zone DEFAULT now() NOT NULL,
+    decided_at timestamp with time zone,
+    last_read_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT lobby_member_status_check CHECK (((status)::text = ANY (ARRAY[('OWNER'::character varying)::text, ('PENDING'::character varying)::text, ('ACCEPTED'::character varying)::text, ('REJECTED'::character varying)::text, ('LEFT'::character varying)::text, ('KICKED'::character varying)::text])))
+);
+
+
+--
+-- Name: TABLE lobby_member; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.lobby_member IS 'Join requests and memberships in one: PENDING is a request, ACCEPTED/OWNER are the team, REJECTED is a final no, LEFT and KICKED are how people go.';
+
+
+--
+-- Name: COLUMN lobby_member.last_read_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.lobby_member.last_read_at IS 'Chat read watermark, same shape as chat_participant.last_read_at. Unread count is messages newer than this.';
+
+
+--
+-- Name: lobby_message; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.lobby_message (
+    id uuid NOT NULL,
+    lobby_id uuid NOT NULL,
+    sender_id character varying(255) NOT NULL,
+    body bytea NOT NULL,
+    nonce bytea NOT NULL,
+    key_version smallint NOT NULL,
+    created_at timestamp with time zone NOT NULL
+);
+
+
+--
+-- Name: TABLE lobby_message; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.lobby_message IS 'Lobby chat, encrypted at rest like chat_message. Deleted when the lobby archives.';
+
+
+--
 -- Name: notification_outbox; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -604,34 +637,6 @@ CREATE TABLE gamebuddy.notifications (
     recipient character varying(255) NOT NULL,
     title character varying(255) NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: post; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.post (
-    created_date timestamp(6) with time zone NOT NULL,
-    updated_date timestamp(6) with time zone NOT NULL,
-    community_id uuid NOT NULL,
-    post_id uuid NOT NULL,
-    body character varying(4000),
-    owner character varying(255),
-    picture character varying(255),
-    title character varying(255),
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
---
--- Name: post_likes_join; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.post_likes_join (
-    post_id uuid NOT NULL,
-    user_id character varying(255) NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -821,38 +826,6 @@ ALTER TABLE ONLY gamebuddy.coin_ledger
 
 
 --
--- Name: comment_likes_join comment_likes_join_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.comment_likes_join
-    ADD CONSTRAINT comment_likes_join_pkey PRIMARY KEY (comment_id, user_id);
-
-
---
--- Name: comment comment_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.comment
-    ADD CONSTRAINT comment_pkey PRIMARY KEY (comment_id);
-
-
---
--- Name: community_members_join community_members_join_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.community_members_join
-    ADD CONSTRAINT community_members_join_pkey PRIMARY KEY (community_id, user_id);
-
-
---
--- Name: community community_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.community
-    ADD CONSTRAINT community_pkey PRIMARY KEY (community_id);
-
-
---
 -- Name: content_report content_report_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -973,6 +946,30 @@ ALTER TABLE ONLY gamebuddy.keywords
 
 
 --
+-- Name: lobby_member lobby_member_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby_member
+    ADD CONSTRAINT lobby_member_pkey PRIMARY KEY (lobby_id, user_id);
+
+
+--
+-- Name: lobby_message lobby_message_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby_message
+    ADD CONSTRAINT lobby_message_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: lobby lobby_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby
+    ADD CONSTRAINT lobby_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: notification_outbox notification_outbox_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -986,22 +983,6 @@ ALTER TABLE ONLY gamebuddy.notification_outbox
 
 ALTER TABLE ONLY gamebuddy.notifications
     ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
-
-
---
--- Name: post_likes_join post_likes_join_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.post_likes_join
-    ADD CONSTRAINT post_likes_join_pkey PRIMARY KEY (post_id, user_id);
-
-
---
--- Name: post post_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.post
-    ADD CONSTRAINT post_pkey PRIMARY KEY (post_id);
 
 
 --
@@ -1240,6 +1221,34 @@ CREATE INDEX idx_impression_user_candidate ON gamebuddy.recommendation_impressio
 
 
 --
+-- Name: idx_lobby_browse; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_lobby_browse ON gamebuddy.lobby USING btree (status, starts_at);
+
+
+--
+-- Name: idx_lobby_game; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_lobby_game ON gamebuddy.lobby USING btree (game_id) WHERE ((status)::text = 'OPEN'::text);
+
+
+--
+-- Name: idx_lobby_member_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_lobby_member_user ON gamebuddy.lobby_member USING btree (user_id, status);
+
+
+--
+-- Name: idx_lobby_message_lobby; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_lobby_message_lobby ON gamebuddy.lobby_message USING btree (lobby_id, created_at);
+
+
+--
 -- Name: idx_notification_recipient; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
@@ -1251,20 +1260,6 @@ CREATE INDEX idx_notification_recipient ON gamebuddy.notifications USING btree (
 --
 
 CREATE INDEX idx_outbox_pending ON gamebuddy.notification_outbox USING btree (next_attempt_at, created_at) WHERE (sent_at IS NULL);
-
-
---
--- Name: idx_post_community; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE INDEX idx_post_community ON gamebuddy.post USING btree (community_id);
-
-
---
--- Name: idx_post_updated; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE INDEX idx_post_updated ON gamebuddy.post USING btree (updated_date);
 
 
 --
@@ -1310,6 +1305,13 @@ CREATE INDEX idx_verification_code_email ON gamebuddy.verification_code USING bt
 
 
 --
+-- Name: uq_lobby_active_owner; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_lobby_active_owner ON gamebuddy.lobby USING btree (owner_id) WHERE ((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('LOCKED'::character varying)::text]));
+
+
+--
 -- Name: avatars set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
 --
 
@@ -1328,20 +1330,6 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.chat_participant FOR EA
 --
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.chat_room FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
-
-
---
--- Name: comment set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
---
-
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.comment FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
-
-
---
--- Name: community set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
---
-
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.community FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
 
 
 --
@@ -1387,6 +1375,20 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.keywords FOR EACH ROW E
 
 
 --
+-- Name: lobby set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.lobby FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: lobby_member set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.lobby_member FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
 -- Name: notification_outbox set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
 --
 
@@ -1398,13 +1400,6 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.notification_outbox FOR
 --
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.notifications FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
-
-
---
--- Name: post set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
---
-
-CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.post FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
 
 
 --
@@ -1437,14 +1432,6 @@ ALTER TABLE ONLY gamebuddy.gamer_keywords_join
 
 
 --
--- Name: post_likes_join fk2cbg048ocdq9838hny4h6g97t; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.post_likes_join
-    ADD CONSTRAINT fk2cbg048ocdq9838hny4h6g97t FOREIGN KEY (post_id) REFERENCES gamebuddy.post(post_id);
-
-
---
 -- Name: blocked_friends fk3729u0vtmao7yrpdckcnnmhnl; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1466,22 +1453,6 @@ ALTER TABLE ONLY gamebuddy.gamer_games_join
 
 ALTER TABLE ONLY gamebuddy.waiting_friends
     ADD CONSTRAINT fk6fvyihyp8dh9f52b1e68lx9q FOREIGN KEY (requested_id) REFERENCES gamebuddy.gamer(user_id);
-
-
---
--- Name: community_members_join fk7g4in20nl8dvxop2yhbn832o5; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.community_members_join
-    ADD CONSTRAINT fk7g4in20nl8dvxop2yhbn832o5 FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id);
-
-
---
--- Name: comment_likes_join fk84if1k3dinptdrn5w4xpawq71; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.comment_likes_join
-    ADD CONSTRAINT fk84if1k3dinptdrn5w4xpawq71 FOREIGN KEY (comment_id) REFERENCES gamebuddy.comment(comment_id);
 
 
 --
@@ -1533,14 +1504,6 @@ ALTER TABLE ONLY gamebuddy.gamer_keywords_join
 
 
 --
--- Name: community_members_join fkgoxmn2hmjpb2qk3r1u87p4b31; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.community_members_join
-    ADD CONSTRAINT fkgoxmn2hmjpb2qk3r1u87p4b31 FOREIGN KEY (community_id) REFERENCES gamebuddy.community(community_id);
-
-
---
 -- Name: waiting_friends fkjlu43y5hnj4vupw0l9esgji3q; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1557,51 +1520,11 @@ ALTER TABLE ONLY gamebuddy.blocked_friends
 
 
 --
--- Name: post fkokm06ignilxux2n1anwepgun7; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.post
-    ADD CONSTRAINT fkokm06ignilxux2n1anwepgun7 FOREIGN KEY (community_id) REFERENCES gamebuddy.community(community_id);
-
-
---
--- Name: post_likes_join fkqv87tmyekthrymv5w9jsevesq; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.post_likes_join
-    ADD CONSTRAINT fkqv87tmyekthrymv5w9jsevesq FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id);
-
-
---
--- Name: comment fks1slvnkuemjsq2kj4h3vhx7i1; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.comment
-    ADD CONSTRAINT fks1slvnkuemjsq2kj4h3vhx7i1 FOREIGN KEY (post_id) REFERENCES gamebuddy.post(post_id);
-
-
---
--- Name: comment_likes_join fksakra0l1lqrow56n3pvjoeqcw; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.comment_likes_join
-    ADD CONSTRAINT fksakra0l1lqrow56n3pvjoeqcw FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id);
-
-
---
 -- Name: friends fkt9hovkymyt454v5k1pkndyryx; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
 ALTER TABLE ONLY gamebuddy.friends
     ADD CONSTRAINT fkt9hovkymyt454v5k1pkndyryx FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id);
-
-
---
--- Name: community fktjyro66mpf7ydi9w35ejrbqjp; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.community
-    ADD CONSTRAINT fktjyro66mpf7ydi9w35ejrbqjp FOREIGN KEY (owner) REFERENCES gamebuddy.gamer(user_id);
 
 
 --
@@ -1645,7 +1568,48 @@ ALTER TABLE ONLY gamebuddy.gamer
 
 
 --
+-- Name: lobby lobby_game_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby
+    ADD CONSTRAINT lobby_game_id_fkey FOREIGN KEY (game_id) REFERENCES gamebuddy.games(game_id);
+
+
+--
+-- Name: lobby_member lobby_member_lobby_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby_member
+    ADD CONSTRAINT lobby_member_lobby_id_fkey FOREIGN KEY (lobby_id) REFERENCES gamebuddy.lobby(id);
+
+
+--
+-- Name: lobby_member lobby_member_user_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby_member
+    ADD CONSTRAINT lobby_member_user_id_fkey FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id);
+
+
+--
+-- Name: lobby_message lobby_message_lobby_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby_message
+    ADD CONSTRAINT lobby_message_lobby_id_fkey FOREIGN KEY (lobby_id) REFERENCES gamebuddy.lobby(id);
+
+
+--
+-- Name: lobby lobby_owner_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.lobby
+    ADD CONSTRAINT lobby_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES gamebuddy.gamer(user_id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
+\unrestrict j3axqcaIlb7v5HzSVenIbKHr19TPatJiAlABfsUuxtghtBqANDMKTlNavrp9uWe
 

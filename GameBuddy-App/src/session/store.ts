@@ -1,8 +1,10 @@
 import { create } from 'zustand';
+import { authApi } from '../api/auth';
 import { profileApi } from '../api/catalogue';
 import { setSessionExpiredHandler, setTokenProvider } from '../api/client';
 import type { UserInfo } from '../api/types';
 import { secureStorage } from './storage';
+import { shouldRefresh } from './tokenClock';
 
 const TOKEN_KEY = 'gamebuddy.accessToken';
 const USER_ID_KEY = 'gamebuddy.userId';
@@ -36,6 +38,11 @@ type SessionState = {
 
   /** Called once at startup. Resolves the stored token into a status. */
   restore: () => Promise<void>;
+  /**
+   * Renews the token if it is past half its life. Safe to call often — it is a no-op
+   * for a fresh token — and safe to call when signed out.
+   */
+  renewIfStale: () => Promise<void>;
   /**
    * After verification. Stores the token, then asks the server how far this account
    * actually got — a code can be requested at any time, so this is the recovery path
@@ -78,6 +85,43 @@ export const useSession = create<SessionState>((set, get) => ({
       // must not sign the user out; they would lose their session because their train
       // went into a tunnel. Let them through and let the first real request fail.
       if (get().token) set({ status: 'ready' });
+    }
+
+    // After the status is settled, not before: renewing is housekeeping, and making
+    // the first screen wait on it would trade a visible delay for an invisible gain.
+    void get().renewIfStale();
+  },
+
+  /**
+   * The sliding half of the session.
+   *
+   * The token lasts a week from when it was issued, and that is a hard stop — without
+   * this, somebody who opens the app every single day is still thrown out every seventh
+   * day, for no reason they can see. Renewing on use turns that into "you stay signed in
+   * as long as you keep playing", while an abandoned session still lapses a week after
+   * it was last touched.
+   *
+   * Failures are swallowed on purpose. The token in hand is still valid — it has at
+   * least half its life left, which is what made this a renewal rather than an expiry —
+   * so a failed attempt costs nothing and will be retried on the next launch or the next
+   * time the app comes back to the foreground.
+   */
+  renewIfStale: async () => {
+    const token = get().token;
+    if (!token || !shouldRefresh(token)) return;
+
+    try {
+      const renewed = await authApi.refresh();
+      // The store may have moved on while the request was in flight — a sign-out, or a
+      // sign-in as somebody else. Writing the new token then would resurrect a session
+      // the user just ended.
+      if (get().token !== token) return;
+
+      await persist(renewed.accessToken, renewed.userId);
+      set({ token: renewed.accessToken, userId: renewed.userId });
+    } catch {
+      // Includes the server refusing because the session hit its ceiling, which arrives
+      // as TOKEN_INVALID and has already signed the user out through the expiry handler.
     }
   },
 

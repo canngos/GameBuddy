@@ -14,6 +14,7 @@ import java.util.Date;
 import java.util.List;
 import javax.crypto.SecretKey;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -29,7 +30,7 @@ class JwtServiceTest {
 
     private static final String SECRET = "a-test-signing-key-that-is-long-enough-for-hs256";
 
-    private final JwtService jwtService = new JwtService(new JwtProperties(SECRET, Duration.ofDays(7), "gamebuddy"));
+    private final JwtService jwtService = new JwtService(new JwtProperties(SECRET, Duration.ofDays(7), null, "gamebuddy"));
 
     private static UserDetails user(String email) {
         return User.withUsername(email).password("x").roles("USER").build();
@@ -73,7 +74,7 @@ class JwtServiceTest {
     @Test
     @DisplayName("a secret shorter than 256 bits is refused at construction, not at first request")
     void testConstructor_whenSecretTooShort_Throws() {
-        JwtProperties tooShort = new JwtProperties("too-short", Duration.ofDays(1), "gamebuddy");
+        JwtProperties tooShort = new JwtProperties("too-short", Duration.ofDays(1), null, "gamebuddy");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> new JwtService(tooShort));
         assertTrue(ex.getMessage().contains("32 bytes"));
@@ -109,7 +110,7 @@ class JwtServiceTest {
 
     @Test
     void testIsTokenValid_whenExpired_ReturnsFalse() {
-        JwtService shortLived = new JwtService(new JwtProperties(SECRET, Duration.ofSeconds(-30), "gamebuddy"));
+        JwtService shortLived = new JwtService(new JwtProperties(SECRET, Duration.ofSeconds(-30), null, "gamebuddy"));
         String expired = shortLived.generateToken(user("a@example.com"));
 
         assertFalse(jwtService.isTokenValid(expired, user("a@example.com")));
@@ -118,7 +119,7 @@ class JwtServiceTest {
     @Test
     @DisplayName("a token minted for one issuer is not accepted by another")
     void testIsTokenValid_whenIssuerDiffers_ReturnsFalse() {
-        JwtService other = new JwtService(new JwtProperties(SECRET, Duration.ofDays(1), "someone-else"));
+        JwtService other = new JwtService(new JwtProperties(SECRET, Duration.ofDays(1), null, "someone-else"));
         String token = other.generateToken(user("a@example.com"));
 
         assertFalse(jwtService.isTokenValid(token, user("a@example.com")));
@@ -170,9 +171,66 @@ class JwtServiceTest {
     void testConstructor_whenSecretIsBase64_DecodesIt() {
         String base64 = java.util.Base64.getEncoder()
                 .encodeToString("0123456789abcdef0123456789abcdef".getBytes(StandardCharsets.UTF_8));
-        JwtService service = new JwtService(new JwtProperties(base64, Duration.ofDays(1), "gamebuddy"));
+        JwtService service = new JwtService(new JwtProperties(base64, Duration.ofDays(1), null, "gamebuddy"));
 
         String token = service.generateToken(user("a@example.com"));
         assertTrue(service.isTokenValid(token, user("a@example.com")));
+    }
+
+    @Nested
+    @DisplayName("sliding sessions")
+    class SlidingSessions {
+
+        @Test
+        @DisplayName("a fresh token's session starts now")
+        void testGenerateToken_whenNewSession_StampsSessionStart() {
+            String token = jwtService.generateToken(user("a@example.com"));
+
+            Instant start = jwtService.extractSessionStart(token);
+            assertTrue(Duration.between(start, Instant.now()).abs().toSeconds() <= 5);
+        }
+
+        @Test
+        @DisplayName("refreshing carries the original start forward, so the session keeps ageing")
+        void testGenerateToken_whenRefreshed_KeepsOriginalSessionStart() {
+            Instant began = Instant.now().minus(Duration.ofDays(20));
+
+            String refreshed = jwtService.generateToken(user("a@example.com"), began);
+
+            // The token is new — a later expiry is the whole point — but the session is
+            // still twenty days old. Resetting this is what would let a stolen token be
+            // renewed forever.
+            assertEquals(began.getEpochSecond(), jwtService.extractSessionStart(refreshed).getEpochSecond());
+            assertTrue(jwtService.extractExpiration(refreshed).isAfter(Instant.now().plus(Duration.ofDays(6))));
+        }
+
+        @Test
+        @DisplayName("a session inside the ceiling may be extended; one past it may not")
+        void testWithinMaxSessionAge_BoundsTheSession() {
+            Instant now = Instant.now();
+            // The default ceiling is 30 days — see JwtProperties.
+            assertTrue(jwtService.withinMaxSessionAge(now.minus(Duration.ofDays(29)), now));
+            assertFalse(jwtService.withinMaxSessionAge(now.minus(Duration.ofDays(31)), now));
+        }
+
+        @Test
+        @DisplayName("a token minted before the claim existed ages from when it was issued")
+        void testExtractSessionStart_whenClaimMissing_FallsBackToIssuedAt() {
+            // Exactly the shape of a token already in somebody's keychain at deploy time:
+            // signed by us, valid, with no session-start claim on it.
+            String legacy = Jwts.builder()
+                    .subject("a@example.com")
+                    .issuer("gamebuddy")
+                    .issuedAt(Date.from(Instant.now().minus(Duration.ofDays(2))))
+                    .expiration(Date.from(Instant.now().plus(Duration.ofDays(5))))
+                    .signWith(Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8)))
+                    .compact();
+
+            Instant start = jwtService.extractSessionStart(legacy);
+
+            assertEquals(jwtService.extractIssuedAt(legacy), start);
+            // And it is still refreshable, so the deploy logs nobody out.
+            assertTrue(jwtService.withinMaxSessionAge(start, Instant.now()));
+        }
     }
 }

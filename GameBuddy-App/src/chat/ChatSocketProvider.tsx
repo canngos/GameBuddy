@@ -3,6 +3,7 @@ import { useSession } from '../session/store';
 import {
   createChatSocket,
   type ChatNotification,
+  type LobbyEvent,
   type PresenceUpdate,
   type SocketStatus,
 } from './socket';
@@ -11,6 +12,7 @@ import {
 const TYPING_TTL_MS = 5000;
 
 type MessageHandler = (notification: ChatNotification) => void;
+type LobbyHandler = (event: LobbyEvent) => void;
 
 type ChatSocketValue = {
   status: SocketStatus;
@@ -20,6 +22,8 @@ type ChatSocketValue = {
   typing: Record<string, true>;
   /** Registers a handler for incoming messages; returns an unsubscribe. */
   onMessage: (handler: MessageHandler) => () => void;
+  /** Registers a handler for lobby events (chat, roster, lifecycle); returns an unsubscribe. */
+  onLobby: (handler: LobbyHandler) => () => void;
   sendTyping: (receiverId: string) => void;
 };
 
@@ -59,6 +63,7 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
    * which is also a presence flicker for everybody watching.
    */
   const handlers = useRef(new Set<MessageHandler>());
+  const lobbyHandlers = useRef(new Set<LobbyHandler>());
   const socket = useRef<ReturnType<typeof createChatSocket> | null>(null);
   /** One expiry timer per person typing, so a stale indicator cannot get stuck on. */
   const typingTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -82,6 +87,9 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
         setPresence((current) => ({ ...current, [update.userId]: update }));
         // Somebody who just went offline is not still typing.
         if (!update.online) clearTyping(update.userId);
+      },
+      onLobby: (event) => {
+        lobbyHandlers.current.forEach((handler) => handler(event));
       },
       onTyping: ({ senderId }) => {
         setTyping((current) => (current[senderId] ? current : { ...current, [senderId]: true }));
@@ -133,6 +141,12 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
         handlers.current.add(handler);
         return () => {
           handlers.current.delete(handler);
+        };
+      },
+      onLobby: (handler) => {
+        lobbyHandlers.current.add(handler);
+        return () => {
+          lobbyHandlers.current.delete(handler);
         };
       },
       sendTyping: (receiverId) => socket.current?.sendTyping(receiverId),

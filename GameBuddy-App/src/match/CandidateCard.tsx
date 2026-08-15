@@ -6,6 +6,7 @@ import { avatarGradient, avatarUri, initialsOf } from '../avatars';
 import { profileApi } from '../api/catalogue';
 import type { Candidate } from '../api/types';
 import { PlatformIcon } from '../profile/PlatformIcon';
+import { useUpper } from '../i18n/case';
 import { useThemeColors } from '../theme';
 import { platformIdOf } from '../profile/platforms';
 import { Avatar } from '../ui/Avatar';
@@ -324,11 +325,13 @@ export function KeywordRow({
   items: string[];
   hidden?: number;
 }) {
+  const upper = useUpper();
+
   if (items.length === 0) return null;
 
   return (
     <View className="gap-2">
-      <Text variant="overline">{title.toUpperCase()}</Text>
+      <Text variant="overline">{upper(title)}</Text>
       <View className="flex-row flex-wrap gap-2">
         {items.map((item) => (
           <View key={item} className="max-w-full rounded-full bg-raised px-3 py-1.5">

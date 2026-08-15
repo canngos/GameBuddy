@@ -247,10 +247,6 @@ public class Gamer implements RevocableUser {
     @Column(name = "notify_social", nullable = false)
     private boolean notifySocial = true;
 
-    /** Posts, comments and likes in communities they joined. */
-    @Column(name = "notify_communities", nullable = false)
-    private boolean notifyCommunities = true;
-
     /**
      * "Come back" nudges — the re-engagement reminders.
      *
@@ -414,8 +410,9 @@ public class Gamer implements RevocableUser {
     @Column(name = "quest_base_matches", nullable = false)
     private int questBaseMatches = 0;
 
-    @Column(name = "quest_base_posts", nullable = false)
-    private int questBasePosts = 0;
+    /** Baseline for the weekly lobby quest. Replaced quest_base_posts when Communities retired. */
+    @Column(name = "quest_base_lobbies", nullable = false)
+    private int questBaseLobbies = 0;
 
     /** Bitmask of quests already paid this week; cleared when the week rolls over. */
     @Column(name = "quest_claimed_mask", nullable = false)

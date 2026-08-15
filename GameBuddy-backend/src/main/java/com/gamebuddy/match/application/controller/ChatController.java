@@ -6,7 +6,7 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.util.Ids;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import com.gamebuddy.match.domain.service.chat.SentMessage;
-import com.gamebuddy.match.domain.service.chat.UserMessaging;
+import com.gamebuddy.shared.messaging.UserMessaging;
 import com.gamebuddy.match.interfaces.dto.ChatNotification;
 import com.gamebuddy.match.interfaces.request.ChatMessageRequest;
 import com.gamebuddy.match.interfaces.request.TypingRequest;
