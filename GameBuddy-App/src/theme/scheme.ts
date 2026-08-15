@@ -59,7 +59,15 @@ function isPreference(value: string | null): value is ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark';
 }
 
-/** Human labels for the settings screen, in the order they should be shown. */
+/**
+ * English labels, for the two surfaces that stay English: the moderator console and the
+ * development gallery.
+ *
+ * The user-facing Settings screen no longer reads this — it builds the same three rows
+ * from the translation catalogue (`settings.theme*`). A module-level array is evaluated
+ * at import time, before anybody has chosen a language, so translated copy cannot live
+ * here; that is the reason for the split rather than an oversight.
+ */
 export const THEME_OPTIONS: { value: ThemePreference; label: string; hint: string }[] = [
   { value: 'system', label: 'System', hint: 'Match your phone' },
   { value: 'light', label: 'Light', hint: 'Always light' },

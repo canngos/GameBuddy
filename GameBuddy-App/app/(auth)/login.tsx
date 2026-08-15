@@ -5,9 +5,11 @@ import { View } from 'react-native';
 import { authApi } from '../../src/api/auth';
 import { ApiError, Code } from '../../src/api/envelope';
 import { useSession } from '../../src/session/store';
+import { useT } from '../../src/i18n/useT';
 import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
 
 export default function Login() {
+  const t = useT();
   const router = useRouter();
   const signIn = useSession((s) => s.signIn);
 
@@ -45,15 +47,15 @@ export default function Login() {
   return (
     <Screen scroll>
       <View className="gap-2 pb-8 pt-12">
-        <Text variant="title">Welcome back</Text>
+        <Text variant="title">{t.auth.login.title}</Text>
         <Text variant="body" className="text-muted">
-          Sign in with your username or email.
+          {t.auth.login.subtitle}
         </Text>
       </View>
 
       <View className="gap-5">
         <TextField
-          label="Username or email"
+          label={t.auth.login.identifier}
           value={identifier}
           onChangeText={setIdentifier}
           textContentType="username"
@@ -62,7 +64,7 @@ export default function Login() {
         />
 
         <TextField
-          label="Password"
+          label={t.auth.login.password}
           value={password}
           onChangeText={setPassword}
           secure
@@ -82,10 +84,10 @@ export default function Login() {
             <Text variant="caption">
               {/* Only useful if the identifier is the email — sendCode looks up by
                   address, so a username here comes back as "User not found". */}
-              We can email a new code to finish setting up this account.
+              {t.auth.login.needsCode}
             </Text>
             <Button
-              label="Email me a code"
+              label={t.auth.login.emailCode}
               variant="secondary"
               size="md"
               loading={sendCode.isPending}
@@ -98,12 +100,12 @@ export default function Login() {
 
       <View className="mt-auto gap-2 pt-10">
         <Button
-          label="Sign in"
+          label={t.auth.login.submit}
           loading={login.isPending}
           disabled={!canSubmit}
           onPress={() => login.mutate()}
         />
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
+        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
       </View>
     </Screen>
   );

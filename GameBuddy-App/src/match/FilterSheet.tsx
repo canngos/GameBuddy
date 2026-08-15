@@ -9,6 +9,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { profileApi } from '../api/catalogue';
+import { useUpper } from '../i18n/case';
 import { PLATFORMS } from '../profile/platforms';
 import { Button } from '../ui/Button';
 import { Text } from '../ui/Text';
@@ -237,10 +238,12 @@ function Section({
   hint: string;
   children: React.ReactNode;
 }) {
+  const upper = useUpper();
+
   return (
     <View className="gap-3">
       <View className="gap-0.5">
-        <Text variant="overline">{title.toUpperCase()}</Text>
+        <Text variant="overline">{upper(title)}</Text>
         <Text variant="caption">{hint}</Text>
       </View>
       {children}

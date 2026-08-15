@@ -52,6 +52,16 @@ export const authApi = {
   /** Confirms the stored token is still good, and is how the app resumes a session. */
   validateToken: () => api.post<{ userId: string }>('/auth/validateToken'),
 
+  /**
+   * Trades the current token for one with a later expiry, keeping the session alive.
+   *
+   * Called by the session store when the stored token is past half its life — not on
+   * every launch. The session keeps its original start date across refreshes, so this
+   * extends a session but cannot hold one open indefinitely: past the server's ceiling
+   * it answers TOKEN_INVALID and the app asks for the password again.
+   */
+  refresh: () => api.post<Session>('/auth/refresh'),
+
   setUsername: (username: string) => api.post<void>('/auth/username', { username }),
 
   /** Second and final onboarding step. Completing it is what makes login work. */

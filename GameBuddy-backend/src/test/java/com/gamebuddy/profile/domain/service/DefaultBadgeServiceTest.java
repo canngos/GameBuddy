@@ -83,8 +83,7 @@ class DefaultBadgeServiceTest {
         // Two sources, each owning different metrics — the real arrangement, where the
         // profile module measures some and other modules measure the rest.
         BadgeMetricSource one = g -> filtered(BadgeMetric.MATCHES, BadgeMetric.FRIENDS);
-        BadgeMetricSource two =
-                g -> filtered(BadgeMetric.MESSAGES_SENT, BadgeMetric.POSTS_WRITTEN, BadgeMetric.COMMUNITIES_JOINED);
+        BadgeMetricSource two = g -> filtered(BadgeMetric.MESSAGES_SENT, BadgeMetric.LOBBIES_JOINED);
 
         badgeService = new DefaultBadgeService(
                 badgeRepository,
@@ -253,29 +252,29 @@ class DefaultBadgeServiceTest {
         @Test
         @DisplayName("earning one notifies the gamer it belongs to")
         void testEvaluate_whenAwarded_PublishesNotification() {
-            metrics.put(BadgeMetric.COMMUNITIES_JOINED, 1);
+            metrics.put(BadgeMetric.FRIENDS, 1);
 
             badgeService.evaluate(gamer);
 
             ArgumentCaptor<NotificationRequestedEvent> event = ArgumentCaptor.captor();
             verify(events).publishEvent(event.capture());
             assertEquals("fcm-me", event.getValue().fcmToken());
-            assertTrue(event.getValue().body().contains(Badge.GUILD_MEMBER.getTitle()));
+            assertTrue(event.getValue().body().contains(Badge.FRIENDLY_PERSON.getTitle()));
         }
 
         @Test
         @DisplayName("metrics come from every source, not just the first")
         void testEvaluate_whenMetricBelongsToAnotherSource_StillCounts() {
-            // POSTS_WRITTEN is owned by the second fake source. A merge that stopped at the
-            // first would silently make every community mission unreachable.
-            metrics.put(BadgeMetric.POSTS_WRITTEN, 1);
+            // MESSAGES_SENT is owned by the second fake source. A merge that stopped at
+            // the first would silently make every chat mission unreachable.
+            metrics.put(BadgeMetric.MESSAGES_SENT, 1);
 
             badgeService.evaluate(gamer);
 
             ArgumentCaptor<List<GamerBadge>> saved = ArgumentCaptor.captor();
             verify(badgeRepository).saveAll(saved.capture());
             assertTrue(saved.getValue().stream()
-                    .anyMatch(row -> row.getBadgeCode().equals(Badge.SAY_SOMETHING.getCode())));
+                    .anyMatch(row -> row.getBadgeCode().equals(Badge.ICEBREAKER.getCode())));
         }
 
         @Test
@@ -400,8 +399,8 @@ class DefaultBadgeServiceTest {
             List<String> codes = List.of(
                     Badge.FIRST_CONTACT.getCode(),
                     Badge.ICEBREAKER.getCode(),
-                    Badge.GUILD_MEMBER.getCode(),
-                    Badge.SAY_SOMETHING.getCode());
+                    Badge.FRIENDLY_PERSON.getCode(),
+                    Badge.SQUAD_FORMING.getCode());
 
             BusinessException ex = assertThrows(BusinessException.class, () -> badgeService.showcase(gamer, codes));
             assertEquals(167, ex.getTransactionCode().getId());

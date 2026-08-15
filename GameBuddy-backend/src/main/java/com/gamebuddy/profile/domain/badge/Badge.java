@@ -41,8 +41,12 @@ public enum Badge {
             50),
     ICEBREAKER("icebreaker", "Icebreaker", "Send your first message.", MESSAGES_SENT, 1, 25),
     FRIENDLY_PERSON("friendly-person", "Friendly Person", "Add your first friend.", FRIENDS, 1, 25),
-    GUILD_MEMBER("guild-member", "Guild Member", "Join a community.", COMMUNITIES_JOINED, 1, 25),
-    SAY_SOMETHING("say-something", "Say Something", "Write your first post.", POSTS_WRITTEN, 1, 25),
+
+    // guild-member, say-something and local-legend retired with the Community feature.
+    // Their earned rows survive on purpose — byCode() answers empty and the screen skips
+    // them — but the codes are spent forever: reusing one would resurrect everybody's old
+    // badge under a new name. A lobby mission over LOBBIES_JOINED can take their place
+    // once its icon exists in the media bucket (badges/generate.py).
 
     // --- getting somewhere -------------------------------------------------
 
@@ -54,7 +58,6 @@ public enum Badge {
     // --- the long haul -----------------------------------------------------
 
     FULL_PARTY("full-party", "Full Party", "Match with 10 players.", MATCHES, 10, 150),
-    LOCAL_LEGEND("local-legend", "Local Legend", "Write 10 posts.", POSTS_WRITTEN, 10, 150),
     NEVER_OFFLINE("never-offline", "Never Offline", "Send 100 messages.", MESSAGES_SENT, 100, 200);
 
     /** Stored in the database, and the icon's filename. Kebab-case, stable forever. */

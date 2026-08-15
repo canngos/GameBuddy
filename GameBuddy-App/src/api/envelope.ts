@@ -43,14 +43,8 @@ export const Code = {
   USER_BLOCKED: '113',
   /** A cosmetic cost more than the balance. The Market offers coins rather than nagging. */
   COIN_NOT_ENOUGH: '129',
-  COMMUNITY_NOT_FOUND: '131',
-  /** Community posts, comments and members are all members-only reads, not just writes. */
-  NOT_MEMBER: '132',
-  POST_NOT_FOUND: '133',
-  /** Deleting a post, a comment or a community you did not create. */
-  NOT_OWNER: '134',
-  ALREADY_MEMBER: '136',
-  ALREADY_LIKED: '139',
+  // 131-139 belonged to the retired Community feature; the numbers stay spent on the
+  // backend and are no longer branched on here.
   VERIFICATION_CODE_EXPIRED: '144',
   TOO_MANY_ATTEMPTS: '145',
   RATE_LIMITED: '146',
@@ -62,6 +56,15 @@ export const Code = {
   ACCEPT_LIMIT_REACHED: '158',
   SUBSCRIPTION_REQUIRED: '159',
   SWIPE_LIMIT_REACHED: '163',
+  LOBBY_NOT_FOUND: '178',
+  LOBBY_FULL: '179',
+  /** The lobby is locked, ended or cancelled — refresh and show it as it is now. */
+  LOBBY_NOT_OPEN: '180',
+  LOBBY_ALREADY_MEMBER: '181',
+  /** One live lobby per owner: finish or cancel the current one first. */
+  LOBBY_LIMIT_REACHED: '183',
+  /** The owner already said no, and that answer is final for this lobby. */
+  LOBBY_REJECTED: '185',
 } as const;
 
 export type CodeValue = (typeof Code)[keyof typeof Code];

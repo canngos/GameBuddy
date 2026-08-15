@@ -5,7 +5,7 @@ import com.gamebuddy.shared.entity.Gamer;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-/** Gamer and community entities to their DTOs. */
+/** Gamer entities to their DTOs. */
 @Mapper
 public interface ProfileMapper {
 

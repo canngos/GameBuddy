@@ -30,8 +30,8 @@ const AUTHENTICATED_GETS = [
   `${P.match}/get/accept-allowance`,
   `${P.match}/boost`,
   '/messages/get/inbox',
-  `${P.community}/get/posts`,
-  `${P.community}/get/communities`,
+  `${P.lobby}/browse`,
+  `${P.lobby}/mine`,
   `${P.notif}/pending`,
   `${P.notif}/preferences`,
   `${P.billing}/subscription`,
@@ -102,6 +102,46 @@ describe('security', () => {
       const after_ = await get(`${P.profile}/get/user/info`, { token: account.token });
       assert.equal(after_.status, 401,
         'the old token still works after a password change — a stolen token outlives the response to it');
+    });
+
+    test('a session can be extended without the password, and the new token works', async () => {
+      const account = await createAccount();
+
+      // Past the second boundary: a JWT minted in the same second with the same claims
+      // is the same string, so without this the "new token" assertion below compares a
+      // token to itself. The real client refreshes days in, not milliseconds in.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const refreshed = await post(`${P.auth}/refresh`, undefined, { token: account.token });
+      assert.equal(refreshed.status, 200, refreshed.text);
+      const token = refreshed.data.accessToken;
+      assert.ok(token, 'refresh must return a token');
+      assert.notEqual(token, account.token, 'refresh must issue a new token, not echo the old one');
+
+      const me = await get(`${P.profile}/get/user/info`, { token });
+      assert.equal(me.status, 200, 'the renewed token must be usable');
+    });
+
+    test('refreshing does not reset how old the session is', async () => {
+      // The ceiling only means anything if the clock survives a refresh. Read it off the
+      // token itself: `sst` is the session start, and it must not move when `iat` does.
+      const account = await createAccount();
+      const claims = (t) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString());
+
+      const first = claims(account.token);
+      // A JWT's clock ticks in whole seconds, so a refresh issued in the same second as
+      // the login is genuinely indistinguishable from it. Wait past the tick, otherwise
+      // this asserts nothing about whether the expiry moves.
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const refreshed = await post(`${P.auth}/refresh`, undefined, { token: account.token });
+      const second = claims(refreshed.data.accessToken);
+
+      assert.equal(second.sst, first.sst, 'the session start must carry across a refresh');
+      assert.ok(second.exp > first.exp, 'but the expiry must move out — that is the point');
+    });
+
+    test('refresh is closed to anonymous callers and to junk tokens', async () => {
+      assert.equal((await post(`${P.auth}/refresh`)).status, 401);
+      assert.equal((await post(`${P.auth}/refresh`, undefined, { token: 'not.a.token' })).status, 401);
     });
   });
 
@@ -250,21 +290,26 @@ describe('security', () => {
     // Any authenticated user could produce 500s at will. The bound now matches the column on
     // every field, as CreateCommentRequest always did.
     test('oversized text is refused with a 4xx, not a 500', async () => {
+      // Bean validation on the lobby requests fires before the Gold gate, so a free
+      // account can probe these — a 402 here would itself be a finding, because it would
+      // mean an oversized value reached the service.
       const [a] = seeded(1);
-      const name = `QA Size ${Math.random().toString(36).slice(2, 7).replace(/[0-9]/g, 'x')}`;
-      await post(`${P.community}/create/community`, { name, description: 'probe' }, { token: a.token });
-      const communityId = (await get(`${P.community}/get/communities`, { token: a.token }))
-        .data.communities.find((c) => c.name === name).communityId;
+      const base = {
+        gameId: 'probe',
+        tone: 'CHILL',
+        maxPlayers: 3,
+        startsAt: new Date(Date.now() + 3_600_000).toISOString(),
+      };
 
       const cases = [
-        ['community name', () => post(`${P.community}/create/community`,
-          { name: 'x'.repeat(300), description: 'd' }, { token: a.token })],
-        ['community description', () => post(`${P.community}/create/community`,
-          { name: `QA n${Math.random().toString(36).slice(2, 6)}`, description: 'x'.repeat(3000) }, { token: a.token })],
-        ['post title', () => post(`${P.community}/create/post`,
-          { communityId, title: 'x'.repeat(300), body: 'b' }, { token: a.token })],
-        ['post body', () => post(`${P.community}/create/post`,
-          { communityId, title: `t${Math.random().toString(36).slice(2, 6)}`, body: 'x'.repeat(100_000) }, { token: a.token })],
+        ['lobby title', () => post(`${P.lobby}/create`,
+          { ...base, title: 'x'.repeat(300) }, { token: a.token })],
+        ['lobby description', () => post(`${P.lobby}/create`,
+          { ...base, title: 't', description: 'x'.repeat(3000) }, { token: a.token })],
+        ['lobby requirements', () => post(`${P.lobby}/create`,
+          { ...base, title: 't', requirements: 'x'.repeat(3000) }, { token: a.token })],
+        ['lobby message', () => post(`${P.lobby}/00000000-0000-0000-0000-000000000000/messages/send`,
+          { message: 'x'.repeat(100_000) }, { token: a.token })],
       ];
 
       const fives = [];
@@ -276,33 +321,24 @@ describe('security', () => {
     });
 
     test('the endpoints that DO validate length still do', async () => {
-      // The counter-example, and the reason the one above is a defect rather than a design
-      // choice: three sibling endpoints handle exactly this case correctly.
       const [a] = seeded(1);
       const long = 'x'.repeat(100_000);
 
-      assert.equal((await post(`${P.community}/create/comment`,
-        { postId: '00000000-0000-0000-0000-000000000000', message: long }, { token: a.token })).status, 400);
+      assert.equal((await post(`${P.lobby}/00000000-0000-0000-0000-000000000000/messages/send`,
+        { message: long }, { token: a.token })).status, 400);
       assert.equal((await post(`${P.auth}/username`, { username: 'x'.repeat(300) }, { token: a.token })).status, 400);
       assert.equal((await put(`${P.auth}/fcm-token`, { fcmToken: long }, { token: a.token })).status, 400);
     });
 
-    test('HTML in a post body is not returned as executable markup', async () => {
-      const [owner] = seeded(1);
-      const name = `QA XSS ${Math.random().toString(36).slice(2, 7).replace(/[0-9]/g, 'x')}`;
-      await post(`${P.community}/create/community`, { name, description: 'xss probe' }, { token: owner.token });
-      const communityId = (await get(`${P.community}/get/communities`, { token: owner.token }))
-        .data.communities.find((c) => c.name === name).communityId;
-
-      const title = `xss-${Math.random().toString(36).slice(2, 6)}`;
-      await post(`${P.community}/create/post`,
-        { communityId, title, body: '<script>alert(1)</script>' }, { token: owner.token });
-
-      const posts = await get(`${P.community}/get/posts/${communityId}`, { token: owner.token });
-      // The API is JSON and the client is React Native, so this is defence in depth rather
-      // than the only control — but a stored script tag is worth knowing about before a web
-      // client ever ships.
-      assert.equal(posts.headers.get('content-type')?.includes('application/json'), true,
+    test('stored user text comes back as JSON, never as executable markup', async () => {
+      // The lobby browse feed is the public surface that serves stranger-written text.
+      // The API is JSON and the client is React Native, so this is defence in depth
+      // rather than the only control — but a stored script tag is worth knowing about
+      // before a web client ever ships.
+      const [a] = seeded(1);
+      const browse = await get(`${P.lobby}/browse`, { token: a.token });
+      assert.equal(browse.status, 200, browse.text);
+      assert.equal(browse.headers.get('content-type')?.includes('application/json'), true,
         'the response must be JSON, not HTML');
     });
   });

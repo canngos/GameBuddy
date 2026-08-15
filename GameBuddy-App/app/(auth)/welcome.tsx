@@ -1,24 +1,47 @@
 import { useRouter } from 'expo-router';
-import { Gamepad2, MessagesSquare, ShieldCheck } from 'lucide-react-native';
+import { Gamepad2, MessagesSquare, Users } from 'lucide-react-native';
+import { useState } from 'react';
 import { View } from 'react-native';
+import { LanguageButton, LanguagePicker } from '../../src/i18n/LanguagePicker';
+import { useT } from '../../src/i18n/useT';
 import { Button, Icon, Screen, Text } from '../../src/ui';
 
 /**
  * Three claims, each tied to something the product actually does — the recommender,
- * the age bands, the match-before-chat rule. Generic marketing copy here would be
- * writing a cheque the app has to cash on the next screen.
+ * lobbies, the match-before-chat rule. Generic marketing copy here would be writing a
+ * cheque the app has to cash on the next screen.
+ *
+ * The middle one used to advertise age separation. That stopped being worth a third of
+ * this screen when the app went 18-only: `AgeBand` still refuses to pair a minor with an
+ * adult, but registration already refuses minors, so the guarantee is invisible to
+ * everybody who can read it. The slot went to the thing people can actually do.
  */
-const PITCH = [
-  { icon: Gamepad2, title: 'Matched on taste', body: 'Ranked by what you play, not who is nearby.' },
-  { icon: ShieldCheck, title: 'Age-separated', body: 'Under-18 and over-18 are never shown to each other.' },
-  { icon: MessagesSquare, title: 'Chat after a match', body: 'Both of you have to say yes first.' },
-];
+const PITCH_ICONS = [Gamepad2, Users, MessagesSquare];
 
 export default function Welcome() {
   const router = useRouter();
+  const t = useT();
+  const [picking, setPicking] = useState(false);
+
+  // Paired here rather than in the dictionary: an icon is not copy, and a translator
+  // opening the Finnish file should not meet a Lucide import.
+  const pitch = [
+    { icon: PITCH_ICONS[0], title: t.welcome.matchedTitle, body: t.welcome.matchedBody },
+    { icon: PITCH_ICONS[1], title: t.welcome.lobbyTitle, body: t.welcome.lobbyBody },
+    { icon: PITCH_ICONS[2], title: t.welcome.chatTitle, body: t.welcome.chatBody },
+  ];
 
   return (
     <Screen scroll>
+      {/* Top left, above everything. This is the first screen of the app and the only
+          one somebody who does not read English can be certain to reach, so the way
+          out of English has to be here and has to be visible without reading. */}
+      <View className="flex-row pt-2">
+        <LanguageButton onPress={() => setPicking(true)} />
+      </View>
+
+      <LanguagePicker visible={picking} onClose={() => setPicking(false)} />
+
       <View className="flex-1 justify-center gap-10 py-12">
         <View className="gap-3">
           {/* Two weights on one line: the brand reads as a mark rather than a heading.
@@ -26,7 +49,7 @@ export default function Welcome() {
               rather than a role, so it survives the demotion described in
               `src/theme/gradients.ts`. Everything else on this screen moved to `primary`. */}
           <Text variant="display" className="text-content">
-            Find your
+            {t.welcome.titleTop}
           </Text>
           <View className="flex-row items-baseline gap-2">
             <Text variant="display" className="text-brand">
@@ -35,12 +58,12 @@ export default function Welcome() {
             <View className="h-3 w-3 rounded-full bg-brand" />
           </View>
           <Text variant="body" className="mt-2 text-muted">
-            People who play what you play, at the hours you actually play.
+            {t.welcome.tagline}
           </Text>
         </View>
 
         <View className="gap-3">
-          {PITCH.map((item) => (
+          {pitch.map((item) => (
             <View
               key={item.title}
               className="flex-row items-center gap-4 rounded-card bg-raised p-4"
@@ -58,9 +81,9 @@ export default function Welcome() {
       </View>
 
       <View className="gap-3">
-        <Button label="Create an account" onPress={() => router.push('/register')} />
+        <Button label={t.welcome.createAccount} onPress={() => router.push('/register')} />
         <Button
-          label="I already have one"
+          label={t.welcome.haveAccount}
           variant="secondary"
           onPress={() => router.push('/login')}
         />

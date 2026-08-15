@@ -63,6 +63,9 @@ public enum TransactionCode {
     COIN_NOT_ENOUGH(129, "Not enough coins", HttpStatus.CONFLICT),
 
     // --- Communities --------------------------------------------------------
+    // 131-139 belonged to the retired Community feature. The entries stay so the numbers
+    // stay spent — a reused id would mean two generations of clients disagreeing about
+    // what an error meant. Only the ones still thrown remain referenced.
     COMMUNITY_NOT_FOUND(131, "Community not found", HttpStatus.NOT_FOUND),
     NOT_MEMBER(132, "You are not a member of this community", HttpStatus.FORBIDDEN),
     POST_NOT_FOUND(133, "Post not found", HttpStatus.NOT_FOUND),
@@ -183,6 +186,27 @@ public enum TransactionCode {
      * broken with their account.
      */
     NO_ADMIRERS_LEFT(177, "You have already revealed everybody", HttpStatus.CONFLICT),
+    LOBBY_NOT_FOUND(178, "Lobby not found", HttpStatus.NOT_FOUND),
+    LOBBY_FULL(179, "This lobby is already full", HttpStatus.CONFLICT),
+    /**
+     * The lobby stopped taking this action: it is locked, ended, cancelled or archived.
+     *
+     * <p>One code for every "too late" rather than one per state, because the caller's
+     * remedy is the same in all of them — refresh and look at the lobby as it is now.
+     */
+    LOBBY_NOT_OPEN(180, "This lobby is no longer open", HttpStatus.CONFLICT),
+    LOBBY_ALREADY_MEMBER(181, "You already asked to join this lobby", HttpStatus.CONFLICT),
+    LOBBY_NOT_MEMBER(182, "You are not in this lobby", HttpStatus.FORBIDDEN),
+    /** One live lobby per owner. Backed by a partial unique index the entity cannot express. */
+    LOBBY_LIMIT_REACHED(183, "Finish or cancel your current lobby first", HttpStatus.CONFLICT),
+    LOBBY_REQUEST_NOT_FOUND(184, "No pending request from this gamer", HttpStatus.NOT_FOUND),
+    /**
+     * The owner already said no, and that answer is final for this lobby.
+     *
+     * <p>Final by design: an owner who screens strangers by hand must be able to answer
+     * each of them exactly once, not be petitioned until they give in.
+     */
+    LOBBY_REJECTED(185, "The owner already answered your request", HttpStatus.CONFLICT),
 
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);

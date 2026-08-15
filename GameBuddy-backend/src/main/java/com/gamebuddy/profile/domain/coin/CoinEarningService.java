@@ -165,7 +165,7 @@ public class CoinEarningService {
         gamer.setQuestWeekStartedAt(weekStart);
         gamer.setQuestBaseMessages(metrics.getOrDefault(BadgeMetric.MESSAGES_SENT, 0));
         gamer.setQuestBaseMatches(metrics.getOrDefault(BadgeMetric.MATCHES, 0));
-        gamer.setQuestBasePosts(metrics.getOrDefault(BadgeMetric.POSTS_WRITTEN, 0));
+        gamer.setQuestBaseLobbies(metrics.getOrDefault(BadgeMetric.LOBBIES_JOINED, 0));
         gamer.setQuestClaimedMask(0);
     }
 
@@ -182,7 +182,7 @@ public class CoinEarningService {
                 switch (quest) {
                     case TALK -> gamer.getQuestBaseMessages();
                     case MEET -> gamer.getQuestBaseMatches();
-                    case POST -> gamer.getQuestBasePosts();
+                    case SQUAD -> gamer.getQuestBaseLobbies();
                 };
         return Math.max(0, current - base);
     }

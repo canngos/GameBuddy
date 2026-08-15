@@ -21,9 +21,9 @@ export const TUTORIAL_STEPS = [
     body: 'Matching opens a private chat. Nobody can message you unless you both agreed to it, and you can block or report anyone from inside a conversation.',
   },
   {
-    route: '/community',
-    title: 'Join the conversation',
-    body: 'Communities are built around games. Post, comment, and find people who are already talking about what you play.',
+    route: '/lobby',
+    title: 'Team up in a lobby',
+    body: 'Open lobbies are games looking for players — the game, the time, and the vibe are on the card. Ask to join, and the owner picks the team. Opening your own comes with Gold.',
   },
   {
     route: '/market',

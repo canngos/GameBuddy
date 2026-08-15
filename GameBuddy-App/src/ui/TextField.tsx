@@ -1,5 +1,6 @@
 import { type Ref, useState } from 'react';
 import { Pressable, TextInput, type TextInputProps, View } from 'react-native';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { cn } from './cn';
 import { glow } from './glow';
@@ -51,6 +52,7 @@ export function TextField({
   ...rest
 }: TextFieldProps) {
   const colors = useThemeColors();
+  const t = useT();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
 
@@ -101,10 +103,10 @@ export function TextField({
             onPress={() => setRevealed((v) => !v)}
             hitSlop={12}
             accessibilityRole="button"
-            accessibilityLabel={revealed ? 'Hide password' : 'Show password'}
+            accessibilityLabel={revealed ? t.ui.hidePasswordA11y : t.ui.showPasswordA11y}
           >
             <Text variant="label" className="text-primary">
-              {revealed ? 'Hide' : 'Show'}
+              {revealed ? t.ui.hidePassword : t.ui.showPassword}
             </Text>
           </Pressable>
         )}

@@ -63,6 +63,9 @@ public class BillingController {
                 tier.dailyAccepts(),
                 tier.canSeeWhoLikedYou(),
                 tier.canUseAdvancedFilters(),
+                // The lobby gate is "is Gold", checked the same way the service checks it,
+                // so the create button can route to the paywall before the round trip.
+                tier == SubscriptionTier.GOLD,
                 seasonPassTeaser,
                 upgradePrompts.isDue(principal));
 

@@ -86,7 +86,9 @@ public final class CoinFaucet {
     public enum Quest {
         TALK("Send 10 messages", BadgeMetric.MESSAGES_SENT, 10, 25),
         MEET("Match with 2 gamers", BadgeMetric.MATCHES, 2, 25),
-        POST("Write 2 posts", BadgeMetric.POSTS_WRITTEN, 2, 25);
+        // Took the retired POST quest's slot — same ordinal, so a mid-week claim of the
+        // old quest carries over harmlessly until the weekly rollover resets the mask.
+        SQUAD("Join a lobby", BadgeMetric.LOBBIES_JOINED, 1, 25);
 
         private final String title;
         private final BadgeMetric metric;

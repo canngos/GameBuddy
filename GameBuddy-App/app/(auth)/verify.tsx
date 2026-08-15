@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { authApi } from '../../src/api/auth';
 import { ApiError, Code } from '../../src/api/envelope';
 import { useSession } from '../../src/session/store';
+import { useT } from '../../src/i18n/useT';
 import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
 import { codeError } from '../../src/validation';
 
@@ -12,6 +13,7 @@ import { codeError } from '../../src/validation';
 const RESEND_COOLDOWN_SECONDS = 45;
 
 export default function Verify() {
+  const t = useT();
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
   const adoptToken = useSession((s) => s.adoptToken);
@@ -62,10 +64,10 @@ export default function Verify() {
   return (
     <Screen scroll>
       <View className="gap-2 pb-8 pt-12">
-        <Text variant="overline">STEP 2</Text>
-        <Text variant="title">Check your email</Text>
+        <Text variant="overline">{t.auth.stepTwo}</Text>
+        <Text variant="title">{t.auth.verify.title}</Text>
         <Text variant="body" className="text-muted">
-          We sent a six-digit code to{' '}
+          {t.auth.verify.sentCodeBefore}{' '}
           <Text variant="bodyStrong" className="text-content">
             {email}
           </Text>
@@ -75,7 +77,7 @@ export default function Verify() {
 
       <View className="gap-5">
         <TextField
-          label="Verification code"
+          label={t.auth.verify.code}
           value={code}
           // Strip anything that is not a digit: pasting from a mail client often
           // brings a trailing space or a stray character with it.
@@ -99,7 +101,7 @@ export default function Verify() {
       </View>
 
       <View className="mt-auto gap-2 pt-10">
-        <Button label="Verify" loading={verify.isPending} onPress={submit} />
+        <Button label={t.auth.verify.submit} loading={verify.isPending} onPress={submit} />
         <Button
           // A spent or expired code cannot be retried, so the resend button stops being
           // a secondary option and becomes the only way forward.

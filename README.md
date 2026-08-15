@@ -92,8 +92,8 @@ GameBuddy-App  ──►  backend (Spring Boot)  ──►  Postgres
                          └──►  model (FastAPI)   ranking only, no database access
 ```
 
-The backend is a **modular monolith**: one deployable, eight modules
-(`shared`, `auth`, `profile`, `community`, `match`, `notif`, `billing`, `config`) whose
+The backend is a **modular monolith**: one deployable, nine modules
+(`shared`, `auth`, `profile`, `lobby`, `moderation`, `match`, `notif`, `billing`, `config`) whose
 boundaries are enforced by ArchUnit rather than by convention. It was five separate
 services; they are still on disk as `GameBuddy-*-service` directories, each its own GitHub
 repository, but `settings.gradle` no longer includes them and nothing should be added to
@@ -245,6 +245,8 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-24-platforms.sql` | What each gamer plays on.                        |
 | `db/upgrade-2026-25-rewarded-ads.sql` | Rewarded-ad grants and the daily cap.          |
 | `db/upgrade-2026-26-column-bounds.sql` | fcm_token widened; a warning on subscription_tier. |
+| `db/upgrade-2026-27-lobby.sql` | Game lobbies: lobby, lobby_member, lobby_message. |
+| `db/upgrade-2026-28-retire-community.sql` | Community tables dropped; lobby quest baseline. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 | `db/delete-seed.sql`              | Removes the synthetic accounts. Not a migration — see above. |
 
@@ -293,13 +295,11 @@ and that statement has never worked: fifteen of the sixteen foreign keys pointin
 first, in dependency order — and two of them key on `gamer_id` where everything else uses
 `user_id`, which is most of why writing it by hand goes wrong.
 
-The script also handles the case a plain cascade would get wrong. The seed **owns
-communities** (570 in the development database, which was a surprise), so deleting the
-accounts naively would take those communities and every post inside them. Instead it
-follows the rule the product already uses when an owner leaves: a community with a
-surviving member passes to the longest-standing one, a community with none is removed, and
-posts or comments a real person wrote are never touched. Run it together with flipping
-`RETRAIN_INCLUDE_BOTS` to false, and in that order.
+The script used to carry a large community-ownership-succession section (the seed owned
+570 communities); it went with the community tables in `upgrade-2026-28`. Lobbies replaced
+it with a simpler rule — bots cannot own lobbies, creation being Gold-gated — so the lobby
+deletes are plain child-first rows. Run it together with flipping `RETRAIN_INCLUDE_BOTS`
+to false, and in that order.
 
 It seeds 1200 by default, which is more than it sounds like it needs: the recommender
 ranks against the population it was *trained* on, and only ids that also exist in this
@@ -364,7 +364,7 @@ details, because two matched adults swapping Discord tags is this app working �
 the point of a service for finding people to play with, and redacting it would be sabotage
 dressed as safety.
 
-`TextSurface.PUBLIC` — posts, comments, community names, usernames — also removes email
+`TextSurface.PUBLIC` — lobby titles, descriptions and requirements, usernames — also removes email
 addresses, links and phone numbers, which are a different thing when broadcast to
 strangers.
 
@@ -394,7 +394,7 @@ docker compose exec -T postgres psql -U gamebuddy -d scratch \
 # silently never reaches the baseline. That has already happened once — 21 and 22 were
 # both missing, so a fresh `docker compose up` built a database with no coin_ledger and
 # no funnel_event, and the backend refused to start against it.
-for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26; do
+for n in 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28; do
   f=$(ls GameBuddy-backend/src/main/resources/db/upgrade-2026-$n-*.sql)
   docker compose exec -T postgres psql -U gamebuddy -d scratch -f /dev/stdin < "$f"
 done

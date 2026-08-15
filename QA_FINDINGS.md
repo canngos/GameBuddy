@@ -661,6 +661,9 @@ native termination is invisible to JavaScript, whichever direction it comes from
 | `lan`, `preview` | `test_VVPmkcbxscVCUltzvloqUXiAfvx` | the app closes itself after sign-in |
 | `production` | **not set** | runs — and billing is silently dead |
 
+Both rows were the state as found. The test key has since been removed from `lan` and
+`preview`, so all three profiles now behave like the second row — see *Fix* below.
+
 The second row is the more dangerous one. With no key, `API_KEY` is `''`, so
 `storeAvailable()` returns false and `identify()` returns before configuring. Nothing
 crashes, nothing logs in production, and the paywall simply never works — a store build could
@@ -668,13 +671,25 @@ ship in that state and look fine until somebody tried to pay.
 
 ### Fix
 
-Needs a real **public SDK key** from the RevenueCat dashboard (the `goog_…` one for Android),
-set on the `production` and `preview` profiles. That is account work, and it belongs with the
-open tasks #79 (register the SKUs) and #81 (final RevenueCat wiring).
+**Done — the crash.** The `test_` key is gone from `lan` and `preview` in `eas.json`, and
+`src/billing/purchases.ts` now validates the key's platform prefix (`goog_` on Android,
+`appl_` on iOS) before it reaches `configure`. Anything else is treated as no key at all, so
+a stray test key disables purchases instead of closing the app. This had to live in code, not
+just in `eas.json`: the termination is native and unreachable from JavaScript, so refusing to
+call `configure` is the only defence available.
 
-Worth adding at the same time, because the current failure mode is so quiet: make
-`storeAvailable()` log at `error` rather than only under `__DEV__` when the key is missing in
-a release build. A build that cannot sell anything should say so somewhere.
+**Done — the silence.** `storeAvailable()`'s missing-key path now logs at `error`
+unconditionally rather than under `__DEV__`, so a release build that cannot sell anything
+says so in logcat and Crashlytics.
+
+**Still open, and it needs your account, not code:** a real **public SDK key** from the
+RevenueCat dashboard (the `goog_…` one for Android), set on `production` and `preview`. Open
+tasks #79 (register the SKUs) and #81 (final RevenueCat wiring).
+
+Worth knowing before that key is tested: Google Play Billing only answers a build the Play
+Store recognises. A sideloaded `lan` APK cannot open a purchase sheet even with a correct key
+— `getProducts` comes back empty — so the paywall has to be exercised from an internal
+testing track, not from `eas build` output installed over USB.
 
 Meanwhile the release gate uses a `gate` profile — `extends: production`, so no RevenueCat
 key, plus an `EXPO_PUBLIC_API_URL` for the local backend. That matches production's native

@@ -39,6 +39,15 @@ const CODE = {
   ACCEPT_LIMIT_REACHED: '158',
   SUBSCRIPTION_REQUIRED: '159',
   SWIPE_LIMIT_REACHED: '163',
+  CONTENT_BLOCKED: '170',
+  LOBBY_NOT_FOUND: '178',
+  LOBBY_FULL: '179',
+  LOBBY_NOT_OPEN: '180',
+  LOBBY_ALREADY_MEMBER: '181',
+  LOBBY_NOT_MEMBER: '182',
+  LOBBY_LIMIT_REACHED: '183',
+  LOBBY_REQUEST_NOT_FOUND: '184',
+  LOBBY_REJECTED: '185',
 };
 
 /** Controller base paths, so a test never hard-codes a prefix that moved. */
@@ -48,6 +57,7 @@ const P = {
   match: '/match',
   chat: '', // ChatController has no @RequestMapping — /messages/**, /presence/**
   community: '/community',
+  lobby: '/lobby',
   notif: '/notif',
   billing: '/billing',
   coins: '/coins',

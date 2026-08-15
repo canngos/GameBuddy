@@ -90,26 +90,17 @@ describe('moderation', () => {
     assert.notEqual(after_, 'OPEN', 'a dismissed report must not stay open');
   });
 
-  test('actioning a reported post removes it', async () => {
-    const [owner, reporter] = seeded(2);
-    const name = `QA Mod ${suffix()}`;
-    await post(`${P.community}/create/community`, { name, description: 'mod test' }, { token: owner.token });
-    const communityId = (await get(`${P.community}/get/communities`, { token: owner.token }))
-      .data.communities.find((c) => c.name === name).communityId;
+  test('actioning a profile report closes every open report against the same person', async () => {
+    // Two reporters, one target: actioning either report must close both, or popular
+    // targets leave the moderator a queue of duplicates.
+    const [reporterA, reporterB, target] = seeded(3);
+    await post(`${P.community}/report/profile/${target.userId}`,
+      { reason: `QA action A ${suffix()}` }, { token: reporterA.token });
+    await post(`${P.community}/report/profile/${target.userId}`,
+      { reason: `QA action B ${suffix()}` }, { token: reporterB.token });
 
-    const title = `bad-post-${suffix()}`;
-    await post(`${P.community}/create/post`, { communityId, title, body: 'QA offending body' }, { token: owner.token });
-    const postId = (await get(`${P.community}/get/posts/${communityId}`, { token: owner.token }))
-      .data.posts.find((p) => p.title === title).postId;
-
-    // Reporting a post requires membership of the community it is in — a stranger who
-    // cannot see the post has no standing to report it.
-    await post(`${P.community}/join/community`, { communityId }, { token: reporter.token });
-    const reported = await post(`${P.community}/report/post/${postId}`,
-      { reason: 'QA: rule breach' }, { token: reporter.token });
-    assert.equal(reported.status, 200, reported.text);
     const reportId = db.scalar(
-      `select id from gamebuddy.content_report where content_id = '${db.esc(postId)}' ` +
+      `select id from gamebuddy.content_report where content_id = '${db.esc(target.userId)}' ` +
       "and status = 'OPEN' limit 1;",
     );
     assert.ok(reportId);
@@ -117,8 +108,11 @@ describe('moderation', () => {
     const actioned = await post(`${P.community}/admin/reports/${reportId}/action`, undefined, { token: admin.token });
     assert.equal(actioned.status, 200, actioned.text);
 
-    const gone = await get(`${P.community}/get/post/${postId}`, { token: owner.token });
-    assert.equal(gone.status, 404, 'an actioned post must be removed');
+    const stillOpen = db.scalar(
+      `select count(*) from gamebuddy.content_report where content_id = '${db.esc(target.userId)}' ` +
+      "and status = 'OPEN';",
+    );
+    assert.equal(Number(stillOpen), 0, 'actioning one report must close its siblings too');
   });
 
   test('an ordinary gamer cannot action or dismiss a report', async () => {

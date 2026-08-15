@@ -142,16 +142,9 @@ export default function NotificationSettings() {
             <Divider />
             <Row
               title="Matches and friends"
-              body="New matches, friend requests and answers, badges you earn."
+              body="New matches, friend requests and answers, lobby activity, badges you earn."
               value={prefs.data.social}
               onToggle={() => toggle('social')}
-            />
-            <Divider />
-            <Row
-              title="Communities"
-              body="New posts where you are a member, and replies and likes on yours."
-              value={prefs.data.communities}
-              onToggle={() => toggle('communities')}
             />
             <Divider />
             <Row

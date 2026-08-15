@@ -67,6 +67,8 @@ class ModuleBoundaryTest {
                     "..gamebuddy.profile..",
                     "..gamebuddy.community..",
                     "..gamebuddy.match..",
+                    "..gamebuddy.lobby..",
+                    "..gamebuddy.moderation..",
                     "..gamebuddy.notif..",
                     "..gamebuddy.billing..")
             .allowEmptyShould(true);

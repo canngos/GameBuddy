@@ -10,6 +10,7 @@ import { useInAppNotifications } from '../../src/notifications/useInAppNotificat
 import { useMatchNotifications } from '../../src/notifications/useMatchNotifications';
 import { useNotificationRouting } from '../../src/notifications/useNotificationRouting';
 import { usePushRegistration } from '../../src/notifications/usePushRegistration';
+import { useT } from '../../src/i18n/useT';
 import { RouteGuard } from '../../src/session/RouteGuard';
 import { useSession } from '../../src/session/store';
 import { TutorialOverlay } from '../../src/tutorial/TutorialOverlay';
@@ -38,6 +39,7 @@ const TAB_BAR_HEIGHT = 64;
  */
 export default function MainLayout() {
   const colors = useThemeColors();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const hairline = useHairline();
 
@@ -187,11 +189,12 @@ export default function MainLayout() {
           tabBarLabelStyle: { fontFamily: 'Poppins_500Medium', fontSize: 10 },
         }}
       >
-        <Tabs.Screen name="home" options={tab('Home', 'deck')} />
-        <Tabs.Screen name="community" options={tab('Community', 'community')} />
-        <Tabs.Screen name="messages" options={tab('Messages', 'messages')} />
-        <Tabs.Screen name="market" options={tab('Market', 'market')} />
-        <Tabs.Screen name="profile" options={tab('Profile', 'profile')} />
+        <Tabs.Screen name="home" options={tab(t.tabs.home, 'deck')} />
+        <Tabs.Screen name="lobby" options={tab(t.tabs.lobby, 'lobby')} />
+        <Tabs.Screen name="messages" options={tab(t.tabs.messages, 'messages')} />
+        <Tabs.Screen name="market" options={tab(t.tabs.market, 'market')} />
+        <Tabs.Screen name="profile" options={tab(t.tabs.profile, 'profile')} />
+
 
         {/* Reachable from Profile, but not a tab of its own. One entry, not two: the
             screens it leads to are inside its stack rather than in a second `edit` tab.
@@ -220,6 +223,21 @@ export default function MainLayout() {
             an unsaved change in it, and claiming a reward then heading to the market to
             spend it is the path this is meant to make short. */}
         <Tabs.Screen name="badges" options={{ href: null }} />
+
+        {/* Reached from the Friends count on Profile, the same way Badges is reached
+            from its own. Keeps the tab bar: it is a list to look through, not a form. */}
+        <Tabs.Screen name="friends" options={{ href: null }} />
+
+        {/* A friend's profile. The same screen also exists inside the Messages stack,
+            for the copy of it opened from a conversation — two mounts so that backing
+            out returns to whichever list you came from.
+
+            Registered under its full path, not `gamer`: the folder holds one route and
+            no `_layout`, so Expo Router flattens it and the screen this navigator sees
+            is literally `gamer/[userId]`. Naming it `gamer` matches nothing, and an
+            unmatched name is not ignored — it becomes a sixth tab, with the route id
+            for a label and a placeholder for an icon. */}
+        <Tabs.Screen name="gamer/[userId]" options={{ href: null }} />
 
         {/* Reached from Profile, and from the Market once something has been bought. Keeps
             the tab bar: deciding what to wear and going back to the shop for more is the

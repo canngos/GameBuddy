@@ -5,10 +5,12 @@ import { View } from 'react-native';
 import { authApi } from '../../src/api/auth';
 import { ApiError, Code } from '../../src/api/envelope';
 import { openPrivacy, openTerms } from '../../src/legal';
+import { useT } from '../../src/i18n/useT';
 import { Button, Checkbox, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
 import { emailError, passwordError } from '../../src/validation';
 
 export default function Register() {
+  const t = useT();
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,8 +46,8 @@ export default function Register() {
   return (
     <Screen scroll>
       <View className="gap-2 pb-8 pt-12">
-        <Text variant="overline">STEP 1</Text>
-        <Text variant="title">Create your account</Text>
+        <Text variant="overline">{t.auth.stepOne}</Text>
+        <Text variant="title">{t.auth.register.title}</Text>
         <Text variant="body" className="text-muted">
           We will email a six-digit code to confirm the address.
         </Text>
@@ -53,7 +55,7 @@ export default function Register() {
 
       <View className="gap-5">
         <TextField
-          label="Email"
+          label={t.auth.register.email}
           value={email}
           onChangeText={setEmail}
           error={emailProblem}
@@ -64,11 +66,11 @@ export default function Register() {
         />
 
         <TextField
-          label="Password"
+          label={t.auth.register.password}
           value={password}
           onChangeText={setPassword}
           error={passwordProblem}
-          hint="At least 8 characters, with a letter and a number."
+          hint={t.auth.register.passwordHint}
           secure
           textContentType="newPassword"
           autoComplete="new-password"
@@ -111,7 +113,7 @@ export default function Register() {
               That email is already registered.
             </Text>
             <Button
-              label="Sign in instead"
+              label={t.auth.register.signInInstead}
               variant="secondary"
               size="md"
               onPress={() => router.replace('/login')}
@@ -121,8 +123,8 @@ export default function Register() {
       </View>
 
       <View className="mt-auto gap-2 pt-10">
-        <Button label="Continue" loading={register.isPending} onPress={submit} />
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
+        <Button label={t.common.continue} loading={register.isPending} onPress={submit} />
+        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
       </View>
     </Screen>
   );

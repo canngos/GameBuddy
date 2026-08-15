@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Crown, Settings, Shirt } from 'lucide-react-native';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
 import { profileApi } from '../../src/api/catalogue';
 import { socialApi } from '../../src/api/social';
@@ -103,10 +103,17 @@ export default function Profile() {
             </View>
 
             <View className="flex-row gap-3">
-              <Stat label="Friends" value={friends.data?.length ?? 0} />
+              {/* Two of the three go somewhere, and the count is the way in: a number
+                  you can tap beats the same number printed above a list of the thing it
+                  counts. Coins is the odd one out on purpose — spending them is the
+                  Market's job, and sending people there from here would be a shop
+                  doorway in the middle of a profile. */}
+              <Stat
+                label="Friends"
+                value={friends.data?.length ?? 0}
+                onPress={() => router.push('/friends')}
+              />
               <Stat label="Coins" value={me.data.coin ?? 0} />
-              {/* The only stat that goes somewhere. It is a score with a screen behind
-                  it, where the other two are just counts of what is already below. */}
               <Stat
                 label="Badges"
                 value={me.data.badgeCount ?? 0}
@@ -126,12 +133,11 @@ export default function Profile() {
           </Card>
         )}
 
-        {/* Requests first when there are any: this is the one thing on the screen that
-            is waiting on the gamer rather than describing them. It was the best part
-            of the old home screen and it keeps that priority here. */}
+        {/* The one thing on this screen waiting on the gamer rather than describing
+            them, so it stays here rather than moving to the friends list with the
+            friends themselves — an answerable prompt one tap deeper is one that gets
+            missed. It renders nothing when there is nothing to answer. */}
         <FriendRequests query={requests} />
-
-        <FriendList query={friends} />
       </View>
     </Screen>
   );
@@ -339,94 +345,6 @@ function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSumm
       </View>
 
       {answer.error && <ErrorNotice error={answer.error} />}
-    </View>
-  );
-}
-
-function FriendList({ query }: { query: ReturnType<typeof useQuery<GamerSummary[]>> }) {
-  const queryClient = useQueryClient();
-  const friends = query.data ?? [];
-
-  /**
-   * Removing a friend drops them back to being a match.
-   *
-   * The endpoint has existed since the friend tiers were built and nothing called it,
-   * so a friendship could be made but never undone — which is the half of the pair that
-   * actually matters to somebody who wants out of it.
-   *
-   * The match survives on purpose: unfriending is not blocking, and silently severing a
-   * mutual match as well would be a bigger action than the button says.
-   */
-  const remove = useMutation({
-    mutationFn: (userId: string) => socialApi.remove(userId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['friends'] });
-      // The messages screen splits on friendship, so this row moves from one section to
-      // the other. Without this it stays under Friends until the next poll.
-      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-    },
-  });
-
-  const confirmRemove = (person: GamerSummary) =>
-    Alert.alert(
-      `Remove ${person.username}?`,
-      'They go back to being a match — you can still message each other, and either of you can send a new friend request.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => remove.mutate(person.userId),
-        },
-      ],
-    );
-
-  return (
-    <View className="gap-3 pb-4">
-      <Text variant="overline">FRIENDS</Text>
-
-      {query.error && <ErrorNotice error={query.error} onRetry={() => query.refetch()} />}
-      {remove.error && <ErrorNotice error={remove.error} />}
-
-      {!query.isPending && friends.length === 0 && (
-        <Card className="gap-1">
-          <Text variant="bodyStrong">No friends yet</Text>
-          <Text variant="caption">
-            You can add someone as a friend once you have matched with them.
-          </Text>
-        </Card>
-      )}
-
-      {friends.map((person) => (
-        <Card key={person.userId} className="flex-row items-center gap-3 p-4">
-          <FramedAvatar
-            frame={person.frame}
-            source={person.avatar}
-            name={person.username}
-            colorSeed={person.userId}
-            size={44}
-          />
-          <View className="flex-1 gap-0.5">
-            <Text variant="bodyStrong">{person.username}</Text>
-            <Text variant="caption">
-              {[person.age, person.country].filter(Boolean).join(' · ')}
-            </Text>
-          </View>
-
-          {/* Ghost, and it asks first. Removing a friend is not dangerous — they stay a
-              match — but it is not undoable in one tap either, and a solid button next
-              to somebody's name reads as the point of the row. */}
-          <Button
-            label="Remove"
-            variant="ghost"
-            size="md"
-            className="px-3"
-            disabled={remove.isPending}
-            onPress={() => confirmRemove(person)}
-          />
-        </Card>
-      ))}
     </View>
   );
 }

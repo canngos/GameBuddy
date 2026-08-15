@@ -13,8 +13,8 @@
 --
 --     DELETE FROM gamebuddy.gamer WHERE email LIKE '%@bot.gamebuddy.invalid';
 --
--- and it has never worked. Fifteen of the sixteen foreign keys pointing at `gamer` are
--- NO ACTION rather than CASCADE, so the first child table refuses:
+-- and it has never worked. Most of the foreign keys pointing at `gamer` are NO ACTION
+-- rather than CASCADE, so the first child table refuses:
 --
 --     ERROR: update or delete on table "gamer" violates foreign key constraint
 --            "fk24su9eu5fhblvx77oiwxcfcog" on table "gamer_keywords_join"
@@ -25,8 +25,12 @@
 --
 -- Cascades were considered and rejected. Account deletion does not need them —
 -- DefaultAuthService.deleteAccount anonymises the row rather than removing it, precisely so
--- that other people's conversations and posts survive — and a blanket cascade from `gamer`
--- to `community` is exactly the behaviour the section below exists to avoid.
+-- that other people's conversations survive.
+--
+-- The community section this file used to carry (570 bot-owned communities, ownership
+-- succession, abandoned-community teardown) went with the community tables in
+-- upgrade-2026-28. Lobbies took its place below, with a simpler rule: bots cannot own
+-- lobbies (creation is Gold-gated), but a bot that somehow sits in one is just a row.
 --
 -- Note the two join tables key on `gamer_id` while everything else uses `user_id`. That
 -- inconsistency is most of why hand-writing this goes wrong.
@@ -41,79 +45,17 @@ SELECT user_id FROM gamer WHERE email LIKE '%@bot.gamebuddy.invalid';
 
 CREATE INDEX ON doomed (user_id);
 
--- Communities owned by a seed account: transfer or remove, never cascade
--- ----------------------------------------------------------------------
--- The seed owns communities — 570 of them in the development database, which was a surprise
--- and is the reason this section exists. Deleting a `gamer` row cannot be allowed to take a
--- community with it: by launch day a real person may have joined one, and the whole point of
--- this purge is to protect real users from synthetic content, not to delete what they wrote.
---
--- So the two cases are separated, and the rule matches what the product already does when an
--- owner leaves (DefaultCommunityService: succession to the longest-standing member, closure
--- only if empty):
---
---   * a community with at least one surviving member -> ownership passes to the
---     longest-standing of them, and the community stays
---   * a community with none -> it is wholly synthetic, and it goes
---
--- In the development database today every one of the 570 falls into the second case: no real
--- members, no real posts. The first branch is for the day that is no longer true, which is
--- precisely the day this script gets run for real.
-CREATE TEMP TABLE inherited ON COMMIT DROP AS
-SELECT c.community_id,
-       (SELECT m.user_id
-          FROM community_members_join m
-          JOIN gamer g ON g.user_id = m.user_id
-         WHERE m.community_id = c.community_id
-           AND g.user_id NOT IN (SELECT user_id FROM doomed)
-           AND g.deleted_at IS NULL
-         ORDER BY g.created_date NULLS LAST
-         LIMIT 1) AS heir
-  FROM community c
- WHERE c.owner IN (SELECT user_id FROM doomed);
+-- Lobby traffic: messages before members, and a doomed owner's whole lobby goes — its
+-- members' rows included, because a membership in a deleted lobby points at nothing.
+DELETE FROM lobby_message
+ WHERE sender_id IN (SELECT user_id FROM doomed)
+    OR lobby_id IN (SELECT id FROM lobby WHERE owner_id IN (SELECT user_id FROM doomed));
+DELETE FROM lobby_member
+ WHERE user_id IN (SELECT user_id FROM doomed)
+    OR lobby_id IN (SELECT id FROM lobby WHERE owner_id IN (SELECT user_id FROM doomed));
+DELETE FROM lobby WHERE owner_id IN (SELECT user_id FROM doomed);
 
-UPDATE community c
-   SET owner = i.heir
-  FROM inherited i
- WHERE c.community_id = i.community_id AND i.heir IS NOT NULL;
-
-CREATE TEMP TABLE abandoned ON COMMIT DROP AS
-SELECT community_id FROM inherited WHERE heir IS NULL;
-
--- Everything inside a community nobody is left to run.
-DELETE FROM comment_likes_join
- WHERE comment_id IN (SELECT cm.comment_id FROM comment cm
-                        JOIN post p ON p.post_id = cm.post_id
-                       WHERE p.community_id IN (SELECT community_id FROM abandoned));
-DELETE FROM comment
- WHERE post_id IN (SELECT post_id FROM post
-                    WHERE community_id IN (SELECT community_id FROM abandoned));
-DELETE FROM post_likes_join
- WHERE post_id IN (SELECT post_id FROM post
-                    WHERE community_id IN (SELECT community_id FROM abandoned));
-DELETE FROM post WHERE community_id IN (SELECT community_id FROM abandoned);
-DELETE FROM community_members_join WHERE community_id IN (SELECT community_id FROM abandoned);
-DELETE FROM community WHERE community_id IN (SELECT community_id FROM abandoned);
-
--- Posts and comments the seed wrote in communities that survive. These have to go for the
--- same reason the profiles do: a fake account's post is still a fake account talking to real
--- people, and it would outlive the profile behind it.
-DELETE FROM comment_likes_join
- WHERE comment_id IN (SELECT comment_id FROM comment WHERE owner IN (SELECT user_id FROM doomed));
-DELETE FROM comment WHERE owner IN (SELECT user_id FROM doomed);
-
-DELETE FROM comment_likes_join
- WHERE comment_id IN (SELECT cm.comment_id FROM comment cm
-                       WHERE cm.post_id IN (SELECT post_id FROM post
-                                             WHERE owner IN (SELECT user_id FROM doomed)));
-DELETE FROM comment
- WHERE post_id IN (SELECT post_id FROM post WHERE owner IN (SELECT user_id FROM doomed));
-DELETE FROM post_likes_join
- WHERE post_id IN (SELECT post_id FROM post WHERE owner IN (SELECT user_id FROM doomed));
-DELETE FROM post WHERE owner IN (SELECT user_id FROM doomed);
-
--- The rest, children first. Chat before the social graph, because rooms are reached
--- through their participants.
+-- Chat before the social graph, because rooms are reached through their participants.
 DELETE FROM chat_message
  WHERE room_id IN (SELECT room_id FROM chat_participant WHERE user_id IN (SELECT user_id FROM doomed));
 DELETE FROM chat_participant WHERE user_id IN (SELECT user_id FROM doomed);
@@ -131,10 +73,6 @@ DELETE FROM blocked_friends
  WHERE gamer_id IN (SELECT user_id FROM doomed) OR blocked_user_id IN (SELECT user_id FROM doomed);
 DELETE FROM unlocked_admirer
  WHERE user_id IN (SELECT user_id FROM doomed) OR admirer_id IN (SELECT user_id FROM doomed);
-
-DELETE FROM comment_likes_join WHERE user_id IN (SELECT user_id FROM doomed);
-DELETE FROM post_likes_join WHERE user_id IN (SELECT user_id FROM doomed);
-DELETE FROM community_members_join WHERE user_id IN (SELECT user_id FROM doomed);
 
 DELETE FROM content_report
  WHERE reporter_id IN (SELECT user_id FROM doomed)
@@ -179,5 +117,4 @@ COMMIT;
 -- What survived, so the outcome is visible rather than assumed.
 SELECT (SELECT count(*) FROM gamer WHERE email LIKE '%@bot.gamebuddy.invalid') AS seed_accounts_left,
        (SELECT count(*) FROM gamer) AS gamers,
-       (SELECT count(*) FROM community) AS communities,
-       (SELECT count(*) FROM post) AS posts;
+       (SELECT count(*) FROM lobby) AS lobbies;

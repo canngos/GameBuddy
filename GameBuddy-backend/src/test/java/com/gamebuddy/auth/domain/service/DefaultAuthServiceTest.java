@@ -128,6 +128,9 @@ class DefaultAuthServiceTest {
         gamer.setIsBlocked(false);
 
         when(jwtService.generateToken(any())).thenReturn(TOKEN);
+        // Sessions are issued through the two-argument form now: a login passes the
+        // moment it began, a refresh passes the moment the session originally began.
+        when(jwtService.generateToken(any(), any())).thenReturn(TOKEN);
         when(jwtService.extractExpiration(anyString())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
     }
 

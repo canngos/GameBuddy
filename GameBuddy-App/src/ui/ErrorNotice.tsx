@@ -1,6 +1,8 @@
 import { TriangleAlert } from 'lucide-react-native';
 import { View } from 'react-native';
 import { ApiError } from '../api/envelope';
+import { useErrorText } from '../i18n/useErrorText';
+import { useT } from '../i18n/useT';
 import { Button } from './Button';
 import { Icon } from './Icon';
 import { Text } from './Text';
@@ -13,16 +15,19 @@ type ErrorNoticeProps = {
 /**
  * A form-level failure banner.
  *
- * The backend's messages are already written for users — "Email already registered",
- * "Daily like limit reached" — so they are shown as-is rather than remapped screen by
- * screen. Anything that is not an ApiError is something we did not anticipate and gets
- * a generic line instead of a stack trace.
+ * The message is resolved by `useErrorText`, which translates the backend's numeric
+ * code into the reader's language and falls back to the server's own English sentence
+ * for codes it does not know — see that file for why the translation happens here
+ * rather than behind an `Accept-Language` header. Anything that is not an ApiError is
+ * something we did not anticipate and gets a generic line instead of a stack trace.
  */
 export function ErrorNotice({ error, onRetry }: ErrorNoticeProps) {
+  const errorText = useErrorText();
+  const t = useT();
+
   if (!error) return null;
 
-  const message =
-    error instanceof ApiError ? error.message : 'Something went wrong. Please try again.';
+  const message = errorText(error);
 
   // Offering "Try again" on a rejected password would be misleading — retrying the
   // identical request cannot help. Only transient failures get the button.
@@ -49,7 +54,7 @@ export function ErrorNotice({ error, onRetry }: ErrorNoticeProps) {
         </Text>
       </View>
       {retryable && (
-        <Button label="Try again" variant="secondary" size="md" onPress={onRetry} />
+        <Button label={t.common.retry} variant="secondary" size="md" onPress={onRetry} />
       )}
     </View>
   );

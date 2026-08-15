@@ -12,8 +12,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080",
-        "EXPO_PUBLIC_REVENUECAT_API_KEY": "test_VVPmkcbxscVCUltzvloqUXiAfvx"
+        "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080"
       },
       "environment": "production"
     },

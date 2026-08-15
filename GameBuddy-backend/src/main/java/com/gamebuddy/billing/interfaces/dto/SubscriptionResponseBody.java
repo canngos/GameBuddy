@@ -31,6 +31,9 @@ public class SubscriptionResponseBody implements BaseModel {
     private boolean canSeeWhoLikedYou;
     private boolean canUseAdvancedFilters;
 
+    /** Whether opening a game lobby is included. Gold's perk; joining is free for everyone. */
+    private boolean canCreateLobby;
+
     /**
      * Whether to show the Season Pass teaser.
      *

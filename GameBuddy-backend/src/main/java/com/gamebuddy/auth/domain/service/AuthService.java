@@ -28,6 +28,25 @@ public interface AuthService {
 
     TokenResponse validateToken(String token);
 
+    /**
+     * Extends the caller's session by issuing a fresh token for it.
+     *
+     * <p>What makes a session sliding: the token has a short life, and using the app
+     * quietly renews it, so somebody who plays every week never meets a login screen
+     * while an abandoned session still lapses about a week after it was last touched.
+     *
+     * <p>The session's own age is carried in the token and does not reset here, so this
+     * cannot be used to hold a session open forever — past
+     * {@code gamebuddy.jwt.max-session-age} the password is required again.
+     *
+     * @param bearerToken the caller's current token, which the filter has already
+     *     verified; re-read here because the session's start is a claim inside it
+     * @throws com.gamebuddy.common.exception.BusinessException
+     *     {@code TOKEN_INVALID} when the session has outlived the ceiling, which the
+     *     client treats exactly as it treats an expiry — by asking for the password
+     */
+    LoginResponse refreshSession(Gamer principal, String bearerToken);
+
     // --- Authenticated -----------------------------------------------------
 
     DefaultMessageResponse setUsername(Gamer principal, UsernameRequest usernameRequest);

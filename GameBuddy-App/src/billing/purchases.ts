@@ -28,8 +28,58 @@ import type { Subscription } from '../api/types';
  * Once a build made after this install is on the device, the lazy load is invisible.
  */
 
-/** The public SDK key. Public by design — RevenueCat expects it to ship inside the app. */
-const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY ?? '';
+/**
+ * The public SDK key. Public by design — RevenueCat expects it to ship inside the app.
+ *
+ * **The key is checked rather than trusted, and that check is load-bearing.** RevenueCat
+ * issues one key per platform — `goog_` for Google Play, `appl_` for the App Store — plus
+ * `test_` keys for its own Test Store. Hand a *release* build a `test_` key and the SDK shows
+ * a native "Wrong API Key" dialog and then **deliberately terminates the process**, to stop
+ * test purchases reaching a shipped app.
+ *
+ * That kill is native, so the try/catch in `identify` below cannot intercept it — the same
+ * blind spot recorded in `QA_FINDINGS.md`, where every Maestro flow died at this exact point
+ * seconds after sign-in. It is also invisible in development, because it only fires on a
+ * release build. A Test Store key left in an EAS profile is therefore not a dead purchase
+ * button; it is the app closing itself on the first screen after sign-in.
+ *
+ * So a `test_` key is accepted in a debug build and refused in a release one — the same line
+ * RevenueCat draws, enforced before `configure` instead of after. That keeps the Test Store
+ * usable for exercising the purchase flow while the Play account is still being verified,
+ * without letting the same key reach a build that would die holding it.
+ */
+const STORE_PREFIX = Platform.select({ android: 'goog_', ios: 'appl_', default: '' });
+
+const RAW_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY ?? '';
+
+function keyIsUsable(key: string): boolean {
+  if (STORE_PREFIX === '') return false; // web, where there is no store to reach
+  if (key.startsWith(STORE_PREFIX)) return true; // a real store key, always fine
+  return __DEV__ && key.startsWith('test_'); // Test Store: debug builds only
+}
+
+const API_KEY = keyIsUsable(RAW_API_KEY) ? RAW_API_KEY : '';
+
+/**
+ * Announced at `error`, not behind `__DEV__`, and that is the point.
+ *
+ * A build with no usable key runs perfectly: `storeAvailable()` simply returns false and the
+ * paywall never sells anything. `QA_FINDINGS.md` calls that the more dangerous of the two
+ * misconfigurations for exactly that reason — it is silent, so a store build could ship
+ * unable to take money and look fine until somebody tried to pay. A build that cannot sell
+ * has to say so somewhere a release build is actually read: logcat and Crashlytics.
+ */
+if (API_KEY === '' && Platform.OS !== 'web') {
+  console.error(
+    RAW_API_KEY === ''
+      ? '[billing] no EXPO_PUBLIC_REVENUECAT_API_KEY in this build — purchases are disabled.'
+      : RAW_API_KEY.startsWith('test_')
+        ? '[billing] a RevenueCat Test Store key cannot be used in a release build — RevenueCat ' +
+          'closes the app rather than allow it. Purchases are disabled in this build instead.'
+        : `[billing] ignoring EXPO_PUBLIC_REVENUECAT_API_KEY: expected it to start with "${STORE_PREFIX}". ` +
+          'Purchases are disabled in this build rather than closing it.',
+  );
+}
 
 type PurchasesSdk = typeof import('react-native-purchases').default;
 
