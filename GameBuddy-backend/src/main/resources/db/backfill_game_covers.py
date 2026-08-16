@@ -73,10 +73,6 @@ GAME_TYPES = "(0,3,8,9,10,11)"
 # 2016's Doom above 1993's for the query "Doom".
 #
 # A string is a search term, used where IGDB simply files the game under a fuller name.
-#
-# Deliberately absent: eFootball 2026, which IGDB lists only as sponsored editions
-# ("eFootball: Leo Messi Edition 2026"). None of those is the game, and inventing a match
-# would be worse than the lettered fallback the picker shows instead.
 OVERRIDES: dict[str, int | str] = {
     "The Finals": 214417,
     "The Forest": 7504,
@@ -91,6 +87,13 @@ OVERRIDES: dict[str, int | str] = {
     # record is the 2023 one, which is the game people are actually playing, so the
     # catalogue follows it and takes that name and cover.
     "Overwatch 2": "Overwatch",
+    # Same shape, different conclusion than this file first reached. IGDB files the 2026
+    # release only as sponsored editions ("eFootball: Leo Messi Edition 2026"), none of
+    # which is the game, so eFootball 2026 was left unmatched and rendered as the lettered
+    # fallback. Called by its plain name, IGDB's evergreen "eFootball" record is the same
+    # continuously-updated free-to-play title the catalogue means — so it supplies the
+    # cover and the description, and KEEP_OUR_NAME below holds the year in the catalogue.
+    "eFootball 2026": "eFootball",
 }
 
 # Catalogue names that keep their own spelling instead of adopting IGDB's.
@@ -104,6 +107,10 @@ OVERRIDES: dict[str, int | str] = {
 # cover and description still come from the full record.
 KEEP_OUR_NAME = {
     "Dragon Quest XI S",
+    # Borrows IGDB's evergreen "eFootball" record for art and text, but the catalogue sells
+    # the current season and players look for the year. Without this the entry would rename
+    # itself to "eFootball" and stop matching what is on the box.
+    "eFootball 2026",
 }
 
 
