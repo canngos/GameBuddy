@@ -1,0 +1,15 @@
+# Dependencies for the offline tooling, not for the service.
+#
+# Kept out of requirements.txt so the serving image does not carry a database driver it
+# has no use for: the API loads a pickle and never opens a connection. Install these on
+# whatever runs the training pipeline.
+#
+#   pip install -r requirements.txt -r requirements-tools.txt
+
+-r requirements.txt
+
+# `python -m gamebuddy_model export` — reads live gamers and swipes into training CSVs.
+psycopg[binary]>=3.2,<4.0
+
+# The test suite.
+pytest>=8.0,<9.0

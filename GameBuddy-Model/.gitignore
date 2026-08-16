@@ -10,4 +10,17 @@ venv/
 # seed in that command, so committing 18MB of SQL would be storing something a one-line
 # command regenerates.
 data/
-artifacts/
+
+# The artefacts directory follows the same rule with one exception. `Dockerfile` does
+# `COPY artifacts ./artifacts` on purpose — the baked artefact is what seeds the named
+# volume, so a fresh deploy is never left without a model — and an ignored artefact meant
+# the image could not be built from a clean checkout at all. CI proved it: the model images
+# failed while the backend succeeded.
+#
+# So the live artefact is tracked and everything else here is not. It is ~9.6 MB and
+# changes rarely: retrains write to the mounted volume, not back into git.
+artifacts/*
+!artifacts/recommender.pkl
+
+# Same reasoning: written by tools/seed_local_gamers.py, regenerated in one command.
+tools/local-gamers.sql

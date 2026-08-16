@@ -104,6 +104,97 @@ def test_exclusion_list_is_bounded(client, user_id):
     assert response.status_code == 422
 
 
+def test_predict_honours_an_inclusion_list(client, user_id, artefact):
+    """The eligible set for a narrowed feed: nothing outside it may be returned.
+
+    This is what fixes Gold's advanced filters. The backend used to send the *complement* —
+    everyone the filter ruled out — which in a 20,001-gamer database was 20,001 entries
+    against a 10,000 cap, so three of the four filters answered 503 and blamed the model.
+    """
+    _, ids = artefact
+    eligible = [i for i in ids if i != user_id][:12]
+    body = client.post(
+        "/predict",
+        json={"user_id": user_id, "limit": 20, "include": eligible},
+        headers={"X-Internal-Api-Key": KEY},
+    ).json()
+
+    assert set(body["sim_users"]) <= set(eligible)
+    # And all of them, not just the ones that happened to share a cluster with the caller.
+    # An eligible set is spread across clusters, so a cluster-restricted pool would return a
+    # fraction of it and the deck would look mysteriously short.
+    assert len(body["sim_users"]) == 12
+
+
+def test_an_empty_inclusion_list_means_nobody_not_everybody(client, user_id):
+    """The distinction that must never be collapsed.
+
+    Absent means "not filtering"; empty means "the filter matched nobody". Reading empty as
+    absent would answer a filter that matches nobody with a full unfiltered deck — a gamer
+    asks for people online in their country and is shown people who are neither, which is a
+    worse failure than the 503 this replaced.
+    """
+    body = client.post(
+        "/predict",
+        json={"user_id": user_id, "limit": 20, "include": []},
+        headers={"X-Internal-Api-Key": KEY},
+    ).json()
+    assert body["sim_users"] == []
+
+    absent = client.post(
+        "/predict",
+        json={"user_id": user_id, "limit": 20},
+        headers={"X-Internal-Api-Key": KEY},
+    ).json()
+    assert len(absent["sim_users"]) == 20
+
+
+def test_inclusion_and_exclusion_both_apply(client, user_id, artefact):
+    """A filtered feed still has to skip everyone already swiped on."""
+    _, ids = artefact
+    eligible = [i for i in ids if i != user_id][:10]
+    headers = {"X-Internal-Api-Key": KEY}
+
+    first = client.post(
+        "/predict",
+        json={"user_id": user_id, "limit": 4, "include": eligible},
+        headers=headers,
+    ).json()["sim_users"]
+    second = client.post(
+        "/predict",
+        json={"user_id": user_id, "limit": 10, "include": eligible, "exclude": first},
+        headers=headers,
+    ).json()["sim_users"]
+
+    assert set(second) <= set(eligible)
+    assert not set(first) & set(second)
+
+
+def test_cold_start_honours_an_inclusion_list(client, artefact):
+    """The cold-start path needs it too: a Gold subscriber who signed up since the last
+    retrain is ranked here, and their filters have to work on their first day."""
+    _, ids = artefact
+    eligible = ids[:8]
+    body = client.post(
+        "/predict/cold-start",
+        json={"user_id": "brand-new", "games": ["VALORANT"], "keywords": ["competitive"],
+              "limit": 20, "include": eligible},
+        headers={"X-Internal-Api-Key": KEY},
+    ).json()
+    assert set(body["sim_users"]) <= set(eligible)
+
+
+def test_inclusion_list_is_bounded(client, user_id):
+    """Bounded for the same reason as the exclusion list, just far higher — see
+    MAX_INCLUSIONS on why the two caps differ."""
+    response = client.post(
+        "/predict",
+        json={"user_id": user_id, "include": [f"g{i}" for i in range(50_001)]},
+        headers={"X-Internal-Api-Key": KEY},
+    )
+    assert response.status_code == 422
+
+
 def test_unknown_user_is_empty_not_a_500(client):
     """The original raised KeyError here, which meant every gamer who signed up between
     retrains got a 500 on their first swipe."""

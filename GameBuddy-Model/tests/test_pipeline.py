@@ -1,20 +1,32 @@
 """Tests for the generator, the feature space and the recommender.
 
-The emphasis is on the properties that would be expensive to get wrong: the age-band
-guarantee, cold start, and the fact that the model beats chance. A recommender can be
-wrong without being broken — it returns a plausible list of ids either way — so the tests
-that matter are the ones that would fail if it stopped ranking and started guessing.
+The emphasis is on the properties that would be expensive to get wrong: the age floor,
+cold start, and the fact that the model beats chance. A recommender can be wrong without
+being broken — it returns a plausible list of ids either way — so the tests that matter
+are the ones that would fail if it stopped ranking and started guessing.
+
+The population tests are unusually opinionated about *shape*, and deliberately. The
+generator has more than one way to produce data that looks fine and teaches nothing: a
+match graph where everybody matches their own archetype and nobody else, or one where
+cross-genre matching is uniform noise, both pass a test that only checks the like rate is
+sane. Those are the failure modes the structural assertions below exist to catch.
 """
 
 from __future__ import annotations
 
+import pathlib
+import re
+
 import numpy as np
 import pytest
 
-from gamebuddy_model.catalogue import ALL_GAMES, ALL_KEYWORDS, ARCHETYPES
-from gamebuddy_model.evaluate import RandomBaseline, RewrittenModel, evaluate
+from gamebuddy_model.catalogue import (ALL_GAMES, ALL_KEYWORDS, ARCHETYPES, GENRE_KEYWORDS,
+                                       VIBE_KEYWORDS, WARMTH)
+from gamebuddy_model.evaluate import (RandomBaseline, RewrittenModel, evaluate,
+                                      split_exposures)
 from gamebuddy_model.features import fit_feature_space, transform
-from gamebuddy_model.population import MAJORITY_AGE, PopulationGenerator, summarise
+from gamebuddy_model.population import (MAXIMUM_AGE, MINIMUM_AGE, PLATFORM_IDS,
+                                        PopulationGenerator, summarise)
 from gamebuddy_model.recommender import train
 
 
@@ -24,34 +36,33 @@ def population():
 
 
 @pytest.fixture(scope="module")
+def big_population():
+    """Large enough that the structural rates below are not just sampling noise."""
+    return PopulationGenerator(n_gamers=2500, seed=1234).generate()
+
+
+@pytest.fixture(scope="module")
 def model(population):
     gamers = population.gamers
     return train(
         [g.user_id for g in gamers],
         [g.games for g in gamers],
         [g.keywords for g in gamers],
+        [g.platforms for g in gamers],
     )
 
 
 # -- population --------------------------------------------------------------
 
 
-def test_no_minor_adult_matches(population):
-    """The safety property. If this ever fails the product ships a child-safety incident,
-    so it is asserted on the generated data as well as enforced in the backend."""
-    by_id = {g.user_id: g for g in population.gamers}
-    for pair in population.mutual:
-        a, b = (by_id[x] for x in pair)
-        assert a.is_minor == b.is_minor
-
-
-def test_no_minor_adult_exposure(population):
-    """Stronger than the above: minors and adults are never even shown to each other, so
-    a match is impossible rather than merely unlikely."""
-    by_id = {g.user_id: g for g in population.gamers}
-    for pair in population.exposed_pairs:
-        a, b = (by_id[x] for x in pair)
-        assert a.is_minor == b.is_minor
+def test_population_is_adults_only(population):
+    """The product is 18+ — the signup screen gates on it and the backend refuses a
+    younger birth date — so a generated profile under 18 is one that could not exist,
+    and seeding it into a live schema would be a profile the product is not allowed to
+    have. Asserted on the data as well as enforced upstream."""
+    assert summarise(population)["under_age"] == 0
+    for gamer in population.gamers:
+        assert gamer.age >= MINIMUM_AGE
 
 
 def test_population_is_reproducible():
@@ -59,7 +70,7 @@ def test_population_is_reproducible():
     b = PopulationGenerator(n_gamers=100, seed=7).generate()
     assert [g.user_id for g in a.gamers] == [g.user_id for g in b.gamers]
     assert [g.games for g in a.gamers] == [g.games for g in b.gamers]
-    assert a.mutual == b.mutual
+    assert np.array_equal(a.mutual_pairs, b.mutual_pairs)
 
 
 def test_different_seeds_give_different_populations():
@@ -72,9 +83,67 @@ def test_population_is_neither_empty_nor_saturated(population):
     """A population where nobody matches teaches nothing, and one where everybody matches
     teaches nothing either — both were failure modes while calibrating this."""
     stats = summarise(population)
-    assert 0.05 < stats["like_rate"] < 0.6
-    assert stats["median_matches_per_gamer"] >= 3
+    assert 0.15 < stats["like_rate"] < 0.40
+    assert stats["median_matches_per_gamer"] >= 5
     assert stats["gamers_with_no_match"] < len(population.gamers) * 0.1
+
+
+def test_most_matches_cross_archetype(big_population):
+    """The failure mode this guards against is data that is too tidy.
+
+    If competitive shooter players only ever matched other competitive shooter players,
+    the recommender would score well by learning one rule and the product would be worse
+    than useless — it would confidently refuse to introduce people who would get along.
+    Same-archetype pairs should be over-represented against the 1-in-14 chance rate, and
+    still be a minority of all matches.
+    """
+    same = summarise(big_population)["same_archetype"]
+    assert 3 * (1 / len(ARCHETYPES)) < same < 0.45
+
+
+def test_cross_archetype_matching_is_structured_not_noise(big_population):
+    """And the failure mode this guards against is data that is merely random.
+
+    Cross-genre matching that ignores what the genres are is not organic, it is noise —
+    and it is what the generator produced before ``WARMTH`` existed, where battle-royale
+    and competitive-FPS players came out as the *coldest* pair in the graph despite
+    sharing two games in the catalogue. Warm archetype pairs must match meaningfully more
+    often than cold ones, and cold pairs must still match sometimes.
+    """
+    stats = summarise(big_population)
+    assert stats["warm_cold_lift"] > 1.8
+
+    dominant = np.array([int(np.argmax(g.theta)) for g in big_population.gamers])
+    left, right = big_population.exposed[:, 0], big_population.exposed[:, 1]
+    cold = (dominant[left] != dominant[right]) & (WARMTH[dominant[left], dominant[right]] <= 0.10)
+    assert big_population.mutual_mask[cold].mean() > 0.02, (
+        "the coldest archetype pairs should still match sometimes — a floor of zero means "
+        "the model can never learn to introduce anyone across taste"
+    )
+
+
+def test_keywords_reveal_temperament_not_just_genre(big_population):
+    """Keywords have to carry an axis games do not.
+
+    They used to be sampled from the same mixture as the games, which made them a second
+    noisy copy of the genre signal — and made the feature space's keyword weight a knob
+    with nothing to tune. Two gamers with similar temperament should share tags at a
+    visibly higher rate than two drawn at random, independently of what they play.
+    """
+    gamers = big_population.gamers
+    vibe = np.array([g.vibe for g in gamers])
+    tags = [set(g.keywords) & set(VIBE_KEYWORDS) for g in gamers]
+
+    rng = np.random.default_rng(0)
+    left, right = rng.integers(0, len(gamers), 20000), rng.integers(0, len(gamers), 20000)
+    keep = left != right
+    left, right = left[keep], right[keep]
+
+    gap = np.linalg.norm(vibe[left] - vibe[right], axis=1)
+    shared = np.array([len(tags[a] & tags[b]) for a, b in zip(left, right)], dtype=float)
+
+    close, far = gap < np.quantile(gap, 0.25), gap > np.quantile(gap, 0.75)
+    assert shared[close].mean() > 1.5 * shared[far].mean()
 
 
 def test_profiles_are_drawn_from_the_catalogue(population):
@@ -85,10 +154,32 @@ def test_profiles_are_drawn_from_the_catalogue(population):
         assert len(gamer.games) == len(set(gamer.games)), "no duplicate games"
 
 
-def test_ages_respect_the_band(population):
+def test_profiles_satisfy_the_products_minimums(population):
+    """The app refuses to submit onboarding below these, so a generated profile that
+    breaks them is one the product would never have stored."""
     for gamer in population.gamers:
-        assert 13 <= gamer.age <= 75
-        assert gamer.is_minor == (gamer.age < MAJORITY_AGE)
+        assert len(gamer.games) >= 3
+        assert len(gamer.keywords) >= 5
+        assert 1 <= len(gamer.platforms) <= 3
+        assert set(gamer.platforms) <= set(PLATFORM_IDS)
+        assert len(gamer.platforms) == len(set(gamer.platforms))
+
+
+def test_activity_is_heavy_tailed(population):
+    """A log where everyone swiped the same amount makes the desirability prior's
+    rate-versus-count handling and its rater weighting untestable by the data they exist
+    to handle — they only matter when activity is wildly uneven, and it is."""
+    exposure = np.array([g.exposure for g in population.gamers])
+    assert exposure.max() > 5 * np.median(exposure)
+    assert (exposure < 15).mean() > 0.08, "there should be a visible tail of lurkers"
+
+
+def test_ages_are_within_the_products_range(population):
+    """The bounds match ``MIN_AGE``/``MAX_AGE`` in ``GameBuddy-App/src/validation.ts`` —
+    an age outside them is one the app would refuse to store. The *shape* inside those
+    bounds is a separate question, asserted by ``test_age_has_a_realistic_right_tail``."""
+    for gamer in population.gamers:
+        assert MINIMUM_AGE <= gamer.age <= MAXIMUM_AGE
 
 
 def test_matches_are_symmetric(population):
@@ -118,12 +209,69 @@ def test_unknown_items_are_ignored_not_fatal(population):
 
 def test_age_and_country_are_absent_from_the_feature_space(population):
     """The specific defect in the original: age and country dominated the similarity. If
-    they reappear in the vocabulary, similarity stops being about taste."""
+    they reappear in the vocabulary, similarity stops being about taste.
+
+    Platform is a deliberate exception and is asserted *present* below — it is a real
+    constraint on whether two people can play together, unlike country, which the
+    evaluation shows carries no compatibility signal.
+    """
     gamers = population.gamers
-    space, _ = fit_feature_space([g.games for g in gamers], [g.keywords for g in gamers])
-    vocabulary = set(space.game_index) | set(space.keyword_index)
+    space, _ = fit_feature_space(
+        [g.games for g in gamers], [g.keywords for g in gamers], [g.platforms for g in gamers]
+    )
+    vocabulary = set(space.game_index) | set(space.keyword_index) | set(space.platform_index)
     assert not vocabulary & {g.country for g in gamers}
     assert not vocabulary & {str(g.age) for g in gamers}
+
+
+def test_platform_is_in_the_feature_space(population):
+    gamers = population.gamers
+    space, vectors = fit_feature_space(
+        [g.games for g in gamers], [g.keywords for g in gamers], [g.platforms for g in gamers]
+    )
+    assert set(space.platform_index) <= set(PLATFORM_IDS)
+    assert space.n_features == len(space.game_index) + len(space.keyword_index) + len(space.platform_index)
+    assert vectors.shape[1] == space.n_features
+
+
+def test_the_platform_block_is_optional_in_both_directions(population):
+    """An artefact trained before platform existed must still serve, and a profile with no
+    platforms must still rank. Onboarding has required at least one since it shipped, but
+    accounts predating that exist, and the right answer for them is to rank on what they
+    do have rather than to fail."""
+    gamers = population.gamers[:200]
+
+    without, vectors = fit_feature_space([g.games for g in gamers], [g.keywords for g in gamers])
+    assert without.platform_index == {}
+    assert without.platform_tfidf is None
+    # Transforming with platforms against a space that has no platform block ignores them.
+    assert transform(without, [gamers[0].games], [gamers[0].keywords], [["PC"]]).shape[1] == vectors.shape[1]
+
+    with_platforms, _ = fit_feature_space(
+        [g.games for g in gamers], [g.keywords for g in gamers], [g.platforms for g in gamers]
+    )
+    # And a gamer with no platforms is an empty block, not an error.
+    empty = transform(with_platforms, [gamers[0].games], [gamers[0].keywords], [[]])
+    assert empty.nnz > 0
+
+
+def test_cross_platform_pairs_match_less_often(big_population):
+    """Platform has to matter in the *data*, or the feature is noise.
+
+    Adding a block to the vector that the labels are indifferent to would not help the
+    model — it would dilute the taste signal and the sweep would correctly show it hurting.
+    Two gamers who share no platform cannot play most games together, so they should match
+    measurably less; not never, because crossplay exists and people make friends they never
+    queue with.
+    """
+    owns = [set(g.platforms) for g in big_population.gamers]
+    left, right = big_population.exposed[:, 0], big_population.exposed[:, 1]
+    shared = np.array([bool(owns[a] & owns[b]) for a, b in zip(left, right)])
+
+    matched = big_population.mutual_mask
+    assert shared.mean() > 0.3, "the split must not be so lopsided that it says nothing"
+    assert matched[shared].mean() > 1.4 * matched[~shared].mean()
+    assert matched[~shared].mean() > 0.02, "cross-platform pairs should still match sometimes"
 
 
 # -- recommender -------------------------------------------------------------
@@ -232,6 +380,131 @@ def test_cold_start_honours_exclusions(model):
     assert not set(first) & set(second)
 
 
+# -- inclusions: the fix for Gold's advanced filters -------------------------
+
+
+def test_inclusion_restricts_the_pool(model, population):
+    """Only the eligible set may be returned.
+
+    The backend evaluates a filter — country, activity, game, platform — and hands over who
+    matched. It used to hand over the complement instead, which grows with the population
+    rather than with the answer and was refused outright above ten thousand entries.
+    """
+    user_id = population.gamers[0].user_id
+    eligible = [g.user_id for g in population.gamers[1:40]]
+    result = model.similar_to(user_id, 20, include=eligible)
+    assert len(result) == 20
+    assert set(result) <= set(eligible)
+
+
+def test_inclusion_reaches_past_the_callers_own_cluster(model, population):
+    """The one that would fail if the cluster restriction were left to bite.
+
+    An eligible set is spread across every cluster — nothing about "online in Finland"
+    correlates with taste — so intersecting it with the caller's own cluster leaves a
+    handful of people, and the deck comes back mysteriously short while plenty of matching
+    gamers sit there unshown. That is the *same* failure the filter was supposed to fix,
+    reintroduced one layer down.
+    """
+    user_id = population.gamers[0].user_id
+    idx = model._index_of[user_id]
+    other_clusters = [
+        model.user_ids[i]
+        for i in range(len(model.user_ids))
+        if model.labels[i] != model.labels[idx]
+    ]
+    result = model.similar_to(user_id, 20, include=other_clusters)
+    assert len(result) == 20
+    assert set(result) <= set(other_clusters)
+
+
+def test_an_empty_inclusion_means_nobody(model, population):
+    """Empty and absent are opposite answers.
+
+    Empty is "the filter matched nobody" and must produce an empty deck. Reading it as
+    "unfiltered" would show a gamer who asked for people online in their country a page of
+    people who are neither — worse than showing nothing, because it looks like the filter
+    was ignored.
+    """
+    user_id = population.gamers[0].user_id
+    assert model.similar_to(user_id, 20, include=[]) == []
+    assert len(model.similar_to(user_id, 20, include=None)) == 20
+
+
+def test_inclusion_and_exclusion_compose(model, population):
+    """A filtered feed still skips everyone already decided on."""
+    user_id = population.gamers[0].user_id
+    eligible = [g.user_id for g in population.gamers[1:40]]
+    first = model.similar_to(user_id, 10, include=eligible)
+    second = model.similar_to(user_id, 20, include=eligible, exclude=first)
+    assert set(second) <= set(eligible)
+    assert not set(first) & set(second)
+
+
+def test_the_caller_is_never_returned_even_if_included(model, population):
+    """The backend builds the eligible set from a database query, and the caller satisfies
+    their own filter — they are in their own country, on their own platform. Nobody should
+    be shown their own profile because of it."""
+    user_id = population.gamers[0].user_id
+    eligible = [g.user_id for g in population.gamers[:40]]
+    assert user_id not in model.similar_to(user_id, 20, include=eligible)
+
+
+def test_unknown_ids_in_the_inclusion_list_are_ignored(model, population):
+    """Symmetric with the exclusion case, but the consequence differs and it is worth
+    knowing which way: an unknown id in `exclude` changes nothing, while an unknown id in
+    `include` narrows the pool. A stale artefact therefore serves a shorter filtered deck,
+    never a wrong one — the fix is a retrain, not a code change."""
+    user_id = population.gamers[0].user_id
+    eligible = [g.user_id for g in population.gamers[1:40]]
+    with_ghosts = model.similar_to(user_id, 20, include=[*eligible, "ghost-1", "ghost-2"])
+    assert with_ghosts == model.similar_to(user_id, 20, include=eligible)
+
+
+def test_inclusion_preserves_ranking_order(model, population):
+    """Filtering decides who is ranked, not in what order — a filtered deck must be the
+    unfiltered one with the ineligible people taken out."""
+    user_id = population.gamers[0].user_id
+    full = model.similar_to(user_id, 60)
+    eligible = full[::2]
+    result = model.similar_to(user_id, 30, include=eligible)
+    assert result == eligible
+
+
+def test_cold_start_honours_inclusions(model, population):
+    """A Gold subscriber who signed up since the last retrain is served by this path."""
+    archetype = ARCHETYPES[0]
+    games = [name for name, _ in archetype.games[:4]]
+    eligible = [g.user_id for g in population.gamers[:30]]
+    result = model.similar_to_profile(
+        games, archetype.keywords[:3], 20, include=eligible
+    )
+    assert result
+    assert set(result) <= set(eligible)
+
+
+def test_hidden_seed_accounts_still_win_against_an_inclusion_list(population):
+    """Two restrictions, and the stricter one has to hold.
+
+    An eligible set is built by the backend, which does not know which rows the artefact
+    marks as seed accounts. If a filter listing one made it recommendable, turning
+    HIDE_SEED_ACCOUNTS on would stop working for exactly the paying users who filter.
+    """
+    gamers = population.gamers[:200]
+    hidden = [i < 100 for i in range(len(gamers))]
+    trained = train(
+        [g.user_id for g in gamers],
+        [g.games for g in gamers],
+        [g.keywords for g in gamers],
+        [g.platforms for g in gamers],
+        hidden=hidden,
+    )
+    trained.hide_seed_accounts = True
+
+    seeded_ids = [g.user_id for g in gamers[:100]]
+    assert trained.similar_to(gamers[150].user_id, 20, include=seeded_ids) == []
+
+
 def test_similar_profiles_rank_each_other_highly(model, population):
     """A gamer's nearest neighbour should share more of their profile than a random gamer
     does. This is the weakest possible statement of 'the ranking means something', and it
@@ -282,11 +555,7 @@ def test_desirability_prior_is_optional_and_reversible(population):
     )
     baseline = model.similar_to(gamers[0].user_id, 20)
 
-    exposures: dict[str, int] = {}
-    for pair in population.exposed_pairs:
-        for uid in pair:
-            exposures[uid] = exposures.get(uid, 0) + 1
-    model.fit_desirability(population.likes, exposures)
+    model.fit_desirability(population.likes(), population.exposure_counts())
     assert model.desirability is not None
     assert model.similar_to(gamers[0].user_id, 20) != baseline
 
@@ -378,12 +647,279 @@ def test_desirability_falls_back_to_counts_without_exposures(population):
 # -- end to end --------------------------------------------------------------
 
 
-def test_model_beats_random(population):
+def test_model_beats_random(big_population):
     """The claim the original could not make. Guarded loosely, because the point is to
     catch a regression to chance rather than to pin an exact score."""
-    ranked = evaluate(RewrittenModel(population, use_desirability=True), population,
-                      name="hybrid", min_matches=3, max_users=300)
-    chance = evaluate(RandomBaseline(population), population,
-                      name="random", min_matches=3, max_users=300)
+    split = split_exposures(big_population, seed=1234)
+    ranked = evaluate(RewrittenModel(big_population, split, use_desirability=True),
+                      big_population, split, name="hybrid", min_matches=3, max_users=400)
+    chance = evaluate(RandomBaseline(big_population, split), big_population, split,
+                      name="random", min_matches=3, max_users=400)
     assert ranked.precision_at_10 > chance.precision_at_10 * 2
     assert ranked.map_at_20 > chance.map_at_20 * 2
+
+
+def test_the_split_actually_holds_data_back(big_population):
+    """The leak this exists to close.
+
+    The desirability prior and the popularity baseline are fitted from the like log, and
+    mutual matches are made of those same likes — so scoring them against the whole graph
+    was scoring them on answers they had been shown. Nothing a model may learn from can
+    appear in what it is scored against.
+    """
+    split = split_exposures(big_population, ratio=0.5, seed=1234)
+
+    fit_pairs = {frozenset(pair) for pair in split.fit_likes}
+    holdout_pairs = {
+        frozenset((uid, other))
+        for uid, others in split.holdout_matches.items()
+        for other in others
+    }
+    assert holdout_pairs, "the holdout must contain some matches to score against"
+    assert not (fit_pairs & holdout_pairs), "a scored match was visible in the fitting log"
+
+
+def test_the_model_serves_a_mix_not_a_monoculture(big_population):
+    """A recommender that only ever returns the caller's own archetype would score
+    respectably and make a dull product. What it serves should lean towards similar taste
+    without being confined to it."""
+    from gamebuddy_model.evaluate import structure_report
+
+    split = split_exposures(big_population, seed=1234)
+    served = structure_report(
+        RewrittenModel(big_population, split, use_desirability=True),
+        big_population,
+        max_users=150,
+    )
+    chance = 1 / len(ARCHETYPES)
+    assert chance < served["same_archetype"] < 0.6
+    assert served["mean_warmth"] > 0.15, "cross-genre suggestions should favour warm pairs"
+
+
+# -- catalogue ---------------------------------------------------------------
+
+
+def test_warmth_is_a_usable_similarity_kernel():
+    """Symmetric, unit-diagonal and positive semi-definite.
+
+    The first two are obvious. The third is the one that bites: ``WARM_PAIRS`` is a
+    hand-written table of opinions, and nothing stops those opinions from being
+    geometrically impossible — "A is close to B, B is close to C, A is far from C" can be
+    written down but cannot be embedded. A kernel with a negative eigenvalue lets a gamer
+    be less similar to themselves than to a stranger, which surfaces as a cosine outside
+    [-1, 1] and a like probability that makes no sense. ``_build_warmth`` projects onto the
+    PSD cone to guarantee it; this test is what tells whoever edits the table next that
+    the projection has started moving their numbers.
+    """
+    assert np.allclose(WARMTH, WARMTH.T)
+    assert np.allclose(np.diag(WARMTH), 1.0)
+    assert np.linalg.eigvalsh(WARMTH).min() >= -1e-9
+    off_diagonal = WARMTH[~np.eye(len(ARCHETYPES), dtype=bool)]
+    assert off_diagonal.min() > 0.0, "no archetype pair should be at zero warmth"
+    assert off_diagonal.max() < 1.0
+
+
+def test_warmth_matches_the_table_it_was_written_from():
+    """The PSD projection is allowed to nudge the hand-written numbers, not to rewrite
+    them. If this fails, the table has become inconsistent enough that the projection is
+    now making the decisions."""
+    from gamebuddy_model.catalogue import ARCHETYPE_INDEX, WARM_PAIRS
+
+    for (left, right), value in WARM_PAIRS.items():
+        actual = WARMTH[ARCHETYPE_INDEX[left], ARCHETYPE_INDEX[right]]
+        assert abs(actual - value) < 0.05, f"{left}/{right}: {value} became {actual:.3f}"
+
+
+def test_every_keyword_is_either_genre_or_vibe():
+    """The two sets partition the vocabulary. A keyword in neither would be unreachable
+    from the vibe side and near-unreachable from the genre side; one in both would be
+    double-counted."""
+    assert set(GENRE_KEYWORDS).isdisjoint(VIBE_KEYWORDS)
+    assert set(GENRE_KEYWORDS) | set(VIBE_KEYWORDS) == set(ALL_KEYWORDS)
+
+
+def test_the_prior_breaks_ties_rather_than_overriding_taste(big_population):
+    """The popularity prior must not outrank a visibly better fit.
+
+    It is standardised to unit variance, so adding it raw applied a fixed-size shove to a
+    similarity whose spread differs from pool to pool. Asked for cosy life-sim players the
+    model returned a battle-royale and an MMO player ahead of five gamers with Stardew
+    Valley and Animal Crossing on their profiles, purely because they were more liked.
+    Scaling the nudge by the pool's own spread is what makes it a tie-break.
+    """
+    from gamebuddy_model.catalogue import GAMES
+
+    gamers = big_population.gamers
+    model = train([g.user_id for g in gamers], [g.games for g in gamers],
+                  [g.keywords for g in gamers])
+    split = split_exposures(big_population, seed=1234)
+    model.fit_desirability(split.fit_likes, split.fit_exposures)
+
+    cosy = {name for name, _ in GAMES["cozy_life_sim"]}
+    plays = {g.user_id: set(g.games) for g in gamers}
+    query = (["Stardew Valley", "Animal Crossing: New Horizons", "The Sims 4"],
+             ["chill", "casual", "no mic", "short sessions", "decorator"])
+
+    ranked = model.similar_to_profile(*query, 20)
+    on_taste = sum(1 for uid in ranked if cosy & plays[uid])
+    assert on_taste >= 15, (
+        f"only {on_taste}/20 of the returned candidates play a cosy game — the prior is "
+        "picking candidates rather than ordering them"
+    )
+
+
+def test_artefact_records_the_environment_that_built_it(model):
+    """Unpickling fitted estimators across scikit-learn versions is undefined behaviour,
+    and it does not raise — it returns a model that loads, serves, and ranks wrongly. The
+    stamp is what lets the API say so at startup instead of it going unnoticed."""
+    build = model.report.build
+    assert {"python", "numpy", "scipy", "scikit-learn"} <= set(build.versions)
+    assert not build.mismatches(), "freshly trained, so nothing should differ"
+
+    build.versions["scikit-learn"] = "0.0.1-not-a-real-version"
+    assert "scikit-learn" in build.mismatches()
+
+
+def test_interpreter_skew_is_reported_separately_from_library_skew(model):
+    """Training happens outside the serving container, so the Python version differing is
+    the normal state. Folding it in with the library check would make the check fire on
+    every boot, and a warning that always fires is one nobody reads."""
+    build = model.report.build
+    build.versions["python"] = "3.0.0"
+    assert build.interpreter_mismatch() == ("3.0.0", __import__("platform").python_version())
+    assert "python" not in build.mismatches()
+
+
+def test_age_has_a_realistic_right_tail(big_population):
+    """Young-skewed, as a social product is, but not truncated.
+
+    A plain normal around the archetype means stopped the population dead at about 50.
+    There are people in their sixties on Old School RuneScape, and generating none of them
+    is a quiet decision that they do not exist — the kind of thing that only shows up when
+    someone browses the seeded database and finds it looks nothing like their users.
+    """
+    ages = np.array([g.age for g in big_population.gamers])
+    assert ages.min() >= MINIMUM_AGE and ages.max() <= MAXIMUM_AGE
+    assert 22 <= np.median(ages) <= 30, "the bulk should still be a young social product"
+    assert ((ages >= 18) & (ages <= 34)).mean() > 0.75
+    assert (ages >= 40).mean() > 0.03, "there should be a real tail, not a cliff"
+
+
+def test_catalogue_names_match_the_database_seed():
+    """The model's game names must be exactly the product's game names.
+
+    The model is trained on names, and names are what crosses every boundary: the local
+    seeder resolves ``gamer_games_join`` by joining on them, and the backend's cold-start
+    path sends the names off a live profile to ``/predict/cold-start``. Neither fails loudly
+    when they disagree — the seeder's INSERT...SELECT matches no row and inserts nothing,
+    and ``transform`` drops vocabulary it does not recognise. The result is a seeded gamer
+    quietly missing a fifth of their library and a real user whose favourite game
+    contributes nothing to their recommendations.
+
+    That is not hypothetical: 17 of the 100 titles had drifted apart this way — the
+    catalogue said "Baldur's Gate 3" and "VALORANT" where the database said "Baldur's Gate
+    III" and "Valorant". Everything looked fine from either side alone.
+    """
+    seed_sql = (pathlib.Path(__file__).resolve().parents[2]
+                / "GameBuddy-backend/src/main/resources/db/seed-local.sql")
+    if not seed_sql.exists():
+        pytest.skip("backend checkout not present")
+
+    text = seed_sql.read_text(encoding="utf-8")
+    # Rows are `('<uuid>', '<name>', '<category>', ...)`; take the name that follows an id.
+    seeded_games = {
+        name.replace("''", "'")
+        for _, name in re.findall(r"\(\s*'([0-9a-f-]{36})',\s*'((?:[^']|'')*)',", text)
+    }
+
+    catalogue = {name for name, _ in ALL_GAMES}
+    missing = catalogue - seeded_games
+    assert not missing, (
+        f"{len(missing)} catalogue titles are not in seed-local.sql, so they will silently "
+        f"vanish from seeded profiles and from cold-start ranking: {sorted(missing)}"
+    )
+
+
+# -- seed-account visibility -------------------------------------------------
+
+
+def test_seed_accounts_are_learned_from_but_not_served(population):
+    """The whole point of keeping the seed population after launch.
+
+    Hidden rows must still shape the feature space — that is why they are kept, since a
+    vector space fitted on twenty thousand profiles is steadier than one fitted on the
+    first thousand signups — while never appearing in anyone's deck, because they will
+    never answer a message.
+    """
+    gamers = population.gamers[:400]
+    ids = [g.user_id for g in gamers]
+    # First 300 are seed accounts, last 100 are "real".
+    hidden = [i < 300 for i in range(len(gamers))]
+
+    model = train(ids, [g.games for g in gamers], [g.keywords for g in gamers],
+                  [g.platforms for g in gamers], hidden=hidden)
+
+    # Learned from: every profile contributed to the vocabulary and the vectors.
+    assert model.vectors.shape[0] == 400
+    assert len(model.user_ids) == 400
+
+    real = ids[300:]
+    model.hide_seed_accounts = True
+    for uid in real[:10]:
+        returned = model.similar_to(uid, 100)
+        assert returned, "a real gamer must still get candidates"
+        assert set(returned) <= set(real), "a hidden account was recommended"
+
+
+def test_hiding_is_off_until_asked(population):
+    """Default off: during development the seed accounts are the population, and defaulting
+    to hidden would empty the feed of anyone who upgraded without reading a changelog."""
+    gamers = population.gamers[:200]
+    ids = [g.user_id for g in gamers]
+    model = train(ids, [g.games for g in gamers], [g.keywords for g in gamers],
+                  [g.platforms for g in gamers], hidden=[True] * 200)
+    assert model.hide_seed_accounts is False
+    assert model.similar_to(ids[0], 20), "nothing should be hidden by default"
+
+
+def test_cold_start_also_respects_hiding(population):
+    """Cold start is the path every new signup takes until the next retrain, so a leak
+    here would show seed accounts to precisely the users forming a first impression."""
+    gamers = population.gamers[:400]
+    ids = [g.user_id for g in gamers]
+    hidden = [i < 300 for i in range(len(gamers))]
+    model = train(ids, [g.games for g in gamers], [g.keywords for g in gamers],
+                  [g.platforms for g in gamers], hidden=hidden)
+    model.hide_seed_accounts = True
+
+    newcomer = gamers[350]
+    returned = model.similar_to_profile(newcomer.games, newcomer.keywords, 100,
+                                        platforms=newcomer.platforms)
+    assert returned
+    assert set(returned) <= set(ids[300:])
+
+
+def test_an_artefact_without_markers_still_serves(population):
+    """Artefacts trained before the marker existed must keep working rather than refusing
+    to return anyone — an upgrade should not empty the feed."""
+    gamers = population.gamers[:200]
+    ids = [g.user_id for g in gamers]
+    model = train(ids, [g.games for g in gamers], [g.keywords for g in gamers],
+                  [g.platforms for g in gamers])
+    assert model.hidden is None
+    model.hide_seed_accounts = True
+    assert model.similar_to(ids[0], 20)
+
+
+def test_the_seed_marker_has_one_definition():
+    """Asked by the exporter, the trainer and the cleanup SQL. If they disagree, accounts
+    get trained on but never served, or served but never trained, and nothing says so."""
+    from gamebuddy_model.seed import BOT_EMAIL_DOMAIN, is_seed_account
+
+    assert is_seed_account(f"bot00001@{BOT_EMAIL_DOMAIN}")
+    assert is_seed_account(f"BOT00001@{BOT_EMAIL_DOMAIN.upper()}"), "must be case-insensitive"
+    assert not is_seed_account("a.real.person@gmail.com")
+    assert not is_seed_account("")
+    assert not is_seed_account(None)
+    # Must not match a lookalike domain a real user could register.
+    assert not is_seed_account("someone@notbot.gamebuddy.invalid.example.com")
