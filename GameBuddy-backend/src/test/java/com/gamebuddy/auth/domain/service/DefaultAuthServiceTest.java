@@ -413,13 +413,25 @@ class DefaultAuthServiceTest {
             return r;
         }
 
+        /**
+         * An unknown address must be indistinguishable from a wrong code.
+         *
+         * <p>This asserted 103 (USER_NOT_FOUND) when verify still said so out loud, which
+         * made the endpoint an account oracle: submit any six digits and the error told you
+         * whether the address was registered. It now answers 105 for both, and the test
+         * pins that rather than the leak it replaced — an assertion of 103 here passing
+         * again would mean the hardening had been undone.
+         */
         @Test
-        void testVerifyCode_whenUserNotFound_ReturnError103() {
+        void testVerifyCode_whenUserNotFound_LooksIdenticalToAWrongCode() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
             var request = request(123456);
             BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyCode(request));
-            assertEquals(103, ex.getTransactionCode().getId());
+            assertEquals(
+                    105,
+                    ex.getTransactionCode().getId(),
+                    "an unregistered address must answer exactly as a wrong code does");
         }
 
         @Test
@@ -534,14 +546,29 @@ class DefaultAuthServiceTest {
             return r;
         }
 
+        /**
+         * An unknown address is answered, not refused, and nothing is sent.
+         *
+         * <p>This asserted 103 (USER_NOT_FOUND) back when the endpoint said so, which made
+         * it two things at once: an oracle for which addresses are registered, and — since
+         * a known address does send mail — a way to have somebody else's inbox filled by
+         * anyone who knows it. The reply is now identical either way.
+         *
+         * <p>The silence is half the guarantee, so it is asserted rather than assumed: no
+         * code is issued and no mail leaves for an address with no account. The rate
+         * limiter above this in the service covers the volume; this covers the target.
+         */
         @Test
-        void testSendVerificationEmail_whenUserNotFound_ReturnError103() {
+        void testSendVerificationEmail_whenUserNotFound_SaysTheSameAndSendsNothing() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
             var request = request(true);
-            BusinessException ex =
-                    assertThrows(BusinessException.class, () -> authService.sendVerificationEmail(request));
-            assertEquals(103, ex.getTransactionCode().getId());
+            DefaultMessageResponse response =
+                    assertDoesNotThrow(() -> authService.sendVerificationEmail(request));
+
+            assertNotNull(response);
+            verify(emailSender, never()).send(any(SimpleMailMessage.class));
+            verify(verificationCodeRepository, never()).save(any(VerificationCode.class));
         }
 
         @Test
