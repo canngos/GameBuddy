@@ -22,7 +22,25 @@ public enum Platform {
     PLAYSTATION("PlayStation"),
     XBOX("Xbox"),
     SWITCH("Nintendo Switch"),
-    MOBILE("Mobile");
+    MOBILE("Mobile"),
+
+    /**
+     * Somewhere the five above do not cover. Applies to games, not to people.
+     *
+     * <p>Four catalogue games run on nothing this enum names — Chrono Trigger, Street
+     * Fighter II, Super Mario 64 and Ocarina of Time are SNES, arcade and N64 titles. They
+     * were left untagged at first, which read as "we failed to look this up" when the truth
+     * was "we looked, and the answer is not on the list". The picker treats the two the
+     * same, but the catalogue should not have to lie about which one it means.
+     *
+     * <p>Deliberately absent from the app's own PLATFORMS list, so no one is ever asked
+     * whether they play on "Other". Nothing tagged this way lands in anybody's "on your
+     * platforms" group, which is the correct outcome: a game nobody's console runs sorts
+     * with everything else, and still appears, and is still searchable.
+     *
+     * <p>Last on purpose. The order above is the order the picker renders in.
+     */
+    OTHER("Other");
 
     private final String label;
 

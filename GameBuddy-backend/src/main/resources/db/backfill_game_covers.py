@@ -317,6 +317,15 @@ def main() -> int:
     parser.add_argument(
         "--limit", type=int, default=0, help="stop after N games. 0 means all of them."
     )
+    parser.add_argument(
+        "--rename",
+        action="store_true",
+        help=(
+            "also adopt IGDB's spelling of each title. OFF by default: renaming silently "
+            "desynchronises the trained recommender, which is keyed on names. Requires "
+            "updating gamebuddy_model/catalogue.py and retraining afterwards."
+        ),
+    )
     args = parser.parse_args()
 
     required = [
@@ -354,9 +363,18 @@ def main() -> int:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
+                -- A row needs this script if it is missing either half of what the script
+                -- provides. Selecting on the cover alone was enough while the two were
+                -- always absent together, and stopped being enough the moment 99 covers
+                -- were repaired by SQL from the objects already in R2: those rows then had
+                -- art and still said "seeded for local development" in the picker, and a
+                -- cover-only WHERE walked straight past every one of them.
                 SELECT game_id, game_name
                 FROM gamebuddy.games
-                WHERE game_icon IS NULL OR game_icon = ''
+                WHERE game_icon IS NULL
+                   OR game_icon = ''
+                   OR description IS NULL
+                   OR description LIKE '%seeded for local development'
                 ORDER BY game_name
                 """
             )
@@ -395,7 +413,15 @@ def main() -> int:
             if not args.apply:
                 continue
 
-            stored_name = game_name if game_name in KEEP_OUR_NAME else match.name
+            # --rename is opt-in, so the default keeps every catalogue name exactly as it
+            # is. The paragraph below explains what adopting IGDB's spelling costs when the
+            # model is not retrained with it; making that the default made the cost easy to
+            # pay by accident.
+            stored_name = (
+                match.name
+                if args.rename and game_name not in KEEP_OUR_NAME
+                else game_name
+            )
 
             try:
                 stored = upload_cover(s3, bucket, public_url, game_id, match.cover_url)

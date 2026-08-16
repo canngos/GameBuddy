@@ -125,17 +125,20 @@ def main() -> int:
                 {tag_for[p] for p in platforms_of(match.igdb_id, headers) if p in tag_for}
             )
             if not tags:
+                # Retro, mostly: Chrono Trigger, Street Fighter II, Super Mario 64 and
+                # Ocarina of Time are SNES, arcade and N64 records. OTHER says that outright
+                # instead of leaving a blank that reads as a lookup we never did.
+                tags = ["OTHER"]
                 untaggable.append(game_name)
-                continue
             tagged.append((game_id, game_name, tags))
             print(f"  + {game_name[:44]:46} {','.join(tags)}")
 
         print(f"\n{len(tagged)} taggable, {len(unmatched)} unmatched, "
-              f"{len(untaggable)} on no platform the app knows.")
+              f"{len(untaggable)} tagged OTHER.")
         for name in unmatched:
             print(f"  !  {name}: not identified on IGDB")
         for name in untaggable:
-            print(f"  ~  {name}: no platform the app recognises")
+            print(f"  ~  {name}: runs on nothing the enum names, tagged OTHER")
 
         if not args.apply:
             print("\nDry run — nothing written. Re-run with --apply.")
