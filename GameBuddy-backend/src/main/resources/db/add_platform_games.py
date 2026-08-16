@@ -113,7 +113,7 @@ MIN_FOLLOWS_RECENT = 20
 
 FIELDS = (
     "fields name,summary,cover.image_id,genres.id,genres.name,themes,"
-    "total_rating_count,follows,first_release_date,platforms;"
+    "game_modes,keywords,total_rating_count,follows,first_release_date,platforms;"
 )
 
 
