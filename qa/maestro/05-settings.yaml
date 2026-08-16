@@ -11,7 +11,7 @@
 # Nothing here saves a change. Destructive settings (delete account, password) are asserted
 # on the API side where the result can be checked and rolled back.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 05 settings
 ---
 - runFlow: _login.yaml

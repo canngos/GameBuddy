@@ -14,7 +14,7 @@
 # whichever box still had focus — which is exactly how the first run of this flow put an
 # email address and a password into the same field. See src/ui/TextField.tsx.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 01 onboarding
 ---
 - launchApp:

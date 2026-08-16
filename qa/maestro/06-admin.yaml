@@ -7,7 +7,7 @@
 # It runs against the single staff account bootstrapped from MODERATOR_EMAIL — there is no
 # sign-up flow for it on purpose. Skipped automatically when that variable is empty.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 06 admin
 ---
 - launchApp:

@@ -128,6 +128,21 @@ locally — reinstalling, or signing in on a second device, would defeat a local
 
 ## Android
 
+The package is **`com.findgamebuddy.app`**, and the odd-looking `find` prefix is
+deliberate. `com.gamebuddy.app` was the original choice and it is **already taken on Google
+Play by somebody else** — discovered at app-creation time, when the console refused it.
+Package names are globally unique and permanent once an app exists, so this is not a
+preference that can be revisited later.
+
+It is also the more correct name. Reverse-DNS packages are supposed to mirror a domain you
+control, and `gamebuddy.app` is a domain nobody here owns — the same reason the marketing
+site ended up at `findgamebuddy.com`. Both now agree.
+
+The Play Console app was created 2026-08-16 as *GameBuddy: Find Gamers to Play* (app id
+`4972657633723197721`), free, categorised as an App rather than a Game — Play applies extra
+policy to the Dating category and this is a gaming-partner app, so nothing in the listing
+should invite that classification.
+
 Minimum supported version is **API 24 (Android 7.0)** — that is React Native 0.86's
 floor, from `node_modules/react-native/gradle/libs.versions.toml`. Tested on an
 **API 26 (Android 8.0)** emulator, which is the oldest device this is claimed to work on.
@@ -178,6 +193,18 @@ eas build --platform android --profile lan
 ```
 
 #### google-services.json has to be handed over separately
+
+> **The file's `package_name` has to match `android.package` exactly.** The Gradle plugin
+> matches on that string and stops the build with `No matching client found for package
+> name` when it does not. This bit once, during the rename to `com.findgamebuddy.app` (see
+> *Android* above): the old file was still registered against `com.gamebuddy.app`.
+>
+> Hand-editing the JSON is **not** the fix — the app id and API key inside belong to whichever
+> registration Firebase issued them for. Register the app in the Firebase console under the
+> new package, download the fresh file, and replace *both* copies (repo root and
+> `android/app/`), then re-run the `eas env:set` below so the builder gets it too. Resolved
+> 2026-08-16; current file is project `gamebuddy-a4205`, app id ending `9738c2`, verified by
+> `FirebaseApp initialization successful` in logcat on a running build.
 
 Without that `env:set`, the build fails on the builder:
 
@@ -296,7 +323,7 @@ the right tool once the backend is deployed and on HTTPS.
 When that day comes:
 
 1. **Apple Developer Program — $99/year.** There is no free path to TestFlight.
-2. Create the app in App Store Connect with bundle id `com.gamebuddy.app`.
+2. Create the app in App Store Connect with bundle id `com.findgamebuddy.app`.
 3. `eas build --platform ios --profile production` — EAS builds on cloud macOS, so no Mac
    is required, and it generates and stores the signing certificates.
 4. `eas submit --platform ios --latest`
@@ -304,16 +331,50 @@ When that day comes:
 
 ### Build profiles
 
-`eas.json` defines three:
+`production` is the source of truth and **the other three all `extends` it**, so they cannot
+silently drift from what ships. Each one overrides only what it genuinely needs to.
 
-| Profile | What it is for |
-| --- | --- |
-| `lan` | An APK pointed at this PC's LAN address. Update the IP when your router hands you a new one |
-| `preview` | An internal-distribution APK against whatever `EXPO_PUBLIC_API_URL` the environment supplies |
-| `production` | An `.aab` for the Play Store, and the iOS build TestFlight receives |
+| Profile | What it is for | Differs from `production` by |
+| --- | --- | --- |
+| `production` | The build end users get. `.aab` for Play, and the iOS build TestFlight receives | — |
+| `preview` | The same product, on **your own device**, to confirm the real thing is right before release | APK instead of `.aab` (an `.aab` cannot be sideloaded), internal distribution, own channel |
+| `gate` | The Maestro release gate | + LAN backend |
+| `lan` | Emulator or device, for **UI and flow** work | + LAN backend, **no RevenueCat key** |
 
-The IP in the `lan` profile is a convenience, not configuration — it is your current
-DHCP lease and it will go stale.
+Three deliberate details, each of which has already gone wrong once:
+
+**`preview` overrides nothing but packaging.** It used to hand-copy `production`'s `env` and
+run under a separate `preview` EAS environment, which meant a secret added to `production`
+would quietly be missing from the one build meant to prove production works. It now `extends`
+and shares `environment: production`, so "the same as production" is structural rather than a
+promise someone has to remember to keep.
+
+**`lan` sets `EXPO_PUBLIC_REVENUECAT_API_KEY` to the empty string.** Not an oversight — it is
+how you *un*-inherit. Without it `lan` picks up the real `goog_` key and every throwaway
+UI build starts registering its test accounts as customers in the live RevenueCat project,
+for no benefit: a sideloaded APK cannot transact with Play Billing anyway.
+
+**`gate` keeps the real key on purpose.** Its entire job is catching release-only faults, and
+the RevenueCat termination bug in `QA_FINDINGS.md` is exactly that class — `gate` passed while
+`lan` and `preview` died, precisely because `gate` was the profile without a key. A gate that
+does not carry what production carries is not a gate.
+
+`autoIncrement` is `true` only on `production`. The others switch it off so a throwaway build
+does not burn a number out of the remote `versionCode` counter that Play releases draw from.
+
+**Every profile has its own EAS Update channel**, `production` included. That last one was
+missing until 2026-08-16, which meant shipped builds could not receive an over-the-air update
+at all — `updates.url` was configured in `app.json`, so the plumbing looked complete, but a
+build without a channel subscribes to nothing. Publish to a release with
+`eas update --branch <branch> --channel production`.
+
+The channels are deliberately distinct, so an update pushed to `preview` can never reach a
+store build. Combined with `runtimeVersion.policy: "appVersion"`, an update only reaches
+builds of the *same* app version — so JS-only fixes ship over the air, while anything touching
+native code correctly requires a new version and a new store release.
+
+The IP in `lan` and `gate` is a convenience, not configuration — it is your current DHCP lease
+and it will go stale.
 
 ## Known gaps
 

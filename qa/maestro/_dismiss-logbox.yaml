@@ -30,7 +30,7 @@
 # accessibility label is the level glyph ("!", or a count once several have stacked up),
 # then ", ", then the message. A new kind of warning is covered without editing this file.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 ---
 # The RevenueCat failure is raised while the first authenticated screen is loading, so it
 # can arrive a beat after the deck does.

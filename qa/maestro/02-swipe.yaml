@@ -9,7 +9,7 @@
 # from the same SwipeQuota the API suite asserts against, and it only moves when a swipe
 # was really recorded — so a card that animates away without calling the backend is caught.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 02 swipe
 ---
 - runFlow: _login.yaml

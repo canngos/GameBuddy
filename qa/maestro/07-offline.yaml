@@ -20,7 +20,7 @@
 # so its queries have no react-query cache to fall back on and really do have to hit the
 # network.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 07 offline
 ---
 - runFlow: _login.yaml

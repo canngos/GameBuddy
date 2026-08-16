@@ -24,7 +24,7 @@ and an observation there proves nothing either way — which is exactly the posi
 cd GameBuddy-App
 eas build --profile lan --platform android
 # download the APK from the build page, then
-adb uninstall com.gamebuddy.app     # signatures differ; install-over fails
+adb uninstall com.findgamebuddy.app     # signatures differ; install-over fails
 adb install <the>.apk
 cd ../qa/maestro; .\run.ps1 -ReleaseBuild
 ```

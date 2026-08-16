@@ -8,7 +8,7 @@
 # that the message appears in this list, in the right order, attributed to the right
 # person. That is what this is for.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 03 chat
 ---
 - runFlow: _login.yaml

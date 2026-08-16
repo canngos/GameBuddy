@@ -112,7 +112,7 @@ const CRASHLYTICS_PLUGINS = ['@react-native-firebase/app', '@react-native-fireba
  * the reason was fresh in anyone's mind.
  *
  * To finish it: register an iOS app in the Firebase console under the bundle id
- * `com.gamebuddy.app`, download `GoogleService-Info.plist`, upload it to EAS the same way as
+ * `com.findgamebuddy.app`, download `GoogleService-Info.plist`, upload it to EAS the same way as
  * the Android one, and set `ios.googleServicesFile`. Android-first is the plan, so this is a
  * task for the Apple release rather than a gap in this one.
  */
@@ -129,7 +129,7 @@ module.exports = ({ config }) => {
     console.warn(
       '[crashlytics] iOS has no GoogleService-Info.plist, so crash reporting is being left ' +
         'out of this build. Register an iOS app in the Firebase console for bundle id ' +
-        'com.gamebuddy.app, then set expo.ios.googleServicesFile. See app.config.js.',
+        'com.findgamebuddy.app, then set expo.ios.googleServicesFile. See app.config.js.',
     );
   }
 
