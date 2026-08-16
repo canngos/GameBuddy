@@ -19,6 +19,11 @@ public interface AdminCatalogueMapper {
     @Mapping(target = "isPopular", ignore = true)
     // The inverse side of the join. Populated by gamers liking the game, never on insert.
     @Mapping(target = "gamers", ignore = true)
+    // What a game runs on is a fact IGDB holds, not a judgement an admin makes, so it is
+    // written by the tagging scripts rather than typed into the console. Left empty here
+    // the game still appears in the picker — it sorts below the ones on your platforms
+    // instead of vanishing — so an admin-added game is incomplete, never invisible.
+    @Mapping(target = "platforms", ignore = true)
     Games toEntity(GameRequest request);
 
     @Mapping(target = "id", expression = "java(java.util.UUID.randomUUID())")
