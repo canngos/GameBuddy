@@ -97,6 +97,20 @@ PLATFORM_FAMILIES: dict[str, tuple[str, ...]] = {
 # that the pass does not simply re-run the ratings pass.
 RECENT_YEARS = 3
 
+# The floor the recent pass has to clear, in IGDB follows.
+#
+# Without it the pass is worse than useless on consoles. "Most followed, released recently"
+# sounds like a quality signal and is not one on its own: a new release competes only
+# against other new releases, so on the Switch eShop the top of that list came back as
+# "Primary School: English Grade 1 & 2", "Bubble Shooter: Color Splash" and a dozen more
+# asset flips, which would have gone into the screen every new account picks its games from.
+# Nearly two thirds of every platform's additions were 2025-26 titles nobody follows.
+#
+# Follows rather than ratings because ratings accumulate too slowly to judge a game released
+# this year — which is the entire population this pass looks at. A genuine new hit clears
+# this comfortably; shovelware has single digits.
+MIN_FOLLOWS_RECENT = 20
+
 FIELDS = (
     "fields name,summary,cover.image_id,genres.id,genres.name,themes,"
     "total_rating_count,follows,first_release_date,platforms;"
@@ -150,8 +164,13 @@ def tags_for(game: dict, tag_for: dict[int, str]) -> list[str]:
 
     Sorted and de-duplicated because PS4 and PS5 both collapse to PLAYSTATION, and writing
     that twice would violate the (game_id, platform) primary key and abort the insert.
+
+    Falls back to OTHER rather than to nothing. A game IGDB lists only on the SNES is not a
+    game we failed to look up, and leaving it empty spells those two very differently-fixable
+    situations the same way.
     """
-    return sorted({tag_for[p] for p in (game.get("platforms") or []) if p in tag_for})
+    tags = sorted({tag_for[p] for p in (game.get("platforms") or []) if p in tag_for})
+    return tags or ["OTHER"]
 
 
 def query(headers: dict, where: str, sort: str, limit: int) -> list[dict]:
@@ -194,7 +213,7 @@ def candidates_for(headers: dict, platform_ids: list[int], count: int) -> list[d
     established = query(headers, on_platform, "total_rating_count desc", count * 2)
     recent = query(
         headers,
-        f"{on_platform} & first_release_date > {cutoff}",
+        f"{on_platform} & first_release_date > {cutoff} & follows >= {MIN_FOLLOWS_RECENT}",
         "follows desc",
         count * 2,
     )
