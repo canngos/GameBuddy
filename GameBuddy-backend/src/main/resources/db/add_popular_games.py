@@ -40,6 +40,7 @@ import requests
 IGDB_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 IGDB_GAMES_URL = "https://api.igdb.com/v4/games"
 IGDB_POPULARITY_URL = "https://api.igdb.com/v4/popularity_primitives"
+IGDB_KEYWORDS_URL = "https://api.igdb.com/v4/keywords"
 
 REQUEST_INTERVAL_SECONDS = 0.30
 COVER_SIZE = "t_cover_big"
@@ -58,12 +59,73 @@ EROTIC_THEME = 42
 
 GAME_TYPES = "(0,3,8,9,10,11)"
 
+# The five categories IGDB files under neither genre nor theme.
+#
+# The hand-typed seed used JRPG, MMO, Roguelike, Metroidvania and Battle Royale, and the
+# rules below could not produce any of them — so a JRPG added by this script was filed as
+# RPG and the catalogue ended up speaking two vocabularies at once. Invisible while genre
+# was only a label on a card; a bug the moment genre became a filter, because tapping
+# "JRPG" returned the eight seeded ones and none of the newer ones.
+#
+# IGDB does know all five, just not where the rules were looking:
+#
+#   game_modes  carries MMO (5) and Battle Royale (6) as first-class values.
+#   keywords    carry roguelike, metroidvania and jrpg — community tags rather than
+#               taxonomy, which is exactly why they capture how people describe games.
+#
+# Keyword ids are resolved by name at runtime, for the same reason platform ids are: a
+# hard-coded id that drifts fails silently, and silently means a whole category quietly
+# stops being produced.
+KEYWORD_CATEGORIES: dict[str, str] = {
+    "metroidvania": "Metroidvania",
+    "roguelike": "Roguelike",
+    "roguelite": "Roguelike",
+    "rogue-like": "Roguelike",
+    "jrpg": "JRPG",
+}
+
+# IGDB game_mode id -> category. 5 is Massively Multiplayer Online, 6 is Battle Royale.
+MODE_CATEGORIES: dict[int, str] = {
+    5: "MMO",
+    6: "Battle Royale",
+}
+
+# Filled by load_keyword_categories(). Module-level rather than a parameter so that every
+# existing categorise() call site benefits without changing its signature.
+_KEYWORD_IDS: dict[int, str] = {}
+
+
+def load_keyword_categories(headers: dict) -> dict[int, str]:
+    """Resolve the keyword names above to IGDB ids, once per run."""
+    global _KEYWORD_IDS
+    wanted = sorted(KEYWORD_CATEGORIES)
+    names = ",".join(f'"{name}"' for name in wanted)
+    time.sleep(REQUEST_INTERVAL_SECONDS)
+    response = requests.post(
+        IGDB_KEYWORDS_URL,
+        headers=headers,
+        data=f"fields id,name; where name = ({names}); limit 50;",
+        timeout=25,
+    )
+    response.raise_for_status()
+    _KEYWORD_IDS = {
+        row["id"]: KEYWORD_CATEGORIES[row["name"]]
+        for row in response.json()
+        if row["name"] in KEYWORD_CATEGORIES
+    }
+    found = sorted({c for c in _KEYWORD_IDS.values()})
+    print(f"  keyword categories resolved: {', '.join(found) or 'none'}")
+    return _KEYWORD_IDS
+
+
 # IGDB genre and theme ids to the categories this catalogue already uses.
 #
 # Ordered: the first rule that matches wins, so the specific ones come before the broad.
 # "Horror" and "Survival" are themes rather than genres in IGDB and are checked first
 # because they describe a game better than "Shooter" does when both apply — Resident Evil
 # is a horror game that happens to contain a gun.
+#
+# Reached only after the keyword and game_mode checks above, which are narrower still.
 CATEGORY_RULES: list[tuple[str, str, int]] = [
     ("themes", "Horror", 19),
     ("themes", "Survival", 21),
@@ -136,6 +198,19 @@ def categorise(game: dict) -> str:
     if override:
         return override
 
+    # Most specific first, and these are more specific than any genre IGDB assigns.
+    #
+    # A roguelike is tagged Action and RPG as well, so leaving this until after the genre
+    # rules would file Hades as RPG and never produce the category at all. Same for
+    # Metroidvania, which is Platform + Adventure, and for battle royales, which are
+    # Shooter. The narrower answer is the one somebody scrolling a genre filter wants.
+    for keyword in game.get("keywords") or []:
+        if keyword in _KEYWORD_IDS:
+            return _KEYWORD_IDS[keyword]
+    for mode in game.get("game_modes") or []:
+        if mode in MODE_CATEGORIES:
+            return MODE_CATEGORIES[mode]
+
     genres = {g["id"] for g in (game.get("genres") or [])}
     themes = set(game.get("themes") or [])
     for field, category, ident in CATEGORY_RULES:
@@ -189,7 +264,7 @@ def fetch_games(ids: list[int], headers: dict) -> list[dict]:
             headers=headers,
             data=(
                 "fields name,summary,cover.image_id,genres.id,genres.name,themes,"
-                "total_rating_count,first_release_date; "
+                "game_modes,keywords,total_rating_count,first_release_date; "
                 f"where id = ({','.join(str(i) for i in chunk)}) "
                 f"& version_parent = null & game_type = {GAME_TYPES} "
                 # Every one of these is a reason the entry cannot be shown in the picker:
