@@ -9,10 +9,10 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gamebuddy.app"
+      "bundleIdentifier": "com.findgamebuddy.app"
     },
     "android": {
-      "package": "com.gamebuddy.app",
+      "package": "com.findgamebuddy.app",
       "adaptiveIcon": {
         "backgroundColor": "#0B0B12",
         "foregroundImage": "./assets/android-icon-foreground.png",

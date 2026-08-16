@@ -682,9 +682,17 @@ call `configure` is the only defence available.
 unconditionally rather than under `__DEV__`, so a release build that cannot sell anything
 says so in logcat and Crashlytics.
 
-**Still open, and it needs your account, not code:** a real **public SDK key** from the
-RevenueCat dashboard (the `goog_…` one for Android), set on `production` and `preview`. Open
-tasks #79 (register the SKUs) and #81 (final RevenueCat wiring).
+**Done 2026-08-16 — the real key exists.** Google Play is now connected to RevenueCat (service
+account `play-publisher@project-736aa984-61c3-4516-9cb…`, which RevenueCat validated as *Valid
+credentials* against Play), and the resulting public SDK key `goog_xmTnFlrJ…` is set on
+`production` and `preview`. `lan` and `gate` inherit it through `extends: production`, which
+is a gain rather than an oversight: this finding used to note that `gate` omitted RevenueCat
+and so never exercised that native subsystem. It does now, and a valid `goog_` key cannot
+trigger the termination described above — only a `test_` key in a release build does that.
+
+The local `.env` deliberately keeps the `test_` Test Store key, because debug builds are the
+only place the Test Store is allowed to run, and that is where the six sandbox products
+(`gamebuddy.gold.*`, `gamebuddy.coins.*`) can be exercised.
 
 Worth knowing before that key is tested: Google Play Billing only answers a build the Play
 Store recognises. A sideloaded `lan` APK cannot open a purchase sheet even with a correct key

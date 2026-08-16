@@ -11,7 +11,7 @@
 # FRAMES AND BANNERS, the Frames/Banners switch, the coin shop — is mounted only while
 # Shop is selected, so it has to be selected before any of it can be asserted.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 name: 04 market
 ---
 - runFlow: _login.yaml

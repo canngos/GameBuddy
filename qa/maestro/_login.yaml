@@ -6,7 +6,7 @@
 # Called with `runFlow: _login.yaml`. The leading underscore keeps it out of
 # `maestro test .` — it is a step, not a test.
 
-appId: com.gamebuddy.app
+appId: com.findgamebuddy.app
 ---
 - launchApp:
     clearState: true
