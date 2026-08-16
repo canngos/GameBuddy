@@ -5,7 +5,14 @@
 **/.env-args
 
 secret/
-tools/
+
+# Scratch scripts at the repository root only. Anchored with a leading slash on purpose:
+# a bare `tools/` matches a directory of that name at ANY depth, which silently swallowed
+# GameBuddy-Model/tools/. That directory holds retrain.py, which the model-retrain image's
+# ENTRYPOINT runs — so the image built and then crash-looped in production with
+# "can't open file '/app/tools/retrain.py'". seed_local_gamers.py beside it survived only
+# because it was committed before this rule existed.
+/tools/
 
 # Contents, not the directory itself. Git cannot re-include a file whose *parent* is
 # excluded, so a plain `documentation/` would make the negation below impossible.
