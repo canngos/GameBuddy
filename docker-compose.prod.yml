@@ -204,9 +204,21 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env}
 
-      # Real mail. MAIL_MODE is deliberately NOT set — the default is smtp, and the only
-      # value that changes it is the exact word "log", which would let anyone reading the
-      # logs verify any address they liked.
+      # Real mail. Set EXPLICITLY, and it has to be.
+      #
+      # This previously said MAIL_MODE was "deliberately not set, the default is smtp".
+      # Both halves were wrong, and together they meant production sent no mail at all:
+      #   - application.yml reads `mode: ${MAIL_MODE:log}`, so the default is *log*. The
+      #     `:smtp` fallback in MailConfig is unreachable, because application.yml always
+      #     supplies a value.
+      #   - the base compose file sets MAIL_MODE: log for local work, and compose MERGES
+      #     environment maps rather than replacing them. Not setting it here inherited it.
+      # `docker compose config` on the merged files resolved to MAIL_MODE: log.
+      #
+      # The effect was silent: registration would appear to work, the verification code
+      # would go to the container log instead of the user, and — as application.yml warns —
+      # anyone who could read the logs could verify any address they liked.
+      MAIL_MODE: smtp
       MAIL_HOST: ${MAIL_HOST:?set MAIL_HOST in .env}
       MAIL_PORT: ${MAIL_PORT:-587}
       SMTP_EMAIL: ${SMTP_EMAIL:?set SMTP_EMAIL in .env}
