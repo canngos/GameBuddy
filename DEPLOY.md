@@ -11,11 +11,27 @@ recoverable.
 
 ## 1. The server
 
-```bash
-# Hetzner Cloud console: CX23, Ubuntu 24.04, your SSH key, Nuremberg/Helsinki/Falkenstein.
-# Add the server to a Cloud Firewall (below) BEFORE it first boots if you can.
+**Provisioned 2026-08-16.** This section is now a record of what exists, not a shopping list.
 
-ssh root@<ip>
+| | |
+| --- | --- |
+| Name | `gamebuddy-prod` |
+| Type | CX23 — 2 vCPU (Intel/AMD), 3819 MB RAM, 38 GB disk, 20 TB traffic |
+| Location | **Falkenstein** (`fsn1`, eu-central) |
+| Image | Ubuntu 24.04.4 LTS, x86_64 |
+| IPv4 | `REDACTED_SERVER_IP` |
+| SSH key | `~/.ssh/gamebuddy_hetzner` (ed25519, no passphrase, `SHA256:REDACTED…`) |
+| Cost | €7.52/mo incl. VAT (€6.89 server + €0.63 IPv4) |
+
+**Why Falkenstein and not Helsinki.** The operator is in Finland, so Helsinki is the tempting
+pick, but the users are not: Europe broadly, Turkey and the US. Germany is ~20–40 ms better to
+Central/Western Europe and Turkey and ~20 ms better to the US, and loses only to the Nordics.
+Germany is also the better-peered transit hub. Living somewhere is a reason to *test* from
+there, not to host there. (CX23 is EU-only in any case — the US and Singapore sites offer CPX
+and CCX, not CX, so they were never selectable.)
+
+```bash
+ssh -i ~/.ssh/gamebuddy_hetzner root@REDACTED_SERVER_IP
 adduser gamebuddy && usermod -aG sudo gamebuddy
 rsync --archive --chown=gamebuddy:gamebuddy ~/.ssh /home/gamebuddy/
 
