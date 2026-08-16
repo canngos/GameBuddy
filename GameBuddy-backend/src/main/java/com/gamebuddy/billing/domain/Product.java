@@ -81,7 +81,29 @@ public enum Product {
         return tier != null;
     }
 
+    /**
+     * Finds the product a store reported, tolerating Google's base-plan suffix.
+     *
+     * <p>Google Play's newer subscription model splits a subscription into a product and one
+     * or more <em>base plans</em>, and RevenueCat identifies the pair as
+     * {@code <productId>:<basePlanId>} — so a Gold renewal arrives at the webhook as
+     * {@code gamebuddy.gold.monthly:monthly}, not {@code gamebuddy.gold.monthly}. An exact
+     * match therefore found nothing and {@link com.gamebuddy.billing.domain.RevenueCatService}
+     * logged "unknown product" while the buyer had already been charged — precisely the
+     * failure the comment on {@code GOLD_WEEKLY} above describes.
+     *
+     * <p>The base plan is a Google-only billing arrangement, not a different thing to sell:
+     * every base plan of {@code gamebuddy.gold.monthly} grants the same tier for the same
+     * period. So the suffix is dropped rather than enumerated, which also means adding a base
+     * plan in the Play Console (a price experiment, say) cannot break granting. Apple sends no
+     * suffix and none of our ids contain a colon, so ids without one are unaffected.
+     */
     public static Optional<Product> byStoreId(String storeId) {
-        return Arrays.stream(values()).filter(p -> p.storeId.equals(storeId)).findFirst();
+        if (storeId == null) {
+            return Optional.empty();
+        }
+        int suffix = storeId.indexOf(':');
+        String productId = suffix < 0 ? storeId : storeId.substring(0, suffix);
+        return Arrays.stream(values()).filter(p -> p.storeId.equals(productId)).findFirst();
     }
 }

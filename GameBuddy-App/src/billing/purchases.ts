@@ -1,4 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
+import type { PRODUCT_CATEGORY } from 'react-native-purchases';
 import type { Subscription } from '../api/types';
 
 /**
@@ -52,6 +53,21 @@ const STORE_PREFIX = Platform.select({ android: 'goog_', ios: 'appl_', default: 
 
 const RAW_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY ?? '';
 
+/**
+ * What a build writes instead of a key when it is meant not to sell anything.
+ *
+ * The `lan` EAS profile inherits its env from `production`, and `extends` deep-merges rather
+ * than replaces — so the only way to drop an inherited value is to overwrite it. Empty string
+ * would be the obvious way to say "no key", but EAS rejects it: `eas.json is not valid —
+ * "build.lan.env.EXPO_PUBLIC_REVENUECAT_API_KEY" is not allowed to be empty`, and it fails
+ * validation of the whole file, so one empty value blocks every build including `production`.
+ *
+ * Hence a word rather than nothing. It is refused by `keyIsUsable` like any other malformed
+ * key; naming it here only lets the log below tell a deliberate opt-out apart from a build
+ * that lost its key by accident, which are the same silence but very different problems.
+ */
+const KEY_DISABLED = 'none';
+
 function keyIsUsable(key: string): boolean {
   if (STORE_PREFIX === '') return false; // web, where there is no store to reach
   if (key.startsWith(STORE_PREFIX)) return true; // a real store key, always fine
@@ -70,15 +86,21 @@ const API_KEY = keyIsUsable(RAW_API_KEY) ? RAW_API_KEY : '';
  * has to say so somewhere a release build is actually read: logcat and Crashlytics.
  */
 if (API_KEY === '' && Platform.OS !== 'web') {
-  console.error(
-    RAW_API_KEY === ''
-      ? '[billing] no EXPO_PUBLIC_REVENUECAT_API_KEY in this build — purchases are disabled.'
-      : RAW_API_KEY.startsWith('test_')
-        ? '[billing] a RevenueCat Test Store key cannot be used in a release build — RevenueCat ' +
-          'closes the app rather than allow it. Purchases are disabled in this build instead.'
-        : `[billing] ignoring EXPO_PUBLIC_REVENUECAT_API_KEY: expected it to start with "${STORE_PREFIX}". ` +
-          'Purchases are disabled in this build rather than closing it.',
-  );
+  if (RAW_API_KEY === KEY_DISABLED) {
+    // Asked for. Said once so the absence of a paywall is explainable, but not at `error`:
+    // shouting about a build behaving exactly as configured is how real errors get skimmed.
+    console.info('[billing] purchases are switched off in this build (LAN/testing profile).');
+  } else {
+    console.error(
+      RAW_API_KEY === ''
+        ? '[billing] no EXPO_PUBLIC_REVENUECAT_API_KEY in this build — purchases are disabled.'
+        : RAW_API_KEY.startsWith('test_')
+          ? '[billing] a RevenueCat Test Store key cannot be used in a release build — RevenueCat ' +
+            'closes the app rather than allow it. Purchases are disabled in this build instead.'
+          : `[billing] ignoring EXPO_PUBLIC_REVENUECAT_API_KEY: expected it to start with "${STORE_PREFIX}". ` +
+            'Purchases are disabled in this build rather than closing it.',
+    );
+  }
 }
 
 type PurchasesSdk = typeof import('react-native-purchases').default;
@@ -192,6 +214,10 @@ export class PurchaseCancelledError extends Error {
  * layer of indirection that would have to agree with it. Offerings become worth it when
  * prices need localising or plans need changing without an app release — see the note on
  * `GOLD_PLANS`.
+ *
+ * Fetching by id is not quite as literal as it sounds on Google Play, and both wrinkles are
+ * handled below: the category has to be named, and a subscription comes back under
+ * `<productId>:<basePlanId>` rather than the id that was asked for.
  */
 export async function purchase(productId: string): Promise<void> {
   const Purchases = sdk();
@@ -204,8 +230,36 @@ export async function purchase(productId: string): Promise<void> {
     throw new StoreUnavailableError('No RevenueCat key is configured in this build.');
   }
 
-  const products = await Purchases.getProducts([productId]);
-  const product = products.find((candidate) => candidate.identifier === productId);
+  // The category has to be stated. `getProducts` defaults to SUBSCRIPTION, so asking for a
+  // coin pack without it queries the wrong half of the store and comes back empty — the
+  // paywall would have reported "not available right now" for all three packs while Play was
+  // selling them perfectly well. Gold is a subscription; coin packs are not.
+  //
+  // The split is read off the id prefix, which holds for all six ids in `Product.java` but is
+  // a convention rather than a guarantee: a subscription added later under some other prefix
+  // would be looked up as a one-time product and silently come back empty. Anything sold as a
+  // recurring plan has to be named here too.
+  //
+  // The literals are written out rather than referenced through the `PRODUCT_CATEGORY` enum
+  // because naming an enum *value* imports the package, which is exactly what the lazy load
+  // above exists to avoid; `PRODUCT_CATEGORY` is imported as a type only, so this stays
+  // checked against the SDK while compiling to two plain strings.
+  const category: PRODUCT_CATEGORY = productId.startsWith('gamebuddy.gold.')
+    ? ('SUBSCRIPTION' as PRODUCT_CATEGORY)
+    : ('NON_SUBSCRIPTION' as PRODUCT_CATEGORY);
+
+  const products = await Purchases.getProducts([productId], category);
+
+  // Google Play splits a subscription into a product and one or more *base plans*, and
+  // RevenueCat names the pair `<productId>:<basePlanId>` — so asking for
+  // `gamebuddy.gold.monthly` returns something whose identifier is
+  // `gamebuddy.gold.monthly:monthly`. An `===` test therefore missed every Gold plan and
+  // threw StoreUnavailableError before the store sheet ever opened. Exact match is still
+  // tried first, because Apple and the coin packs return the bare id.
+  const product =
+    products.find((candidate) => candidate.identifier === productId) ??
+    products.find((candidate) => candidate.identifier.startsWith(`${productId}:`));
+
   if (!product) {
     // The id is not sold on this store. Ours to fix — the plan list and the store
     // disagree — so it is logged loudly rather than shown as a payment failure.
