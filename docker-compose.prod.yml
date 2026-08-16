@@ -118,7 +118,15 @@ services:
     mem_limit: 128m
     logging: *logging
 
+  # The three images GameBuddy owns are PULLED here, never built. `image:` alongside the
+  # base file's `build:` is what makes that work: `docker compose pull` fetches these tags
+  # from GHCR, while `build` (which this box should not run) would tag its output the same.
+  # DEPLOY.md §5 has the reasoning — ~7.5 GB of images against a 40 GB disk.
+  #
+  # GAMEBUDDY_TAG pins a specific build for a rollback: set it to the long commit SHA that
+  # CI tagged, e.g. GAMEBUDDY_TAG=sha-<40 hex>. Unset means `latest`.
   model:
+    image: ghcr.io/canngos/gamebuddy-model:${GAMEBUDDY_TAG:-latest}
     restart: unless-stopped
     ports: !reset []
     environment:
@@ -135,6 +143,7 @@ services:
     logging: *logging
 
   model-retrain:
+    image: ghcr.io/canngos/gamebuddy-model-retrain:${GAMEBUDDY_TAG:-latest}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${DB_USER:-gamebuddy}:${DB_PASSWORD:?set DB_PASSWORD in .env}@postgres:5432/${DB_NAME:-gamebuddy}
@@ -158,6 +167,7 @@ services:
     logging: *logging
 
   backend:
+    image: ghcr.io/canngos/gamebuddy-backend:${GAMEBUDDY_TAG:-latest}
     restart: unless-stopped
     # Not published. Caddy reaches it as `backend:8080` over the compose network and is
     # the only thing that can. Publishing 8080 here would let anyone bypass TLS by asking
