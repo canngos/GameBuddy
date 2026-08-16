@@ -1,19 +1,33 @@
-# Pinned to a lower bound rather than left open: an unpinned scikit-learn means a rebuilt
-# image can silently change what the recommender returns, and unpickling an artefact
-# written by a different version is undefined behaviour that usually surfaces as a wrong
-# answer rather than an error.
+# The service tier is range-pinned; the pickle tier is pinned exactly.
+#
+# The artefact is a pickle of fitted scikit-learn estimators, so the version that writes
+# it and the version that reads it have to agree. Unpickling across versions is undefined
+# behaviour, and the way it usually surfaces is not an exception — it is a model that
+# loads, answers every request, and ranks wrongly. A range for the three libraries whose
+# objects are inside the pickle is not a pin at all: `pip install` a month apart produces
+# two different resolutions and nothing warns you. So they are `==`, and
+# `gamebuddy_model.version` stamps what was used into the artefact so the API can check
+# at load time rather than leaving it to be noticed.
+#
+# Raising these is a deliberate act: bump the version, retrain, redeploy the artefact with
+# the image. Do not bump one without the other.
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.32,<1.0
 pydantic>=2.9,<3.0
-numpy>=2.0,<3.0
 pandas>=2.2,<4.0
-scikit-learn>=1.5,<2.0
-scipy>=1.14,<2.0
+
+numpy==2.4.1
+scikit-learn==1.9.0
+scipy==1.18.0
 
 # nbformat and nbconvert are gone: they existed only so an HTTP endpoint could execute a
 # Jupyter notebook in-process. Training is a batch job now.
-# SQLAlchemy and psycopg2 are gone with them — nothing in the service talks to the
-# database; it serves a pre-built artefact.
+#
+# psycopg is deliberately NOT here. `python -m gamebuddy_model export` needs it, but the
+# serving container never talks to Postgres — it loads a pickle — and shipping a database
+# driver plus credentials handling into an image that has no use for either is avoidable
+# surface. It lives in requirements-tools.txt, and export.py imports it inside the
+# function so the package stays importable without it.
 
 # --- image moderation ------------------------------------------------------
 # Nothing an account uploads is shown to another account until it has been screened, and

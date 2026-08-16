@@ -43,6 +43,7 @@ from sklearn.decomposition import TruncatedSVD
 from sklearn.metrics import silhouette_score
 
 from .features import FeatureSpace, fit_feature_space, transform
+from .version import BuildInfo
 
 
 @dataclass
@@ -54,6 +55,12 @@ class TrainingReport:
     chosen_k: int
     silhouette_by_k: dict[int, float] = field(default_factory=dict)
     cluster_sizes: list[int] = field(default_factory=list)
+
+    #: Which library versions built this artefact. Defaulted rather than required so an
+    #: artefact pickled before this field existed still unpickles — it just reports the
+    #: loading environment instead of the training one, which is the honest answer when
+    #: the truth was never recorded.
+    build: BuildInfo = field(default_factory=BuildInfo)
 
 
 @dataclass
@@ -71,14 +78,52 @@ class Recommender:
     #: until there is one. See ``fit_desirability``.
     desirability: np.ndarray | None = None
 
-    #: How much weight the desirability prior gets against taste similarity. Swept against
-    #: the match graph: 0 gives P@10 0.033, 0.15 gives 0.057, and by 3.0 it has decayed to
-    #: 0.048 — which is the popularity baseline's score, i.e. taste has been drowned out
-    #: entirely. The prior is meant to break ties among plausible candidates, not to pick
-    #: them, and this is deliberately at the low end. Pushing popular profiles harder is
-    #: also self-reinforcing in a live product: the more they are shown, the more liked
-    #: they get, the more they are shown.
-    desirability_weight: float = 0.15
+    #: (n,) bool. True for rows that may be *learned from* but never *returned* — the
+    #: synthetic seed accounts, once real users arrive.
+    #:
+    #: The distinction is the whole point. A seed profile still shapes the IDF weights, the
+    #: SVD components, the cluster centroids and the population mean of the desirability
+    #: prior; with a thousand real users, a feature space fitted on twenty-one thousand
+    #: profiles is far steadier than one fitted on the first thousand signups. What it must
+    #: not do is appear in anyone's deck, because it will never answer a message.
+    #:
+    #: This cannot be done by filtering the response instead. ``/predict`` returns the top
+    #: 150 of the whole artefact, and when 95% of the artefact is seed accounts, so is the
+    #: top 150 — measured on the live database it was 150 out of 150. Discarding them
+    #: afterwards leaves an empty deck rather than a short one, and the few real users who
+    #: did survive would be whoever happened to crack the global top 150 rather than the
+    #: best real matches. The exclusion has to happen before the cut, which is here.
+    hidden: np.ndarray | None = field(default=None, repr=False)
+
+    #: Whether to act on ``hidden``. Serve-time rather than train-time so visibility is a
+    #: restart and not a retrain, and so it is reversible the same way: during development
+    #: the seed accounts *are* the product and must be served, at launch they must not be.
+    #: The API sets this from ``HIDE_SEED_ACCOUNTS``.
+    hide_seed_accounts: bool = False
+
+    #: How much weight the desirability prior gets, in units of the candidate pool's own
+    #: spread of taste scores — see ``_score``. Swept against the held-out match graph,
+    #: reading three things together, because precision alone picks the wrong value:
+    #:
+    #:     weight     0.00   0.25   0.50   1.00   1.50   2.50
+    #:     lift        3.8    4.6    6.1    6.8    6.8    6.9
+    #:     coverage   0.998  0.987  0.890  0.510  0.332  0.207
+    #:     on-taste   19/20  20/20  20/20  17/20  --     14/20
+    #:
+    #: ``on-taste`` is the qualitative check: ask the model for cosy life-sim players and
+    #: count how many of the twenty it returns actually have a cosy game on their profile.
+    #:
+    #: 0.5 is the settled value. It takes 88% of the available accuracy while still
+    #: surfacing nine gamers in ten and returning a deck that visibly matches what was
+    #: asked for. Past 1.0 the last 12% of precision costs a third of the taste coherence
+    #: and half the population — the ranking is converging on the popularity baseline,
+    #: which scores respectably on precision while showing the same fifty profiles to
+    #: everybody, and which is a dead product for the other nineteen thousand.
+    #:
+    #: The prior is meant to break ties among plausible candidates, not to pick them.
+    #: Pushing popular profiles harder is also self-reinforcing in a live product: the
+    #: more they are shown, the more liked they get, the more they are shown.
+    desirability_weight: float = 0.5
 
     _index_of: dict[str, int] = field(default_factory=dict, repr=False)
     _unit: np.ndarray = field(default_factory=lambda: np.empty(0), repr=False)
@@ -97,6 +142,7 @@ class Recommender:
         top_n: int = 100,
         *,
         exclude: Iterable[str] | None = None,
+        include: Iterable[str] | None = None,
         restrict_to_cluster: bool = True,
     ) -> list[str]:
         """Ranks other gamers by taste similarity, most similar first.
@@ -109,6 +155,11 @@ class Recommender:
         feed goes empty and stays empty. Excluding before the cut instead means the ranking
         keeps descending into candidates the gamer has not seen.
 
+        ``include`` is the opposite question and answers a different caller: the whole set
+        of gamers who satisfy a filter, which only the backend can evaluate because this
+        service knows nothing about countries, activity or the like. See ``_candidates``
+        for why it exists in this direction rather than as a longer exclusion list.
+
         Returns an empty list for an unknown gamer rather than raising. The original
         indexed straight into the pickled frame, so anyone who had completed onboarding
         since the last training run got a KeyError and the endpoint answered 500 — which
@@ -120,14 +171,12 @@ class Recommender:
 
         blocked = self._excluded(exclude, idx)
         candidates = self._candidates(
-            self.labels[idx] if restrict_to_cluster else None, top_n, blocked
+            self.labels[idx] if restrict_to_cluster else None,
+            top_n,
+            blocked,
+            self._allowed(include),
         )
-        if candidates.size == 0:
-            return []
-
-        scores = self._score(candidates, self._unit[idx])
-        order = np.argsort(-scores)[:top_n]
-        return [self.user_ids[int(candidates[i])] for i in order]
+        return self._top(candidates, self._unit[idx], top_n)
 
     def similar_to_profile(
         self,
@@ -135,14 +184,22 @@ class Recommender:
         keywords: list[str],
         top_n: int = 100,
         *,
+        platforms: list[str] | None = None,
         exclude: Iterable[str] | None = None,
+        include: Iterable[str] | None = None,
     ) -> list[str]:
         """Ranks for a gamer who is not in the trained model yet.
 
         This is the cold-start path: a gamer who has just finished onboarding can be
         served immediately from their profile alone, without waiting for a retrain.
+
+        ``platforms`` is keyword-only and optional so an older caller that passes just
+        games and keywords keeps working — it simply ranks without the platform block
+        rather than failing. ``include`` behaves as it does in ``similar_to``, and matters
+        just as much here: a brand-new Gold subscriber filtering their first deck is served
+        by this path, not by the trained one.
         """
-        vector = transform(self.space, [games], [keywords])
+        vector = transform(self.space, [games], [keywords], [platforms or []])
         if vector.nnz == 0:
             return []
 
@@ -151,15 +208,28 @@ class Recommender:
         unit = (reduced / norm).ravel()
 
         cluster = int(self.kmeans.predict(reduced)[0])
-        candidates = self._candidates(cluster, top_n, self._excluded(exclude, None))
+        candidates = self._candidates(
+            cluster, top_n, self._excluded(exclude, None), self._allowed(include)
+        )
+        return self._top(candidates, unit, top_n)
+
+    # -- internals --------------------------------------------------------
+
+    def _top(self, candidates: np.ndarray, unit: np.ndarray, top_n: int) -> list[str]:
+        """Scores a candidate pool and returns the best ``top_n`` ids, best first."""
         if candidates.size == 0:
             return []
 
         scores = self._score(candidates, unit)
-        order = np.argsort(-scores)[:top_n]
+        # argpartition first: the pool is the whole population whenever a cluster was too
+        # small to fill the page, and a full sort of it to take the first hundred is work
+        # nobody asked for.
+        if len(scores) > top_n:
+            top = np.argpartition(-scores, top_n)[:top_n]
+            order = top[np.argsort(-scores[top])]
+        else:
+            order = np.argsort(-scores)
         return [self.user_ids[int(candidates[i])] for i in order]
-
-    # -- internals --------------------------------------------------------
 
     def _excluded(self, exclude: Iterable[str] | None, idx: int | None) -> set[int]:
         """Maps ids to row indices, dropping ids the model has never seen.
@@ -174,10 +244,65 @@ class Recommender:
                 blocked.add(row)
         return blocked
 
-    def _candidates(self, cluster: int | None, top_n: int, excluded: set[int]) -> np.ndarray:
+    def _allowed(self, include: Iterable[str] | None) -> set[int] | None:
+        """Maps an inclusion list to row indices, or ``None`` for "no restriction".
+
+        ``None`` and the empty set mean opposite things and must never be conflated:
+        ``None`` is "the caller is not filtering", the empty set is "the caller filtered and
+        nobody qualifies". Collapsing them would answer a filter that matches nobody with an
+        unfiltered deck, which is a worse failure than the one this parameter exists to fix
+        — the gamer asked for people online in their country and got a page of people who
+        are neither.
+
+        Ids this artefact has never seen are dropped, as ``_excluded`` also does, but the
+        asymmetry is worth naming. An unknown id in ``exclude`` is harmless; an unknown id in
+        ``include`` silently narrows the pool. That is still correct — nothing here can rank
+        a row it does not have — but it means a stale artefact serves a *shorter* filtered
+        deck rather than a wrong one, and the fix is a retrain, not a code change.
+        """
+        if include is None:
+            return None
+        allowed: set[int] = set()
+        for user_id in include:
+            row = self._index_of.get(user_id)
+            if row is not None:
+                allowed.add(row)
+        return allowed
+
+    def _candidates(
+        self,
+        cluster: int | None,
+        top_n: int,
+        excluded: set[int],
+        allowed: set[int] | None = None,
+    ) -> np.ndarray:
+        """The pool to score, after every restriction that applies before the cut.
+
+        ``allowed`` is the eligible set for a narrowed feed, and it is expressed this way
+        round on purpose. The backend used to send the complement — everyone the filter ruled
+        *out* — which grows with the population rather than with the answer, and above ten
+        thousand entries the request was refused outright and the caller was told the
+        recommender was unavailable.
+
+        Both directions have a size ceiling. What makes this one right is *when* it is
+        reached: an exclusion list is longest when the filter is most narrowing, which is
+        exactly when the caller cannot recover by filtering the response instead. An
+        inclusion list is longest when the filter barely narrows anything — and then the
+        caller dropping it and post-filtering the ranking costs almost nothing, because
+        almost everyone qualifies. So the degraded path is only ever taken in the case where
+        degrading is harmless.
+        """
         keep = np.ones(len(self.user_ids), dtype=bool)
         if excluded:
             keep[list(excluded)] = False
+        if allowed is not None:
+            eligible = np.zeros(len(self.user_ids), dtype=bool)
+            if allowed:
+                eligible[list(allowed)] = True
+            keep &= eligible
+        if self.hide_seed_accounts and self.hidden is not None:
+            # Before the cut, not after: see the note on `hidden`.
+            keep &= ~self.hidden
 
         everyone = np.flatnonzero(keep)
         if cluster is None:
@@ -187,12 +312,37 @@ class Recommender:
         # A cluster can be smaller than the page we want to fill — and once exclusions are
         # applied it shrinks further, which is exactly the state a heavy swiper ends up in.
         # Widening to the whole population beats returning three people or none.
+        #
+        # This rule carries the inclusion case rather than needing one of its own: an
+        # eligible set is spread across every cluster, so the caller's own cluster
+        # intersected with it is usually far too small to fill a page, and this widens past
+        # it automatically. `everyone` is already masked by `allowed`, so widening never
+        # reaches somebody the filter excluded — it only stops the *cluster* narrowing a
+        # deck that the filter has already narrowed.
         return pool if len(pool) >= top_n else everyone
 
     def _score(self, candidates: np.ndarray, unit: np.ndarray) -> np.ndarray:
+        """Taste similarity, nudged by the popularity prior.
+
+        The nudge is scaled by the **spread of taste scores in this candidate pool**,
+        which is what makes it a tie-breaker rather than a second opinion. The prior is
+        standardised to unit variance, so adding it raw meant a fixed-size shove against a
+        similarity whose spread varies from pool to pool — and where the pool was tightly
+        clustered, that shove was large enough to reorder it completely. Asked for cosy
+        life-sim players, the model returned a battle-royale player and an MMO player
+        ahead of five gamers with Stardew Valley and Animal Crossing on their profiles,
+        purely because they were more liked. That is not a tie being broken, and it is the
+        difference between a feed that looks like it understood you and one that looks
+        random.
+
+        Scaling by the spread means the prior decides only when taste has no strong
+        opinion. Where one candidate is a clearly better fit, no amount of popularity
+        overturns them.
+        """
         scores = self._unit[candidates] @ unit
         if self.desirability is not None:
-            scores = scores + self.desirability_weight * self.desirability[candidates]
+            spread = float(scores.std())
+            scores = scores + self.desirability_weight * spread * self.desirability[candidates]
         return scores
 
     def _reduce(self, vectors: csr_matrix) -> np.ndarray:
@@ -297,12 +447,15 @@ def train(
     user_ids: list[str],
     games_per_gamer: list[list[str]],
     keywords_per_gamer: list[list[str]],
+    platforms_per_gamer: list[list[str]] | None = None,
     *,
+    hidden: list[bool] | None = None,
     candidate_k: tuple[int, ...] = (4, 6, 8, 10, 12, 16, 20, 24),
     n_components: int | None = 16,
     variance_target: float = 0.80,
     max_components: int = 128,
     keyword_weight: float = 1.0,
+    platform_weight: float = 1.0,
     random_state: int = 20260801,
     silhouette_sample: int = 3000,
 ) -> Recommender:
@@ -317,7 +470,13 @@ def train(
     keeps components that describe *how much gamers differ*, not *how they differ in ways
     that predict a match*.
     """
-    space, vectors = fit_feature_space(games_per_gamer, keywords_per_gamer, keyword_weight=keyword_weight)
+    space, vectors = fit_feature_space(
+        games_per_gamer,
+        keywords_per_gamer,
+        platforms_per_gamer,
+        keyword_weight=keyword_weight,
+        platform_weight=platform_weight,
+    )
 
     # TruncatedSVD rather than PCA: it works on sparse matrices without densifying them,
     # which for a few thousand gamers across several hundred games is the difference
@@ -397,4 +556,7 @@ def train(
         reduced=reduced,
         labels=best_labels,
         report=report,
+        # Recorded whether or not it will be acted on, so that turning seed accounts
+        # invisible is an environment variable and a restart rather than a retrain.
+        hidden=np.asarray(hidden, dtype=bool) if hidden is not None else None,
     )

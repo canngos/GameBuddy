@@ -26,12 +26,25 @@ from __future__ import annotations
 
 import csv
 import uuid
+from collections import Counter
 from pathlib import Path
 
 from .catalogue import ALL_GAMES, ALL_KEYWORDS
 from .population import Population
 
 BOT_EMAIL_DOMAIN = "bot.gamebuddy.invalid"
+
+
+def is_seed_account(email: str | None) -> bool:
+    """Whether an address belongs to a generated account rather than a person.
+
+    The single definition of that question. It is asked in three places that must agree —
+    the exporter deciding what to train on, the trainer deciding what may be recommended,
+    and the SQL that deletes the seed — and a mismatch between any two of them is silent:
+    accounts that are trained on but never served, or served but never trained, or left
+    behind by a cleanup that believed it had removed everything.
+    """
+    return bool(email) and email.lower().endswith("@" + BOT_EMAIL_DOMAIN)
 
 #: Deliberately not a bcrypt hash. Spring Security's BCryptPasswordEncoder rejects any
 #: string that does not start with $2a/$2b/$2y, so no password can ever match this.
@@ -78,7 +91,14 @@ def write_sql(population: Population, path: Path | str, *, schema: str = "schtra
             "    user_id VARCHAR(255) PRIMARY KEY, username VARCHAR(255) UNIQUE,",
             "    email VARCHAR(255) UNIQUE NOT NULL, age INTEGER, country VARCHAR(255),",
             "    gender VARCHAR(255), pwd VARCHAR(255), is_blocked BOOLEAN DEFAULT FALSE,",
-            "    coin INTEGER DEFAULT 0, role VARCHAR(32) DEFAULT 'USER', version BIGINT DEFAULT 0);",
+            "    coin INTEGER DEFAULT 0, role VARCHAR(32) DEFAULT 'USER',",
+            "    last_active_at TIMESTAMPTZ, version BIGINT DEFAULT 0);",
+            # Column named user_id, matching gamebuddy.gamer_platform in the live schema —
+            # the join tables either side of it use gamer_id, and getting this wrong is
+            # only discovered when the seed is pointed at schauth.
+            f"CREATE TABLE IF NOT EXISTS {schema}.gamer_platform (",
+            f"    user_id VARCHAR(255) REFERENCES {schema}.gamer(user_id) ON DELETE CASCADE,",
+            "    platform VARCHAR(16) NOT NULL, PRIMARY KEY (user_id, platform));",
             f"CREATE TABLE IF NOT EXISTS {schema}.gamer_games_join (",
             f"    gamer_id VARCHAR(255) REFERENCES {schema}.gamer(user_id) ON DELETE CASCADE,",
             f"    game_id VARCHAR(255) REFERENCES {schema}.games(game_id) ON DELETE CASCADE,",
@@ -98,8 +118,11 @@ def write_sql(population: Population, path: Path | str, *, schema: str = "schtra
     game_ids = {name: _stable_uuid("game", name) for name, _ in ALL_GAMES}
     keyword_ids = {kw: _stable_uuid("keyword", kw) for kw in ALL_KEYWORDS}
 
-    played = {g for gamer in population.gamers for g in gamer.games}
-    popular = {name for name in played if sum(1 for x in population.gamers if name in x.games) > len(population.gamers) * 0.08}
+    # One pass rather than a scan of every gamer for every title: the nested version was
+    # quadratic and turned into a visible stall once populations reached five figures.
+    plays = Counter(name for gamer in population.gamers for name in gamer.games)
+    threshold = len(population.gamers) * 0.08
+    popular = {name for name, count in plays.items() if count > threshold}
 
     lines.append("-- Games")
     for name, category in ALL_GAMES:
@@ -119,13 +142,17 @@ def write_sql(population: Population, path: Path | str, *, schema: str = "schtra
     # -- gamers ------------------------------------------------------------
     lines += ["", "-- Synthetic gamers"]
     for gamer in population.gamers:
+        # Relative to NOW() rather than a baked timestamp, so a seed loaded next month
+        # still has people who look recently active — the product's "online now" filter
+        # reads a 15-minute window and an absolute time would make every bot look dead.
+        last_active = f"NOW() - INTERVAL '{gamer.last_active_minutes_ago} minutes'"
         lines.append(
             f"INSERT INTO {schema}.gamer (user_id, username, email, age, country, gender, "
-            "pwd, is_blocked, coin, role, version) VALUES ("
+            "pwd, is_blocked, coin, role, last_active_at, version) VALUES ("
             f"{_sql_str(gamer.user_id)}, {_sql_str(gamer.username)}, "
             f"{_sql_str(gamer.email)}, {gamer.age}, {_sql_str(gamer.country)}, "
-            f"{_sql_str(gamer.gender)}, {_sql_str(UNUSABLE_PASSWORD)}, FALSE, 0, 'USER', 0) "
-            "ON CONFLICT (user_id) DO NOTHING;"
+            f"{_sql_str(gamer.gender)}, {_sql_str(UNUSABLE_PASSWORD)}, FALSE, 0, 'USER', "
+            f"{last_active}, 0) ON CONFLICT (user_id) DO NOTHING;"
         )
 
     lines += ["", "-- Profiles"]
@@ -140,12 +167,18 @@ def write_sql(population: Population, path: Path | str, *, schema: str = "schtra
                 f"INSERT INTO {schema}.gamer_keywords_join (gamer_id, keyword_id) VALUES "
                 f"({_sql_str(gamer.user_id)}, {_sql_str(keyword_ids[kw])}) ON CONFLICT DO NOTHING;"
             )
+        for platform in gamer.platforms:
+            lines.append(
+                f"INSERT INTO {schema}.gamer_platform (user_id, platform) VALUES "
+                f"({_sql_str(gamer.user_id)}, {_sql_str(platform)}) ON CONFLICT DO NOTHING;"
+            )
 
     # Matches are stored both ways round, because the backend reads the owning side from
     # whichever gamer is asking.
     lines += ["", "-- Mutual matches (both directions)"]
-    for pair in sorted(tuple(sorted(p)) for p in population.mutual):
-        a, b = pair
+    ids = population.user_ids
+    for left, right in population.mutual_pairs:
+        a, b = ids[left], ids[right]
         for x, y in ((a, b), (b, a)):
             lines.append(
                 f"INSERT INTO {schema}.approved_matches (user_id, matched_id) VALUES "
@@ -171,9 +204,11 @@ def write_csv(population: Population, directory: Path | str) -> dict[str, Path]:
     paths["gamers"] = directory / "gamers.csv"
     with paths["gamers"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
-        writer.writerow(["user_id", "username", "email", "age", "country", "gender", "is_minor"])
+        writer.writerow(["user_id", "username", "email", "age", "country", "gender",
+                         "platforms", "last_active_minutes_ago"])
         for g in population.gamers:
-            writer.writerow([g.user_id, g.username, g.email, g.age, g.country, g.gender, g.is_minor])
+            writer.writerow([g.user_id, g.username, g.email, g.age, g.country, g.gender,
+                             "|".join(sorted(g.platforms)), g.last_active_minutes_ago])
 
     paths["profiles"] = directory / "profiles.csv"
     with paths["profiles"].open("w", newline="", encoding="utf-8") as fh:
@@ -185,20 +220,22 @@ def write_csv(population: Population, directory: Path | str) -> dict[str, Path]:
             for kw in sorted(g.keywords):
                 writer.writerow([g.user_id, "keyword", kw])
 
+    ids = population.user_ids
+
     paths["matches"] = directory / "matches.csv"
     with paths["matches"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         writer.writerow(["user_id", "matched_id"])
-        for pair in sorted(tuple(sorted(p)) for p in population.mutual):
-            writer.writerow(list(pair))
+        for left, right in population.mutual_pairs:
+            writer.writerow([ids[left], ids[right]])
 
     paths["interactions"] = directory / "interactions.csv"
     with paths["interactions"].open("w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         writer.writerow(["user_id", "target_id", "decision"])
-        for a, b in sorted(population.likes):
-            writer.writerow([a, b, "LIKE"])
-        for a, b in sorted(population.passes):
-            writer.writerow([a, b, "PASS"])
+        # Streamed straight from the generator rather than sorted into memory first: at
+        # twenty thousand gamers this is several million rows, and sorting them bought
+        # nothing that the deterministic seed does not already give.
+        writer.writerows(population.interactions())
 
     return paths
