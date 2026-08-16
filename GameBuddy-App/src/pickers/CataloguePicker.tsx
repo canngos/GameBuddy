@@ -133,6 +133,26 @@ export function CataloguePicker({
         returnKeyType="search"
       />
 
+      {/* Above the filters, not below the list.
+
+          Says which of the two narrowed things to nothing, because the fix differs: clear
+          the filters, or search for something else. Blaming the query when a chip emptied
+          the list sends people to retype a search that was never the problem.
+
+          Directly under the search field because that is where the eye already is, and
+          because the two chip rows are ~380px tall: sitting after them, the line fell
+          below the fold on a phone the moment the keyboard was up — which is precisely
+          when a search returns nothing and the explanation is needed. */}
+      {!isLoading && items.length > 0 && visible.length === 0 && (
+        <Text className="text-center text-muted">
+          {query && activeCount > 0
+            ? `Nothing matches “${query}” with these filters.`
+            : activeCount > 0
+              ? 'Nothing matches these filters.'
+              : `Nothing matches “${query}”.`}
+        </Text>
+      )}
+
       {filters?.map((filter) => (
         <FilterRow
           key={filter.key}
@@ -179,19 +199,6 @@ export function CataloguePicker({
           ),
         )}
       </View>
-
-      {/* Says which of the two narrowed things to nothing, because the fix differs: clear
-          the filters, or search for something else. Blaming the query when a chip emptied
-          the list sends people to retype a search that was never the problem. */}
-      {!isLoading && items.length > 0 && visible.length === 0 && (
-        <Text className="text-center text-muted">
-          {query && activeCount > 0
-            ? `Nothing matches “${query}” with these filters.`
-            : activeCount > 0
-              ? 'Nothing matches these filters.'
-              : `Nothing matches “${query}”.`}
-        </Text>
-      )}
     </View>
   );
 }
