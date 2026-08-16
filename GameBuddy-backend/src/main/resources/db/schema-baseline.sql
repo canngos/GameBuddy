@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict j3axqcaIlb7v5HzSVenIbKHr19TPatJiAlABfsUuxtghtBqANDMKTlNavrp9uWe
+\restrict ic4pFF6BXsQaeVOObj48II3kJNgiDP4tPBVfwrEVGtcWJrhUPbDNgpbXxea1Gfn
 
--- Dumped from database version 17.10
--- Dumped by pg_dump version 17.10
+-- Dumped from database version 17.11
+-- Dumped by pg_dump version 17.11
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -160,7 +160,7 @@ CREATE TABLE gamebuddy.content_report (
     reviewed_by character varying(255),
     status character varying(255) NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT content_report_content_type_check CHECK (((content_type)::text = ANY ((ARRAY['POST'::character varying, 'COMMENT'::character varying, 'PROFILE'::character varying])::text[]))),
+    CONSTRAINT content_report_content_type_check CHECK (((content_type)::text = ANY (ARRAY[('POST'::character varying)::text, ('COMMENT'::character varying)::text, ('PROFILE'::character varying)::text]))),
     CONSTRAINT content_report_status_check CHECK (((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('ACTIONED'::character varying)::text, ('DISMISSED'::character varying)::text])))
 );
 
@@ -224,6 +224,23 @@ CREATE TABLE gamebuddy.funnel_event (
 --
 
 COMMENT ON TABLE gamebuddy.funnel_event IS 'Client-reported funnel steps. Nothing here grants anything; see CoinLedger for money.';
+
+
+--
+-- Name: game_platform; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.game_platform (
+    game_id character varying(255) NOT NULL,
+    platform character varying(16) NOT NULL
+);
+
+
+--
+-- Name: TABLE game_platform; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.game_platform IS 'Which platforms each game is played on. A set, not a single value.';
 
 
 --
@@ -866,6 +883,14 @@ ALTER TABLE ONLY gamebuddy.funnel_event
 
 
 --
+-- Name: game_platform game_platform_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.game_platform
+    ADD CONSTRAINT game_platform_pkey PRIMARY KEY (game_id, platform);
+
+
+--
 -- Name: gamer_badge gamer_badge_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1141,6 +1166,13 @@ CREATE INDEX idx_funnel_event_kind ON gamebuddy.funnel_event USING btree (kind, 
 --
 
 CREATE INDEX idx_funnel_event_user ON gamebuddy.funnel_event USING btree (user_id, kind);
+
+
+--
+-- Name: idx_game_platform_platform; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_game_platform_platform ON gamebuddy.game_platform USING btree (platform);
 
 
 --
@@ -1472,6 +1504,14 @@ ALTER TABLE ONLY gamebuddy.approved_matches
 
 
 --
+-- Name: game_platform fk_game_platform_game; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.game_platform
+    ADD CONSTRAINT fk_game_platform_game FOREIGN KEY (game_id) REFERENCES gamebuddy.games(game_id) ON DELETE CASCADE;
+
+
+--
 -- Name: gamer_platform fk_gamer_platform_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1611,5 +1651,5 @@ ALTER TABLE ONLY gamebuddy.lobby
 -- PostgreSQL database dump complete
 --
 
-\unrestrict j3axqcaIlb7v5HzSVenIbKHr19TPatJiAlABfsUuxtghtBqANDMKTlNavrp9uWe
+\unrestrict ic4pFF6BXsQaeVOObj48II3kJNgiDP4tPBVfwrEVGtcWJrhUPbDNgpbXxea1Gfn
 
