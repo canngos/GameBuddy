@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { authApi } from '../../../src/api/auth';
 import { catalogueApi, profileApi } from '../../../src/api/catalogue';
 import { CataloguePicker } from '../../../src/pickers/CataloguePicker';
+import { gameFilters, toGameItem } from '../../../src/pickers/gameFilters';
 import { SelectionCount } from '../../../src/onboarding/SelectionCount';
 import { EditScreen } from '../../../src/ui/EditScreen';
 import { MIN_GAMES } from '../../../src/validation';
@@ -21,18 +22,8 @@ export default function EditGames() {
   const [selected, setSelected] = useState<string[] | undefined>(undefined);
   const current = selected ?? me.data?.games.map((g) => g.gameId) ?? [];
 
-  const items = useMemo(
-    () =>
-      (games.data ?? []).map((game) => ({
-        id: game.gameId,
-        label: game.gameName,
-        // The category is shown under the name, so it no longer needs to be duplicated
-        // into `keywords` for the search to reach it — the picker searches `detail` too.
-        detail: game.category,
-        image: game.gameIcon || null,
-      })),
-    [games.data],
-  );
+  const items = useMemo(() => (games.data ?? []).map(toGameItem), [games.data]);
+  const filters = useMemo(() => gameFilters(games.data ?? []), [games.data]);
 
   const save = useMutation({
     mutationFn: () => authApi.changeGames(current),
@@ -67,6 +58,7 @@ export default function EditGames() {
         onRetry={() => games.refetch()}
         layout="grid"
         searchPlaceholder="Search games"
+        filters={filters}
       />
 
       <SelectionCount picked={current.length} minimum={MIN_GAMES} />
