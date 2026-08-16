@@ -15,6 +15,17 @@ export type Game = {
   category: string;
   avgVote: number | null;
   description: string | null;
+  /**
+   * Platform enum names — the same strings as {@link PlatformId}, plus `OTHER`.
+   *
+   * `OTHER` is why this is not typed as `PlatformId[]`: four catalogue games run on the
+   * SNES, N64 or arcade hardware, and the backend says so rather than leaving a blank that
+   * would read as "never looked". Nobody is offered `OTHER` when choosing what *they* play,
+   * so it belongs to games and not to {@link PlatformId}.
+   *
+   * Always present and possibly empty; the server sends `[]` rather than omitting it.
+   */
+  platforms: string[];
 };
 
 export type Keyword = {

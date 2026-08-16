@@ -7,6 +7,7 @@ import { useDraft } from '../../src/onboarding/draft';
 import { SelectionCount } from '../../src/onboarding/SelectionCount';
 import { StepHeader } from '../../src/onboarding/StepHeader';
 import { CataloguePicker } from '../../src/pickers/CataloguePicker';
+import { gameFilters, toGameItem } from '../../src/pickers/gameFilters';
 import { Button, Screen } from '../../src/ui';
 import { MIN_GAMES } from '../../src/validation';
 
@@ -16,18 +17,8 @@ export default function Games() {
 
   const games = useQuery({ queryKey: ['games'], queryFn: catalogueApi.games });
 
-  const items = useMemo(
-    () =>
-      (games.data ?? []).map((game) => ({
-        id: game.gameId,
-        label: game.gameName,
-        // The category is shown under the name, so it no longer needs to be duplicated
-        // into `keywords` for the search to reach it — the picker searches `detail` too.
-        detail: game.category,
-        image: game.gameIcon || null,
-      })),
-    [games.data],
-  );
+  const items = useMemo(() => (games.data ?? []).map(toGameItem), [games.data]);
+  const filters = useMemo(() => gameFilters(games.data ?? []), [games.data]);
 
   return (
     <Screen
@@ -60,6 +51,7 @@ export default function Games() {
         onRetry={() => games.refetch()}
         layout="grid"
         searchPlaceholder="Search games"
+        filters={filters}
       />
     </Screen>
   );
