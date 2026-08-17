@@ -466,7 +466,6 @@ wrong:
 | `MAIL_MODE`           | `smtp` in production. `log` only locally                                  |
 | `FIREBASE_ENABLED`    | Startup fails if `true` without a credentials file                        |
 | `CORS_ALLOWED_ORIGINS`| Empty by default, refusing every browser. Only a web client needs it       |
-| `MODERATOR_EMAIL` / `MODERATOR_PASSWORD` | Creates the one staff account on first start. Empty means no staff account |
 | `REVENUECAT_WEBHOOK_TOKEN` | **Startup fails without it.** The only thing that can grant a paid entitlement — see Billing below |
 | `AVATAR_PUBLISH_AFTER`| ISO-8601 duration. How long an unreviewed ambiguous avatar waits before publishing |
 | `NSFW_APPROVE_THRESHOLD` / `NSFW_REJECT_THRESHOLD` | On the **model** service. The band between them is what needs a human |
@@ -558,16 +557,54 @@ that wiring lives.
 
 ## The moderator console
 
-One staff account, and no way to sign up for it. `ModeratorBootstrap` creates it on first
-start from `MODERATOR_EMAIL` and `MODERATOR_PASSWORD`, and **does nothing at all if an
-account with that address already exists** — including when the configured password
-differs. That is deliberate: a restart with a stale environment variable must not silently
-change the moderator's password, and an attacker who can set an environment variable must
-not be able to take over an existing account. To change the password, sign in as the
-moderator and use `PUT /auth/change/pwd`.
+A moderator is an ordinary account with `role = 'ADMIN'`. There is nothing else to it: no
+separate table, no staff sign-up, no limit on how many there are. `role` is a column on
+`gamer`, and every check on it — `DefaultAdminService`, `DefaultModerationService`,
+`Gamer.isDiscoverable` — asks about the one account in hand rather than counting them.
 
-The account has no age, no games and no keywords, and it never completes onboarding. It is
-not a participant:
+### Making one
+
+Sign up through the app like anybody else, then promote the row:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
+  psql -U gamebuddy -d gamebuddy \
+  -c "update gamebuddy.gamer set role = 'ADMIN' where email = 'someone@example.com';"
+```
+
+Sign out and back in afterwards. The app decides where an account belongs from the `role`
+on `/application/get/user/info` and caches the answer for the session (`stageOf` in
+`src/session/store.ts`), so a session that was already open goes on showing the deck until
+it is re-established.
+
+**Two steps, and that is the point.** The account is created by the ordinary registration
+flow, which means it is verified and password-policied like any other; becoming staff is
+then a separate, deliberate act by someone with a shell on the database host. Neither half
+can grant ADMIN on its own.
+
+There is no endpoint for the second step and there must not be — a route that mints an
+administrator only has to be wrong once. There is no environment variable for it either,
+which is a change from how this used to work: `MODERATOR_EMAIL` and `MODERATOR_PASSWORD`
+created an account on first start, and that meant the production environment had to hold a
+staff password in plaintext forever, that anyone who could write the environment could
+create an administrator, and that adding a second one took a restart. Promoting a row costs
+nothing to keep and grants nothing by itself.
+
+To change a moderator's password, sign in as that account and use `PUT /auth/change/pwd` —
+the same endpoint everyone else uses.
+
+### Demoting one
+
+The same UPDATE with `'USER'`. Worth knowing what comes back with it: the account becomes
+discoverable again, so it re-enters the deck — with whatever age, games and keywords it was
+registered with. An account promoted straight after sign-up has all three, so this is
+usually fine, but check the profile is one you are happy to have in circulation before
+demoting rather than deleting.
+
+### A moderator is not a participant
+
+Whatever profile the account happens to carry, the role takes it out of circulation
+entirely — the checks are on `role`, not on whether the profile looks empty:
 
 - `Gamer.isDiscoverable()` is false for ADMIN, so `isPairableWith` refuses it everywhere —
   the deck, the exploration slots, who-liked-you.
@@ -577,8 +614,16 @@ not a participant:
 - Fetching its profile by id answers `USER_NOT_FOUND`, the same as a blocked account, so
   the response cannot confirm the account exists.
 - `DefaultMatchService.reload` refuses an ADMIN outright, so the moderator cannot swipe
-  either. Without it the account's null age would put it in the minor band and build it a
-  deck of children.
+  either.
+- `stageOf` in the app checks the role *before* the onboarding checks, so an account with
+  no age is sent to the console rather than to a profile form.
+
+That last pair used to be load-bearing in a way it no longer is. When staff accounts were
+bootstrapped from the environment they had no age at all, and `reload` refusing ADMIN was
+what stopped a null age putting the account in the minor band and building it a deck of
+children. A promoted account has a real age and a real profile, so the null-age hazard is
+gone — but the refusals stay where they are, because they are about what the role means and
+not about what a particular row happens to contain.
 
 The app routes on the `role` field of `/application/get/user/info` — own profile only,
 never anyone else's — into a separate `(admin)` route group with four tabs:

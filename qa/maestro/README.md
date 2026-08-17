@@ -158,7 +158,7 @@ over as `-e` variables:
 | `PENDING_*` | registered, code issued, unverified | 01 finishes the signup |
 | `MEMBER_*` | fully onboarded, matched | 02, 03, 04, 05, 07 |
 | `PARTNER_*` | the other half of the match, has sent one message | 03 |
-| `MODERATOR_*` | from `.env`; 06 skips if empty | 06 |
+| `QA_ADMIN_*` | from `.env`; 06 skips if empty | 06 |
 
 Everything is `@qa.gamebuddy.invalid` and removable:
 

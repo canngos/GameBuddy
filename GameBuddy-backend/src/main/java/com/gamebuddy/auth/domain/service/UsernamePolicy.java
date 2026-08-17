@@ -33,9 +33,10 @@ public final class UsernamePolicy {
      * Names that would let someone pass themselves off as the app or its staff. Compared
      * in lower case, so {@code MoDeRaToR} is caught too.
      *
-     * <p>{@code moderator} is here for a second reason: it is the default username of the
-     * one staff account — see {@code ModeratorBootstrap}. That account is created
-     * directly rather than through this service, so it is not subject to this check.
+     * <p>Staff accounts are ordinary accounts promoted to ADMIN afterwards, so they pick
+     * their username through this service like everyone else and are held to this list
+     * like everyone else. Nothing is exempt from it, and nothing should be: a moderator
+     * called {@code support} would be as confusing as an impostor called {@code support}.
      */
     private static final Set<String> RESERVED = Set.of(
             "admin",

@@ -4,8 +4,9 @@
 # screen; the question worth asking is whether a normal account is kept out of it, because
 # that is the failure nobody notices until it is being exploited.
 #
-# It runs against the single staff account bootstrapped from MODERATOR_EMAIL — there is no
-# sign-up flow for it on purpose. Skipped automatically when that variable is empty.
+# It runs against whichever staff account QA_ADMIN_EMAIL names. Staff accounts are ordinary
+# accounts promoted to role = 'ADMIN' by hand — there is no sign-up flow and no environment
+# variable that grants it. Skipped automatically when that variable is empty.
 
 appId: com.findgamebuddy.app
 name: 06 admin
@@ -20,13 +21,13 @@ name: 06 admin
 
 - tapOn:
     id: "field-username-or-email"
-- inputText: ${MODERATOR_EMAIL}
+- inputText: ${QA_ADMIN_EMAIL}
 - hideKeyboard
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn:
     id: "field-password"
-- inputText: ${MODERATOR_PASSWORD}
+- inputText: ${QA_ADMIN_PASSWORD}
 - hideKeyboard
 - waitForAnimationToEnd:
     timeout: 3000

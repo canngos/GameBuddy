@@ -108,7 +108,6 @@ openssl rand -hex  32     # INTERNAL_API_KEY
 openssl rand -base64 32   # REVENUECAT_WEBHOOK_TOKEN  (same value in the RevenueCat dashboard)
 openssl rand -base64 24   # DB_PASSWORD
 openssl rand -base64 24   # REDIS_PASSWORD
-openssl rand -base64 24   # MODERATOR_PASSWORD
 ```
 
 `CHAT_ENCRYPTION_KEY` deserves a separate thought: it decrypts every stored message. Losing
@@ -138,7 +137,6 @@ R2_PUBLIC_URL=https://pub-....r2.dev
 # volume loses every avatar.
 
 FIREBASE_SERVICE_ACCOUNT=./secret/firebase-service-account.json
-MODERATOR_EMAIL=you@yourdomain.com
 
 HIDE_SEED_ACCOUNTS=true       # do not serve fixtures to real users
 RETRAIN_INCLUDE_BOTS=true     # until the seed is deleted — see step 8

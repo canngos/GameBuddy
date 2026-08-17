@@ -107,17 +107,6 @@ gamebuddy:
     rescreen-cron: ${AVATAR_RESCREEN_CRON:0 */10 * * * *}
     publish-cron: ${AVATAR_PUBLISH_CRON:0 20 * * * *}
 
-  moderator:
-    # The one staff account, created on first start if it does not already exist. There is
-    # no sign-up flow for it on purpose: an endpoint that mints an administrator is a
-    # permanent liability. Leave these empty and no account is created.
-    #
-    # Setting them again later does nothing — see ModeratorBootstrap. To change the
-    # password, log in as the moderator and use the ordinary change-password endpoint.
-    email: ${MODERATOR_EMAIL:}
-    password: ${MODERATOR_PASSWORD:}
-    username: ${MODERATOR_USERNAME:moderator}
-
   chat:
     # Message bodies are encrypted before they reach the database, so a leaked dump or a
     # stolen disk yields nothing readable. Not end-to-end: the server can still decrypt,

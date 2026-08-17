@@ -18,10 +18,14 @@ const fixtures = require('./helpers/fixtures');
 const seeded = (n) => fixtures.take(n);
 const suffix = () => Math.random().toString(36).slice(2, 8).replace(/[0-9]/g, 'x');
 
-/** The single staff account, bootstrapped from MODERATOR_EMAIL on first start. */
+/**
+ * A staff account, found by role rather than named in configuration — there may be more
+ * than one, and nothing creates them automatically. See "The moderator console" in the
+ * README for how a row gets promoted.
+ */
 function moderator() {
   const email = db.scalar("select email from gamebuddy.gamer where role = 'ADMIN' limit 1;");
-  assert.ok(email, 'no ADMIN account exists — set MODERATOR_EMAIL in .env and restart');
+  assert.ok(email, "no ADMIN account exists — promote one with: update gamebuddy.gamer set role = 'ADMIN' where email = …");
   return { email, token: mint(email), userId: db.gamerId(email) };
 }
 
