@@ -57,10 +57,12 @@ async function main() {
   const matched = (matches.data?.recommendedGamers ?? []).some((g) => g.userId === partner.userId);
   if (!matched) throw new Error('the match was not created; chat flow would fail');
 
-  // 3. The moderator, for the admin flow. Bootstrapped from .env on first start.
+  // 3. A staff account, for the admin flow. Not provisioned here and deliberately not
+  // creatable from anything the harness can reach: ADMIN is granted by promoting a row by
+  // hand, so the flow needs an account that already exists to be named in .env.
   const e = env();
-  const moderatorEmail = e.MODERATOR_EMAIL || '';
-  const moderatorPassword = e.MODERATOR_PASSWORD || '';
+  const adminEmail = e.QA_ADMIN_EMAIL || '';
+  const adminPassword = e.QA_ADMIN_PASSWORD || '';
 
   const values = {
     PENDING_EMAIL: pendingEmail,
@@ -72,8 +74,8 @@ async function main() {
     MEMBER_EMAIL: member.email,
     MEMBER_USERNAME: member.username,
     PARTNER_USERNAME: partner.username,
-    MODERATOR_EMAIL: moderatorEmail,
-    MODERATOR_PASSWORD: moderatorPassword,
+    QA_ADMIN_EMAIL: adminEmail,
+    QA_ADMIN_PASSWORD: adminPassword,
   };
 
   if (args.includes('--args')) {
@@ -87,8 +89,8 @@ async function main() {
     const shown = k.includes('PASSWORD') ? `${String(v).slice(0, 3)}…` : v;
     console.log(`  ${k.padEnd(20)} ${shown}`);
   }
-  if (!moderatorEmail) {
-    console.log('\n  MODERATOR_EMAIL is empty in .env — 06-admin will be skipped.');
+  if (!adminEmail) {
+    console.log('\n  QA_ADMIN_EMAIL is empty in .env — 06-admin will be skipped.');
   }
   console.log('\nRun the flows with:  qa/maestro/run.ps1');
 }

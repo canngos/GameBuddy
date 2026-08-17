@@ -239,11 +239,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env}
 
-      # The single staff account, created on first start only. Empty means "do not create
-      # one", which is the right default for anyone else running this stack.
-      MODERATOR_EMAIL: ${MODERATOR_EMAIL:-}
-      MODERATOR_PASSWORD: ${MODERATOR_PASSWORD:-}
-
       # How long an avatar the classifier was unsure about waits for a human before it
       # publishes itself. See AvatarReviewJob — the queue is meant to be ignorable.
       AVATAR_PUBLISH_AFTER: ${AVATAR_PUBLISH_AFTER:-P3D}
