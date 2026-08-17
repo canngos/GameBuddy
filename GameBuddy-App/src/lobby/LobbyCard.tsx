@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { memo, useCallback, useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 import type { Lobby } from '../api/types';
 import { Avatar, Card, Text } from '../ui';
@@ -16,17 +17,30 @@ const STATUS_LABEL: Record<string, string> = {
  * One lobby, in the browse feed or the "mine" strip. The same card everywhere, because a
  * lobby looks the same whether or not you are in it — only the badge row differs.
  */
-export function LobbyCard({ lobby }: { lobby: Lobby }) {
+export const LobbyCard = memo(function LobbyCard({ lobby }: { lobby: Lobby }) {
   const router = useRouter();
   const seats = `${lobby.playerCount}/${lobby.maxPlayers}`;
   const full = lobby.playerCount >= lobby.maxPlayers;
 
+  const open = useCallback(
+    () => router.push({ pathname: '/lobby/[lobbyId]', params: { lobbyId: lobby.id } } as never),
+    [router, lobby.id],
+  );
+
+  // `startsLabel` builds a `Date` and reads `Date.now()`. It was doing that on every render
+  // of every card in an infinite feed; the answer only changes when the timestamp does.
+  const when = useMemo(
+    () =>
+      lobby.status === 'OPEN'
+        ? `Plays ${startsLabel(lobby.startsAt)}`
+        : (STATUS_LABEL[lobby.status] ?? lobby.status),
+    [lobby.status, lobby.startsAt],
+  );
+
   return (
     <Card className="gap-0 p-0">
       <Pressable
-        onPress={() =>
-          router.push({ pathname: '/lobby/[lobbyId]', params: { lobbyId: lobby.id } } as never)
-        }
+        onPress={open}
         accessibilityRole="button"
         className="gap-3 p-4 active:opacity-70"
       >
@@ -60,11 +74,7 @@ export function LobbyCard({ lobby }: { lobby: Lobby }) {
             <Text variant="label">{full ? `${seats} full` : `${seats} players`}</Text>
           </View>
           <View className="rounded-full bg-raised px-2.5 py-0.5">
-            <Text variant="label">
-              {lobby.status === 'OPEN'
-                ? `Plays ${startsLabel(lobby.startsAt)}`
-                : (STATUS_LABEL[lobby.status] ?? lobby.status)}
-            </Text>
+            <Text variant="label">{when}</Text>
           </View>
           {lobby.myStatus === 'PENDING' && (
             <View className="rounded-full bg-raised px-2.5 py-0.5">
@@ -75,4 +85,4 @@ export function LobbyCard({ lobby }: { lobby: Lobby }) {
       </Pressable>
     </Card>
   );
-}
+});

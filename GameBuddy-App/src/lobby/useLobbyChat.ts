@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { LobbyMessage } from '../api/types';
-import { useChatSocket } from '../chat/ChatSocketProvider';
+import { useChatSocketApi, useChatSocketStatus } from '../chat/ChatSocketProvider';
 
 /**
  * Feeds one lobby screen from the shared socket.
@@ -22,7 +22,9 @@ import { useChatSocket } from '../chat/ChatSocketProvider';
  * author), but a reconnect can replay recent frames. Appending by id keeps that harmless.
  */
 export function useLobbyChat(lobbyId: string | undefined) {
-  const { onLobby, status } = useChatSocket();
+  // Narrow hooks: a lobby cares about its own frames and the connection, never presence.
+  const { onLobby } = useChatSocketApi();
+  const { status } = useChatSocketStatus();
   const queryClient = useQueryClient();
 
   useEffect(() => {

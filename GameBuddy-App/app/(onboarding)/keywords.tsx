@@ -69,10 +69,13 @@ export default function Keywords() {
   if (!draftIntact && !submit.isSuccess) return <Redirect href="/profile" />;
 
   return (
+    // Not `scroll`: the picker is a FlatList and owns the scrolling.
     <Screen
-      scroll
       footer={
         <View className="gap-2">
+          {/* Next to the button that failed, rather than below a forty-eight-row list
+              where it needed a scroll to reach. */}
+          {!!submit.error && <ErrorNotice error={submit.error} />}
           <SelectionCount picked={draft.keywordIds.length} minimum={MIN_KEYWORDS} />
           <Button
             label="Finish"
@@ -84,27 +87,24 @@ export default function Keywords() {
         </View>
       }
     >
-      <StepHeader
-        step={6}
-        total={6}
-        title="How do you play?"
-        subtitle={`Pick at least ${MIN_KEYWORDS}. These are the habits and moods we match on.`}
-      />
-
       <CataloguePicker
+        header={
+          <StepHeader
+            step={6}
+            total={6}
+            title="How do you play?"
+            subtitle={`Pick at least ${MIN_KEYWORDS}. These are the habits and moods we match on.`}
+          />
+        }
         items={items}
         selected={draft.keywordIds}
+        // Stable across renders even though `draft` is not: it is the same store action
+        // every time, which is what keeps the rows memoised.
         onToggle={draft.toggleKeyword}
         isLoading={keywords.isPending}
         error={keywords.error}
         onRetry={() => keywords.refetch()}
       />
-
-      {submit.error && (
-        <View className="pt-4">
-          <ErrorNotice error={submit.error} />
-        </View>
-      )}
     </Screen>
   );
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { lobbyApi } from '../../../src/api/lobby';
 import type { LobbyDetail, LobbyMember, LobbyMessage } from '../../../src/api/types';
@@ -38,7 +38,6 @@ export default function LobbyScreen() {
   const queryClient = useQueryClient();
   const myId = useSession((s) => s.userId);
   const listRef = useRef<FlatList<LobbyMessage>>(null);
-  const [draft, setDraft] = useState('');
 
   const detail = useQuery({
     queryKey: ['lobby', lobbyId],
@@ -98,12 +97,32 @@ export default function LobbyScreen() {
     },
   });
 
-  const submit = () => {
-    const text = draft.trim();
-    if (!text || send.isPending) return;
-    setDraft('');
-    send.mutate(text);
-  };
+  /**
+   * Takes the text rather than reading it from this component's state.
+   *
+   * The half-typed message lives in {@link Composer} now. It used to be state up here, and
+   * the roster and the lobby header are in the list's `ListHeaderComponent` — so every
+   * character typed rebuilt the whole header, every member row and every pending request.
+   */
+  const submit = useCallback(
+    (text: string) => {
+      if (!text || send.isPending) return;
+      send.mutate(text);
+    },
+    [send],
+  );
+
+  const keyExtractor = useCallback((m: LobbyMessage) => m.id, []);
+  const scrollToEnd = useCallback(
+    () => listRef.current?.scrollToEnd({ animated: false }),
+    [],
+  );
+  const renderLine = useCallback(
+    ({ item }: { item: LobbyMessage }) => (
+      <ChatLine line={item} mine={item.senderId === myId} />
+    ),
+    [myId],
+  );
 
   if (detail.isPending) {
     return (
@@ -140,11 +159,11 @@ export default function LobbyScreen() {
       <FlatList
         ref={listRef}
         data={inTeam ? (messages.data ?? []) : []}
-        keyExtractor={(m) => m.id}
+        keyExtractor={keyExtractor}
         contentContainerClassName="gap-2 px-6 pb-4"
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        renderItem={({ item }) => <ChatLine line={item} mine={item.senderId === myId} />}
+        onContentSizeChange={scrollToEnd}
+        renderItem={renderLine}
         ListHeaderComponent={
           <View className="gap-4 pb-4 pt-2">
             <LobbyHeader detail={detail.data} />
@@ -246,36 +265,67 @@ export default function LobbyScreen() {
         </View>
       )}
 
-      {inTeam && chatOpen && (
-        <View className="flex-row items-end gap-2 border-t border-line p-3">
-          <View className="flex-1">
-            <TextField
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Message the team"
-              multiline
-              maxLength={1000}
-              onSubmitEditing={submit}
-              returnKeyType="send"
-            />
-          </View>
-          <Pressable
-            onPress={submit}
-            disabled={draft.trim().length === 0 || send.isPending}
-            accessibilityRole="button"
-            accessibilityLabel="Send"
-            className={cn(
-              'h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80',
-              (draft.trim().length === 0 || send.isPending) && 'opacity-40',
-            )}
-          >
-            <View className="h-3 w-3 rotate-45 border-r-2 border-t-2 border-white" />
-          </Pressable>
-        </View>
-      )}
+      {inTeam && chatOpen && <Composer sending={send.isPending} onSend={submit} />}
     </Screen>
   );
 }
+
+/**
+ * The compose box, and the only thing that knows what is half-typed.
+ *
+ * Owning `draft` down here is the whole point: the roster, the lobby header and the
+ * pending-request list all live in the message list's `ListHeaderComponent`, so while this
+ * state was held by the screen above, typing one character re-rendered every one of them.
+ *
+ * Memoised, and both its props are stable — `sending` is a boolean and `onSend` is a
+ * `useCallback` — so a new message arriving over the socket does not reset what somebody
+ * is in the middle of writing.
+ */
+const Composer = memo(function Composer({
+  sending,
+  onSend,
+}: {
+  sending: boolean;
+  onSend: (text: string) => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const empty = draft.trim().length === 0;
+
+  const submit = useCallback(() => {
+    const text = draft.trim();
+    if (!text || sending) return;
+    setDraft('');
+    onSend(text);
+  }, [draft, sending, onSend]);
+
+  return (
+    <View className="flex-row items-end gap-2 border-t border-line p-3">
+      <View className="flex-1">
+        <TextField
+          value={draft}
+          onChangeText={setDraft}
+          placeholder="Message the team"
+          multiline
+          maxLength={1000}
+          onSubmitEditing={submit}
+          returnKeyType="send"
+        />
+      </View>
+      <Pressable
+        onPress={submit}
+        disabled={empty || sending}
+        accessibilityRole="button"
+        accessibilityLabel="Send"
+        className={cn(
+          'h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80',
+          (empty || sending) && 'opacity-40',
+        )}
+      >
+        <View className="h-3 w-3 rotate-45 border-r-2 border-t-2 border-white" />
+      </Pressable>
+    </View>
+  );
+});
 
 function LobbyHeader({ detail }: { detail: LobbyDetail }) {
   const { lobby } = detail;
@@ -416,7 +466,13 @@ function MemberRow({ member, children }: { member: LobbyMember; children?: React
   );
 }
 
-function ChatLine({ line, mine }: { line: LobbyMessage; mine: boolean }) {
+const ChatLine = memo(function ChatLine({
+  line,
+  mine,
+}: {
+  line: LobbyMessage;
+  mine: boolean;
+}) {
   return (
     <View className={cn('max-w-[85%] gap-0.5', mine ? 'self-end' : 'self-start')}>
       {!mine && <Text variant="caption">{line.senderUsername ?? 'Unknown gamer'}</Text>}
@@ -427,4 +483,4 @@ function ChatLine({ line, mine }: { line: LobbyMessage; mine: boolean }) {
       </View>
     </View>
   );
-}
+});

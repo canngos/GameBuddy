@@ -33,9 +33,21 @@ export function useConversation(friendId: string) {
   const history = useQuery({
     queryKey: ['conversation', friendId],
     queryFn: () => chatApi.conversation(friendId),
-    // The safety net for when the socket is not connected: without live delivery this
-    // is the only way a reply appears. Cheap, and it stops chat being dead in the water.
-    refetchInterval: 10_000,
+    /*
+     * The safety net for when the socket is not connected: without live delivery this
+     * is the only way a reply appears, and it stops chat being dead in the water.
+     *
+     * **Only when the socket is down, though.** This was an unconditional ten seconds,
+     * which meant that for the entire time a chat was open the app refetched the *whole
+     * unpaginated history* six times a minute — parsing all of it, rebuilding the merged
+     * list, re-rendering the thread — while the STOMP socket sat right there delivering
+     * the very same messages live, into `setLive` below. It was the largest pure waste in
+     * the app: all of that work, on a screen where nothing had changed, over mobile data.
+     *
+     * Thirty seconds rather than ten when it does run: this is a fallback for a socket
+     * that is already trying to reconnect every four seconds, not a primary transport.
+     */
+    refetchInterval: status === 'connected' ? false : 30_000,
   });
 
   useEffect(

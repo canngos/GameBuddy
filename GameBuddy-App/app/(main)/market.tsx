@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Sparkles } from 'lucide-react-native';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import { ApiError, Code } from '../../src/api/envelope';
@@ -27,6 +27,9 @@ import {
 } from '../../src/ui';
 
 const STORE_KEY = ['cosmetics'];
+
+/** The image fills its already-sized box. A constant, so it is not a new prop per row. */
+const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill;
 
 /**
  * The Market: frames and banners, bought with earned coins.
@@ -144,7 +147,11 @@ export default function Market() {
    * screen, where the art is a reason to subscribe rather than a locked row. See
    * `GoldCosmetics` in `app/(main)/gold.tsx`.
    */
-  const items = all.filter((item) => !item.membershipOnly);
+  const items = useMemo(() => all.filter((item) => !item.membershipOnly), [all]);
+
+  // Stable, so the memoised rows below can bail out instead of rebuilding the whole shelf
+  // whenever anything on this screen changes.
+  const onBuy = useCallback((id: string) => buy.mutate(id), [buy]);
 
   return (
     <Screen scroll edges={['top']} scrollRef={scrollRef}>
@@ -245,7 +252,7 @@ export default function Market() {
                 item={item}
                 balance={store.data?.coins ?? 0}
                 busy={busy}
-                onBuy={() => buy.mutate(item.id)}
+                onBuy={onBuy}
               />
             ))}
 
@@ -291,7 +298,7 @@ export default function Market() {
  * well would be the same rule in two places, and the free frames — the only ones a
  * gamer with no coins can wear — are exactly what a disagreement would lock.
  */
-function Row({
+const Row = memo(function Row({
   item,
   balance,
   busy,
@@ -300,9 +307,10 @@ function Row({
   item: Cosmetic;
   balance: number;
   busy: boolean;
-  onBuy: () => void;
+  onBuy: (id: string) => void;
 }) {
   const isBanner = item.kind === 'BANNER';
+  const press = useCallback(() => onBuy(item.id), [onBuy, item.id]);
 
   /*
    * Affordability only decides between Buy and "Not enough coins" — owned items never reach
@@ -352,10 +360,16 @@ function Row({
         >
           <Image
             source={{ uri: item.image }}
-            style={{ width: '100%', height: '100%' }}
+            style={FILL}
             contentFit={isBanner ? 'cover' : 'contain'}
             autoplay
             transition={150}
+            // The catalogue does not change between visits, and these are animated WebPs
+            // — the most expensive thing to decode in the app. A disk cache means the
+            // second visit to the shop costs nothing, and `recyclingKey` keeps the
+            // previous item's art out of a reused cell.
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
           />
         </View>
 
@@ -383,7 +397,7 @@ function Row({
           // nothing left to sell. The tap does nothing either way, so neither state pretends
           // otherwise.
           disabled={busy || item.owned || !affordable}
-          onPress={onBuy}
+          onPress={press}
           accessibilityRole="button"
           // "animated" is carried here and nowhere else on the row. Dropping the visible
           // tag was right — the preview is playing, so sighted people can see it — but
@@ -428,7 +442,7 @@ function Row({
       </View>
     </Card>
   );
-}
+});
 
 
 /**

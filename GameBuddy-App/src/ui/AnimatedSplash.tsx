@@ -71,8 +71,18 @@ export function AnimatedSplash({ onDone }: AnimatedSplashProps) {
     fillOpacity.value = withDelay(840, withTiming(1, { duration: 320 }));
     sketchOpacity.value = withDelay(900, withTiming(0, { duration: 240 }));
     wordProgress.value = withDelay(1020, withTiming(1, { duration: 300, easing: out }));
+    /*
+     * The last visual event is the wordmark, which finishes at 1320 (1020 + 300). The
+     * fade used to start at 1700, so 380ms of the launch was a completely still frame —
+     * nothing drawing, nothing fading, the shell already mounted underneath and unusable
+     * because this overlay is opaque and covers it.
+     *
+     * 1400 keeps a beat after the wordmark lands and gives that dead time back. Do not
+     * push it below ~1350: the fade would then start while the wordmark is still moving,
+     * which cuts the brand moment rather than the pause after it.
+     */
     overlayOpacity.value = withDelay(
-      1700,
+      1400,
       withTiming(0, { duration: 280 }, (finished) => {
         if (finished) runOnJS(onDone)();
       }),

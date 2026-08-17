@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { profileApi } from '../api/catalogue';
+import type { QueryKeyRoot } from '../query/keys';
 import { useCelebration } from '../match/celebration';
 
 /**
@@ -40,8 +41,13 @@ export function useMatchNotifications(enabled: boolean) {
 
       // A match changes the deck's allowance and adds a conversation. Both are cheap to
       // refresh and both are wrong until they are.
-      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['allowance'] });
+      //
+      // The first was `['conversations']`, a key nothing fetches, so the new match did not
+      // appear until the inbox's own poll came round. `['matches']` matters too: a match
+      // with no messages yet is a row that comes from there, not from the inbox.
+      void queryClient.invalidateQueries({ queryKey: ['inbox'] satisfies QueryKeyRoot[] });
+      void queryClient.invalidateQueries({ queryKey: ['matches'] satisfies QueryKeyRoot[] });
+      void queryClient.invalidateQueries({ queryKey: ['allowance'] satisfies QueryKeyRoot[] });
 
       /*
        * The push carries an id and a line of copy, not a profile — so the avatar and the

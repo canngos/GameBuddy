@@ -18,6 +18,7 @@ import {
   ErrorNotice,
   Screen,
   Text,
+  useHapticsEnabled,
   useSoundEnabled,
 } from '../../../src/ui';
 
@@ -168,7 +169,7 @@ export default function NotificationSettings() {
 }
 
 /**
- * The sound switch, in its own group below the four above.
+ * The device switches, in their own group below the four above.
  *
  * **Separated on purpose, because it is a different kind of setting.** The four above are
  * account preferences: they live on the server, travel with the account, and decide what the
@@ -184,6 +185,8 @@ export default function NotificationSettings() {
 function SoundSetting() {
   const enabled = useSoundEnabled((s) => s.enabled);
   const setEnabled = useSoundEnabled((s) => s.setEnabled);
+  const haptics = useHapticsEnabled((s) => s.enabled);
+  const setHaptics = useHapticsEnabled((s) => s.setEnabled);
 
   return (
     <View className="gap-3 pb-8">
@@ -195,6 +198,18 @@ function SoundSetting() {
           body="A short cue when something happens in the app — a match, a purchase, a message."
           value={enabled}
           onToggle={() => setEnabled(!enabled)}
+        />
+        <Divider />
+        {/* This switch is the only thing standing between the app and buzzing somebody who
+            does not want it. Android's own "touch feedback" setting used to be, and that is
+            precisely the problem it replaced: the app cannot read it, so it could not tell
+            a person who had turned it off from a device where the feedback simply never
+            arrived. See `src/ui/haptics.ts`. */}
+        <Row
+          title="Vibration"
+          body="A short buzz on a swipe, a match, or a purchase."
+          value={haptics}
+          onToggle={() => setHaptics(!haptics)}
         />
       </Card>
 

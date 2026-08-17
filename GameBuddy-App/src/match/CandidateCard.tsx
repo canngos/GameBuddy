@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { ChevronUp } from 'lucide-react-native';
 import { useMemo } from 'react';
-import { Image, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { avatarGradient, avatarUri, initialsOf } from '../avatars';
 import { profileApi } from '../api/catalogue';
 import type { Candidate } from '../api/types';
@@ -241,8 +242,15 @@ export function GameRow({
             {game.gameIcon ? (
               <Image
                 source={{ uri: game.gameIcon }}
-                resizeMode="cover"
-                className="h-6 w-6 rounded-full"
+                // `style`, not the `h-6 w-6 rounded-full` this used to carry: expo-image
+                // is not registered with NativeWind, so a className on it resolves to
+                // nothing at all and the cover would render at zero size. Same trap as
+                // UI_NOTE §4.9 — it fails silently either way.
+                style={styles.gameIcon}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={game.gameIcon}
+                transition={0}
               />
             ) : (
               // The game's initial, on the same footprint the cover would occupy — so a
@@ -362,3 +370,13 @@ function MorePill({ count }: { count: number }) {
     </View>
   );
 }
+
+/**
+ * The game-cover chip on the deck card.
+ *
+ * A style rather than a class because this goes on an `expo-image`, which NativeWind does
+ * not register — see the comment at the call site.
+ */
+const styles = StyleSheet.create({
+  gameIcon: { width: 24, height: 24, borderRadius: 12 },
+});

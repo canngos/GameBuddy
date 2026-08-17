@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import type { QueryKeyRoot } from '../query/keys';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import {
@@ -103,12 +104,21 @@ const PRESENTATION: Record<NotificationKind, { icon: LucideIcon; tone: Tone }> =
   RETURN: { icon: Bell, tone: 'muted' },
 };
 
-/** Query keys each kind invalidates. Empty where the destination fetches fresh anyway. */
-const REFRESH_ON: Record<NotificationKind, readonly string[]> = {
-  MESSAGE: ['conversations'],
-  MATCH: ['conversations', 'allowance'],
-  FRIEND_REQUEST: ['me'],
-  FRIEND_ACCEPTED: ['me', 'conversations'],
+/**
+ * Query keys each kind invalidates. Empty where the destination fetches fresh anyway.
+ *
+ * Typed against {@link QueryKeyRoot} rather than `string`, because three of these were
+ * wrong and nothing said so: `'conversations'` is not a key this app fetches — the inbox is
+ * `'inbox'` — so a foreground MESSAGE push refreshed nothing for as long as the feature had
+ * existed. `invalidateQueries` on a key nobody reads succeeds silently.
+ */
+const REFRESH_ON: Record<NotificationKind, readonly QueryKeyRoot[]> = {
+  MESSAGE: ['inbox'],
+  MATCH: ['inbox', 'matches', 'allowance'],
+  // Was `['me']`, which refetched the whole profile and left the list this notification is
+  // actually about untouched.
+  FRIEND_REQUEST: ['friendRequests'],
+  FRIEND_ACCEPTED: ['friends', 'inbox'],
   BADGE: ['badges', 'cosmetics'],
   // The lobby screens refetch on focus and on socket frames; the list is the one thing a
   // push should freshen so the tab is right when they get there.

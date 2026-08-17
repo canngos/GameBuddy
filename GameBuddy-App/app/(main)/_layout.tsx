@@ -83,14 +83,24 @@ export default function MainLayout() {
   // Held back until the notification primer is done: two full-screen things asking for
   // attention at the same moment is one too many, and the primer spends the single
   // system permission prompt, so it goes first.
-  const tutorial = useTutorial();
+  //
+  // Field selectors rather than `useTutorial()`. Subscribing to the whole store gave this
+  // component a new state object on every tutorial change — and since that object was also
+  // the effect's dependency, the entire tab navigator re-rendered and the effect re-ran on
+  // each of the five walkthrough steps. The actions are identity-stable, so the deps below
+  // are now three primitives and two constants.
+  const tutorialHydrated = useTutorial((s) => s.hydrated);
+  const tutorialSeen = useTutorial((s) => s.seen);
+  const tutorialStep = useTutorial((s) => s.step);
+  const loadTutorial = useTutorial((s) => s.load);
+  const startTutorial = useTutorial((s) => s.start);
   useEffect(() => {
-    if (!tutorial.hydrated) {
-      void tutorial.load();
+    if (!tutorialHydrated) {
+      void loadTutorial();
       return;
     }
-    if (!tutorial.seen && tutorial.step === null && !shouldPrime) tutorial.start();
-  }, [tutorial, shouldPrime]);
+    if (!tutorialSeen && tutorialStep === null && !shouldPrime) startTutorial();
+  }, [tutorialHydrated, tutorialSeen, tutorialStep, loadTutorial, startTutorial, shouldPrime]);
 
   // Shown once, over the app, before the operating system's own prompt — see
   // NotificationPrimer. Rendered instead of the tabs rather than on top of them: it asks
@@ -127,6 +137,23 @@ export default function MainLayout() {
         backBehavior="history"
         screenOptions={{
           headerShown: false,
+          /*
+           * Blurred tabs stop re-rendering.
+           *
+           * Bottom tabs mount lazily but never unmount, so by mid-session several screen
+           * subtrees are live at once — the deck's queries, the inbox's fifteen-second
+           * poll, a running boost countdown — all doing work for a screen nobody is
+           * looking at.
+           *
+           * Scoped to this navigator rather than the global `enableFreeze()`: it is the
+           * same mechanism, it leaves onboarding's stacks alone, and it can be turned off
+           * for a single screen if one ever misbehaves.
+           *
+           * Safe for everything that must keep running, because none of it is inside a
+           * tab: `ChatSocketProvider` wraps `<Tabs>` below, and the four notification
+           * hooks are in this component, above it.
+           */
+          freezeOnBlur: true,
           // `primary`, not `brand`. The pink is now the like/match colour and nothing
           // else — see the gradient table in `src/theme/gradients.ts`. This only tints the
           // label; the icon derives its own colour from `focused`.

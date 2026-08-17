@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react-native';
-import { useThemeColors } from '../theme';
+import { memo } from 'react';
+import { useThemeColors, type ThemeColors } from '../theme';
 
 /**
  * The one place Lucide is configured.
@@ -53,7 +54,25 @@ type IconProps = {
   fill?: string;
 };
 
-export function Icon({
+/**
+ * Every tone but one is the palette key of the same name, so the lookup is the identity
+ * map with a single exception rather than a table to maintain.
+ */
+function toneColor(tone: Tone, colors: ThemeColors): string {
+  return tone === 'inverse' ? colors.onBrand : colors[tone];
+}
+
+/**
+ * Memoised, and this is the component where that pays.
+ *
+ * Every prop is a primitive except `as`, which is a module-scope Lucide component, and
+ * there are no children — so the shallow comparison genuinely bails out. `Icon` wraps every
+ * glyph in the app: five tab icons, a chevron on every row, every checkbox, every toast.
+ * It used to build a nine-key record on each of those renders on top of the seventeen-key
+ * palette object `useThemeColors` allocated; between them that was the single most
+ * frequently repeated allocation in the app.
+ */
+export const Icon = memo(function Icon({
   as: Glyph,
   size = 24,
   color,
@@ -63,17 +82,12 @@ export function Icon({
 }: IconProps) {
   const colors = useThemeColors();
 
-  const tones: Record<Tone, string> = {
-    content: colors.content,
-    muted: colors.muted,
-    primary: colors.primary,
-    accent: colors.accent,
-    gold: colors.gold,
-    online: colors.online,
-    danger: colors.danger,
-    success: colors.success,
-    inverse: colors.onBrand,
-  };
-
-  return <Glyph size={size} color={color ?? tones[tone]} strokeWidth={strokeWidth} fill={fill} />;
-}
+  return (
+    <Glyph
+      size={size}
+      color={color ?? toneColor(tone, colors)}
+      strokeWidth={strokeWidth}
+      fill={fill}
+    />
+  );
+});

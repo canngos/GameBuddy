@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Shirt } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { memo, useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
 import { useThemeColors } from '../../src/theme';
@@ -20,6 +20,9 @@ import {
 } from '../../src/ui';
 
 const STORE_KEY = ['cosmetics'];
+
+/** The image fills its already-sized box. A constant, so it is not a new prop per row. */
+const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill;
 
 /**
  * Everything this account owns, and the only place any of it is put on.
@@ -75,8 +78,12 @@ export default function Inventory() {
   const failure = equip.error ?? unequip.error;
 
   const all = kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? []);
-  const owned = all.filter((item) => item.owned);
+  const owned = useMemo(() => all.filter((item) => item.owned), [all]);
   const wearingOne = all.some((item) => item.equipped);
+
+  // Stable, so the memoised rows can bail out rather than rebuilding the whole wardrobe
+  // every time anything on this screen moves.
+  const onEquip = useCallback((id: string) => equip.mutate(id), [equip]);
 
   const noun = kind === 'FRAME' ? 'frame' : 'banner';
 
@@ -122,12 +129,7 @@ export default function Inventory() {
         {owned.length > 0 && (
           <View className="gap-3 pb-8">
             {owned.map((item) => (
-              <Row
-                key={item.id}
-                item={item}
-                busy={busy}
-                onEquip={() => equip.mutate(item.id)}
-              />
+              <Row key={item.id} item={item} busy={busy} onEquip={onEquip} />
             ))}
 
             {/* Last, not first: taking something off is the rarest thing done here, and a
@@ -163,16 +165,17 @@ export default function Inventory() {
  * nothing, and anything else offers Equip. There is no price and no Buy — that is the
  * Market's half of the split this screen exists to make.
  */
-function Row({
+const Row = memo(function Row({
   item,
   busy,
   onEquip,
 }: {
   item: Cosmetic;
   busy: boolean;
-  onEquip: () => void;
+  onEquip: (id: string) => void;
 }) {
   const isBanner = item.kind === 'BANNER';
+  const equipThis = useCallback(() => onEquip(item.id), [onEquip, item.id]);
 
   return (
     <Card>
@@ -188,10 +191,14 @@ function Row({
         >
           <Image
             source={{ uri: item.image }}
-            style={{ width: '100%', height: '100%' }}
+            style={FILL}
             contentFit={isBanner ? 'cover' : 'contain'}
             autoplay
             transition={150}
+            // See the note on the same image in `market.tsx`: animated WebP is the most
+            // expensive thing this app decodes, and it is the same catalogue every visit.
+            cachePolicy="memory-disk"
+            recyclingKey={item.id}
           />
         </View>
 
@@ -214,7 +221,7 @@ function Row({
         ) : (
           <Pressable
             disabled={busy}
-            onPress={onEquip}
+            onPress={equipThis}
             accessibilityRole="button"
             accessibilityLabel={`Equip ${item.name}`}
             accessibilityState={{ disabled: busy }}
@@ -228,4 +235,4 @@ function Row({
       </View>
     </Card>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { FlatList, Modal, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { searchCountries } from '../countries';
@@ -19,12 +19,23 @@ export function CountryPicker({ value, onChange, error }: CountryPickerProps) {
 
   const results = useMemo(() => searchCountries(query), [query]);
 
-  function choose(country: string) {
-    onChange(country);
-    setOpen(false);
-    // Reset so reopening starts from the suggested list rather than the last search.
-    setQuery('');
-  }
+  const choose = useCallback(
+    (country: string) => {
+      onChange(country);
+      setOpen(false);
+      // Reset so reopening starts from the suggested list rather than the last search.
+      setQuery('');
+    },
+    [onChange],
+  );
+
+  const keyExtractor = useCallback((item: string) => item, []);
+  const renderCountry = useCallback(
+    ({ item }: { item: string }) => (
+      <CountryRow country={item} selected={item === value} onPress={choose} />
+    ),
+    [value, choose],
+  );
 
   return (
     <View>
@@ -67,26 +78,23 @@ export function CountryPicker({ value, onChange, error }: CountryPickerProps) {
             />
           </View>
 
+          {/* No `getItemLayout`, deliberately: `min-h-touch` is a *minimum*, so a long
+              country name that wraps makes a taller row, and an offset table that assumes
+              otherwise puts the list somewhere it is not. The row memo below is where the
+              win is — a hundred and ninety-five of them re-rendered on every keystroke. */}
           <FlatList
             data={results}
-            keyExtractor={(item) => item}
+            keyExtractor={keyExtractor}
             keyboardShouldPersistTaps="handled"
+            initialNumToRender={14}
+            maxToRenderPerBatch={12}
+            windowSize={9}
             ListEmptyComponent={
               <Text className="p-6 text-center text-muted">
                 No country matches “{query}”.
               </Text>
             }
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => choose(item)}
-                className="min-h-touch flex-row items-center justify-between px-6 active:bg-raised"
-              >
-                <Text variant={item === value ? 'bodyStrong' : 'body'}>{item}</Text>
-                {item === value && (
-                  <View className="h-2.5 w-2.5 rounded-full bg-primary" />
-                )}
-              </Pressable>
-            )}
+            renderItem={renderCountry}
           />
 
           <View className="border-t border-line p-4">
@@ -97,3 +105,31 @@ export function CountryPicker({ value, onChange, error }: CountryPickerProps) {
     </View>
   );
 }
+
+/**
+ * One country.
+ *
+ * Memoised on primitives, so typing in the search field re-renders the rows whose text
+ * actually changed rather than all hundred and ninety-five of them.
+ */
+const CountryRow = memo(function CountryRow({
+  country,
+  selected,
+  onPress,
+}: {
+  country: string;
+  selected: boolean;
+  onPress: (country: string) => void;
+}) {
+  const press = useCallback(() => onPress(country), [onPress, country]);
+
+  return (
+    <Pressable
+      onPress={press}
+      className="min-h-touch flex-row items-center justify-between px-6 active:bg-raised"
+    >
+      <Text variant={selected ? 'bodyStrong' : 'body'}>{country}</Text>
+      {selected && <View className="h-2.5 w-2.5 rounded-full bg-primary" />}
+    </Pressable>
+  );
+});

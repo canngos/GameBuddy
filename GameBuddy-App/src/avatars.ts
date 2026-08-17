@@ -52,7 +52,22 @@ export function initialsOf(name: string | null | undefined): string {
  * different colours depending on which surface they appeared on, and the second one would
  * inevitably be written without the avalanche step and reproduce the olive bug.
  */
+/**
+ * Hues by seed.
+ *
+ * The hash walks the whole seed and then does two multiply-shift rounds, and it used to run
+ * on every render of every avatar — twice, because `avatarColor` and `avatarGradient` each
+ * call it. Every list row in the app has an avatar. The answer depends only on the seed and
+ * a session meets a bounded number of people, so this is cached; the cap is there so a
+ * pathological caller cannot grow it without limit.
+ */
+const hues = new Map<string, number>();
+const MAX_HUES = 512;
+
 export function avatarHue(seed: string): number {
+  const hit = hues.get(seed);
+  if (hit !== undefined) return hit;
+
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (Math.imul(hash, 31) + seed.charCodeAt(i)) | 0;
@@ -60,7 +75,11 @@ export function avatarHue(seed: string): number {
   hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
   hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
   hash = (hash ^ (hash >>> 16)) >>> 0;
-  return hash % 360;
+
+  const hue = hash % 360;
+  if (hues.size >= MAX_HUES) hues.clear();
+  hues.set(seed, hue);
+  return hue;
 }
 
 /**
@@ -83,7 +102,21 @@ export function avatarColor(seed: string): string {
  * lands on a clashing complementary, and directional enough that the initials sit on the
  * lighter end.
  */
+const gradients = new Map<string, readonly [string, string]>();
+
 export function avatarGradient(seed: string): readonly [string, string] {
+  // Cached for its *identity* as much as its cost. The result goes straight into
+  // `GradientView`'s `colors` prop, and a fresh array per render is a changed prop —
+  // which is enough to keep every avatar in a list re-rendering forever.
+  const hit = gradients.get(seed);
+  if (hit !== undefined) return hit;
+
   const hue = avatarHue(seed);
-  return [`hsl(${hue}, 55%, 58%)`, `hsl(${(hue + 40) % 360}, 62%, 44%)`];
+  const stops: readonly [string, string] = [
+    `hsl(${hue}, 55%, 58%)`,
+    `hsl(${(hue + 40) % 360}, 62%, 44%)`,
+  ];
+  if (gradients.size >= MAX_HUES) gradients.clear();
+  gradients.set(seed, stops);
+  return stops;
 }

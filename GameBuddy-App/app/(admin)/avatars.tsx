@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { memo, useCallback, useMemo } from 'react';
 import { FlatList, Image, View } from 'react-native';
 import { adminApi } from '../../src/api/admin';
+import type { PendingAvatar } from '../../src/api/types';
 import { Button, Card, ErrorNotice, Screen, Text } from '../../src/ui';
 
 /**
@@ -35,6 +37,18 @@ export default function AvatarsScreen() {
 
   const pending = queue.data?.pending ?? [];
 
+  const keyExtractor = useCallback((item: PendingAvatar) => item.userId, []);
+  const onDecide = useCallback(
+    (userId: string, approve: boolean) => decide.mutate({ userId, approve }),
+    [decide],
+  );
+  const renderRow = useCallback(
+    ({ item }: { item: PendingAvatar }) => (
+      <PendingRow item={item} busy={decide.isPending} onDecide={onDecide} />
+    ),
+    [decide.isPending, onDecide],
+  );
+
   return (
     <Screen edges={['top']}>
       <View className="pb-3 pt-2">
@@ -47,7 +61,7 @@ export default function AvatarsScreen() {
 
       <FlatList
         data={pending}
-        keyExtractor={(item) => item.userId}
+        keyExtractor={keyExtractor}
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-8"
         onRefresh={() => void queue.refetch()}
@@ -59,49 +73,7 @@ export default function AvatarsScreen() {
             </Text>
           )
         }
-        renderItem={({ item }) => (
-          <Card className="mb-3">
-            <View className="flex-row items-center justify-between">
-              <Text variant="bodyStrong">{item.username ?? 'No username'}</Text>
-              <Text variant="caption">{waiting(item.uploadedAt)}</Text>
-            </View>
-
-            {/* Why this one is here, which is not the same question for every row. A
-                score means the model looked and was unsure; no score means it never
-                answered, and the re-screen job will pick it up without you. */}
-            <Text variant="caption" className="mt-1">
-              {item.score == null
-                ? 'Not yet screened — the classifier was unreachable. It will be retried automatically.'
-                : `Classifier: ${(item.score * 100).toFixed(1)}% likely sexual content`}
-            </Text>
-
-            <ReviewImage userId={item.userId} />
-
-            <View className="mt-4 flex-row gap-3">
-              <View className="flex-1">
-                <Button
-                  label="Reject"
-                  variant="danger"
-                  onPress={() => decide.mutate({ userId: item.userId, approve: false })}
-                  disabled={decide.isPending}
-                />
-              </View>
-              <View className="flex-1">
-                <Button
-                  label="Approve"
-                  onPress={() => decide.mutate({ userId: item.userId, approve: true })}
-                  disabled={decide.isPending}
-                />
-              </View>
-            </View>
-
-            <Text variant="caption" className="mt-3">
-              Approving publishes it. Rejecting keeps it private and leaves the account on
-              its monogram. Left alone, an already-screened image publishes itself after
-              three days and stays reportable.
-            </Text>
-          </Card>
-        )}
+        renderItem={renderRow}
       />
     </Screen>
   );
@@ -145,6 +117,11 @@ function ReviewImage({ userId }: ReviewImageProps) {
 
   if (image.data?.image) {
     return (
+      // The last React Native `Image` in the app, and deliberately so. Every other site
+      // moved to `expo-image` for its disk cache — but this `uri` is a base64 data URI
+      // that arrived inside the JSON of the query above, so the bytes are already in
+      // memory and there is no fetch to cache. `expo-image` would buy nothing here and
+      // would cost the `className` sizing below, which it does not support.
       <Image
         source={{ uri: image.data.image }}
         className="mt-3 w-full rounded-card"
@@ -165,3 +142,63 @@ function ReviewImage({ userId }: ReviewImageProps) {
     </View>
   );
 }
+
+/**
+ * One upload awaiting a verdict.
+ *
+ * Extracted so it can be memoised — it was inline JSX inside `renderItem`. `waiting()`
+ * reads the clock and builds a `Date`, so it ran for every row on every render; it is
+ * memoised on the timestamp, which is the only input that can change the answer.
+ *
+ * The image itself still fetches per row, and that is inherent: each is a separate
+ * moderation asset behind its own authenticated request. Virtualization is what keeps
+ * that bounded to the rows actually on screen.
+ */
+const PendingRow = memo(function PendingRow({
+  item,
+  busy,
+  onDecide,
+}: {
+  item: PendingAvatar;
+  busy: boolean;
+  onDecide: (userId: string, approve: boolean) => void;
+}) {
+  const reject = useCallback(() => onDecide(item.userId, false), [onDecide, item.userId]);
+  const approve = useCallback(() => onDecide(item.userId, true), [onDecide, item.userId]);
+  const age = useMemo(() => waiting(item.uploadedAt), [item.uploadedAt]);
+
+  return (
+    <Card className="mb-3">
+      <View className="flex-row items-center justify-between">
+        <Text variant="bodyStrong">{item.username ?? 'No username'}</Text>
+        <Text variant="caption">{age}</Text>
+      </View>
+
+      {/* Why this one is here, which is not the same question for every row. A
+          score means the model looked and was unsure; no score means it never
+          answered, and the re-screen job will pick it up without you. */}
+      <Text variant="caption" className="mt-1">
+        {item.score == null
+          ? 'Not yet screened — the classifier was unreachable. It will be retried automatically.'
+          : `Classifier: ${(item.score * 100).toFixed(1)}% likely sexual content`}
+      </Text>
+
+      <ReviewImage userId={item.userId} />
+
+      <View className="mt-4 flex-row gap-3">
+        <View className="flex-1">
+          <Button label="Reject" variant="danger" onPress={reject} disabled={busy} />
+        </View>
+        <View className="flex-1">
+          <Button label="Approve" onPress={approve} disabled={busy} />
+        </View>
+      </View>
+
+      <Text variant="caption" className="mt-3">
+        Approving publishes it. Rejecting keeps it private and leaves the account on
+        its monogram. Left alone, an already-screened image publishes itself after
+        three days and stays reportable.
+      </Text>
+    </Card>
+  );
+});
