@@ -1,6 +1,6 @@
 # GameBuddy — Privacy Policy
 
-**Version 2026-08-07.**
+**Version 2026-08-17.**
 
 GameBuddy is operated from Finland and is subject to the GDPR.
 
@@ -33,9 +33,15 @@ GameBuddy is operated from Finland and is subject to the GDPR.
 | Last active time | Showing whether somebody is online, and re-engagement notifications |
 | Purchase records | Delivering what you bought and honouring refunds |
 | Server logs | Diagnosing faults and investigating abuse. Kept for 7 days |
+| Crash reports | Finding out why the app broke. Carries your account id — see section 4 |
+| Advertising identifier | Only if you choose to watch an advert for coins — see section 4 |
 
-We do **not** collect your location, your contacts, or your browsing outside GameBuddy. We
-do not use third-party advertising or analytics trackers.
+We do **not** collect your location, your contacts, or your browsing outside GameBuddy.
+
+Three third-party services do receive some of this: an advert network, a crash reporter and
+the service that processes purchases. Section 4 says which, what each one gets, and when. We
+use no other analytics or tracking service, and none of them receive your messages, your
+photograph or your profile.
 
 ## 2. Your photograph
 
@@ -55,13 +61,44 @@ circumstance — when a message has been reported, so that a moderator can judge
 There is no other route by which conversations are read, and messages are never used for
 advertising or training.
 
-## 4. Who your data is shared with
+## 4. Adverts, crash reports and purchases
+
+Three companies receive data about you, and they are worth describing individually rather
+than hiding behind the phrase "our partners".
+
+**Google AdMob — adverts.** GameBuddy has one advert: an optional video you can watch in
+exchange for coins. Nothing else in the app shows advertising. The advert code starts only
+when you tap to watch one, so if you never do, it never runs. When you do, Google receives
+your device's advertising identifier, your IP address, whether you watched to the end, and
+technical diagnostics — and your account id, because Google's server is what tells ours to
+pay you, and without an id there is nobody to pay. You can reset or delete the advertising
+identifier in your Android settings.
+
+At present these are personalised adverts. If you are in the EEA or the UK you have to be
+asked for consent before that is allowed, and a consent screen is not in the app yet. Until
+it is, this is a gap we are naming rather than glossing over, and it is being fixed.
+
+**Google Crashlytics — crash reports.** When the app crashes, a report goes to Google:
+what the app was doing, the device and operating-system version, and your account id. The
+id is attached deliberately, because "this happens to everybody once" and "this happens to
+the same person every time" are different bugs. It carries no message content and no
+profile data.
+
+**RevenueCat — purchases.** Handles subscriptions and coin purchases. It receives your
+account id when you sign in — not only when you buy something — along with what you have
+bought and whether a subscription is active. It never sees your card details; neither do we.
+
+None of the three receives your messages, your photograph, your games and keywords, or who
+you liked.
+
+## 5. Who your data is shared with
 
 - **Other account holders** see your username, photograph, age, country, gender, games and
   keywords, and anything you post.
 - **Our infrastructure providers** hold data on our behalf: Cloudflare R2 (images), our
   hosting provider (the database and application), and Google Firebase (push
   notifications). They process it under contract and for no purpose of their own.
+- **Google AdMob, Google Crashlytics and RevenueCat**, as described in section 4.
 - **Apple and Google** process purchases. We never see your payment details.
 - **Authorities**, where the law requires it, or where content involves the sexual
   exploitation of children.
@@ -69,7 +106,7 @@ advertising or training.
 We do not sell your data. There is nobody to sell it to who would not be a worse custodian
 of it than we are.
 
-## 5. How long we keep it
+## 6. How long we keep it
 
 - **Your account**: until you delete it.
 - **After deletion**: your profile, photograph and personal details are removed
@@ -81,32 +118,34 @@ of it than we are.
 - **Records we must keep by law** (purchases, and material relating to a report we acted
   on): as long as the law requires.
 
-## 6. Your rights
+## 7. Your rights
 
 Under the GDPR you can ask us to give you a copy of your data, correct it, delete it,
 restrict what we do with it, or object to it — and you can ask for it in a portable form.
 Most of this you can do yourself in the app; for the rest, write to the address in section
-9 and we will answer within 30 days.
+10 and we will answer within 30 days.
 
 You can complain to the Finnish Data Protection Ombudsman (*Tietosuojavaltuutetun
 toimisto*) if you think we have handled your data wrongly.
 
-## 7. Legal basis
+## 8. Legal basis
 
 - **Performance of a contract** — running the service you signed up for.
 - **Legitimate interests** — keeping the service safe, preventing abuse, and improving
   recommendations.
 - **Legal obligation** — retaining what the law requires us to retain.
-- **Consent** — push notifications, which you can withdraw at any time in Settings.
+- **Consent** — push notifications, which you can withdraw at any time in Settings, and
+  personalised adverts, which need consent in the EEA and the UK and will be asked for by
+  the screen described in section 4.
 
-## 8. Children
+## 9. Children
 
 GameBuddy is for people aged 18 and over. We do not knowingly collect data from anybody
 under 18. If we discover an account belongs to a minor, we close it and delete its data. If
 you believe a child is using GameBuddy, write to the address below and we will act within
 24 hours.
 
-## 9. Who we are
+## 10. Who we are
 
 **Controller:** Can Baturlar, Finland
 **Data protection contact:** contact@findgamebuddy.com
@@ -115,7 +154,7 @@ GameBuddy is run by one person, not a company. There is no data protection offic
 the scale of processing does not require one under Article 37 — the address above reaches the
 controller directly.
 
-## 10. Changes
+## 11. Changes
 
 If we change how we handle your data we will update this policy and tell you in the app
 before the change takes effect.
