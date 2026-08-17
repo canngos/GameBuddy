@@ -26,5 +26,6 @@ export * as sound from './sound';
 // The pairing layer over the two above. Prefer it at call sites — see `feedback.ts`.
 export * as feedback from './feedback';
 export { useSoundEnabled } from './sound';
+export { useHapticsEnabled } from './haptics';
 export { BackHeader } from './BackHeader';
 export { ReportSheet } from './ReportSheet';

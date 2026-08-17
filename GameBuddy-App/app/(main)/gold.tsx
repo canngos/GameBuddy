@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Crown, Eye, Infinity as InfinityIcon, SlidersHorizontal, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { billingApi, GOLD_PLANS, type GoldPlan } from '../../src/api/billing';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
@@ -14,6 +14,9 @@ import { useThemeColors } from '../../src/theme';
 import { GradientView } from '../../src/ui/Gradient';
 import { glow } from '../../src/ui/glow';
 import { BackHeader, Button, Card, ErrorNotice, Icon, Screen, Text } from '../../src/ui';
+
+/** The image fills its already-sized box. A constant, so it is not a new prop per row. */
+const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill;
 
 /**
  * The Gold pitch and plan picker.
@@ -327,10 +330,13 @@ function GoldCosmeticRow({
       >
         <Image
           source={{ uri: item.image }}
-          style={{ width: '100%', height: '100%' }}
+          style={FILL}
           contentFit={isBanner ? 'cover' : 'contain'}
           autoplay
           transition={150}
+          // See `market.tsx`.
+          cachePolicy="memory-disk"
+          recyclingKey={item.id}
         />
       </View>
 

@@ -14,12 +14,13 @@ const TYPING_TTL_MS = 5000;
 type MessageHandler = (notification: ChatNotification) => void;
 type LobbyHandler = (event: LobbyEvent) => void;
 
-type ChatSocketValue = {
-  status: SocketStatus;
-  /** Presence by user id, for everyone the server has told us about this session. */
-  presence: Record<string, PresenceUpdate>;
-  /** User ids currently typing to us. */
-  typing: Record<string, true>;
+/**
+ * Subscribing and sending. Never changes for the life of the provider.
+ *
+ * Split out from the state below because these three are what most consumers actually
+ * want, and wanting them should not mean re-rendering on somebody else's keystroke.
+ */
+type ChatSocketApi = {
   /** Registers a handler for incoming messages; returns an unsubscribe. */
   onMessage: (handler: MessageHandler) => () => void;
   /** Registers a handler for lobby events (chat, roster, lifecycle); returns an unsubscribe. */
@@ -27,7 +28,32 @@ type ChatSocketValue = {
   sendTyping: (receiverId: string) => void;
 };
 
-const ChatSocketContext = createContext<ChatSocketValue | null>(null);
+/** Connection state. Changes a handful of times per session. */
+type ChatSocketStatus = { status: SocketStatus };
+
+/** Who is online and who is typing. Changes constantly, for people all over the app. */
+type ChatSocketPresence = {
+  /** Presence by user id, for everyone the server has told us about this session. */
+  presence: Record<string, PresenceUpdate>;
+  /** User ids currently typing to us. */
+  typing: Record<string, true>;
+};
+
+type ChatSocketValue = ChatSocketApi & ChatSocketStatus & ChatSocketPresence;
+
+/*
+ * Three contexts, split by how often each part changes.
+ *
+ * There was one, memoised on `[status, presence, typing]` — and `presence` is replaced
+ * wholesale on every frame the server sends about anyone, anywhere. So one stranger going
+ * online re-rendered every consumer of this context, including screens that only ever
+ * wanted to *subscribe* to messages and had no interest in presence at all.
+ *
+ * Now a consumer picks what it depends on and re-renders only for that.
+ */
+const ApiContext = createContext<ChatSocketApi | null>(null);
+const StatusContext = createContext<ChatSocketStatus | null>(null);
+const PresenceContext = createContext<ChatSocketPresence | null>(null);
 
 /**
  * One socket, open for as long as somebody is signed in.
@@ -132,11 +158,10 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
     };
   }, [token]);
 
-  const value = useMemo<ChatSocketValue>(
+  // Empty deps, and correctly so: all three close over refs, never over state. This object
+  // is created once and every consumer that only subscribes or sends can hold it forever.
+  const api = useMemo<ChatSocketApi>(
     () => ({
-      status,
-      presence,
-      typing,
       onMessage: (handler) => {
         handlers.current.add(handler);
         return () => {
@@ -151,10 +176,22 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
       },
       sendTyping: (receiverId) => socket.current?.sendTyping(receiverId),
     }),
-    [status, presence, typing],
+    [],
   );
 
-  return <ChatSocketContext.Provider value={value}>{children}</ChatSocketContext.Provider>;
+  const statusValue = useMemo<ChatSocketStatus>(() => ({ status }), [status]);
+  const presenceValue = useMemo<ChatSocketPresence>(
+    () => ({ presence, typing }),
+    [presence, typing],
+  );
+
+  return (
+    <ApiContext.Provider value={api}>
+      <StatusContext.Provider value={statusValue}>
+        <PresenceContext.Provider value={presenceValue}>{children}</PresenceContext.Provider>
+      </StatusContext.Provider>
+    </ApiContext.Provider>
+  );
 }
 
 /**
@@ -165,7 +202,32 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
  * and never receives anything.
  */
 export function useChatSocket(): ChatSocketValue {
-  const value = useContext(ChatSocketContext);
-  if (!value) throw new Error('useChatSocket must be used inside a ChatSocketProvider');
+  return { ...useChatSocketApi(), ...useChatSocketStatus(), ...useChatSocketPresence() };
+}
+
+/**
+ * Subscribe and send, without depending on anything that moves.
+ *
+ * **Prefer this.** A component using it will not re-render when somebody goes online or
+ * starts typing, which is most of what this socket does. `useChatSocket` above is for the
+ * conversation screen, which genuinely displays all three.
+ */
+export function useChatSocketApi(): ChatSocketApi {
+  const value = useContext(ApiContext);
+  if (!value) throw new Error('useChatSocketApi must be used inside a ChatSocketProvider');
+  return value;
+}
+
+/** Connection state only. Re-renders a handful of times per session. */
+export function useChatSocketStatus(): ChatSocketStatus {
+  const value = useContext(StatusContext);
+  if (!value) throw new Error('useChatSocketStatus must be used inside a ChatSocketProvider');
+  return value;
+}
+
+/** Presence and typing. Re-renders on every frame the server sends about anyone. */
+export function useChatSocketPresence(): ChatSocketPresence {
+  const value = useContext(PresenceContext);
+  if (!value) throw new Error('useChatSocketPresence must be used inside a ChatSocketProvider');
   return value;
 }

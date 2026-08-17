@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '../../../src/api/auth';
 import { catalogueApi, profileApi } from '../../../src/api/catalogue';
 import { CataloguePicker } from '../../../src/pickers/CataloguePicker';
 import { SelectionCount } from '../../../src/onboarding/SelectionCount';
-import { EditScreen } from '../../../src/ui/EditScreen';
+import { EditScreen, EditTitle } from '../../../src/ui/EditScreen';
 import { MIN_KEYWORDS } from '../../../src/validation';
 
 export default function EditKeywords() {
@@ -15,8 +15,22 @@ export default function EditKeywords() {
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
   const keywords = useQuery({ queryKey: ['keywords'], queryFn: catalogueApi.keywords });
 
-  const [selected, setSelected] = useState<string[] | undefined>(undefined);
-  const current = selected ?? me.data?.keywords.map((k) => k.id) ?? [];
+  // Seeded once rather than read through a `selected ?? profile` fallback — see the note
+  // on the games screen: the fallback form is what made the toggle handler unstable.
+  const [current, setCurrent] = useState<string[]>([]);
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (me.data && !seeded.current) {
+      seeded.current = true;
+      setCurrent(me.data.keywords.map((k) => k.id));
+    }
+  }, [me.data]);
+
+  const onToggle = useCallback(
+    (id: string) =>
+      setCurrent((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])),
+    [],
+  );
 
   const items = useMemo(
     () =>
@@ -38,29 +52,30 @@ export default function EditKeywords() {
     },
   });
 
+  const title = 'How you play';
+  const subtitle = `At least ${MIN_KEYWORDS}. These are the habits and moods we match on.`;
+
   return (
     <EditScreen
-      title="How you play"
-      subtitle={`At least ${MIN_KEYWORDS}. These are the habits and moods we match on.`}
+      title={title}
+      subtitle={subtitle}
       onSave={() => save.mutate()}
       saving={save.isPending}
       canSave={current.length >= MIN_KEYWORDS}
       error={save.error}
+      // The picker is a FlatList and scrolls itself.
+      scroll={false}
+      footerNote={<SelectionCount picked={current.length} minimum={MIN_KEYWORDS} />}
     >
       <CataloguePicker
+        header={<EditTitle title={title} subtitle={subtitle} />}
         items={items}
         selected={current}
-        onToggle={(id) =>
-          setSelected(
-            current.includes(id) ? current.filter((x) => x !== id) : [...current, id],
-          )
-        }
+        onToggle={onToggle}
         isLoading={keywords.isPending || me.isPending}
         error={keywords.error}
         onRetry={() => keywords.refetch()}
       />
-
-      <SelectionCount picked={current.length} minimum={MIN_KEYWORDS} />
     </EditScreen>
   );
 }

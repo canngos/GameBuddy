@@ -118,6 +118,12 @@ export function FrameOverlay({
       // No fade. The avatar is already painted underneath, so a transition here reads as
       // the ring flickering rather than as the image arriving.
       transition={0}
+      // Animated WebP, and the same handful of frames recur across every list in the app —
+      // so this is the single most worthwhile disk cache here. `recyclingKey` matters for
+      // the same reason it does on the avatar underneath: a recycled row must not keep
+      // the previous person's ring.
+      cachePolicy="memory-disk"
+      recyclingKey={frame}
     />
   );
 }

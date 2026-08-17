@@ -48,7 +48,10 @@ export function ConsumableShelf({ balance }: { balance: number }) {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       void queryClient.invalidateQueries({ queryKey: ['allowance'] });
       void queryClient.invalidateQueries({ queryKey: ['earn'] });
-      void queryClient.setQueryData(['consumables'], next);
+      // There used to be a `setQueryData(['consumables'], next)` here. Nothing in the app
+      // reads that key — grepped — so it was writing the response into a cache entry no
+      // component subscribes to. Removed rather than wired up: the counts this shelf shows
+      // come from `['cosmetics']`, which is invalidated two lines above.
 
       /*
        * These are the one purchase with nothing to show for it afterwards.

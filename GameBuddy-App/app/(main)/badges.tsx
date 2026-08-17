@@ -1,13 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { badgesApi } from '../../src/api/badges';
 import type { Badge, BadgeBoard, UserInfo } from '../../src/api/types';
 import { useThemeColors } from '../../src/theme';
 import { BackHeader, Button, Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
 
 const BOARD_KEY = ['badges'];
+
+const grid = StyleSheet.create({
+  // `flex-1` with a third-width cap: three columns that divide the row exactly, and a
+  // partial last row that stays left-aligned instead of stretching.
+  tile: { flex: 1, maxWidth: '33.33%' },
+  column: { gap: 8 },
+  icon: { width: 82, height: 82 },
+});
+const TILE = grid.tile;
+const COLUMN = grid.column;
+const ICON = grid.icon;
 
 /**
  * Badges: what there is to do, and what has been done.
@@ -80,9 +91,18 @@ export default function Badges() {
 
   const busy = collect.isPending || showcase.isPending;
   const badges = board.data?.badges ?? [];
-  const shown = badges.filter((badge) => badge.showcased).map((badge) => badge.code);
   const slots = board.data?.showcaseSlots ?? 3;
-  const open = badges.find((badge) => badge.code === openCode) ?? null;
+
+  // Derived from the whole catalogue, so both were a scan of it on every render — and
+  // this screen stays mounted behind the tab bar.
+  const shown = useMemo(
+    () => badges.filter((badge) => badge.showcased).map((badge) => badge.code),
+    [badges],
+  );
+  const open = useMemo(
+    () => badges.find((badge) => badge.code === openCode) ?? null,
+    [badges, openCode],
+  );
 
   /**
    * Opening a badge clears the last complaint.
@@ -91,10 +111,10 @@ export default function Badges() {
    * full" sits at the top of the grid until the next successful action — long after it
    * has been dealt with, and above a screen where nothing is wrong.
    */
-  const openBadge = (code: string) => {
+  const openBadge = useCallback((code: string) => {
     setFailure(null);
     setOpenCode(code);
-  };
+  }, []);
 
   /**
    * Toggles one badge in the showcase and sends the whole selection.
@@ -115,8 +135,15 @@ export default function Badges() {
     showcase.mutate([...shown, badge.code]);
   };
 
+  const keyExtractor = useCallback((badge: Badge) => badge.code, []);
+
+  const renderTile = useCallback(
+    ({ item }: { item: Badge }) => <Tile badge={item} onPress={openBadge} />,
+    [openBadge],
+  );
+
   return (
-    <Screen scroll edges={['top']}>
+    <Screen edges={['top']}>
       <BackHeader
         title="Badges"
         subtitle="Finish missions, claim coins, show off three"
@@ -129,28 +156,35 @@ export default function Badges() {
         }
       />
 
-      {board.isPending && <ActivityIndicator color={colors.primary} />}
-      {board.error && <ErrorNotice error={board.error} onRetry={() => board.refetch()} />}
-
-      {failure && (
-        <Card className="mb-3">
-          <Text variant="body" className="text-danger">
-            {failure}
-          </Text>
-        </Card>
-      )}
-
-      {/* A three-column grid, laid out by width rather than by `gap` so the last row of
-          a partial set still lines up with the ones above it. */}
-      <View className="flex-row flex-wrap justify-between pb-6">
-        {badges.map((badge) => (
-          <Tile key={badge.code} badge={badge} onPress={() => openBadge(badge.code)} />
-        ))}
-        {/* Two spacers, so a row holding one or two tiles keeps them left-aligned
-            instead of spreading them across the width. */}
-        <View className="w-[31%]" />
-        <View className="w-[31%]" />
-      </View>
+      {/* Three columns. The two spacer Views this used to need are gone: `numColumns`
+          lays a partial last row out from the left on its own, which is what they were
+          simulating. */}
+      <FlatList
+        className="flex-1"
+        data={badges}
+        numColumns={3}
+        columnWrapperStyle={COLUMN}
+        keyExtractor={keyExtractor}
+        renderItem={renderTile}
+        contentContainerClassName="pb-6"
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={12}
+        maxToRenderPerBatch={9}
+        windowSize={7}
+        ListHeaderComponent={
+          <View className="gap-2">
+            {board.isPending && <ActivityIndicator color={colors.primary} />}
+            {!!board.error && <ErrorNotice error={board.error} onRetry={() => board.refetch()} />}
+            {!!failure && (
+              <Card className="mb-3">
+                <Text variant="body" className="text-danger">
+                  {failure}
+                </Text>
+              </Card>
+            )}
+          </View>
+        }
+      />
 
       <Detail
         badge={open}
@@ -170,20 +204,34 @@ export default function Badges() {
  * the icons to download, and it means a badge cannot look like a different thing before
  * and after you earn it, which is what makes the wall worth staring at.
  */
-function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
+const Tile = memo(function Tile({
+  badge,
+  onPress,
+}: {
+  badge: Badge;
+  onPress: (code: string) => void;
+}) {
+  const press = useCallback(() => onPress(badge.code), [onPress, badge.code]);
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={press}
       accessibilityRole="button"
       accessibilityLabel={`${badge.title}. ${badge.earned ? 'Earned' : `${badge.progress} of ${badge.target}`}`}
-      className="mb-5 w-[31%] items-center active:opacity-70"
+      style={TILE}
+      className="mb-5 items-center active:opacity-70"
     >
       <View className={badge.earned ? 'opacity-100' : 'opacity-35'}>
         <Image
           source={{ uri: badge.icon }}
-          style={{ width: 82, height: 82 }}
+          style={ICON}
           contentFit="contain"
           transition={150}
+          // A disk cache and a recycling key: the catalogue is fixed, so the second visit
+          // to this screen should paint from disk, and a recycled cell must not show the
+          // previous badge's art while the new one decodes.
+          cachePolicy="memory-disk"
+          recyclingKey={badge.code}
         />
       </View>
 
@@ -210,7 +258,7 @@ function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
       {badge.showcased && <View className="mt-1 h-1 w-6 rounded-full bg-primary" />}
     </Pressable>
   );
-}
+});
 
 /**
  * The sheet for one badge.
@@ -254,6 +302,7 @@ function Detail({
                 style={{ width: 132, height: 132 }}
                 contentFit="contain"
                 transition={150}
+                cachePolicy="memory-disk"
               />
             </View>
 

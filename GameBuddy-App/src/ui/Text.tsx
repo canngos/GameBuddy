@@ -49,5 +49,15 @@ type TextProps = RNTextProps & {
 export function Text({ variant = 'body', className, ...rest }: TextProps) {
   // Through cn, so a caller passing `text-brand` actually overrides the variant's
   // `text-content` rather than racing it on specificity.
-  return <RNText className={cn(variants[variant], className)} {...rest} />;
+  //
+  // Skipped entirely when there is nothing to override, which is most call sites: the
+  // variant strings are already conflict-free, so merging one with nothing can only
+  // return it unchanged. Worth the branch because this is the most-rendered component in
+  // the app.
+  return (
+    <RNText
+      className={className == null ? variants[variant] : cn(variants[variant], className)}
+      {...rest}
+    />
+  );
 }

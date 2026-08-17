@@ -58,16 +58,43 @@ const paletteFor = (scheme: 'light' | 'dark'): Palette => ({
   success: semantic.success[scheme],
 });
 
-const light = paletteFor('light');
-const dark = paletteFor('dark');
-
 export type ThemeColors = Palette & { brand: string; onBrand: string };
 
-/** The resolved palette for whatever theme is currently showing. */
+/**
+ * The two resolved palettes, built once and frozen.
+ *
+ * `brand` and `onBrand` are folded in here rather than spread on at the end of
+ * `useThemeColors`, and that is a performance decision rather than a tidiness one. The
+ * spread allocated a fresh seventeen-key object on **every render of every one of the
+ * forty-nine components that call the hook** — including `Icon`, which wraps every glyph in
+ * every list row. A new identity every render defeats any `React.memo`, `useMemo` or
+ * `useCallback` downstream that takes a colour, which is most of them.
+ *
+ * Frozen so that the sharing cannot become a bug: two components now hold the same object,
+ * and a mutation in one would silently repaint the other.
+ */
+const light: ThemeColors = Object.freeze({
+  ...paletteFor('light'),
+  brand: brand.DEFAULT,
+  onBrand: '#FFFFFF',
+});
+const dark: ThemeColors = Object.freeze({
+  ...paletteFor('dark'),
+  brand: brand.DEFAULT,
+  onBrand: '#FFFFFF',
+});
+
+/**
+ * The resolved palette for whatever theme is currently showing.
+ *
+ * Returns one of two stable objects, so the identity changes exactly when the scheme
+ * changes — which is precisely when every consumer *should* re-render. NativeWind's
+ * `useColorScheme` remains the subscription, so the repaint guarantee `useHairline`
+ * depends on is untouched.
+ */
 export function useThemeColors(): ThemeColors {
   const { colorScheme } = useColorScheme();
-  const base = colorScheme === 'dark' ? dark : light;
-  return { ...base, brand: brand.DEFAULT, onBrand: '#FFFFFF' };
+  return colorScheme === 'dark' ? dark : light;
 }
 
 /** True when the dark theme is on screen, whatever the preference that produced it. */

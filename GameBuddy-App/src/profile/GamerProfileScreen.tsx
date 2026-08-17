@@ -183,6 +183,8 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                         style={{ width: 48, height: 48 }}
                         contentFit="contain"
                         transition={150}
+                        cachePolicy="memory-disk"
+                        recyclingKey={badge.code}
                       />
                       <Text variant="caption" numberOfLines={2} className="text-center">
                         {badge.title}

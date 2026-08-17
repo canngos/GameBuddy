@@ -62,7 +62,12 @@ if ($ReleaseBuild) {
 & adb reverse tcp:8080 tcp:8080 | Out-Null
 & adb reverse tcp:8081 tcp:8081 | Out-Null
 
-$health = Get-HttpText "http://localhost:8080/actuator/health"
+# `127.0.0.1`, not `localhost`. On this machine `localhost` resolves to ::1 first and
+# nothing is listening there for 8080, so this probe times out and reports a healthy
+# backend as down — the failure looks like Docker is off when it is answering fine on IPv4.
+# `qa/functional/helpers/api.js` has the same default and the same problem; export
+# GB_BASE_URL=http://127.0.0.1:8080 for the functional suite.
+$health = Get-HttpText "http://127.0.0.1:8080/actuator/health"
 if ($health -notmatch '"status":"UP"') { throw "Backend is not up. Start it:  docker compose up -d" }
 
 # 01-onboarding reads the verification code through this, because tapping "Email me a

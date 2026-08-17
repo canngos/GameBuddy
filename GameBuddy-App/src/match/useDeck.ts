@@ -151,6 +151,9 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     },
   });
 
+  const dismissBlock = useCallback(() => setBlock(null), []);
+  const dismissMatch = useCallback(() => setMatchedWith(null), []);
+
   /** Asks for a fresh page. This is the only path that records new impressions. */
   const reload = useCallback(async () => {
     setCursor(0);
@@ -177,9 +180,13 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     decisionError: block ? null : decide.error,
     allowance: allowance.data ?? null,
     block,
-    dismissBlock: () => setBlock(null),
+    dismissBlock,
     matchedWith,
-    dismissMatch: () => setMatchedWith(null),
+    // Stable, because `app/(main)/home.tsx` lists this in a `useEffect` dependency array.
+    // As a fresh arrow it changed identity every render, so while a match was on screen
+    // the effect re-ran on every one of them. `celebrate` dedupes by user id so nothing
+    // visible went wrong, which is exactly why it went unnoticed.
+    dismissMatch,
     submit,
     reload,
     refetchFeed: feed.refetch,

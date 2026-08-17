@@ -1,6 +1,6 @@
 import '../global.css';
 
-import { QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -19,6 +19,7 @@ import { useLangStore } from '../src/i18n/store';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
 import { useSoundEnabled } from '../src/ui/sound';
+import { useHapticsEnabled } from '../src/ui/haptics';
 
 // Hold the native splash until fonts are parsed, the stored token has been read, and
 // the theme preference is known. Without this the app flashes blank, then Roboto, then
@@ -55,6 +56,7 @@ export default function RootLayout() {
   const schemeHydrated = useScheme((s) => s.hydrated);
   const loadScheme = useScheme((s) => s.load);
   const loadSound = useSoundEnabled((s) => s.load);
+  const loadHaptics = useHapticsEnabled((s) => s.load);
   const langHydrated = useLangStore((s) => s.hydrated);
   const loadLang = useLangStore((s) => s.load);
   const userId = useSession((s) => s.userId);
@@ -79,6 +81,25 @@ export default function RootLayout() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active') void useSession.getState().renewIfStale();
+
+      /*
+       * Tell react-query whether anyone is looking.
+       *
+       * Nothing was doing this, and react-query has no idea about `AppState` on its own —
+       * so every polling query kept its timer running while the app sat in the background:
+       * the inbox every fifteen seconds and an open conversation every ten, each fetching a
+       * whole unpaginated list, indefinitely, over mobile data.
+       *
+       * `refetchIntervalInBackground` defaults to false, so this one line is the entire
+       * fix: react-query pauses the intervals while unfocused and refetches what went
+       * stale on the way back.
+       *
+       * Deliberately *not* paired with `onlineManager`. That needs NetInfo — a native
+       * dependency and a rebuild — to buy little: while foregrounded a failed request is
+       * cheap, and the retry policy in `src/query.ts` already declines to retry anything
+       * that is not transient.
+       */
+      focusManager.setFocused(next === 'active');
     });
     return () => subscription.remove();
   }, []);
@@ -94,7 +115,9 @@ export default function RootLayout() {
     // the first moments of a session — and gating the splash on it would delay every launch
     // for a setting almost nobody changes. See `src/ui/sound.ts`.
     void loadSound();
-  }, [restore, loadScheme, loadSound, loadLang]);
+    // Same reasoning, same trade — see `src/ui/haptics.ts`.
+    void loadHaptics();
+  }, [restore, loadScheme, loadSound, loadHaptics, loadLang]);
 
   const ready =
     (fontsLoaded || !!fontError) && status !== 'loading' && schemeHydrated && langHydrated;

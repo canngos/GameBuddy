@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { profileApi } from '../../../src/api/catalogue';
 import { chatApi } from '../../../src/api/chat';
@@ -54,6 +54,22 @@ export default function Chat() {
     setDraft('');
     chat.send(text);
   }
+
+  // Stable list callbacks, so the memo on each bubble can bail out. Without them a
+  // presence or typing frame — which arrive constantly over the socket — re-rendered
+  // every message in the thread.
+  const keyExtractor = useCallback((m: Conversation) => m.id, []);
+  const scrollToEnd = useCallback(
+    () => listRef.current?.scrollToEnd({ animated: false }),
+    [],
+  );
+  const onReport = useCallback((id: string) => report.mutate(id), [report]);
+  const renderBubble = useCallback(
+    ({ item }: { item: Conversation }) => (
+      <Bubble message={item} mine={item.sender === chat.myId} onReport={onReport} />
+    ),
+    [chat.myId, onReport],
+  );
 
   return (
     // No bottom edge: this sits inside the Messages tab now, and the tab bar already
@@ -112,9 +128,9 @@ export default function Chat() {
         <FlatList
           ref={listRef}
           data={chat.messages}
-          keyExtractor={(m) => m.id}
+          keyExtractor={keyExtractor}
           contentContainerClassName="gap-2 p-4"
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          onContentSizeChange={scrollToEnd}
           ListEmptyComponent={
             <View className="items-center gap-1 py-10">
               <Text variant="bodyStrong">No messages yet</Text>
@@ -123,13 +139,7 @@ export default function Chat() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <Bubble
-              message={item}
-              mine={item.sender === chat.myId}
-              onReport={() => report.mutate(item.id)}
-            />
-          )}
+          renderItem={renderBubble}
         />
       )}
 
@@ -449,20 +459,22 @@ function timeAgo(iso: string): string {
   return 'a while ago';
 }
 
-function Bubble({
+const Bubble = memo(function Bubble({
   message,
   mine,
   onReport,
 }: {
   message: Conversation;
   mine: boolean;
-  onReport: () => void;
+  onReport: (id: string) => void;
 }) {
+  const report = useCallback(() => onReport(message.id), [onReport, message.id]);
+
   return (
     <Pressable
       // Reporting is only offered on messages you received: the backend refuses a
       // report on your own with RECEIVER_IS_DIFFERENT (143).
-      onLongPress={mine ? undefined : onReport}
+      onLongPress={mine ? undefined : report}
       accessibilityHint={mine ? undefined : 'Long press to report this message'}
       className={cn('max-w-[80%]', mine ? 'self-end' : 'self-start')}
     >
@@ -476,4 +488,4 @@ function Bubble({
       </View>
     </Pressable>
   );
-}
+});

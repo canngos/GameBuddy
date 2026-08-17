@@ -1,10 +1,10 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Clock, Users } from 'lucide-react-native';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { lobbyApi, PAGE_SIZE } from '../../../src/api/lobby';
-import type { LobbyTone } from '../../../src/api/types';
+import type { Lobby, LobbyTone } from '../../../src/api/types';
 import { LobbyCard } from '../../../src/lobby/LobbyCard';
 import { TONES, ToneChip } from '../../../src/lobby/ToneChip';
 import { useThemeColors } from '../../../src/theme';
@@ -39,10 +39,19 @@ export default function LobbyHome() {
   });
 
   const myLobbies = mine.data ?? [];
-  // My own lobbies are pinned above; repeating them in the feed would list them twice.
-  const open = (feed.data?.pages.flat() ?? []).filter(
-    (lobby) => !myLobbies.some((m) => m.id === lobby.id),
-  );
+
+  /**
+   * My own lobbies are pinned above; repeating them in the feed would list them twice.
+   *
+   * Through a `Set` and a memo. This is an infinite query, so `pages.flat()` grows with
+   * every page fetched, and the previous `myLobbies.some(...)` inside the filter made the
+   * whole thing O(pages × mine) — recomputed on every render of a screen that also owns
+   * two chip rows and a pull-to-refresh.
+   */
+  const open = useMemo(() => {
+    const mineIds = new Set(myLobbies.map((lobby) => lobby.id));
+    return (feed.data?.pages.flat() ?? []).filter((lobby) => !mineIds.has(lobby.id));
+  }, [feed.data?.pages, myLobbies]);
 
   // One live lobby per owner is the rule the backend enforces (LOBBY_LIMIT_REACHED).
   // Knowing it here too means the button can say so before somebody fills in a form
@@ -51,11 +60,17 @@ export default function LobbyHome() {
     (lobby) => lobby.myStatus === 'OWNER' && (lobby.status === 'OPEN' || lobby.status === 'LOCKED'),
   );
 
+  const keyExtractor = useCallback((lobby: Lobby) => lobby.id, []);
+  const renderLobby = useCallback(
+    ({ item }: { item: Lobby }) => <LobbyCard lobby={item} />,
+    [],
+  );
+
   return (
     <Screen edges={['top']} padded={false}>
       <FlatList
         data={open}
-        keyExtractor={(lobby) => lobby.id}
+        keyExtractor={keyExtractor}
         contentContainerClassName="gap-3 px-6 pb-8"
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.5}
@@ -67,7 +82,7 @@ export default function LobbyHome() {
           void feed.refetch();
           void mine.refetch();
         }}
-        renderItem={({ item }) => <LobbyCard lobby={item} />}
+        renderItem={renderLobby}
         ListHeaderComponent={
           <View className="gap-5 pb-2">
             <View className="flex-row items-end justify-between pt-8">

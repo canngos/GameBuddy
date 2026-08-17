@@ -47,6 +47,8 @@ export function ProfileBanner({ source }: { source: string | null | undefined })
           // squashes. Anything else would distort every banner in the set.
           contentFit="cover"
           transition={150}
+          cachePolicy="memory-disk"
+          recyclingKey={source}
         />
       ) : null}
     </View>

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { memo, useCallback, useMemo } from 'react';
 import { Alert, FlatList, View } from 'react-native';
 import { adminApi } from '../../src/api/admin';
 import type { Report } from '../../src/api/types';
@@ -37,21 +38,38 @@ export default function ReportsScreen() {
     },
   });
 
-  const confirmRemove = (report: Report) =>
-    Alert.alert(
-      'Remove this content?',
-      'It is deleted for everyone, and every open report against it is closed. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => settle.mutate({ reportId: report.reportId, remove: true }),
-        },
-      ],
-    );
+  // Stable, so the extracted row below can memoise. It was an inline arrow, which is also
+  // why the row could not be a component at all.
+  const confirmRemove = useCallback(
+    (report: Report) =>
+      Alert.alert(
+        'Remove this content?',
+        'It is deleted for everyone, and every open report against it is closed. This cannot be undone.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Remove',
+            style: 'destructive',
+            onPress: () => settle.mutate({ reportId: report.reportId, remove: true }),
+          },
+        ],
+      ),
+    [settle],
+  );
 
   const open = reports.data?.reports ?? [];
+
+  const keyExtractor = useCallback((report: Report) => report.reportId, []);
+  const onKeep = useCallback(
+    (reportId: string) => settle.mutate({ reportId, remove: false }),
+    [settle],
+  );
+  const renderRow = useCallback(
+    ({ item }: { item: Report }) => (
+      <ReportRow report={item} busy={settle.isPending} onKeep={onKeep} onRemove={confirmRemove} />
+    ),
+    [settle.isPending, onKeep, confirmRemove],
+  );
 
   return (
     <Screen edges={['top']}>
@@ -65,7 +83,7 @@ export default function ReportsScreen() {
 
       <FlatList
         data={open}
-        keyExtractor={(report) => report.reportId}
+        keyExtractor={keyExtractor}
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-8"
         onRefresh={() => void reports.refetch()}
@@ -77,78 +95,7 @@ export default function ReportsScreen() {
             </Text>
           )
         }
-        renderItem={({ item }) => (
-          <Card className="mb-3">
-            <View className="flex-row items-center justify-between">
-              <Text variant="overline">{item.contentType}</Text>
-              <Text variant="caption" className={item.overdue ? 'text-danger' : undefined}>
-                {when(item.createdAt)}
-              </Text>
-            </View>
-
-            {/* The terms promise a decision within 24 hours. A promise whose state is
-                invisible is one that gets broken quietly, so the queue says so — and it
-                says so on the row, not in a summary somewhere else. */}
-            {item.overdue && (
-              <View className="mt-2 self-start rounded-full bg-danger/15 px-3 py-1">
-                <Text variant="caption" className="text-danger">
-                  Past the 24-hour commitment — {item.ageHours}h open
-                </Text>
-              </View>
-            )}
-
-            <Text variant="bodyStrong" className="mt-2">
-              {item.authorUsername ?? 'Unknown author'}
-            </Text>
-
-            {/* The reason is the reporter's words, so it is quoted rather than
-                presented as a finding. */}
-            <Text variant="caption" className="mt-1">
-              Reported for: {item.reason}
-            </Text>
-
-            {item.content ? (
-              <View className="mt-3 rounded-input bg-canvas p-3">
-                <Text variant="body">{item.content}</Text>
-              </View>
-            ) : (
-              // A profile report has no text by design — the complaint is about the
-              // account itself, its username or its picture. Saying "already gone" here
-              // told the moderator the content had been removed, which was untrue for
-              // every profile report and would have made them dismiss real ones.
-              <Text variant="caption" className="mt-3 italic">
-                {item.contentType === 'PROFILE'
-                  ? 'A report about the account itself — its username, picture or bio.'
-                  : 'The content is already gone — removed, or the account was deleted.'}
-              </Text>
-            )}
-
-            {item.authorOpenReportCount != null && item.authorOpenReportCount > 1 && (
-              <Text variant="caption" className="mt-3 text-primary">
-                {item.authorOpenReportCount} open reports against this account
-              </Text>
-            )}
-
-            <View className="mt-4 flex-row gap-3">
-              <View className="flex-1">
-                <Button
-                  label="Keep"
-                  variant="secondary"
-                  onPress={() => settle.mutate({ reportId: item.reportId, remove: false })}
-                  disabled={settle.isPending}
-                />
-              </View>
-              <View className="flex-1">
-                <Button
-                  label="Remove"
-                  variant="danger"
-                  onPress={() => confirmRemove(item)}
-                  disabled={settle.isPending}
-                />
-              </View>
-            </View>
-          </Card>
-        )}
+        renderItem={renderRow}
       />
     </Screen>
   );
@@ -163,3 +110,90 @@ function when(iso: string) {
   if (hours < 24) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
 }
+
+/**
+ * One report in the queue.
+ *
+ * Extracted so it can be memoised at all — it was inline JSX inside `renderItem`, which
+ * left no component to wrap. `when()` builds a `Date` and reads the clock, so it was doing
+ * that for every row on every render of the screen; it is memoised on the timestamp here,
+ * which is the only thing that can change the answer.
+ */
+const ReportRow = memo(function ReportRow({
+  report,
+  busy,
+  onKeep,
+  onRemove,
+}: {
+  report: Report;
+  busy: boolean;
+  onKeep: (reportId: string) => void;
+  onRemove: (report: Report) => void;
+}) {
+  const keep = useCallback(() => onKeep(report.reportId), [onKeep, report.reportId]);
+  const remove = useCallback(() => onRemove(report), [onRemove, report]);
+  const age = useMemo(() => when(report.createdAt), [report.createdAt]);
+
+  return (
+    <Card className="mb-3">
+      <View className="flex-row items-center justify-between">
+        <Text variant="overline">{report.contentType}</Text>
+        <Text variant="caption" className={report.overdue ? 'text-danger' : undefined}>
+          {age}
+        </Text>
+      </View>
+
+      {/* The terms promise a decision within 24 hours. A promise whose state is
+          invisible is one that gets broken quietly, so the queue says so — and it
+          says so on the row, not in a summary somewhere else. */}
+      {report.overdue && (
+        <View className="mt-2 self-start rounded-full bg-danger/15 px-3 py-1">
+          <Text variant="caption" className="text-danger">
+            Past the 24-hour commitment — {report.ageHours}h open
+          </Text>
+        </View>
+      )}
+
+      <Text variant="bodyStrong" className="mt-2">
+        {report.authorUsername ?? 'Unknown author'}
+      </Text>
+
+      {/* The reason is the reporter's words, so it is quoted rather than
+          presented as a finding. */}
+      <Text variant="caption" className="mt-1">
+        Reported for: {report.reason}
+      </Text>
+
+      {report.content ? (
+        <View className="mt-3 rounded-input bg-canvas p-3">
+          <Text variant="body">{report.content}</Text>
+        </View>
+      ) : (
+        // A profile report has no text by design — the complaint is about the
+        // account itself, its username or its picture. Saying "already gone" here
+        // told the moderator the content had been removed, which was untrue for
+        // every profile report and would have made them dismiss real ones.
+        <Text variant="caption" className="mt-3 italic">
+          {report.contentType === 'PROFILE'
+            ? 'A report about the account itself — its username, picture or bio.'
+            : 'The content is already gone — removed, or the account was deleted.'}
+        </Text>
+      )}
+
+      {report.authorOpenReportCount != null && report.authorOpenReportCount > 1 && (
+        <Text variant="caption" className="mt-3 text-primary">
+          {report.authorOpenReportCount} open reports against this account
+        </Text>
+      )}
+
+      <View className="mt-4 flex-row gap-3">
+        <View className="flex-1">
+          <Button label="Keep" variant="secondary" onPress={keep} disabled={busy} />
+        </View>
+        <View className="flex-1">
+          <Button label="Remove" variant="danger" onPress={remove} disabled={busy} />
+        </View>
+      </View>
+    </Card>
+  );
+});

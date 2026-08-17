@@ -51,7 +51,32 @@ const LEVELS = {
  * The key set does vary by *platform*, which is safe — `Platform.OS` cannot change at
  * runtime.
  */
+/**
+ * Resolved styles, keyed by the two inputs.
+ *
+ * `glow` is pure, and on Android it runs a regex and builds a `boxShadow` string every
+ * call — for all five tab icons on every tab-bar render, and for every button in the app.
+ * The palette has about ten colours and there are four levels, so the cache settles at a
+ * couple of dozen entries and never grows again.
+ *
+ * The bound guards the one case the `rgba` comment below warns about: a caller glowing an
+ * `hsl()` per-identity avatar colour would otherwise key an entry per user.
+ */
+const cache = new Map<string, ViewStyle>();
+const MAX_ENTRIES = 64;
+
 export function glow(level: GlowLevel, color: string): ViewStyle {
+  const key = `${level}|${color}`;
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+
+  const style = buildGlow(level, color);
+  if (cache.size >= MAX_ENTRIES) cache.clear();
+  cache.set(key, style);
+  return style;
+}
+
+function buildGlow(level: GlowLevel, color: string): ViewStyle {
   const spec = LEVELS[level];
 
   return Platform.select<ViewStyle>({

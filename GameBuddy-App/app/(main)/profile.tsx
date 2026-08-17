@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Crown, Settings, Shirt } from 'lucide-react-native';
+import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
 import { profileApi } from '../../src/api/catalogue';
@@ -235,6 +236,8 @@ function Showcase({
               style={{ width: 48, height: 48 }}
               contentFit="contain"
               transition={150}
+              cachePolicy="memory-disk"
+              recyclingKey={badge.code}
             />
             <Text variant="caption" numberOfLines={2} className="text-center">
               {badge.title}
@@ -299,6 +302,12 @@ function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSumm
     },
   });
 
+  // Stable, so the rows below can actually bail out of re-rendering.
+  const onAnswer = useCallback(
+    (userId: string, accept: boolean) => answer.mutate({ userId, accept }),
+    [answer],
+  );
+
   const requests = query.data ?? [];
   if (requests.length === 0) return null;
 
@@ -308,39 +317,19 @@ function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSumm
         FRIEND REQUESTS · {requests.length}
       </Text>
 
+      {/* Left as a `map` rather than virtualized, deliberately: this is a *section* inside
+          the profile's ScrollView, and a FlatList nested in one is the layout React Native
+          warns about — it would un-virtualize itself and gain nothing. Pending requests are
+          also self-limiting, because answering them is the whole point of the section. The
+          per-render cost is what mattered here, and that is what the memo below removes. */}
       <View className="gap-2">
         {requests.map((person) => (
-          <Card key={person.userId} className="flex-row items-center gap-3 p-4">
-            <FramedAvatar
-              frame={person.frame}
-              source={person.avatar}
-              name={person.username}
-              colorSeed={person.userId}
-              size={44}
-            />
-            <View className="flex-1 gap-0.5">
-              <Text variant="bodyStrong">{person.username}</Text>
-              <Text variant="caption">
-                {[person.age, person.country].filter(Boolean).join(' · ')}
-              </Text>
-            </View>
-
-            <Button
-              label="Accept"
-              size="md"
-              className="px-4"
-              disabled={answer.isPending}
-              onPress={() => answer.mutate({ userId: person.userId, accept: true })}
-            />
-            <Button
-              label="No"
-              variant="ghost"
-              size="md"
-              className="px-3"
-              disabled={answer.isPending}
-              onPress={() => answer.mutate({ userId: person.userId, accept: false })}
-            />
-          </Card>
+          <RequestRow
+            key={person.userId}
+            person={person}
+            busy={answer.isPending}
+            onAnswer={onAnswer}
+          />
         ))}
       </View>
 
@@ -348,3 +337,53 @@ function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSumm
     </View>
   );
 }
+
+/**
+ * One pending friend request.
+ *
+ * Memoised on primitives and a stable `onAnswer`, so answering one request does not
+ * re-render the rest of them — and neither does anything else on the profile, which is
+ * the screen this section happens to live on.
+ */
+const RequestRow = memo(function RequestRow({
+  person,
+  busy,
+  onAnswer,
+}: {
+  person: GamerSummary;
+  busy: boolean;
+  onAnswer: (userId: string, accept: boolean) => void;
+}) {
+  const accept = useCallback(() => onAnswer(person.userId, true), [onAnswer, person.userId]);
+  const decline = useCallback(() => onAnswer(person.userId, false), [onAnswer, person.userId]);
+  const meta = useMemo(
+    () => [person.age, person.country].filter(Boolean).join(' · '),
+    [person.age, person.country],
+  );
+
+  return (
+    <Card className="flex-row items-center gap-3 p-4">
+      <FramedAvatar
+        frame={person.frame}
+        source={person.avatar}
+        name={person.username}
+        colorSeed={person.userId}
+        size={44}
+      />
+      <View className="flex-1 gap-0.5">
+        <Text variant="bodyStrong">{person.username}</Text>
+        <Text variant="caption">{meta}</Text>
+      </View>
+
+      <Button label="Accept" size="md" className="px-4" disabled={busy} onPress={accept} />
+      <Button
+        label="No"
+        variant="ghost"
+        size="md"
+        className="px-3"
+        disabled={busy}
+        onPress={decline}
+      />
+    </Card>
+  );
+});

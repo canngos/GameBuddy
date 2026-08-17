@@ -1,5 +1,15 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
+import { Image } from 'expo-image';
+import {
+  memo,
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useThemeColors } from '../theme';
 import { cn } from '../ui/cn';
 import { ErrorNotice } from '../ui/ErrorNotice';
@@ -38,11 +48,20 @@ export type PickerFilter = {
 type CataloguePickerProps = {
   items: PickerItem[];
   selected: string[];
+  /**
+   * Must be identity-stable — a fresh closure here defeats the `memo` on every card and
+   * puts the whole catalogue back on the render path for one tap. Both onboarding screens
+   * pass a zustand action; both settings screens pass a `useCallback` over a functional
+   * `setState`.
+   */
   onToggle: (id: string) => void;
   /**
    * `grid` is two per row with a cover image — games, where the picture identifies the
    * thing faster than the name does. `rows` is one per row — keywords, where the
    * explanation needs the width and is the reason to read the row at all.
+   *
+   * Fixed for the life of a mounted picker: it decides `numColumns`, which React Native
+   * cannot change without a remount.
    */
   layout?: 'grid' | 'rows';
   isLoading?: boolean;
@@ -56,7 +75,20 @@ type CataloguePickerProps = {
    * to think about. Games have three hundred and two.
    */
   filters?: PickerFilter[];
+  /**
+   * Scrolls away above the search field — a step header, a title.
+   *
+   * A prop rather than a sibling because the picker owns the scrolling surface now (see
+   * the note on the component), so anything a screen wants to scroll with the list has to
+   * come through here.
+   */
+  header?: ReactNode;
+  /** Scrolls in below the last card. A selection count, a submit error. */
+  footer?: ReactNode;
 };
+
+/** Stable identity, so an unfiltered facet does not look like a changed prop. */
+const NO_IDS: string[] = [];
 
 /**
  * Search, then a list of selectable rows.
@@ -68,6 +100,14 @@ type CataloguePickerProps = {
  *
  * Shared by onboarding and by editing, because they are the same interaction on the same
  * data; the only difference is what the button at the bottom does.
+ *
+ * **This component is the scrolling surface, not a block of content inside one.** It used
+ * to map every match into a flex-wrap `View` inside the screen's `ScrollView`, which at
+ * three hundred games meant a hundred and fifty rows — about fifty-five screenfuls —
+ * mounted at once, with three hundred covers fetched and decoded for the two that were
+ * visible. Filtering took about a second and a tap did not feel like a tap. So the screens
+ * hand their chrome to `header` / `footer` and stop scrolling themselves; everything above
+ * the first card rides in `ListHeaderComponent`.
  */
 export function CataloguePicker({
   items,
@@ -79,9 +119,16 @@ export function CataloguePicker({
   onRetry,
   searchPlaceholder = 'Search',
   filters,
+  header,
+  footer,
 }: CataloguePickerProps) {
-  const colors = useThemeColors();
   const [query, setQuery] = useState('');
+  /**
+   * The field stays bound to `query` so typing is never held up; only the filtering reads
+   * the deferred copy. React then keeps the previous list on screen while it recomputes
+   * rather than blocking the keystroke behind three hundred items.
+   */
+  const deferredQuery = useDeferredValue(query);
 
   /** Chosen option ids per facet. Empty or absent means that facet constrains nothing. */
   const [chosen, setChosen] = useState<Record<string, string[]>>({});
@@ -91,44 +138,191 @@ export function CataloguePicker({
     [chosen],
   );
 
+  /**
+   * One lowercased haystack per item, built when the catalogue arrives.
+   *
+   * The search used to call `toLowerCase()` on three fields of every item on every
+   * keystroke — nine hundred allocations per character, thrown away immediately.
+   */
+  const haystacks = useMemo(
+    () =>
+      items.map((item) =>
+        `${item.label}\n${item.detail ?? ''}\n${item.keywords ?? ''}`.toLowerCase(),
+      ),
+    [items],
+  );
+
   const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
 
     // OR within a facet, AND across facets: picking PC and Switch widens, picking Switch
     // and RPG narrows. That is what the two rows look like they do, and getting it the
     // other way round makes selecting a second platform mysteriously return nothing.
     const active = Object.entries(chosen).filter(([, ids]) => ids.length > 0);
 
-    return items.filter((item) => {
-      if (
-        q &&
-        !item.label.toLowerCase().includes(q) &&
-        !item.detail?.toLowerCase().includes(q) &&
-        !item.keywords?.toLowerCase().includes(q)
-      ) {
-        return false;
-      }
+    return items.filter((item, index) => {
+      if (q && !haystacks[index].includes(q)) return false;
       return active.every(([key, ids]) => {
         const values = item.facets?.[key];
         return !!values && ids.some((id) => values.includes(id));
       });
     });
-  }, [items, query, chosen]);
+  }, [items, haystacks, deferredQuery, chosen]);
 
-  const toggleFilter = (key: string, id: string) =>
-    setChosen((current) => {
-      const ids = current[key] ?? [];
-      return {
-        ...current,
-        [key]: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
-      };
-    });
+  /**
+   * A set, not the array, because every card asks whether it is selected — `includes` made
+   * one render of the grid O(items × selection).
+   */
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  const toggleFilter = useCallback(
+    (key: string, id: string) =>
+      setChosen((current) => {
+        const ids = current[key] ?? NO_IDS;
+        return {
+          ...current,
+          [key]: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id],
+        };
+      }),
+    [],
+  );
+
+  const clearFilters = useCallback(() => setChosen({}), []);
+
+  const grid = layout === 'grid';
+
+  /**
+   * Narrowing the list shortens it under the reader. Without this, somebody scrolled
+   * halfway down who taps a chip lands in whatever is left at that offset — usually
+   * nothing — and reads it as the filter having broken.
+   *
+   * `scrollToOffset` does not blur the field, so this is safe to run on every keystroke.
+   */
+  const listRef = useRef<FlatList<PickerItem>>(null);
+  useEffect(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [deferredQuery, chosen]);
+
+  const keyExtractor = useCallback((item: PickerItem) => item.id, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: PickerItem }) =>
+      grid ? (
+        <GameCard item={item} selected={selectedSet.has(item.id)} onToggle={onToggle} />
+      ) : (
+        <KeywordRow item={item} selected={selectedSet.has(item.id)} onToggle={onToggle} />
+      ),
+    [grid, selectedSet, onToggle],
+  );
 
   return (
-    <View className="gap-4">
+    <FlatList
+      ref={listRef}
+      className="flex-1"
+      data={visible}
+      // `numColumns` cannot change on a mounted list (FlatList.js asserts it). `layout` is
+      // fixed per call site, so this only ever matters as a guard.
+      key={grid ? 'grid' : 'rows'}
+      numColumns={grid ? 2 : 1}
+      // A plain style rather than `columnWrapperClassName`. The class form exists, but
+      // FlatList asserts `!columnWrapperStyle` for a single-column list, and an interop
+      // that turned an absent class into an empty array — truthy — would take the two
+      // keyword pickers down. Not worth the doubt for one gap.
+      columnWrapperStyle={grid ? styles.column : undefined}
+      keyExtractor={keyExtractor}
+      renderItem={renderItem}
+      // The set is a new object per selection change, which is what tells the list its
+      // rows are stale. Without it `memo` would hold the old borders on screen.
+      extraData={selectedSet}
+      ListHeaderComponent={
+        // An element of a module-scope component, never an inline arrow: an arrow is a new
+        // component *type* every render, so the TextInput inside would remount and lose
+        // focus after every character typed.
+        <PickerHeader
+          header={header}
+          query={query}
+          onQueryChange={setQuery}
+          searchPlaceholder={searchPlaceholder}
+          filters={filters}
+          chosen={chosen}
+          onToggleFilter={toggleFilter}
+          onClearFilters={clearFilters}
+          activeCount={activeCount}
+          isLoading={isLoading}
+          error={error}
+          onRetry={onRetry}
+          emptyQuery={deferredQuery}
+          showEmpty={!isLoading && items.length > 0 && visible.length === 0}
+        />
+      }
+      // Wrapped because ListFooterComponent takes an element or a component type, not any
+      // ReactNode.
+      ListFooterComponent={footer ? <View>{footer}</View> : null}
+      contentContainerClassName={cn('pb-8', grid ? 'gap-3' : 'gap-2')}
+      showsVerticalScrollIndicator={false}
+      // A tap on a card while the keyboard is up has to select the card, not just close
+      // the keyboard and be swallowed.
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      // In rows, not items: with `numColumns` the list counts `ceil(n / columns)`.
+      initialNumToRender={grid ? 6 : 12}
+      maxToRenderPerBatch={grid ? 4 : 8}
+      updateCellsBatchingPeriod={50}
+      // Roughly three viewports either side. This is the knob that caps how many covers
+      // are decoded at once; raise it if a violent fling shows blank cells.
+      windowSize={7}
+      // `removeClippedSubviews` is deliberately not set: it already defaults to true on
+      // Android, and forcing it on iOS is the documented way to get missing content.
+    />
+  );
+}
+
+/**
+ * Everything above the first card: the screen's own header, search, the empty-state line,
+ * the facet chips, and whatever the query is doing.
+ *
+ * Module scope on purpose — see the `ListHeaderComponent` note above.
+ */
+function PickerHeader({
+  header,
+  query,
+  onQueryChange,
+  searchPlaceholder,
+  filters,
+  chosen,
+  onToggleFilter,
+  onClearFilters,
+  activeCount,
+  isLoading,
+  error,
+  onRetry,
+  emptyQuery,
+  showEmpty,
+}: {
+  header?: ReactNode;
+  query: string;
+  onQueryChange: (value: string) => void;
+  searchPlaceholder: string;
+  filters?: PickerFilter[];
+  chosen: Record<string, string[]>;
+  onToggleFilter: (key: string, id: string) => void;
+  onClearFilters: () => void;
+  activeCount: number;
+  isLoading: boolean;
+  error: unknown;
+  onRetry?: () => void;
+  emptyQuery: string;
+  showEmpty: boolean;
+}) {
+  const colors = useThemeColors();
+
+  return (
+    <View className="gap-4 pb-1">
+      {header}
+
       <TextField
         value={query}
-        onChangeText={setQuery}
+        onChangeText={onQueryChange}
         placeholder={searchPlaceholder}
         returnKeyType="search"
       />
@@ -143,13 +337,13 @@ export function CataloguePicker({
           because the two chip rows are ~380px tall: sitting after them, the line fell
           below the fold on a phone the moment the keyboard was up — which is precisely
           when a search returns nothing and the explanation is needed. */}
-      {!isLoading && items.length > 0 && visible.length === 0 && (
+      {showEmpty && (
         <Text className="text-center text-muted">
-          {query && activeCount > 0
-            ? `Nothing matches “${query}” with these filters.`
+          {emptyQuery && activeCount > 0
+            ? `Nothing matches “${emptyQuery}” with these filters.`
             : activeCount > 0
               ? 'Nothing matches these filters.'
-              : `Nothing matches “${query}”.`}
+              : `Nothing matches “${emptyQuery}”.`}
         </Text>
       )}
 
@@ -157,14 +351,14 @@ export function CataloguePicker({
         <FilterRow
           key={filter.key}
           filter={filter}
-          chosen={chosen[filter.key] ?? []}
-          onToggle={(id) => toggleFilter(filter.key, id)}
+          chosen={chosen[filter.key] ?? NO_IDS}
+          onToggle={onToggleFilter}
         />
       ))}
 
       {activeCount > 0 && (
         <Pressable
-          onPress={() => setChosen({})}
+          onPress={onClearFilters}
           className="min-h-touch justify-center"
           accessibilityRole="button"
           accessibilityLabel="Clear all filters"
@@ -179,52 +373,48 @@ export function CataloguePicker({
       {/* `!!` because `error` is `unknown`: `unknown && <JSX/>` is itself `unknown`,
           which is not a valid child. */}
       {!!error && <ErrorNotice error={error} onRetry={onRetry} />}
-
-      <View className={cn(layout === 'grid' ? 'flex-row flex-wrap gap-3' : 'gap-2')}>
-        {visible.map((item) =>
-          layout === 'grid' ? (
-            <GameCard
-              key={item.id}
-              item={item}
-              selected={selected.includes(item.id)}
-              onPress={() => onToggle(item.id)}
-            />
-          ) : (
-            <KeywordRow
-              key={item.id}
-              item={item}
-              selected={selected.includes(item.id)}
-              onPress={() => onToggle(item.id)}
-            />
-          ),
-        )}
-      </View>
     </View>
   );
 }
 
 /**
+ * `flex-1` with a half-width cap rather than a fixed width, so two fit a row on a small
+ * phone and on a large one without measuring the screen. The cap is what stops a lone card
+ * on an odd last row stretching across the whole width.
+ */
+const styles = StyleSheet.create({
+  card: { flex: 1, maxWidth: '50%' },
+  column: { gap: 12 },
+  // expo-image is not registered with NativeWind — only React Native's own components are
+  // — so `className` on it resolves to nothing and fails silently, which is the trap in
+  // UI_NOTE §4.9. This is a style.
+  cover: { width: '100%', height: '100%' },
+});
+
+/**
  * One game: cover, name, category.
  *
- * `flex-[0_0_48%]` rather than a fixed width, so two fit a row on a small phone and on a
- * large one without measuring the screen.
+ * Memoised on a boolean `selected` and a stable `onToggle`, so selecting a game re-renders
+ * that card rather than the catalogue.
  */
-function GameCard({
+const GameCard = memo(function GameCard({
   item,
   selected,
-  onPress,
+  onToggle,
 }: {
   item: PickerItem;
   selected: boolean;
-  onPress: () => void;
+  onToggle: (id: string) => void;
 }) {
+  const onPress = useCallback(() => onToggle(item.id), [onToggle, item.id]);
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: selected }}
       accessibilityLabel={item.label}
-      style={{ flexBasis: '48%' }}
+      style={styles.card}
       className={cn(
         'overflow-hidden rounded-card border-2 bg-surface active:opacity-80',
         selected ? 'border-primary' : 'border-transparent',
@@ -232,7 +422,21 @@ function GameCard({
     >
       <View className="aspect-[3/4] w-full bg-raised">
         {item.image ? (
-          <Image source={{ uri: item.image }} resizeMode="cover" className="h-full w-full" />
+          <Image
+            source={{ uri: item.image }}
+            style={styles.cover}
+            // `contentFit`, not `resizeMode`: that is React Native's prop and expo-image
+            // ignores it.
+            contentFit="cover"
+            // A disk cache, so the second visit to the picker — register now, edit from
+            // settings later — paints without going back to R2.
+            cachePolicy="memory-disk"
+            // Without this a recycled cell shows the previous game's cover until the new
+            // one decodes, which during a fling looks like the grid is mislabelled.
+            recyclingKey={item.id}
+            transition={150}
+            priority="low"
+          />
         ) : (
           // No cover yet. The initial beats an empty rectangle, and beats a broken-image
           // icon by a long way.
@@ -262,9 +466,8 @@ function GameCard({
       </View>
     </Pressable>
   );
-}
+});
 
-/** One keyword: icon, name, and what picking it means. */
 /**
  * One facet's chips, scrolling sideways.
  *
@@ -276,15 +479,18 @@ function GameCard({
  * `border-primary` for a chosen chip rather than a filled background: the cards below use
  * exactly that to mean "picked", and a filter that highlights differently from a selection
  * reads as a different kind of state.
+ *
+ * Memoised because it sits in the list header, which re-renders on every keystroke, and
+ * twenty-six chips is not free.
  */
-function FilterRow({
+const FilterRow = memo(function FilterRow({
   filter,
   chosen,
   onToggle,
 }: {
   filter: PickerFilter;
   chosen: string[];
-  onToggle: (id: string) => void;
+  onToggle: (key: string, id: string) => void;
 }) {
   return (
     <View className="gap-1.5">
@@ -302,7 +508,7 @@ function FilterRow({
           return (
             <Pressable
               key={option.id}
-              onPress={() => onToggle(option.id)}
+              onPress={() => onToggle(filter.key, option.id)}
               accessibilityRole="button"
               accessibilityState={{ selected: picked }}
               className={cn(
@@ -319,18 +525,20 @@ function FilterRow({
       </ScrollView>
     </View>
   );
-}
+});
 
-function KeywordRow({
+/** One keyword: icon, name, and what picking it means. */
+const KeywordRow = memo(function KeywordRow({
   item,
   selected,
-  onPress,
+  onToggle,
 }: {
   item: PickerItem;
   selected: boolean;
-  onPress: () => void;
+  onToggle: (id: string) => void;
 }) {
   const colors = useThemeColors();
+  const onPress = useCallback(() => onToggle(item.id), [onToggle, item.id]);
 
   return (
     <Pressable
@@ -364,4 +572,4 @@ function KeywordRow({
       </View>
     </Pressable>
   );
-}
+});

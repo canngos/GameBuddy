@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { useCallback, useMemo } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { matchApi } from '../../src/api/match';
 import type { Candidate } from '../../src/api/types';
 import { AdmirerCard } from '../../src/match/AdmirerCard';
@@ -19,6 +20,11 @@ import { BackHeader, Button, ErrorNotice, Screen, Text } from '../../src/ui';
  * number, and anybody can check it against their matches over time. Withholding only the
  * faces is the line that keeps this side of manipulative.
  */
+/** One grid cell: a real admirer, or a placeholder for one still hidden. */
+type Tile = { key: string; candidate?: Candidate };
+
+const COLUMN = StyleSheet.create({ row: { gap: 12 } }).row;
+
 export default function Admirers() {
   const router = useRouter();
   const colors = useThemeColors();
@@ -34,6 +40,44 @@ export default function Admirers() {
   const data = admirers.data;
   const count = data?.count ?? 0;
   const locked = data?.locked ?? true;
+
+  /**
+   * Real faces first, then one placeholder per admirer still hidden.
+   *
+   * The placeholders are not fetched and never will be — the server sends an empty
+   * `likedYou` while locked — so they are built here from the count rather than standing
+   * in for anything that exists.
+   */
+  const tiles = useMemo((): Tile[] => {
+    const revealed: Tile[] = (data?.likedYou ?? []).map((candidate: Candidate) => ({
+      key: candidate.userId,
+      candidate,
+    }));
+    if (!locked) return revealed;
+
+    const hidden = Math.min(count - (data?.likedYou.length ?? 0), 6);
+    return [
+      ...revealed,
+      ...Array.from({ length: Math.max(0, hidden) }, (_, index) => ({ key: `locked-${index}` })),
+    ];
+  }, [data?.likedYou, locked, count]);
+
+  const openProfile = useCallback(
+    (userId: string) => router.push(`/messages/gamer/${userId}`),
+    [router],
+  );
+
+  const keyExtractor = useCallback((tile: Tile) => tile.key, []);
+
+  const renderTile = useCallback(
+    ({ item }: { item: Tile }) =>
+      item.candidate ? (
+        <AdmirerCard candidate={item.candidate} onPress={() => openProfile(item.candidate!.userId)} />
+      ) : (
+        <AdmirerCard locked />
+      ),
+    [openProfile],
+  );
 
   return (
     <Screen edges={['top']} padded={false}>
@@ -57,35 +101,21 @@ export default function Admirers() {
 
       {data && count > 0 && (
         <View className="flex-1">
-          <View className="gap-1 px-6 pb-4">
-            <Text variant="display" className="text-accent">
-              {count}
-            </Text>
-            <Text variant="body" className="text-muted">
-              {count === 1 ? 'person likes you' : 'people like you'}
-              {locked ? ' — upgrade to see who' : ''}
-            </Text>
-          </View>
-
-          <View className="flex-1 flex-row flex-wrap gap-3 px-6">
-            {/* Anyone already paid for shows their face, on any tier. */}
-            {data.likedYou.map((candidate: Candidate) => (
-              <AdmirerCard
-                key={candidate.userId}
-                candidate={candidate}
-                onPress={() => router.push(`/messages/gamer/${candidate.userId}`)}
-              />
-            ))}
-
-            {/* One blurred card per admirer still hidden. The count above is the real
-                number; these are placeholders for faces we are deliberately not sending,
-                so there is nothing to fetch per tile. */}
-            {locked &&
-              Array.from(
-                { length: Math.min(count - data.likedYou.length, 6) },
-                (_, index) => <AdmirerCard key={`locked-${index}`} locked />,
-              )}
-          </View>
+          {/* A FlatList, and not only for the render cost. This grid was a `flex-wrap`
+              View inside a `Screen` that does not scroll, so on a full list every tile
+              past the fold was simply unreachable — a functional bug wearing a
+              performance one. */}
+          <FlatList
+            className="flex-1"
+            data={tiles}
+            numColumns={3}
+            columnWrapperStyle={COLUMN}
+            keyExtractor={keyExtractor}
+            renderItem={renderTile}
+            contentContainerClassName="gap-3 px-6 pb-4"
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={<CountHeader count={count} locked={locked} />}
+          />
 
           {locked && count > data.likedYou.length && (
             <View className="gap-3 border-t border-line bg-canvas px-6 pb-2 pt-4">
@@ -140,6 +170,26 @@ function UnlockOne() {
         onPress={() => unlock.mutate()}
       />
       {unlock.error && <ErrorNotice error={unlock.error} />}
+    </View>
+  );
+}
+
+/**
+ * The count, above the grid and inside the list so it scrolls with it.
+ *
+ * The number is free on purpose — see the note on the screen. It stays honest by being the
+ * real count whether or not any face has been paid for.
+ */
+function CountHeader({ count, locked }: { count: number; locked: boolean }) {
+  return (
+    <View className="gap-1 pb-4">
+      <Text variant="display" className="text-accent">
+        {count}
+      </Text>
+      <Text variant="body" className="text-muted">
+        {count === 1 ? 'person likes you' : 'people like you'}
+        {locked ? ' — upgrade to see who' : ''}
+      </Text>
     </View>
   );
 }

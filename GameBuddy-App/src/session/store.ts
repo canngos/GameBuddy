@@ -8,6 +8,14 @@ import { shouldRefresh } from './tokenClock';
 
 const TOKEN_KEY = 'gamebuddy.accessToken';
 const USER_ID_KEY = 'gamebuddy.userId';
+/**
+ * The last stage the server reported, cached so a cold start can paint before asking.
+ *
+ * Only ever a hint. The server remains the authority — {@link verify} overwrites this
+ * within a second of launch — but it is a far better first guess than `'ready'` for
+ * somebody who closed the app halfway through onboarding.
+ */
+const STAGE_KEY = 'gamebuddy.sessionStage';
 
 /**
  * Where the user is, as far as navigation is concerned.
@@ -36,8 +44,10 @@ type SessionState = {
   token: string | null;
   userId: string | null;
 
-  /** Called once at startup. Resolves the stored token into a status. */
+  /** Called once at startup. Resolves the stored token into a status, without blocking. */
   restore: () => Promise<void>;
+  /** Confirms the stored status against the server. Runs in the background after restore. */
+  verify: () => Promise<void>;
   /**
    * Renews the token if it is past half its life. Safe to call often — it is a no-op
    * for a fresh token — and safe to call when signed out.
@@ -61,10 +71,33 @@ export const useSession = create<SessionState>((set, get) => ({
   token: null,
   userId: null,
 
+  /**
+   * Resolves the stored token into a status, and **does not wait for the network to do
+   * it.**
+   *
+   * This used to `await profileApi.me()` before leaving `'loading'`, and the root layout
+   * renders nothing at all until the status settles — so a cold start showed a blank
+   * screen for one whole round trip, and up to the client's twenty-second timeout on a
+   * bad connection. That is the single worst number in the app and it is paid by every
+   * session.
+   *
+   * Now the stored token is enough to paint, and {@link verify} corrects the guess in the
+   * background. Three things make that safe rather than optimistic:
+   *
+   * - The correction is a redirect, not a crash. `RouteGuard` is built to move somebody
+   *   between route groups without unmounting the navigator.
+   * - Nothing private can leak, because every screen's data comes from its own
+   *   authenticated request; a revoked token fails those too, and the expiry handler
+   *   already signs the user out when it does.
+   * - Guessing on failure is not new — the `catch` below has always fallen back to a
+   *   status it could not confirm. This promotes that fallback to the fast path and
+   *   makes the guess better by remembering the last known answer.
+   */
   restore: async () => {
-    const [token, userId] = await Promise.all([
+    const [token, userId, stage] = await Promise.all([
       secureStorage.get(TOKEN_KEY),
       secureStorage.get(USER_ID_KEY),
+      secureStorage.get(STAGE_KEY),
     ]);
 
     if (!token || !userId) {
@@ -72,23 +105,33 @@ export const useSession = create<SessionState>((set, get) => ({
       return;
     }
 
-    // Set the token first: the profile call below needs it, and the provider reads
-    // straight from this store.
-    set({ token, userId });
+    // Painted from here. `'ready'` is the fallback for a session stored before this
+    // cache existed, which is the same guess the old catch branch made.
+    set({ token, userId, status: isStage(stage) ? stage : 'ready' });
 
+    void get().verify();
+  },
+
+  /**
+   * Asks the server where this account actually is, and corrects the guess.
+   *
+   * Not awaited by anything that paints. A failure is deliberately silent: an expired
+   * token has already been handled by the session-expired handler, and anything else —
+   * the backend down, no network — must not sign somebody out because their train went
+   * into a tunnel.
+   */
+  verify: async () => {
     try {
-      const me = await profileApi.me();
-      set({ status: stageOf(me) });
-    } catch (error) {
-      // An expired or rejected token already triggered the session-expired handler,
-      // which clears everything. Anything else — the backend being down, no network —
-      // must not sign the user out; they would lose their session because their train
-      // went into a tunnel. Let them through and let the first real request fail.
-      if (get().token) set({ status: 'ready' });
+      const stage = rememberStage(stageOf(await profileApi.me()));
+      // Compared before writing so the overwhelmingly common case — the guess was right —
+      // does not re-render the guard for nothing.
+      if (get().status !== stage) set({ status: stage });
+    } catch {
+      // Left as it was. See the note above.
     }
 
-    // After the status is settled, not before: renewing is housekeeping, and making
-    // the first screen wait on it would trade a visible delay for an invisible gain.
+    // Housekeeping, and last: making the first screen wait on a renewal would trade a
+    // visible delay for an invisible gain.
     void get().renewIfStale();
   },
 
@@ -129,14 +172,14 @@ export const useSession = create<SessionState>((set, get) => ({
     await persist(token, userId);
     set({ token, userId });
     try {
-      set({ status: stageOf(await profileApi.me()) });
+      set({ status: rememberStage(stageOf(await profileApi.me())) });
     } catch {
       // The profile read failed on a token the server just issued, so the token is
       // fine and the network is not. A brand-new account is the overwhelmingly likely
       // case, and starting at the username step is recoverable — completing a step
       // that was already done is idempotent, whereas landing on the home screen with
       // no profile is not.
-      set({ status: 'needsUsername' });
+      set({ status: rememberStage('needsUsername') });
     }
   },
 
@@ -152,24 +195,28 @@ export const useSession = create<SessionState>((set, get) => ({
     // the mistake only corrected itself on the next cold start, when `restore` asked
     // the question that should have been asked now.
     try {
-      set({ status: stageOf(await profileApi.me()) });
+      set({ status: rememberStage(stageOf(await profileApi.me())) });
     } catch {
       // The password was just accepted, so the token is good and the network is not.
       // 'ready' is the right guess: an account that can log in has almost always
       // finished onboarding, and the guard re-resolves on the next launch either way.
-      set({ status: 'ready' });
+      set({ status: rememberStage('ready') });
     }
   },
 
-  usernameChosen: () => set({ status: 'needsDetails' }),
+  usernameChosen: () => set({ status: rememberStage('needsDetails') }),
 
-  detailsCompleted: () => set({ status: 'ready' }),
+  detailsCompleted: () => set({ status: rememberStage('ready') }),
 
   signOut: async () => {
     // Clear the state before storage: the guard should redirect immediately rather
     // than wait on a keychain write.
     set({ status: 'signedOut', token: null, userId: null });
-    await Promise.all([secureStorage.remove(TOKEN_KEY), secureStorage.remove(USER_ID_KEY)]);
+    await Promise.all([
+      secureStorage.remove(TOKEN_KEY),
+      secureStorage.remove(USER_ID_KEY),
+      secureStorage.remove(STAGE_KEY),
+    ]);
   },
 }));
 
@@ -186,6 +233,34 @@ async function persist(token: string, userId: string) {
  * The server is the only thing that actually knows: reinstalling the app, or signing
  * in on a second device, would both defeat a locally-tracked flag.
  */
+/**
+ * The statuses worth caching: the ones `stageOf` can return.
+ *
+ * `'loading'` and `'signedOut'` are excluded because neither is a place to start — one
+ * is the absence of an answer and the other is handled by there being no token at all.
+ */
+const STAGES = ['needsUsername', 'needsDetails', 'ready', 'admin'] as const;
+
+function isStage(value: string | null): value is (typeof STAGES)[number] {
+  return !!value && (STAGES as readonly string[]).includes(value);
+}
+
+/**
+ * Writes the stage to storage and hands it straight back, so every place that decides a
+ * status can cache it by wrapping the value rather than by remembering a second call.
+ *
+ * That shape is the point: the cache is only useful if it cannot drift from the status,
+ * and a separate `set` next to every `set({ status })` is exactly the kind of pairing
+ * somebody adds a sixth branch without.
+ *
+ * Not awaited. A failed keychain write costs a slightly worse guess on the next cold
+ * start and nothing else, and no caller should wait on it.
+ */
+function rememberStage(status: SessionStatus): SessionStatus {
+  if (isStage(status)) void secureStorage.set(STAGE_KEY, status);
+  return status;
+}
+
 function stageOf(me: UserInfo): SessionStatus {
   // Before the onboarding checks, deliberately. The moderator account has no age and
   // no username step to complete, so asking those questions first would send it to a

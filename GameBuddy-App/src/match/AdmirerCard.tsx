@@ -1,5 +1,6 @@
-import { Image } from 'react-native';
-import { Pressable, View } from 'react-native';
+import { Image } from 'expo-image';
+import { memo, useMemo } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { Candidate } from '../api/types';
 import { avatarColor, avatarUri, initialsOf } from '../avatars';
 import { FrameOverlay } from '../ui/FramedAvatar';
@@ -20,13 +21,28 @@ type AdmirerCardProps =
  * render behind the blur — which is the point. Nothing is being hidden client-side that a
  * determined person could read out of the response.
  */
-export function AdmirerCard({ locked, candidate, onPress }: AdmirerCardProps) {
+/**
+ * `flex-1` with a third-width cap rather than a `flexBasis`, because the grid is a
+ * three-column `FlatList` now: flex splits the row exactly, and the cap is what stops one
+ * or two cards on a short last row from stretching across the whole width.
+ */
+const styles = StyleSheet.create({
+  card: { flex: 1, maxWidth: '33.33%' },
+  photo: { width: 64, height: 64, borderRadius: 32 },
+});
+
+export const AdmirerCard = memo(function AdmirerCard({
+  locked,
+  candidate,
+  onPress,
+}: AdmirerCardProps) {
   const hairline = useHairline();
+  const box = useMemo(() => [styles.card, hairline], [hairline]);
 
   if (locked) {
     return (
       <View
-        style={[{ flexBasis: '30%' }, hairline]}
+        style={box}
         className="aspect-[3/4] items-center justify-center overflow-hidden rounded-card bg-raised"
       >
         {/* Concentric rings rather than a blurred face. A real blur would need a real
@@ -46,7 +62,7 @@ export function AdmirerCard({ locked, candidate, onPress }: AdmirerCardProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${candidate.gamerUsername}, ${candidate.age}`}
-      style={[{ flexBasis: '30%' }, hairline]}
+      style={box}
       className="aspect-[3/4] overflow-hidden rounded-card bg-surface active:opacity-80"
     >
       <View
@@ -55,7 +71,16 @@ export function AdmirerCard({ locked, candidate, onPress }: AdmirerCardProps) {
       >
         <View className="h-16 w-16 items-center justify-center">
           {photo ? (
-            <Image source={{ uri: photo }} className="h-16 w-16 rounded-full" />
+            <Image
+              source={{ uri: photo }}
+              // A style, not `h-16 w-16 rounded-full` — expo-image is not registered with
+              // NativeWind, so a className here would silently resolve to nothing.
+              style={styles.photo}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={photo}
+              transition={0}
+            />
           ) : (
             <Text variant="heading" className="text-white">
               {initialsOf(candidate.gamerUsername)}
@@ -72,4 +97,4 @@ export function AdmirerCard({ locked, candidate, onPress }: AdmirerCardProps) {
       </View>
     </Pressable>
   );
-}
+});

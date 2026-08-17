@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import type { QueryKeyRoot } from '../query/keys';
 import { useCelebration } from './celebration';
 import { MatchOverlay } from './MatchOverlay';
 
@@ -29,7 +30,10 @@ export function MatchCelebration() {
         // top of it.
         dismiss();
         // The inbox has a new thread in it that it does not know about yet.
-        void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        //
+        // `'inbox'`, not `'conversations'`. The latter was the key here for the whole life
+        // of this component and no query has ever used it, so this line did nothing.
+        void queryClient.invalidateQueries({ queryKey: ['inbox'] satisfies QueryKeyRoot[] });
         router.push({
           pathname: '/messages/[friendId]',
           params: { friendId: gamer.userId, username: gamer.username },

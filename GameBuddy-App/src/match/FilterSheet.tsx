@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -287,7 +288,19 @@ function GameChip({
         selected ? 'border-primary bg-primary/10' : 'border-line bg-raised',
         disabled ? 'opacity-50' : '',
       ].join(' ')}>
-      {icon ? <Image source={{ uri: icon }} className="h-5 w-5 rounded" /> : null}
+      {/* A style, not `h-5 w-5 rounded`: expo-image is not registered with NativeWind and
+          a className on it resolves to nothing, so the chip's cover would render at zero
+          size and the row would silently lose its icon. */}
+      {icon ? (
+        <Image
+          source={{ uri: icon }}
+          style={styles.gameIcon}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={icon}
+          transition={0}
+        />
+      ) : null}
       <Text
         numberOfLines={1}
         className={[
@@ -346,3 +359,8 @@ function Toggle({
     </Pressable>
   );
 }
+
+/** The game-cover chip. A style because it goes on an expo-image — see the call site. */
+const styles = StyleSheet.create({
+  gameIcon: { width: 20, height: 20, borderRadius: 4 },
+});

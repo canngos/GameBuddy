@@ -37,6 +37,34 @@ const twMerge = extendTailwindMerge({
   },
 });
 
+/**
+ * Resolved class strings, keyed by the joined input.
+ *
+ * `twMerge` parses every utility in the string to find the conflicts, and this runs on
+ * every render of every `Text` in the app — a component with sixty-eight importers, and one
+ * that appears several times in every row of every list. The set of distinct class strings
+ * an app produces is small and fixed, so almost every call after the first frame is a
+ * repeat.
+ *
+ * Correctness is unaffected: `twMerge` is pure, so the same input always produced this
+ * answer anyway. In particular the *set of class keys* that comes out is bit-for-bit what
+ * it was, which is what UI_NOTE §4.2 cares about.
+ *
+ * The bound exists only so a caller that generates unbounded strings — an interpolated
+ * colour, say — cannot turn this into a leak. Clearing wholesale rather than evicting one
+ * entry keeps it to two lines; the cost is one cold frame roughly never.
+ */
+const cache = new Map<string, string>();
+const MAX_ENTRIES = 500;
+
 export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs));
+  const raw = clsx(inputs);
+
+  const hit = cache.get(raw);
+  if (hit !== undefined) return hit;
+
+  const merged = twMerge(raw);
+  if (cache.size >= MAX_ENTRIES) cache.clear();
+  cache.set(raw, merged);
+  return merged;
 }
