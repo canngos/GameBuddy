@@ -13,6 +13,7 @@
     },
     "android": {
       "package": "com.findgamebuddy.app",
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#0B0B12",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -86,14 +87,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "7dd92485-36ce-4814-98b7-eb2439ec2101"
+        "projectId": "a31ba997-d691-4546-90df-2abb2e3f3ed1"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/7dd92485-36ce-4814-98b7-eb2439ec2101"
-    }
+      "url": "https://u.expo.dev/a31ba997-d691-4546-90df-2abb2e3f3ed1"
+    },
+    "owner": "gamebuddy-apps-team"
   }
 }

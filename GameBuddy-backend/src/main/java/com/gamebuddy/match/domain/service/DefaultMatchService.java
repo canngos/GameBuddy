@@ -329,10 +329,32 @@ public class DefaultMatchService implements MatchService {
      * every other impression is conditioned on the model already believing in the pairing,
      * so fitting the prior on those alone measures the model's own past opinions. This is
      * the cheapest available fix for both problems at once.
+     *
+     * <p><b>Whatever the ranking cannot fill, this does — and that floor is the whole
+     * difference between a working deck and an empty one on a young install.</b> The slot
+     * count used to be a flat tenth of the ranking, which meant the one mechanism that can
+     * reach a gamer the model has never heard of returned nothing in precisely the case
+     * where the model has never heard of anybody: zero ranked candidates times ten percent
+     * is zero. That is not a hypothetical. {@code /predict} can only return ids that are
+     * <em>inside the trained artefact</em>, so a freshly deployed environment — where the
+     * artefact is the synthetic one baked into the image and every id in it belongs to a
+     * gamer this database has never had — resolves every recommendation to nothing in
+     * {@code findAllById} above. Two real people signed up minutes apart both saw "that's
+     * everyone for now", with no error anywhere, because the deck's only other source of
+     * candidates had sized itself off an empty list.
+     *
+     * <p>Filling to {@link #MAX_RECOMMENDATIONS} is the right shape rather than a patch for
+     * that one situation. A short ranking means the same thing every time it happens — the
+     * model could not name a full page of people — and the database can still name them:
+     * they are ordinary candidates who pass every gate, just unranked. That covers a heavy
+     * swiper who has reached the end of what the model will rank for them, an artefact that
+     * has gone stale between retrains, and a population too small to have been trained on at
+     * all, which is every product on its first day. The page stays bounded either way, and
+     * at healthy scale the ranking fills it and this stays the tenth it always was.
      */
     private List<Gamer> exploration(Gamer gamer, List<Gamer> ranked, Set<String> decided, FeedFilters filters) {
-        int slots = Math.round(ranked.size() * EXPLORATION_RATE);
-        if (slots == 0) {
+        int slots = Math.max(Math.round(ranked.size() * EXPLORATION_RATE), MAX_RECOMMENDATIONS - ranked.size());
+        if (slots <= 0) {
             return List.of();
         }
 
@@ -362,14 +384,27 @@ public class DefaultMatchService implements MatchService {
     }
 
     /**
-     * Explored candidates replace the tail of the page rather than extending it, so
-     * exploration costs a little relevance instead of quietly growing the response.
+     * Explored candidates displace the tail of a full page rather than extending it, so
+     * exploration costs a little relevance instead of quietly growing the response — but
+     * they never displace a ranked candidate the page still has room for.
+     *
+     * <p>Both halves matter, and the second only started to once {@link #exploration} was
+     * allowed to fill an under-full page. Dropping the tail unconditionally would take a
+     * ranking of five and thirty-five explored candidates and throw all five away: the page
+     * had space for every one of them, and they are the only candidates on it the model
+     * actually vouched for. So the cut is whichever of the two rules keeps more of the
+     * ranking, and on a full page they agree.
+     *
+     * <p>The result is bounded by {@link #MAX_RECOMMENDATIONS} however the two lists divide
+     * it, which is what the original rule was protecting.
      */
     private List<Gamer> merge(List<Gamer> ranked, List<Gamer> explored) {
         if (explored.isEmpty()) {
             return ranked;
         }
-        List<Gamer> page = new ArrayList<>(ranked.subList(0, Math.max(0, ranked.size() - explored.size())));
+        int keep = Math.min(
+                ranked.size(), Math.max(ranked.size() - explored.size(), MAX_RECOMMENDATIONS - explored.size()));
+        List<Gamer> page = new ArrayList<>(ranked.subList(0, Math.max(0, keep)));
         page.addAll(explored);
         return page;
     }
@@ -949,6 +984,26 @@ public class DefaultMatchService implements MatchService {
      * triggers the cold-start fallback, but under a filter that matched nobody it means
      * "nobody qualifies" — a different answer with the same shape. Without this the service
      * would make two round trips to be told the same thing twice.
+     *
+     * <p><b>A model that cannot answer returns nothing rather than failing the screen.</b>
+     * This used to throw {@code RECOMMENDER_SERVICE_ERROR}, which is a 503 — so a model
+     * container that had OOMed, or was still loading its artefact after a deploy, took the
+     * home screen of the app down with it. Every other tab kept working, which made it look
+     * like a bug in the deck rather than one service being unavailable.
+     *
+     * <p>Degrading is only the better answer because of what the caller does with an empty
+     * ranking: {@link #exploration} fills the whole page from the database instead. So the
+     * outcome is an unranked deck of real, pairable people rather than an error — worse than
+     * a ranked one and enormously better than a blocked screen. Recommendations are an
+     * enhancement to a list the database can produce on its own; treating them as a hard
+     * dependency was the mistake.
+     *
+     * <p>Both failures are still logged, and still at the levels that say whose fault it is
+     * — that distinction is for whoever reads the logs and was never something to spend the
+     * user's home screen on. What is deliberately <em>not</em> done is any kind of circuit
+     * breaker: the call already has a client timeout, and a model that is down stops being
+     * asked only in the sense that every request pays that timeout once. Worth revisiting if
+     * it ever shows up in the latency figures.
      */
     private List<String> predict(Gamer gamer, Set<String> exclude, List<String> include) {
         String userId = gamer.getUserId();
@@ -982,15 +1037,15 @@ public class DefaultMatchService implements MatchService {
             // a day as "recommendation model unavailable" while the model was perfectly
             // healthy. Anything that hides which side is at fault costs exactly that.
             log.error(
-                    "The model refused our request for {}: {} {}",
+                    "The model refused our request for {}: {} {}. Serving an unranked deck.",
                     userId,
                     e.getStatusCode(),
                     e.getResponseBodyAsString(),
                     e);
-            throw new BusinessException(TransactionCode.RECOMMENDER_SERVICE_ERROR, e);
+            return List.of();
         } catch (RuntimeException e) {
-            log.warn("Recommendation model unavailable for {}", userId, e);
-            throw new BusinessException(TransactionCode.RECOMMENDER_SERVICE_ERROR, e);
+            log.warn("Recommendation model unavailable for {}; serving an unranked deck", userId, e);
+            return List.of();
         }
     }
 
