@@ -47,6 +47,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.ResourceAccessException;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -199,11 +202,19 @@ class DefaultMatchServiceTest {
         }
 
         @Test
-        void testGetRecommendations_whenModelUnavailable_ReturnErrorCode123() {
+        @DisplayName("a model that is down is not an error the user ever sees")
+        void testGetRecommendations_whenModelUnavailable_DoesNotFailTheRequest() {
+            // Was: assert a 123/503 propagates. It no longer does, and that is the point —
+            // see the two degradation tests below for what happens instead. Nothing is left
+            // to find the population here, so the deck is legitimately empty.
             when(predictClient.predict(any(PredictRequest.class))).thenThrow(new IllegalStateException("down"));
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> matchService.getRecommendations(gamer));
-            assertEquals(123, ex.getTransactionCode().getId());
+            assertTrue(matchService
+                    .getRecommendations(gamer)
+                    .getBody()
+                    .getData()
+                    .getRecommendedGamers()
+                    .isEmpty());
         }
 
         @Test
@@ -386,11 +397,13 @@ class DefaultMatchServiceTest {
         }
 
         @Test
-        @DisplayName("a slice of the page is randomly explored, not similarity-ranked")
+        @DisplayName("a slice of a full page is randomly explored, displacing its tail")
         void testGetRecommendations_mixesInExploredCandidates() {
             List<Gamer> ranked = new ArrayList<>();
             List<String> ids = new ArrayList<>();
-            for (int i = 0; i < 20; i++) {
+            // A full page. Exploration only displaces a ranked candidate once there is no
+            // room left to simply add one — see the short-ranking test below.
+            for (int i = 0; i < 50; i++) {
                 Gamer g = new Gamer();
                 g.setUserId("ranked-" + i);
                 g.setAge(gamer.getAge());
@@ -415,8 +428,126 @@ class DefaultMatchServiceTest {
 
             assertTrue(page.contains("explored-1"), "an unranked gamer must still be reachable");
             // Replaces the tail rather than extending the page.
-            assertEquals(20, page.size());
-            assertFalse(page.contains("ranked-19"));
+            assertEquals(50, page.size());
+            assertFalse(page.contains("ranked-49"));
+        }
+
+        @Test
+        @DisplayName("a deck the model cannot rank at all is still filled from the population")
+        void testGetRecommendations_emptyRankingIsFilledByExploration() {
+            // The state every freshly deployed environment starts in: the artefact only
+            // knows gamers this database has never had, so every id it returns is dropped
+            // by findAllById and the ranking comes back empty. Exploration used to size
+            // itself off that empty list — a tenth of nothing — and two real users signed
+            // up minutes apart could not see each other.
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenReturn(new PredictResponse(gamer.getUserId(), List.of("gamer-the-db-never-had")));
+            when(predictClient.predictColdStart(any(ColdStartRequest.class)))
+                    .thenReturn(new PredictResponse(gamer.getUserId(), List.of()));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(List.of());
+
+            Gamer other = new Gamer();
+            other.setUserId("the-only-other-real-user");
+            other.setAge(gamer.getAge());
+            ArgumentCaptor<Integer> slots = ArgumentCaptor.forClass(Integer.class);
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), slots.capture()))
+                    .thenReturn(List.of(other));
+
+            List<String> page =
+                    matchService.getRecommendations(gamer).getBody().getData().getRecommendedGamers().stream()
+                            .map(GamerDto::getUserId)
+                            .toList();
+
+            assertEquals(List.of("the-only-other-real-user"), page);
+            assertEquals(50, slots.getValue(), "an unrankable deck asks the database for a whole page");
+        }
+
+        @Test
+        @DisplayName("a model that is down degrades the deck instead of failing the screen")
+        void testGetRecommendations_whenModelUnreachable_ServesAnUnrankedDeck() {
+            // A 503 here used to take the home screen down with the model container while
+            // every other tab kept working, which reads as a bug in the deck rather than as
+            // one service being unavailable.
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenThrow(new ResourceAccessException("connection refused"));
+
+            Gamer other = new Gamer();
+            other.setUserId("still-a-real-person");
+            other.setAge(gamer.getAge());
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of(other));
+
+            List<String> page =
+                    matchService.getRecommendations(gamer).getBody().getData().getRecommendedGamers().stream()
+                            .map(GamerDto::getUserId)
+                            .toList();
+
+            assertEquals(List.of("still-a-real-person"), page);
+        }
+
+        @Test
+        @DisplayName("a model that refuses our request degrades the deck too")
+        void testGetRecommendations_whenModelRefusesTheRequest_ServesAnUnrankedDeck() {
+            // Our bug rather than the model's, and it is logged as one — but which side is
+            // at fault is a question for whoever reads the logs, not for the user's deck.
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenThrow(new HttpClientErrorException(HttpStatus.BAD_REQUEST));
+
+            Gamer other = new Gamer();
+            other.setUserId("still-a-real-person");
+            other.setAge(gamer.getAge());
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
+                    .thenReturn(List.of(other));
+
+            List<String> page =
+                    matchService.getRecommendations(gamer).getBody().getData().getRecommendedGamers().stream()
+                            .map(GamerDto::getUserId)
+                            .toList();
+
+            assertEquals(List.of("still-a-real-person"), page);
+        }
+
+        @Test
+        @DisplayName("a short ranking is topped up rather than thrown away")
+        void testGetRecommendations_shortRankingKeepsEveryRankedCandidate() {
+            List<Gamer> ranked = new ArrayList<>();
+            List<String> ids = new ArrayList<>();
+            for (int i = 0; i < 5; i++) {
+                Gamer g = new Gamer();
+                g.setUserId("ranked-" + i);
+                g.setAge(gamer.getAge());
+                ranked.add(g);
+                ids.add(g.getUserId());
+            }
+            List<Gamer> explored = new ArrayList<>();
+            for (int i = 0; i < 45; i++) {
+                Gamer g = new Gamer();
+                g.setUserId("explored-" + i);
+                g.setAge(gamer.getAge());
+                explored.add(g);
+            }
+
+            when(predictClient.predict(any(PredictRequest.class)))
+                    .thenReturn(new PredictResponse(gamer.getUserId(), ids));
+            when(gamerRepository.findAllById(anyIterable())).thenReturn(ranked);
+            when(gamerRepository.findRandomPairable(
+                            anyBoolean(), any(String[].class), any(), any(), any(), any(), anyInt()))
+                    .thenReturn(explored);
+
+            List<String> page =
+                    matchService.getRecommendations(gamer).getBody().getData().getRecommendedGamers().stream()
+                            .map(GamerDto::getUserId)
+                            .toList();
+
+            assertEquals(50, page.size(), "the page is still bounded");
+            // The five the model actually vouched for are the last thing worth dropping,
+            // and the page had room for all of them.
+            for (int i = 0; i < 5; i++) {
+                assertTrue(page.contains("ranked-" + i), "ranked-" + i + " had room and was dropped");
+            }
         }
 
         @Test
@@ -522,15 +653,17 @@ class DefaultMatchServiceTest {
                     .orElseThrow(() -> new AssertionError("no impression event was published"));
 
             assertEquals(gamer.getUserId(), event.userId());
-            assertEquals(10, event.candidates().size());
+            // Ten ranked plus the explored one. Nothing is displaced: the page holds fifty
+            // and the ranking only filled ten of them.
+            assertEquals(11, event.candidates().size());
 
             // Position is most of the signal in click data, so it has to be recorded.
             assertEquals(0, event.candidates().get(0).position());
-            assertEquals(9, event.candidates().get(9).position());
+            assertEquals(10, event.candidates().get(10).position());
 
             // The explored slot must be distinguishable: fitting the desirability prior on
             // model-chosen impressions alone would just measure the model's own opinions.
-            var last = event.candidates().get(9);
+            var last = event.candidates().get(10);
             assertEquals("explored-1", last.candidateId());
             assertEquals(ImpressionSource.EXPLORATION, last.source());
             assertEquals(ImpressionSource.MODEL, event.candidates().get(0).source());
