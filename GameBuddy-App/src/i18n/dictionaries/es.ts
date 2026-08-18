@@ -202,10 +202,18 @@ export const es: Dictionary = {
       emptyBlurb: 'Abre uno, pon una hora y elige quién se une.',
     },
 
+    boost: {
+      badge: 'Destacado',
+      action: (cost: number) => `Destacar este lobby · ${cost}`,
+      caption: 'Lo coloca al principio de la lista hasta que empiece.',
+      activeCaption: 'Destacado: al principio de la lista hasta que empiece este lobby.',
+    },
+
     detail: {
       fallbackTitle: 'Lobby',
       gone: 'Este lobby ya no existe.',
       wantsToJoin: 'Quieren unirse',
+      requestSent: 'Solicitud enviada. Te avisaremos cuando respondan.',
       team: (taken: number, total: number) => `Equipo · ${taken}/${total}`,
       accept: 'Aceptar',
       pass: 'Pasar',
@@ -225,7 +233,6 @@ export const es: Dictionary = {
       unlock: 'Abrir equipo',
       endLobby: 'Terminar lobby',
       leaveLobby: 'Salir del lobby',
-      requestSent: 'Solicitud enviada. Te avisaremos cuando respondan.',
       withdraw: 'Retirar solicitud',
       rejected: 'El propietario llenó este lobby con otra persona.',
       askToJoin: 'Pedir unirse',
@@ -293,12 +300,6 @@ export const es: Dictionary = {
       undoCost: (cost: number) => `Deshacer el último swipe, ${cost} monedas`,
     },
 
-    boost: {
-      free: 'Gratis',
-      activeA11y: (remaining: string) => `Boost activo, quedan ${remaining}`,
-      freeA11y: 'Usar tu boost semanal gratis',
-      costA11y: (cost: number) => `Boost por ${cost} monedas`,
-    },
 
     match: {
       title: '¡Es un match!',
@@ -402,6 +403,8 @@ export const es: Dictionary = {
       boughtBody: 'Póntelo desde tu Inventario.',
       owned: 'Tuyo',
       buy: 'Comprar',
+      claim: 'Conseguir',
+      claimA11y: (name: string) => `Conseguir ${name}, gratis`,
       free: 'Gratis',
       coinsPrice: (n: number) => `${n} monedas`,
       animatedSuffix: ', animado',
@@ -423,6 +426,8 @@ export const es: Dictionary = {
       earnedTitle: (n: number) => `+${n} monedas`,
       earnedBody: 'Gástalas en marcos, banners o likes.',
       watchedBody: 'Gracias por mirar.',
+      rewardPendingTitle: 'Las monedas están en camino',
+      rewardPendingBody: 'Vuelve a mirar tu saldo en un momento.',
       consentTitle: 'Los vídeos requieren consentimiento de anuncios',
       consentBody: 'Cámbialo en Ajustes → Privacidad de los anuncios.',
       watchVideo: 'Mira un vídeo corto',
@@ -569,10 +574,9 @@ export const es: Dictionary = {
     conversation: 'Conversación',
     viewProfileA11y: (name: string) => `Ver el perfil de ${name}`,
     thisGamer: 'esta persona',
-    alreadyFriends: 'Ya sois amigos',
     acceptRequest: 'Aceptar solicitud de amistad',
-    requestSent: 'Solicitud de amistad enviada',
     sendRequest: 'Enviar solicitud de amistad',
+    alreadyFriends: 'Ya sois amigos',
     reported: 'Denunciado. Un moderador lo revisará.',
     placeholder: 'Mensaje',
     connecting: 'Conectando…',
@@ -602,7 +606,9 @@ export const es: Dictionary = {
     games: 'Juegos',
     playsOn: 'Juega en',
     keywords: 'Palabras clave',
-    friendRequests: (n: number) => `Solicitudes de amistad · ${n}`,
+    friendRequestsShort: 'Solicitudes',
+    acceptRequestA11y: (name: string) => `Aceptar la solicitud de ${name}`,
+    declineRequestA11y: (name: string) => `Rechazar la solicitud de ${name}`,
     accept: 'Aceptar',
     no: 'No',
 
@@ -623,6 +629,17 @@ export const es: Dictionary = {
     blockConfirmTitle: (name: string) => `¿Bloquear a ${name}?`,
     blockConfirmBody:
       'No os veréis en ninguna parte de la app, y ninguno de los dos podrá escribir al otro. Puedes deshacerlo en Ajustes.',
+
+    moreActionsA11y: 'Más acciones',
+    matchBack: 'Dar like',
+    matchBackCaption: 'Ya te ha dado like — dale like y empezad a hablar.',
+    matching: 'Haciendo match…',
+    addFriend: 'Añadir a amigos',
+    addFriendCaption: 'Primero haced match; después podrás enviar la solicitud.',
+    acceptRequest: 'Aceptar solicitud',
+    withdrawRequest: 'Retirar solicitud',
+    withdrawConfirmTitle: (name: string) => `¿Retirar tu solicitud a ${name}?`,
+    withdrawConfirmBody: 'Dejará de verla. Puedes enviar otra cuando quieras.',
 
     admirersTitle: 'Quién te dio like',
     peopleLikeYou: (n: number) => (n === 1 ? 'persona te ha dado like' : 'personas te han dado like'),
@@ -823,6 +840,7 @@ export const es: Dictionary = {
       '163': 'Te has quedado sin swipes por hoy.',
       '168': 'Debes tener al menos 18 años para usar GameBuddy.',
       '170': 'Ese mensaje incumple las reglas.',
+      '173': 'Este lobby ya está destacado.',
       '179': 'Este lobby ya está lleno.',
       '180': 'Este lobby ya no está abierto.',
       '183': 'Termina o cancela tu lobby actual primero.',

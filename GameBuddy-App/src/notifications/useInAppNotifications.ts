@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import { useEffect } from 'react';
+import { useActiveConversation } from '../chat/activeConversation';
 import { receive } from '../ui/feedback';
 import type { Tone } from '../ui/Icon';
 import { showToast } from '../ui/toast';
@@ -54,6 +55,15 @@ export function useInAppNotifications(enabled: boolean) {
         void queryClient.invalidateQueries({ queryKey: [key] });
       }
 
+      // Nothing to announce about a conversation the gamer is reading. The backend sends
+      // the push either way and says why — it cannot see which screen is open — so this
+      // is the half that was missing: a reply used to arrive as a bubble and, a moment
+      // later, as a banner covering the thread it had just been added to. The refresh
+      // above still runs, so the inbox behind them is right when they leave.
+      if (kind === 'MESSAGE' && data?.targetId === useActiveConversation.getState().friendId) {
+        return;
+      }
+
       const { icon, tone } = PRESENTATION[kind];
 
       showToast({
@@ -68,7 +78,12 @@ export function useInAppNotifications(enabled: boolean) {
         body: content.body ?? undefined,
         icon,
         tone,
-        onPress: () => router.push(routeFor(kind, data?.targetId, content.title ?? undefined) as never),
+        // `withAnchor` for the same reason as useNotificationRouting: a deep screen
+        // opened from a toast needs its list loaded underneath for back to make sense.
+        onPress: () =>
+          router.push(routeFor(kind, data?.targetId, content.title ?? undefined) as never, {
+            withAnchor: true,
+          }),
       });
 
       // One cue and one light buzz, at the moment the toast appears. The OS sound is off

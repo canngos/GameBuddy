@@ -453,6 +453,42 @@ class DefaultProfileServiceTest {
         }
 
         @Test
+        @DisplayName("withdrawing takes the request off the recipient's list, not the sender's")
+        void testWithdrawFriendRequest_whenPending_DropsIt() {
+            other.getWaitingFriends().add(gamer);
+
+            assertEquals(
+                    "100",
+                    profileService
+                            .withdrawFriendRequest(gamer, request(other))
+                            .getStatus()
+                            .getCode());
+            assertFalse(other.getWaitingFriends().contains(gamer));
+            verify(gamerRepository).save(other);
+        }
+
+        @Test
+        void testWithdrawFriendRequest_whenNothingPending_ReturnErrorCode116() {
+            FriendRequest req = request(other);
+
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> profileService.withdrawFriendRequest(gamer, req));
+            assertEquals(116, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("a request you received is not yours to withdraw — reject is that door")
+        void testWithdrawFriendRequest_whenTheyAskedYou_ReturnErrorCode116() {
+            gamer.getWaitingFriends().add(other);
+            FriendRequest req = request(other);
+
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> profileService.withdrawFriendRequest(gamer, req));
+            assertEquals(116, ex.getTransactionCode().getId());
+            assertTrue(gamer.getWaitingFriends().contains(other));
+        }
+
+        @Test
         void testRemoveFriend_whenNotFriends_ReturnErrorCode117() {
             FriendRequest req = request(other);
 

@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { chatApi } from '../api/chat';
-import type { Conversation } from '../api/types';
+import type { Conversation, InboxEntry } from '../api/types';
 import { useSession } from '../session/store';
+import { useActiveConversation } from './activeConversation';
 import { useChatSocket } from './ChatSocketProvider';
 
 /** Smallest gap between two "I am typing" frames for the same conversation. */
@@ -34,6 +36,14 @@ export function useConversation(friendId: string) {
     queryKey: ['conversation', friendId],
     queryFn: () => chatApi.conversation(friendId),
     /*
+     * Never served stale. A conversation is the one screen where a five minute old copy
+     * is simply wrong — and the cached copy also meant re-opening a chat sent no request,
+     * so the server-side read watermark (moved by loading the history) never advanced and
+     * the unread badge stayed up. `markRead` below covers the watermark on its own now;
+     * this covers the messages.
+     */
+    staleTime: 0,
+    /*
      * The safety net for when the socket is not connected: without live delivery this
      * is the only way a reply appears, and it stops chat being dead in the water.
      *
@@ -49,6 +59,39 @@ export function useConversation(friendId: string) {
      */
     refetchInterval: status === 'connected' ? false : 30_000,
   });
+
+  /**
+   * Tells the server this thread has been read, and clears its badge here immediately.
+   *
+   * The optimistic edit is what makes leaving a chat feel right: the messages screen keeps
+   * the inbox cached, so without zeroing the row the badge is still showing the old number
+   * when the list comes back, for as long as it takes the refetch to land.
+   */
+  const markRead = useCallback(() => {
+    void chatApi.markRead(friendId).catch(() => {
+      // A failed mark-read is not worth surfacing — the next open re-sends it, and the
+      // history load moves the watermark anyway. Swallowing it keeps an offline blip from
+      // putting an error on a screen whose messages loaded fine.
+    });
+    queryClient.setQueryData<InboxEntry[]>(['inbox'], (current) =>
+      current?.map((row) => (row.userId === friendId ? { ...row, unreadCount: 0 } : row)),
+    );
+  }, [friendId, queryClient]);
+
+  /**
+   * While this conversation is on screen it is read as it arrives, and it owns the toast.
+   *
+   * Focus rather than mount: the chat stays mounted underneath a profile pushed on top of
+   * it, and the tab navigator freezes rather than unmounts a blurred tab. Registering on
+   * mount would suppress notifications for a chat nobody is looking at any more.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      useActiveConversation.getState().open(friendId);
+      markRead();
+      return () => useActiveConversation.getState().close(friendId);
+    }, [friendId, markRead]),
+  );
 
   useEffect(
     () =>
@@ -72,8 +115,12 @@ export function useConversation(friendId: string) {
             date: new Date().toISOString(),
           },
         ]);
+        // Read the moment it is drawn. The watermark only ever moved when the history
+        // loaded, and a thread receiving live never reloads — so a conversation somebody
+        // sat and read in real time was still counted unread when they left it.
+        markRead();
       }),
-    [onMessage, friendId, myId, queryClient],
+    [onMessage, friendId, myId, queryClient, markRead],
   );
 
   /**

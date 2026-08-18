@@ -35,10 +35,10 @@ const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill
  * they did not, sorted by price rather than by whether they were theirs. Buying and wearing
  * are different intents on different days. The Market is now a shop; this is the wardrobe.
  *
- * Owned is the server's flag, not a re-derivation from price. Free cosmetics are owned by
- * everybody without a purchase ever existing, and the Gold frame and banner are owned for
- * as long as a membership lasts — both belong here, and neither can be worked out from what
- * they cost. That also means this screen is never empty: the free frames are always in it.
+ * Owned is the server's flag, not a re-derivation from price. The Gold frame and banner are
+ * owned for as long as a membership lasts, and the free frame is owned only once it has been
+ * claimed — neither can be worked out from what they cost. A brand new account therefore
+ * sees the empty state until it claims something, which is why that state exists.
  */
 export default function Inventory() {
   const colors = useThemeColors();

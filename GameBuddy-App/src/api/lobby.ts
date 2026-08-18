@@ -5,6 +5,15 @@ import type { Lobby, LobbyDetail, LobbyMessage, LobbyTone } from './types';
 export const PAGE_SIZE = 20;
 
 /**
+ * Coins a lobby boost costs, for the label on the button.
+ *
+ * A display copy of `DefaultLobbyService.LOBBY_BOOST_COST_COINS`, never the authority: the
+ * server charges what its own constant says, so if these drift the button is briefly wrong
+ * and nobody is charged the wrong amount.
+ */
+export const LOBBY_BOOST_COST_COINS = 300;
+
+/**
  * Lobbies: an open invitation to play one game, together, at a stated time.
  *
  * Three things shape every screen built on this:
@@ -52,6 +61,16 @@ export const lobbyApi = {
     /** ISO instant; "now" is simply the current time. */
     startsAt: string;
   }) => api.post<LobbyDetail>('/lobby/create', input),
+
+  /**
+   * Owner, while OPEN: spends coins to pin the lobby to the top of the browse list.
+   *
+   * It lasts until the lobby stops being open rather than for a set time — browse only
+   * shows OPEN lobbies, so locking, starting or cancelling ends it. Refused with
+   * LOBBY_ALREADY_BOOSTED (173) on a second attempt, and COIN_NOT_ENOUGH (129) when the
+   * balance will not cover it. Answers with the whole refreshed lobby.
+   */
+  boost: (lobbyId: string) => api.post<LobbyDetail>(`/lobby/${lobbyId}/boost`),
 
   /** Owner, while OPEN. Every field optional; `maxPlayers` only shrinks to seats filled. */
   update: (lobbyId: string, input: Record<string, unknown>) =>

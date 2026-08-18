@@ -9,7 +9,6 @@ import com.gamebuddy.match.domain.service.FeedFilters;
 import com.gamebuddy.match.domain.service.MatchService;
 import com.gamebuddy.match.interfaces.request.GamerRequest;
 import com.gamebuddy.match.interfaces.response.AcceptResponse;
-import com.gamebuddy.match.interfaces.response.BoostResponse;
 import com.gamebuddy.match.interfaces.response.ConsumableResponse;
 import com.gamebuddy.match.interfaces.response.LikedYouResponse;
 import com.gamebuddy.match.interfaces.response.RecommendationResponse;
@@ -75,16 +74,6 @@ public class MatchController {
     @PostMapping("/rewind")
     public ResponseEntity<RewindResponse> rewind(@AuthenticationPrincipal Gamer principal) {
         return ResponseEntity.ok(matchService.rewind(principal));
-    }
-
-    @PostMapping("/boost")
-    public ResponseEntity<BoostResponse> boost(@AuthenticationPrincipal Gamer principal) {
-        return ResponseEntity.ok(matchService.boost(principal));
-    }
-
-    @GetMapping("/boost")
-    public ResponseEntity<BoostResponse> boostStatus(@AuthenticationPrincipal Gamer principal) {
-        return ResponseEntity.ok(matchService.boostStatus(principal));
     }
 
     /**

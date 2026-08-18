@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, View } from 'react-native';
 import { AdmirersBadge } from './admirers';
 import { billingApi } from '../../src/api/billing';
 import { UpgradePromptSheet } from '../../src/billing/UpgradePromptSheet';
-import { BoostButton, REWIND_COST_COINS } from '../../src/match/BoostButton';
+import { REWIND_COST_COINS } from '../../src/match/prices';
 import type { Candidate } from '../../src/api/types';
 import { CandidateCard } from '../../src/match/CandidateCard';
 import { CandidateSheet } from '../../src/match/CandidateSheet';
@@ -189,7 +189,6 @@ export default function Deck() {
           canRewind={deck.canRewind}
           // Gold gets rewinds as an entitlement; everyone else pays, and sees the price.
           rewindCost={unlocked ? 0 : REWIND_COST_COINS}
-          boost={<BoostButton />}
         />
       )}
 

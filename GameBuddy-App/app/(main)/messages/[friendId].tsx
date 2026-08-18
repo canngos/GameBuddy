@@ -210,7 +210,8 @@ export default function Chat() {
  *
  * - already friends → a filled mark, no action. There is nothing to send.
  * - they asked you  → accepting is the useful action, and it is one tap.
- * - you asked them  → waiting. Tapping again would only return ALREADY_SENT_REQUEST.
+ * - you asked them  → waiting, and tapping offers to take the request back. It used to be
+ *   inert, which left a mistaken tap on the plus permanent until the other side answered.
  * - neither         → send the request.
  *
  * Reads three small lists that other screens already keep warm, so opening a chat does
@@ -245,6 +246,14 @@ function FriendAction({ userId }: { userId: string }) {
     mutationFn: () => socialApi.accept(userId),
     onSuccess: refresh,
   });
+  /**
+   * Taking the request back, on the tap and without a confirmation — the same as the icon
+   * on their profile. It undoes something you did yourself and can redo just as easily.
+   */
+  const withdraw = useMutation({
+    mutationFn: () => socialApi.withdraw(userId),
+    onSuccess: refresh,
+  });
 
   /**
    * Re-read the three lists when the chat is opened.
@@ -269,7 +278,7 @@ function FriendAction({ userId }: { userId: string }) {
   const isFriend = (friends.data ?? []).some((f) => f.userId === userId);
   const theyAsked = (incoming.data ?? []).some((f) => f.userId === userId);
   const youAsked = (outgoing.data ?? []).some((f) => f.userId === userId);
-  const busy = send.isPending || accept.isPending;
+  const busy = send.isPending || accept.isPending || withdraw.isPending;
 
   if (isFriend) {
     return (
@@ -284,14 +293,16 @@ function FriendAction({ userId }: { userId: string }) {
 
   return (
     <Pressable
-      onPress={() => (theyAsked ? accept.mutate() : youAsked ? undefined : send.mutate())}
-      disabled={busy || youAsked}
+      onPress={() =>
+        theyAsked ? accept.mutate() : youAsked ? withdraw.mutate() : send.mutate()
+      }
+      disabled={busy}
       accessibilityRole="button"
       accessibilityLabel={
         theyAsked
           ? t.messages.acceptRequest
           : youAsked
-            ? t.messages.requestSent
+            ? t.profile.withdrawRequest
             : t.messages.sendRequest
       }
       hitSlop={8}
@@ -301,8 +312,8 @@ function FriendAction({ userId }: { userId: string }) {
         <ActivityIndicator color={colors.primary} />
       ) : (
         <PersonIcon
-          // Waiting reads as inert rather than disabled-looking: same glyph, muted, with
-          // the plus replaced by a dot so it does not look like it can still be pressed.
+          // Waiting is muted with the plus replaced by a dot: nothing to send, but still
+          // tappable — that is where withdrawing the request lives.
           color={youAsked ? colors.muted : colors.primary}
           badge={theyAsked ? 'check' : youAsked ? 'dot' : 'plus'}
           background={colors.canvas}

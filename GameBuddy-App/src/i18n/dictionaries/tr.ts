@@ -202,10 +202,18 @@ export const tr: Dictionary = {
       emptyBlurb: 'Bir tane aç, saatini belirle ve kimlerin katılacağını sen seç.',
     },
 
+    boost: {
+      badge: 'Öne çıkarıldı',
+      action: (cost: number) => `Bu lobiyi öne çıkar · ${cost}`,
+      caption: 'Lobi başlayana kadar listenin en üstünde durur.',
+      activeCaption: 'Öne çıkarıldı — bu lobi başlayana kadar listenin en üstünde.',
+    },
+
     detail: {
       fallbackTitle: 'Lobi',
       gone: 'Bu lobi artık yok.',
       wantsToJoin: 'Katılmak isteyenler',
+      requestSent: 'İstek gönderildi. Sahibi yanıtlayınca sana haber vereceğiz.',
       team: (taken: number, total: number) => `Takım · ${taken}/${total}`,
       accept: 'Kabul et',
       pass: 'Geç',
@@ -225,7 +233,6 @@ export const tr: Dictionary = {
       unlock: 'Kilidi aç',
       endLobby: 'Lobiyi bitir',
       leaveLobby: 'Lobiden ayrıl',
-      requestSent: 'İstek gönderildi. Sahibi yanıtlayınca sana haber vereceğiz.',
       withdraw: 'İsteği geri çek',
       rejected: 'Sahibi bu lobiyi başkasıyla doldurdu.',
       askToJoin: 'Katılmak iste',
@@ -294,12 +301,6 @@ export const tr: Dictionary = {
       undoCost: (cost: number) => `Son kaydırmayı geri al, ${cost} altın`,
     },
 
-    boost: {
-      free: 'Ücretsiz',
-      activeA11y: (remaining: string) => `Boost etkin, ${remaining} kaldı`,
-      freeA11y: 'Haftalık ücretsiz boostunu kullan',
-      costA11y: (cost: number) => `${cost} altına boost`,
-    },
 
     match: {
       title: 'Eşleştiniz!',
@@ -403,6 +404,8 @@ export const tr: Dictionary = {
       boughtBody: 'Envanterinden takabilirsin.',
       owned: 'Sende var',
       buy: 'Satın al',
+      claim: 'Al',
+      claimA11y: (name: string) => `${name} ücretsiz al`,
       free: 'Ücretsiz',
       coinsPrice: (n: number) => `${n} altın`,
       animatedSuffix: ', hareketli',
@@ -423,6 +426,8 @@ export const tr: Dictionary = {
       earnedTitle: (n: number) => `+${n} altın`,
       earnedBody: 'Çerçevelere, afişlere veya beğenilere harca.',
       watchedBody: 'İzlediğin için teşekkürler.',
+      rewardPendingTitle: 'Altınlar yolda',
+      rewardPendingBody: 'Birazdan bakiyene tekrar bak.',
       consentTitle: 'Videolar için reklam izni gerekiyor',
       consentBody: 'Ayarlar → Reklam gizliliği bölümünden değiştirebilirsin.',
       watchVideo: 'Kısa bir video izle',
@@ -568,10 +573,9 @@ export const tr: Dictionary = {
     conversation: 'Konuşma',
     viewProfileA11y: (name: string) => `${name} adlı oyuncunun profilini gör`,
     thisGamer: 'bu oyuncu',
-    alreadyFriends: 'Zaten arkadaşsınız',
     acceptRequest: 'Arkadaşlık isteğini kabul et',
-    requestSent: 'Arkadaşlık isteği gönderildi',
     sendRequest: 'Arkadaşlık isteği gönder',
+    alreadyFriends: 'Zaten arkadaşsınız',
     reported: 'Bildirildi. Bir moderatör inceleyecek.',
     placeholder: 'Mesaj',
     connecting: 'Bağlanıyor…',
@@ -601,7 +605,9 @@ export const tr: Dictionary = {
     games: 'Oyunlar',
     playsOn: 'Platformları',
     keywords: 'Anahtar kelimeler',
-    friendRequests: (n: number) => `Arkadaşlık istekleri · ${n}`,
+    friendRequestsShort: 'Arkadaşlık istekleri',
+    acceptRequestA11y: (name: string) => `${name} adlı kişinin isteğini kabul et`,
+    declineRequestA11y: (name: string) => `${name} adlı kişinin isteğini reddet`,
     accept: 'Kabul et',
     no: 'Hayır',
 
@@ -622,6 +628,17 @@ export const tr: Dictionary = {
     blockConfirmTitle: (name: string) => `${name} engellensin mi?`,
     blockConfirmBody:
       'Uygulamanın hiçbir yerinde birbirinizi görmezsiniz ve ikiniz de birbirinize mesaj gönderemezsiniz. Bunu Ayarlar bölümünden geri alabilirsin.',
+
+    moreActionsA11y: 'Diğer işlemler',
+    matchBack: 'Sen de beğen',
+    matchBackCaption: 'Bu kişi seni zaten beğendi — sen de beğen, sohbet başlasın.',
+    matching: 'Eşleşiliyor…',
+    addFriend: 'Arkadaş ekle',
+    addFriendCaption: 'Önce eşleşin, sonra arkadaşlık isteği gönderebilirsin.',
+    acceptRequest: 'İsteği kabul et',
+    withdrawRequest: 'İsteği geri çek',
+    withdrawConfirmTitle: (name: string) => `${name} adlı kişiye gönderdiğin istek geri çekilsin mi?`,
+    withdrawConfirmBody: 'İstek karşı tarafta görünmez olur. İstediğin zaman yenisini gönderebilirsin.',
 
     admirersTitle: 'Seni kimler beğendi',
     peopleLikeYou: (n: number) => (n === 1 ? 'kişi seni beğendi' : 'kişi seni beğendi'),
@@ -822,6 +839,7 @@ export const tr: Dictionary = {
       '163': 'Bugünlük kaydırmaların bitti.',
       '168': "GameBuddy'yi kullanmak için en az 18 yaşında olmalısın.",
       '170': 'Bu mesaj kuralları ihlal ediyor.',
+      '173': 'Bu lobi zaten öne çıkarılmış.',
       '179': 'Bu lobi zaten dolu.',
       '180': 'Bu lobi artık açık değil.',
       '183': 'Önce mevcut lobini bitir veya iptal et.',

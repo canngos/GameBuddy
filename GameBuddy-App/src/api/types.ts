@@ -185,21 +185,6 @@ export type Rewind = {
   coinBalance: number;
 };
 
-/** Boost state, returned by both GET and POST /match/boost. */
-export type Boost = {
-  active: boolean;
-  /** ISO instant. Null when nothing is running. */
-  expiresAt: string | null;
-  /** What the next boost costs. Zero when the weekly Gold one is available. */
-  cost: number;
-  freeAvailable: boolean;
-  /** ISO instant, or null when a free one is available now or never. */
-  nextFreeAt: string | null;
-  coinBalance: number;
-  /** What the call just spent, or null when nothing was bought. */
-  coinsSpent: number | null;
-};
-
 /** One weekly quest, with this week's progress. */
 export type Quest = {
   /** The enum name, which is what a claim is addressed to. */
@@ -333,6 +318,13 @@ export type Lobby = {
   myStatus: LobbyMemberStatus | null;
   /** Chat messages newer than the caller's watermark. Only filled on `mine`. */
   unreadCount: number;
+  /**
+   * The owner paid to pin this to the top of the list, and it is still open.
+   *
+   * The server does the ordering and turns this off by itself when the lobby stops being
+   * open, so a card only has to decide whether to wear the frame.
+   */
+  boosted: boolean;
   createdAt: string;
 };
 

@@ -400,6 +400,35 @@ public class DefaultProfileService implements ProfileService {
         return DefaultMessageResponse.of("Friend request sent successfully");
     }
 
+    /**
+     * Takes back a friend request you sent.
+     *
+     * <p>The mirror image of {@link #rejectFriend}, and it needs to be its own method
+     * precisely because that one is not symmetric: rejecting removes the other gamer from
+     * <em>your own</em> waiting list, so a sender calling it only ever got FRIEND_NO_REQUEST.
+     * There was no way to retract a request at all — a mistaken tap was permanent until the
+     * other side answered it.
+     *
+     * <p>Removes the sender from the recipient's waiting list, so the request simply stops
+     * existing. No notification: the recipient was told a request arrived, and telling them
+     * it has been withdrawn draws attention to something the sender evidently thought
+     * better of.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse withdrawFriendRequest(Gamer principal, FriendRequest request) {
+        Gamer gamer = reload(principal);
+        Gamer user = requireGamer(request.getUserId());
+
+        if (!user.getWaitingFriends().contains(gamer)) {
+            throw new BusinessException(TransactionCode.FRIEND_NO_REQUEST);
+        }
+
+        user.getWaitingFriends().remove(gamer);
+        gamerRepository.save(user);
+        return DefaultMessageResponse.of("Friend request withdrawn successfully");
+    }
+
     // =======================================================================
     // Helpers
     // =======================================================================

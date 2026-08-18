@@ -3,7 +3,6 @@ package com.gamebuddy.match.domain.service;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.match.interfaces.request.GamerRequest;
 import com.gamebuddy.match.interfaces.response.AcceptResponse;
-import com.gamebuddy.match.interfaces.response.BoostResponse;
 import com.gamebuddy.match.interfaces.response.ConsumableResponse;
 import com.gamebuddy.match.interfaces.response.LikedYouResponse;
 import com.gamebuddy.match.interfaces.response.RecommendationResponse;
@@ -56,11 +55,9 @@ public interface MatchService {
      */
     RewindResponse rewind(Gamer principal);
 
-    /** Puts this gamer at the front of decks in their country for half an hour. */
-    BoostResponse boost(Gamer principal);
-
-    /** What the Boost button needs to describe itself: state, cost and balance. */
-    BoostResponse boostStatus(Gamer principal);
+    // The deck boost — thirty minutes at the front of decks in your country — was retired.
+    // Promotion now belongs to lobbies, where what is being promoted is a plan somebody can
+    // join rather than a face in a stack. See DefaultLobbyService#boost.
 
     /**
      * Buys a consumable with coins.

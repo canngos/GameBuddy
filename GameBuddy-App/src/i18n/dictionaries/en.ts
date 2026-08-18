@@ -247,10 +247,18 @@ export const en = {
       emptyBlurb: 'Open one, set a time, and choose who joins you.',
     },
 
+    boost: {
+      badge: 'Boosted',
+      action: (cost: number) => `Boost this lobby · ${cost}`,
+      caption: 'Puts it at the top of the list until it starts.',
+      activeCaption: 'Boosted — at the top of the list until this lobby starts.',
+    },
+
     detail: {
       fallbackTitle: 'Lobby',
       gone: 'This lobby is gone.',
       wantsToJoin: 'Wants to join',
+      requestSent: "Request sent. We'll notify you when the owner answers.",
       team: (taken: number, total: number) => `Team · ${taken}/${total}`,
       accept: 'Accept',
       pass: 'Pass',
@@ -270,7 +278,6 @@ export const en = {
       unlock: 'Unlock',
       endLobby: 'End lobby',
       leaveLobby: 'Leave lobby',
-      requestSent: "Request sent. We'll notify you when the owner answers.",
       withdraw: 'Withdraw request',
       rejected: 'The owner filled this one with someone else.',
       askToJoin: 'Ask to join',
@@ -338,12 +345,6 @@ export const en = {
       undoCost: (cost: number) => `Undo last swipe, ${cost} coins`,
     },
 
-    boost: {
-      free: 'Free',
-      activeA11y: (remaining: string) => `Boost active, ${remaining} left`,
-      freeA11y: 'Use your free weekly boost',
-      costA11y: (cost: number) => `Boost for ${cost} coins`,
-    },
 
     match: {
       title: "It's a match!",
@@ -447,6 +448,8 @@ export const en = {
       boughtBody: 'Put it on from your Inventory.',
       owned: 'Owned',
       buy: 'Buy',
+      claim: 'Claim',
+      claimA11y: (name: string) => `Claim ${name}, free`,
       free: 'Free',
       coinsPrice: (n: number) => `${n} coins`,
       /** Appended to the item name in screen-reader labels; the preview plays for everyone else. */
@@ -468,6 +471,8 @@ export const en = {
       earnedTitle: (n: number) => `+${n} coins`,
       earnedBody: 'Spend them on frames, banners or likes.',
       watchedBody: 'Thanks for watching.',
+      rewardPendingTitle: 'Coins are on their way',
+      rewardPendingBody: 'Check your balance again in a moment.',
       consentTitle: 'Videos need advert consent',
       consentBody: 'Change it in Settings → Advert privacy.',
       watchVideo: 'Watch a short video',
@@ -611,10 +616,9 @@ export const en = {
     conversation: 'Conversation',
     viewProfileA11y: (name: string) => `View ${name}'s profile`,
     thisGamer: 'this gamer',
-    alreadyFriends: 'Already friends',
     acceptRequest: 'Accept friend request',
-    requestSent: 'Friend request sent',
     sendRequest: 'Send a friend request',
+    alreadyFriends: 'Already friends',
     reported: 'Reported. A moderator will look at it.',
     placeholder: 'Message',
     connecting: 'Connecting…',
@@ -644,7 +648,9 @@ export const en = {
     games: 'Games',
     playsOn: 'Plays on',
     keywords: 'Keywords',
-    friendRequests: (n: number) => `Friend requests · ${n}`,
+    friendRequestsShort: 'Friend requests',
+    acceptRequestA11y: (name: string) => `Accept ${name}'s friend request`,
+    declineRequestA11y: (name: string) => `Decline ${name}'s friend request`,
     accept: 'Accept',
     no: 'No',
 
@@ -665,6 +671,17 @@ export const en = {
     blockConfirmTitle: (name: string) => `Block ${name}?`,
     blockConfirmBody:
       'You will not see each other anywhere in the app, and neither of you can message the other. You can undo this in Settings.',
+
+    moreActionsA11y: 'More actions',
+    matchBack: 'Match',
+    matchBackCaption: 'They already liked you — match back to start talking.',
+    matching: 'Matching…',
+    addFriend: 'Add friend',
+    addFriendCaption: 'Match first, then you can send a friend request.',
+    acceptRequest: 'Accept friend request',
+    withdrawRequest: 'Withdraw request',
+    withdrawConfirmTitle: (name: string) => `Withdraw your request to ${name}?`,
+    withdrawConfirmBody: 'They stop seeing it. You can send another one whenever you like.',
 
     admirersTitle: 'Who liked you',
     peopleLikeYou: (n: number): string => (n === 1 ? 'person likes you' : 'people like you'),
@@ -865,6 +882,7 @@ export const en = {
       '163': 'You are out of swipes for today.',
       '168': 'You must be at least 18 to use GameBuddy.',
       '170': 'That message breaks the rules.',
+      '173': 'That lobby is already boosted.',
       '179': 'This lobby is already full.',
       '180': 'This lobby is no longer open.',
       '183': 'Finish or cancel your current lobby first.',

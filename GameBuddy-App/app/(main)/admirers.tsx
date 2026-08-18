@@ -65,7 +65,10 @@ export default function Admirers() {
   }, [data?.likedYou, locked, count]);
 
   const openProfile = useCallback(
-    (userId: string) => router.push(`/messages/gamer/${userId}`),
+    // `withAnchor` loads the inbox beneath the profile: this push crosses from the
+    // admirers tab into the Messages stack, and without the anchor that stack is born
+    // holding only the profile — backing out of it then exits the tab entirely.
+    (userId: string) => router.push(`/messages/gamer/${userId}`, { withAnchor: true }),
     [router],
   );
 

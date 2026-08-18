@@ -1,6 +1,6 @@
 import { NO_FILTERS, type FeedFilters } from '../match/filters';
 import { api } from './client';
-import type { Boost, Candidate, Consumables, LikedYou, Rewind, SwipeAllowance } from './types';
+import type { Candidate, Consumables, LikedYou, Rewind, SwipeAllowance } from './types';
 
 export const matchApi = {
   /**
@@ -71,12 +71,6 @@ export const matchApi = {
    * answered (that match is not only yours to reverse), and 129 when the coins are short.
    */
   rewind: () => api.post<Rewind>('/match/rewind'),
-
-  /** Boost state and price, for the button to describe itself. */
-  boostStatus: () => api.get<Boost>('/match/boost'),
-
-  /** Starts a boost. Free once a week on Gold, otherwise coins. */
-  boost: () => api.post<Boost>('/match/boost'),
 
   /**
    * Buys a consumable with coins.

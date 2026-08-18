@@ -184,6 +184,21 @@ public class ChatController {
         return ResponseEntity.ok(chatMessageService.findInbox(principal));
     }
 
+    /**
+     * Marks a conversation read.
+     *
+     * <p>Loading the history already does this, so at first glance it is redundant — but the
+     * client caches a conversation it has open, and a thread on screen receiving messages
+     * over the socket never reloads at all. Both cases left a badge claiming unread messages
+     * the gamer had just read. This is the explicit version, called on open and on delivery.
+     */
+    @PostMapping("/messages/read/{friendId}")
+    @ResponseBody
+    public ResponseEntity<DefaultMessageResponse> markRead(
+            @AuthenticationPrincipal Gamer principal, @PathVariable String friendId) {
+        return ResponseEntity.ok(chatMessageService.markConversationRead(principal, friendId));
+    }
+
     @PostMapping("/messages/report/{messageId}")
     public ResponseEntity<DefaultMessageResponse> reportMessage(
             @AuthenticationPrincipal Gamer principal, @PathVariable String messageId) {

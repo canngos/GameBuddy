@@ -118,7 +118,11 @@ export function useNotificationRouting(enabled: boolean) {
         { kind?: string; targetId?: string } | undefined;
       // The title is the sender's name for the kinds that have one.
       const title = response.notification.request.content.title ?? undefined;
-      router.push(routeFor(data?.kind, data?.targetId, title) as never);
+      // `withAnchor`: a conversation or lobby opened straight from a notification lands
+      // deep inside a stack the gamer never walked into — the anchor loads the list
+      // screen underneath so backing out reaches it instead of leaving the tab. Inert
+      // for the destinations that are plain tab routes.
+      router.push(routeFor(data?.kind, data?.targetId, title) as never, { withAnchor: true });
     };
 
     // A tap that started the app. Read once — asking again later would re-navigate on

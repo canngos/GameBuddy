@@ -68,6 +68,17 @@ public class LobbyController {
         return ResponseEntity.ok(lobbyService.update(principal, lobbyId, request));
     }
 
+    /**
+     * Owner only: pins this lobby to the top of the browse list for coins, until it stops
+     * being open. Answers with the whole refreshed lobby rather than a message, so the
+     * detail screen updates its button and its frame from one response.
+     */
+    @PostMapping("/{lobbyId}/boost")
+    public ResponseEntity<LobbyResponse> boost(
+            @AuthenticationPrincipal Gamer principal, @PathVariable UUID lobbyId) {
+        return ResponseEntity.ok(lobbyService.boost(principal, lobbyId));
+    }
+
     @PostMapping("/{lobbyId}/join")
     public ResponseEntity<DefaultMessageResponse> join(
             @AuthenticationPrincipal Gamer principal, @PathVariable UUID lobbyId) {
