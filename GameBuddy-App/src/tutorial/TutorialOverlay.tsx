@@ -35,8 +35,13 @@ export function TutorialOverlay() {
 
   // Navigation is a side effect of the step changing, not something the buttons do, so
   // starting at step 0 lands on the deck without every caller having to remember to.
+  //
+  // `navigate`, not `replace`: REPLACE onto a tab route splices the tab navigator's
+  // history array by *tab index*, and five of them in a row leave that history pointing
+  // at tabs the gamer never chose — the raw material for a back press that lands on the
+  // store. `navigate` switches tabs through the ordinary path and keeps history sane.
   useEffect(() => {
-    if (current) router.replace(current.route);
+    if (current) router.navigate(current.route);
   }, [current, router]);
 
   if (!current || step === null) return null;

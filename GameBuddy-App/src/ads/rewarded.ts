@@ -46,11 +46,34 @@ const TEST_REWARDED_UNIT_ID = Platform.select({
  * Empty until the account is approved and the unit is created. While it is empty the test
  * unit is used even in a release build — a missing id would otherwise fail to load an ad
  * and leave the button spinning, which is worse than showing a test ad to nobody.
+ *
+ * **That fallback is silent, and the silence cost us the feature.** Internal testers watched
+ * adverts and were never paid: the variable was set nowhere — not in `.env`, not in
+ * `eas.json` — so every build shipped on the test unit, and Google's test units never call a
+ * publisher's server-side verification endpoint. The advert played, the client reported
+ * `earned`, and no callback ever reached `/ads/reward` to move a coin or spend a daily view.
+ * Hence the warning below: the fallback stays, but a release build no longer takes it
+ * quietly.
  */
 const LIVE_REWARDED_UNIT_ID = process.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID ?? '';
 
+/** True when this build shows adverts that structurally cannot pay. */
+export function rewardsAreLive(): boolean {
+  return !__DEV__ && !!LIVE_REWARDED_UNIT_ID;
+}
+
 export function rewardedUnitId(): string {
-  return __DEV__ || !LIVE_REWARDED_UNIT_ID ? TEST_REWARDED_UNIT_ID : LIVE_REWARDED_UNIT_ID;
+  if (__DEV__ || !LIVE_REWARDED_UNIT_ID) {
+    if (!__DEV__) {
+      console.warn(
+        '[ads] EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID is unset in a release build — ' +
+          'falling back to the test unit, which never fires the reward callback. ' +
+          'Set it in eas.json and configure SSV on the unit in the AdMob console.',
+      );
+    }
+    return TEST_REWARDED_UNIT_ID;
+  }
+  return LIVE_REWARDED_UNIT_ID;
 }
 
 /**

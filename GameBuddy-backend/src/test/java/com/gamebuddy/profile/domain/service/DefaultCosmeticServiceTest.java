@@ -103,17 +103,29 @@ class DefaultCosmeticServiceTest {
         }
 
         @Test
-        @DisplayName("a free cosmetic is owned by everyone, with no purchase row")
-        void testGetCosmetics_whenItemIsFree_MarksOwned() {
+        @DisplayName("a free cosmetic is not owned until it has been claimed")
+        void testGetCosmetics_whenItemIsFreeAndUnclaimed_MarksNotOwned() {
             when(cosmeticRepository.findAllByOrderByKindAscSortOrderAsc())
                     .thenReturn(List.of(cosmetic(CosmeticKind.FRAME, 0)));
 
             CosmeticsResponse response = cosmeticService.getCosmetics(gamer);
 
-            // The reason this matters: the free frames are exactly what a gamer with no
-            // coins can wear, and asking the purchase table would lock every one of them.
+            // Free used to mean owned outright, which is what made the free frame something
+            // a gamer already had rather than something they got from the store. Ownership
+            // is the row now, for every item at every price.
+            assertFalse(response.getBody().getData().getFrames().get(0).isOwned());
+        }
+
+        @Test
+        @DisplayName("a claimed free cosmetic is owned like anything else")
+        void testGetCosmetics_whenItemIsFreeAndClaimed_MarksOwned() {
+            Cosmetic free = cosmetic(CosmeticKind.FRAME, 0);
+            when(cosmeticRepository.findAllByOrderByKindAscSortOrderAsc()).thenReturn(List.of(free));
+            when(ownershipRepository.findOwnedIds(gamer.getUserId())).thenReturn(Set.of(free.getId()));
+
+            CosmeticsResponse response = cosmeticService.getCosmetics(gamer);
+
             assertTrue(response.getBody().getData().getFrames().get(0).isOwned());
-            verify(ownershipRepository, never()).existsByUserIdAndCosmeticId(anyString(), any(UUID.class));
         }
 
         @Test
@@ -186,14 +198,49 @@ class DefaultCosmeticServiceTest {
         }
 
         @Test
-        @DisplayName("a free cosmetic cannot be bought — there is nothing to charge for")
-        void testBuy_whenFree_ReturnErrorCode165() {
+        @DisplayName("a free cosmetic is claimed: a row is written and no coins move")
+        void testBuy_whenFree_ClaimsWithoutCharging() {
             Cosmetic free = cosmetic(CosmeticKind.FRAME, 0);
             when(cosmeticRepository.findById(free.getId())).thenReturn(Optional.of(free));
+
+            cosmeticService.buy(gamer, free.getId().toString());
+
+            assertEquals(100, gamer.getCoin());
+            // No ledger entry either. A zero-coin row is noise in a history whose job is to
+            // account for coins that actually moved.
+            verify(coinLedgerRepository, never()).save(any());
+
+            ArgumentCaptor<GamerCosmetic> saved = ArgumentCaptor.forClass(GamerCosmetic.class);
+            verify(ownershipRepository).save(saved.capture());
+            assertEquals(0, saved.getValue().getPaid());
+        }
+
+        @Test
+        @DisplayName("claiming twice is refused like any other double purchase")
+        void testBuy_whenFreeAlreadyClaimed_ReturnErrorCode165() {
+            Cosmetic free = cosmetic(CosmeticKind.FRAME, 0);
+            when(cosmeticRepository.findById(free.getId())).thenReturn(Optional.of(free));
+            when(ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), free.getId()))
+                    .thenReturn(true);
             String id = free.getId().toString();
 
             BusinessException ex = assertThrows(BusinessException.class, () -> cosmeticService.buy(gamer, id));
             assertEquals(165, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("a membership item is priced at zero and is still not claimable")
+        void testBuy_whenMembershipOnly_ReturnsSubscriptionRequired() {
+            Cosmetic members = cosmetic(CosmeticKind.BANNER, 0);
+            members.setMembershipOnly(true);
+            when(cosmeticRepository.findById(members.getId())).thenReturn(Optional.of(members));
+            String id = members.getId().toString();
+
+            // The reason this test exists: dropping the free-means-owned shortcut turned a
+            // zero price into a claimable price, and membership items share that price.
+            BusinessException ex = assertThrows(BusinessException.class, () -> cosmeticService.buy(gamer, id));
+            assertEquals(159, ex.getTransactionCode().getId());
+            verify(ownershipRepository, never()).save(any());
         }
 
         @Test
@@ -280,10 +327,21 @@ class DefaultCosmeticServiceTest {
         }
 
         @Test
-        @DisplayName("a free cosmetic needs no purchase to wear")
-        void testEquip_whenFree_WearsIt() {
+        @DisplayName("an unclaimed free cosmetic cannot be worn either")
+        void testEquip_whenFreeAndUnclaimed_ReturnErrorCode166() {
             Cosmetic free = cosmetic(CosmeticKind.BANNER, 0);
             when(cosmeticRepository.findById(free.getId())).thenReturn(Optional.of(free));
+            String id = free.getId().toString();
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> cosmeticService.equip(gamer, id));
+            assertEquals(166, ex.getTransactionCode().getId());
+            assertNull(gamer.getEquippedBanner());
+        }
+
+        @Test
+        @DisplayName("a claimed free cosmetic is worn like any other owned item")
+        void testEquip_whenFreeAndClaimed_WearsIt() {
+            Cosmetic free = own(cosmetic(CosmeticKind.BANNER, 0));
 
             cosmeticService.equip(gamer, free.getId().toString());
 
@@ -294,9 +352,8 @@ class DefaultCosmeticServiceTest {
         @DisplayName("each kind has its own slot, so a banner does not displace a frame")
         void testEquip_whenBannerEquipped_LeavesFrameAlone() {
             Cosmetic frame = cosmetic(CosmeticKind.FRAME, 0);
-            Cosmetic banner = cosmetic(CosmeticKind.BANNER, 0);
+            Cosmetic banner = own(cosmetic(CosmeticKind.BANNER, 0));
             gamer.setEquippedFrame(frame);
-            when(cosmeticRepository.findById(banner.getId())).thenReturn(Optional.of(banner));
 
             cosmeticService.equip(gamer, banner.getId().toString());
 
@@ -307,13 +364,20 @@ class DefaultCosmeticServiceTest {
         @Test
         void testEquip_whenAnotherFrameWorn_ReplacesIt() {
             Cosmetic old = cosmetic(CosmeticKind.FRAME, 0);
-            Cosmetic replacement = cosmetic(CosmeticKind.FRAME, 0);
+            Cosmetic replacement = own(cosmetic(CosmeticKind.FRAME, 0));
             gamer.setEquippedFrame(old);
-            when(cosmeticRepository.findById(replacement.getId())).thenReturn(Optional.of(replacement));
 
             cosmeticService.equip(gamer, replacement.getId().toString());
 
             assertEquals(replacement, gamer.getEquippedFrame());
+        }
+
+        /** Findable in the catalogue and owned by this gamer — the state equipping needs. */
+        private Cosmetic own(Cosmetic cosmetic) {
+            when(cosmeticRepository.findById(cosmetic.getId())).thenReturn(Optional.of(cosmetic));
+            when(ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), cosmetic.getId()))
+                    .thenReturn(true);
+            return cosmetic;
         }
 
         @Test

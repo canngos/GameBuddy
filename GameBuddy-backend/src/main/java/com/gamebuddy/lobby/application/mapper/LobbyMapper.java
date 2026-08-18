@@ -3,6 +3,7 @@ package com.gamebuddy.lobby.application.mapper;
 import com.gamebuddy.lobby.infrastructure.entity.Lobby;
 import com.gamebuddy.lobby.infrastructure.entity.LobbyMember;
 import com.gamebuddy.lobby.infrastructure.entity.LobbyMemberStatus;
+import com.gamebuddy.lobby.infrastructure.entity.LobbyStatus;
 import com.gamebuddy.lobby.interfaces.dto.LobbyDto;
 import com.gamebuddy.lobby.interfaces.dto.LobbyMemberDto;
 import com.gamebuddy.lobby.interfaces.dto.LobbyMessageDto;
@@ -55,6 +56,9 @@ public class LobbyMapper {
         dto.setStatus(lobby.getStatus());
         dto.setMyStatus(myStatus);
         dto.setUnreadCount(unreadCount);
+        // Boosted while the lobby is still open to join. A boost bought on a lobby that has
+        // since locked or ended is spent, not refundable, and not drawn.
+        dto.setBoosted(lobby.getBoostedAt() != null && lobby.getStatus() == LobbyStatus.OPEN);
         dto.setCreatedAt(lobby.getCreatedAt());
         return dto;
     }

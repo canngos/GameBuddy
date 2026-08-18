@@ -295,6 +295,26 @@ public class ChatMessageService {
         return DefaultMessageResponse.of("Message reported successfully");
     }
 
+    /**
+     * Marks a conversation read, on its own rather than as a side effect of loading it.
+     *
+     * <p>Reading the history moved the watermark and nothing else did, which left the unread
+     * badge lying in two ordinary situations. Re-opening a conversation the client still has
+     * cached issues no request, so nothing marked it read; and a message arriving over the
+     * socket while the thread is on screen is read the instant it appears, but the watermark
+     * sat behind it until the next full load. Both now call this.
+     *
+     * <p>Silent when the two have no room yet: there is nothing to mark, and a conversation
+     * opened before either side has said anything is a normal thing to do.
+     */
+    @Transactional
+    public DefaultMessageResponse markConversationRead(Gamer principal, String friendId) {
+        Gamer gamer = requireGamer(principal.getUserId());
+        chatRoomService.find(gamer.getUserId(), friendId)
+                .ifPresent(room -> markRead(room.getId(), gamer.getUserId()));
+        return DefaultMessageResponse.of("Conversation marked read");
+    }
+
     /** Moves this gamer's read watermark to now. */
     @Transactional
     public void markRead(UUID roomId, String userId) {

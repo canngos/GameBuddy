@@ -165,7 +165,13 @@ public enum TransactionCode {
      * sides can already see, and take a match away from somebody who did nothing wrong.
      */
     REWIND_MATCHED(172, "You matched with them — that one cannot be taken back", HttpStatus.CONFLICT),
-    BOOST_ALREADY_ACTIVE(173, "You are already boosted", HttpStatus.CONFLICT),
+    /**
+     * Was BOOST_ALREADY_ACTIVE, for the retired deck boost — same meaning, and now about the
+     * lobby: a boost is bought once and lasts until the lobby starts, so a second one buys
+     * nothing. The id is reused rather than retired because the message is the same sentence
+     * about the same act, and the old code had no client left to confuse.
+     */
+    LOBBY_ALREADY_BOOSTED(173, "That lobby is already boosted", HttpStatus.CONFLICT),
     /** The daily coins, a quest or the stipend was asked for before it was due. */
     REWARD_NOT_READY(174, "There is nothing to claim yet", HttpStatus.CONFLICT),
     /** A quest whose target has not been reached. */

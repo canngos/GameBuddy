@@ -324,23 +324,13 @@ public class Gamer implements RevocableUser {
     @Column(name = "last_decision_at")
     private Instant lastDecisionAt;
 
-    // --- Boost -------------------------------------------------------------
-
-    /**
-     * While this is in the future, the gamer is pinned to the front of decks in their
-     * country. An expiry rather than a flag: nothing has to run to turn it off, so there
-     * is no sweep that can fail and leave somebody boosted forever.
-     */
-    @Column(name = "boost_expires_at")
-    private Instant boostExpiresAt;
-
-    /** When the weekly Gold boost was last taken. Null means never. */
-    @Column(name = "last_free_boost_at")
-    private Instant lastFreeBoostAt;
+    // The deck boost lived here — boost_expires_at and last_free_boost_at — and was retired
+    // with the feature; the columns are dropped by upgrade-2026-31. A lobby carries its own
+    // boost now, on the lobby row where the thing being promoted actually is.
 
     // --- Earning coins -----------------------------------------------------
-    // Here rather than in a wallet table, matching where the swipe quota and the boost
-    // expiry already live: per-gamer counters, read on one screen, written by one action.
+    // Here rather than in a wallet table, matching where the swipe quota already lives:
+    // per-gamer counters, read on one screen, written by one action.
 
     @Column(name = "daily_claimed_at")
     private Instant dailyClaimedAt;

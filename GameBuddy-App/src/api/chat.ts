@@ -47,6 +47,17 @@ export const chatApi = {
   presence: (userId: string) => api.get<PresenceUpdate>(`/presence/${userId}`),
 
   /**
+   * Moves the read watermark for one conversation to now.
+   *
+   * Loading the history marks it read too, so this looks redundant — it is not. The
+   * history is cached, so re-opening a chat inside the cache window sends no request at
+   * all, and a thread already on screen receives over the socket without ever reloading.
+   * In both cases the server went on counting messages the gamer had plainly read, which
+   * is what kept the unread badge up after leaving a conversation.
+   */
+  markRead: (friendId: string) => api.post<void>(`/messages/read/${friendId}`),
+
+  /**
    * Flags a message for moderation. Only the *recipient* may report — the backend
    * refuses with RECEIVER_IS_DIFFERENT (143) otherwise, so this is not offered on
    * your own messages.

@@ -20,7 +20,6 @@ export const QUERY_KEYS = [
   'avatars',
   'badges',
   'blocked',
-  'boost',
   'conversation',
   'cosmetics',
   'earn',

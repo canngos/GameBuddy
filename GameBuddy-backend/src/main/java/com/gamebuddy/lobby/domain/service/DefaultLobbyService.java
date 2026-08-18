@@ -27,6 +27,8 @@ import com.gamebuddy.lobby.interfaces.request.CreateLobbyRequest;
 import com.gamebuddy.lobby.interfaces.request.UpdateLobbyRequest;
 import com.gamebuddy.lobby.interfaces.response.LobbiesResponse;
 import com.gamebuddy.lobby.interfaces.response.LobbyResponse;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.Games;
 import com.gamebuddy.shared.event.NotificationKind;
@@ -98,6 +100,16 @@ public class DefaultLobbyService implements LobbyService {
      */
     private static final Instant NO_START_BOUND = Instant.parse("2999-01-01T00:00:00Z");
 
+    /**
+     * What pinning a lobby to the top of the list costs.
+     *
+     * <p>The same 300 the deck boost charged. It is the most expensive thing on the shelf and
+     * about a week and a half of a free player's income, which is the intended shape: what is
+     * being bought is other people's attention, and that is finite — cheap boosts would mean
+     * everybody boosting, which is the same as nobody boosting.
+     */
+    static final int LOBBY_BOOST_COST_COINS = 300;
+
     private static final EnumSet<LobbyStatus> ACTIVE = EnumSet.of(LobbyStatus.OPEN, LobbyStatus.LOCKED);
     private static final EnumSet<LobbyMemberStatus> TEAM =
             EnumSet.of(LobbyMemberStatus.OWNER, LobbyMemberStatus.ACCEPTED);
@@ -114,6 +126,7 @@ public class DefaultLobbyService implements LobbyService {
     private final UserMessaging messaging;
     private final RateLimiter lobbyCreateRateLimiter;
     private final RateLimiter lobbyJoinRateLimiter;
+    private final CoinLedger coins;
 
     @Override
     @Transactional(readOnly = true)
@@ -458,6 +471,53 @@ public class DefaultLobbyService implements LobbyService {
         return DefaultMessageResponse.of("Member removed");
     }
 
+    /**
+     * Pins a lobby to the top of the browse list, for coins.
+     *
+     * <p>The replacement for the deck boost, and the reason it replaced it: a boosted deck
+     * bought thirty minutes at the front of a stack of faces, and the buyer had no way to see
+     * that anything had happened. A boosted lobby is a row at the top of a list with a frame
+     * around it, which is visible to the person who paid for it as well as to everybody else.
+     *
+     * <p><b>It lasts until the lobby stops being open.</b> No expiry clock and nothing to
+     * sweep: browse only ever shows OPEN lobbies, so locking, starting, ending or cancelling
+     * ends the promotion by itself. That also makes the offer honest — what is bought is the
+     * top of the list for the life of the plan, not a countdown that can run out while the
+     * lobby is still filling.
+     *
+     * <p><b>No refund on cancel.</b> The boost delivered what it sold — visibility, from the
+     * moment it was bought — and an owner who cancels has already had it.
+     *
+     * <p>Read-check-write inside one transaction, so the balance runs under the
+     * {@code @Version} lock on {@link Gamer}: two taps would otherwise both read the old
+     * balance and charge twice for one pin.
+     */
+    @Override
+    @Transactional
+    public LobbyResponse boost(Gamer principal, UUID lobbyId) {
+        Gamer owner = requireGamer(principal.getUserId());
+        Lobby lobby = requireOwnedLobby(lobbyId, owner);
+
+        if (lobby.getStatus() != LobbyStatus.OPEN) {
+            throw new BusinessException(TransactionCode.LOBBY_NOT_OPEN);
+        }
+        if (lobby.getBoostedAt() != null) {
+            throw new BusinessException(TransactionCode.LOBBY_ALREADY_BOOSTED);
+        }
+        if (owner.getCoin() < LOBBY_BOOST_COST_COINS) {
+            throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
+        }
+
+        coins.spend(owner, LOBBY_BOOST_COST_COINS, CoinReason.LOBBY_BOOST);
+        gamerRepository.save(owner);
+
+        lobby.setBoostedAt(clock.instant());
+        lobbyRepository.save(lobby);
+        log.info("Gamer {} boosted lobby {} for {} coins", owner.getUserId(), lobbyId, LOBBY_BOOST_COST_COINS);
+
+        return get(owner, lobbyId);
+    }
+
     @Override
     @Transactional
     public DefaultMessageResponse lock(Gamer principal, UUID lobbyId) {
@@ -572,19 +632,15 @@ public class DefaultLobbyService implements LobbyService {
         Instant startsBefore = startingSoon ? clock.instant().plus(STARTING_SOON) : NO_START_BOUND;
 
         if (byGame && tone != null) {
-            return lobbyRepository.findAllByStatusAndStartsAtBeforeAndGameIdAndToneOrderByStartsAtAsc(
-                    LobbyStatus.OPEN, startsBefore, gameId, tone, pageable);
+            return lobbyRepository.browseByGameAndTone(LobbyStatus.OPEN, startsBefore, gameId, tone, pageable);
         }
         if (byGame) {
-            return lobbyRepository.findAllByStatusAndStartsAtBeforeAndGameIdOrderByStartsAtAsc(
-                    LobbyStatus.OPEN, startsBefore, gameId, pageable);
+            return lobbyRepository.browseByGame(LobbyStatus.OPEN, startsBefore, gameId, pageable);
         }
         if (tone != null) {
-            return lobbyRepository.findAllByStatusAndStartsAtBeforeAndToneOrderByStartsAtAsc(
-                    LobbyStatus.OPEN, startsBefore, tone, pageable);
+            return lobbyRepository.browseByTone(LobbyStatus.OPEN, startsBefore, tone, pageable);
         }
-        return lobbyRepository.findAllByStatusAndStartsAtBeforeOrderByStartsAtAsc(
-                LobbyStatus.OPEN, startsBefore, pageable);
+        return lobbyRepository.browse(LobbyStatus.OPEN, startsBefore, pageable);
     }
 
     private LobbyDto toDto(Lobby lobby, Gamer owner, LobbyMemberStatus myStatus, long unread) {

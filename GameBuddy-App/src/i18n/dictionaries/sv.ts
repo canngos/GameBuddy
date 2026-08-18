@@ -201,10 +201,18 @@ export const sv: Dictionary = {
       emptyBlurb: 'Öppna en, sätt en tid och välj vilka som får vara med.',
     },
 
+    boost: {
+      badge: 'Boostad',
+      action: (cost: number) => `Boosta den här lobbyn · ${cost}`,
+      caption: 'Lägger den överst i listan tills den börjar.',
+      activeCaption: 'Boostad — överst i listan tills lobbyn börjar.',
+    },
+
     detail: {
       fallbackTitle: 'Lobby',
       gone: 'Den här lobbyn finns inte längre.',
       wantsToJoin: 'Vill gå med',
+      requestSent: 'Förfrågan skickad. Vi säger till när ägaren svarar.',
       team: (taken: number, total: number) => `Lag · ${taken}/${total}`,
       accept: 'Acceptera',
       pass: 'Avböj',
@@ -224,7 +232,6 @@ export const sv: Dictionary = {
       unlock: 'Lås upp',
       endLobby: 'Avsluta lobbyn',
       leaveLobby: 'Lämna lobbyn',
-      requestSent: 'Förfrågan skickad. Vi säger till när ägaren svarar.',
       withdraw: 'Dra tillbaka förfrågan',
       rejected: 'Ägaren fyllde den här med någon annan.',
       askToJoin: 'Be att få gå med',
@@ -292,12 +299,6 @@ export const sv: Dictionary = {
       undoCost: (cost: number) => `Ångra senaste svepet, ${cost} mynt`,
     },
 
-    boost: {
-      free: 'Gratis',
-      activeA11y: (remaining: string) => `Boost aktiv, ${remaining} kvar`,
-      freeA11y: 'Använd din gratis veckoboost',
-      costA11y: (cost: number) => `Boost för ${cost} mynt`,
-    },
 
     match: {
       title: 'Det är en match!',
@@ -400,6 +401,8 @@ export const sv: Dictionary = {
       boughtBody: 'Ta på det från ditt Förråd.',
       owned: 'Ägd',
       buy: 'Köp',
+      claim: 'Hämta',
+      claimA11y: (name: string) => `Hämta ${name}, gratis`,
       free: 'Gratis',
       coinsPrice: (n: number) => `${n} mynt`,
       animatedSuffix: ', animerad',
@@ -421,6 +424,8 @@ export const sv: Dictionary = {
       earnedTitle: (n: number) => `+${n} mynt`,
       earnedBody: 'Lägg dem på ramar, banners eller likes.',
       watchedBody: 'Tack för att du tittade.',
+      rewardPendingTitle: 'Mynten är på väg',
+      rewardPendingBody: 'Kolla ditt saldo igen om en stund.',
       consentTitle: 'Videor kräver annonssamtycke',
       consentBody: 'Ändra det i Inställningar → Annonsintegritet.',
       watchVideo: 'Titta på en kort video',
@@ -566,10 +571,9 @@ export const sv: Dictionary = {
     conversation: 'Konversation',
     viewProfileA11y: (name: string) => `Visa ${name}s profil`,
     thisGamer: 'den här spelaren',
-    alreadyFriends: 'Redan vänner',
     acceptRequest: 'Acceptera vänförfrågan',
-    requestSent: 'Vänförfrågan skickad',
     sendRequest: 'Skicka en vänförfrågan',
+    alreadyFriends: 'Redan vänner',
     reported: 'Anmält. En moderator tittar på det.',
     placeholder: 'Meddelande',
     connecting: 'Ansluter…',
@@ -599,7 +603,9 @@ export const sv: Dictionary = {
     games: 'Spel',
     playsOn: 'Spelar på',
     keywords: 'Nyckelord',
-    friendRequests: (n: number) => `Vänförfrågningar · ${n}`,
+    friendRequestsShort: 'Vänförfrågningar',
+    acceptRequestA11y: (name: string) => `Acceptera förfrågan från ${name}`,
+    declineRequestA11y: (name: string) => `Avböj förfrågan från ${name}`,
     accept: 'Acceptera',
     no: 'Nej',
 
@@ -620,6 +626,17 @@ export const sv: Dictionary = {
     blockConfirmTitle: (name: string) => `Blockera ${name}?`,
     blockConfirmBody:
       'Ni ser inte varandra någonstans i appen, och ingen av er kan skriva till den andra. Du kan ångra det i Inställningar.',
+
+    moreActionsA11y: 'Fler åtgärder',
+    matchBack: 'Gilla tillbaka',
+    matchBackCaption: 'Personen har redan gillat dig — gilla tillbaka och börja prata.',
+    matching: 'Matchar…',
+    addFriend: 'Lägg till som vän',
+    addFriendCaption: 'Matcha först, sedan kan du skicka en vänförfrågan.',
+    acceptRequest: 'Acceptera förfrågan',
+    withdrawRequest: 'Dra tillbaka förfrågan',
+    withdrawConfirmTitle: (name: string) => `Dra tillbaka din förfrågan till ${name}?`,
+    withdrawConfirmBody: 'Den försvinner för dem. Du kan skicka en ny när du vill.',
 
     admirersTitle: 'Vem som gillat dig',
     peopleLikeYou: (n: number) => (n === 1 ? 'person gillar dig' : 'personer gillar dig'),
@@ -820,6 +837,7 @@ export const sv: Dictionary = {
       '163': 'Dina svep är slut för idag.',
       '168': 'Du måste vara minst 18 för att använda GameBuddy.',
       '170': 'Meddelandet bryter mot reglerna.',
+      '173': 'Lobbyn är redan boostad.',
       '179': 'Lobbyn är redan full.',
       '180': 'Lobbyn är inte öppen längre.',
       '183': 'Avsluta eller avbryt din nuvarande lobby först.',

@@ -22,6 +22,40 @@ import { StreakStrip } from './StreakStrip';
 const EARN_KEY = ['earn'];
 
 /**
+ * How long to keep asking whether an advert's coins have landed.
+ *
+ * Six tries, roughly five seconds in total. The callback is a server-to-server request that
+ * normally beats the second attempt; the tail is for a slow one. Stopping at five seconds
+ * rather than waiting indefinitely keeps the button from being held hostage to Google's
+ * latency — the coins still arrive, and the next refetch shows them.
+ */
+const CREDIT_POLL_DELAYS_MS = [300, 600, 900, 1200, 1000, 1000];
+
+/**
+ * Re-reads the earn state until the balance moves, or the attempts run out.
+ *
+ * Returns the last balance seen either way, so the caller can tell "paid" from "not yet"
+ * and say something honest about which it was.
+ */
+async function pollForCredit(
+  queryClient: ReturnType<typeof useQueryClient>,
+  before: number | undefined,
+): Promise<number | undefined> {
+  let latest = before;
+
+  for (const delay of CREDIT_POLL_DELAYS_MS) {
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    // Refetch rather than invalidate: this must be the network answer, not whatever is
+    // already cached, and it has to be awaited to be worth checking.
+    await queryClient.refetchQueries({ queryKey: EARN_KEY });
+    latest = queryClient.getQueryData<Earn>(EARN_KEY)?.coinBalance;
+    if (before !== undefined && latest !== undefined && latest > before) return latest;
+  }
+
+  return latest;
+}
+
+/**
  * Ways to earn coins, above the ways to buy them.
  *
  * The order is the argument. Lifetime income used to be 975 coins from thirteen one-time
@@ -98,20 +132,19 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
     try {
       const outcome = await showRewardedAd(userId);
       if (outcome === 'earned') {
-        // Deliberately a refetch rather than adding the coins locally. The grant happens
-        // out of band on Google's callback, so the client genuinely does not know the new
-        // balance — and guessing it would show coins that might never arrive.
-        await queryClient.invalidateQueries({ queryKey: EARN_KEY });
+        /*
+         * Wait for the coins rather than asking once and giving up.
+         *
+         * The grant arrives out of band — Google calls `/ads/reward` from their servers, and
+         * that call races the refetch below. A single immediate fetch usually loses that
+         * race, which looks exactly like the reward being broken: the advert finishes, the
+         * balance is unchanged, nothing is said. So this re-asks for a few seconds, and
+         * stops the moment the balance moves.
+         */
+        const after = await pollForCredit(queryClient, before);
         void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
         void queryClient.invalidateQueries({ queryKey: ['me'] });
 
-        /*
-         * Announced from what the refetch actually returned, for the same reason the fetch
-         * exists at all: Google's server-side callback is what pays, and it can be late or
-         * can decline. Congratulating somebody on coins that never landed is worse than
-         * saying nothing, so this stays silent unless the balance really moved.
-         */
-        const after = queryClient.getQueryData<Earn>(EARN_KEY)?.coinBalance;
         if (before !== undefined && after !== undefined && after > before) {
           feedback.reward();
           showToast({
@@ -120,6 +153,23 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
             body: t.market.earn.watchedBody,
             icon: Coins,
             tone: 'gold',
+          });
+        } else {
+          /*
+           * Watched, but nothing had landed by the time we stopped asking.
+           *
+           * Silence was the old answer and it is the wrong one: to the gamer this is
+           * indistinguishable from being cheated, and it is what testers reported. The
+           * callback may still be in flight, or — if this build shipped without a live ad
+           * unit — it was never sent at all. Either way, say that it is coming rather than
+           * pretending nothing happened.
+           */
+          showToast({
+            id: 'ads:pending',
+            title: t.market.earn.rewardPendingTitle,
+            body: t.market.earn.rewardPendingBody,
+            icon: Clapperboard,
+            tone: 'muted',
           });
         }
       } else if (outcome === 'consentRequired') {

@@ -8,6 +8,7 @@ import { matchApi } from '../../../src/api/match';
 import { socialApi } from '../../../src/api/social';
 import { useUpper } from '../../../src/i18n/case';
 import { useT } from '../../../src/i18n/useT';
+import { FriendRequestsSection } from '../../../src/social/FriendRequestsSection';
 import { useThemeColors } from '../../../src/theme';
 import { Card, ErrorNotice, FramedAvatar, Screen, Text } from '../../../src/ui';
 
@@ -122,8 +123,13 @@ export default function Messages() {
     useCallback(() => {
       void friends.refetch();
       void matches.refetch();
+      // The inbox too, and for a different reason: coming back from a conversation, the
+      // unread counts on this screen are the ones fetched before it was opened. The chat
+      // zeroes its own row optimistically, but only a refetch confirms it — and only this
+      // catches messages that arrived while the socket was down.
+      void inbox.refetch();
       // Refetch functions are stable across renders, so this runs once per focus.
-    }, [friends.refetch, matches.refetch]),
+    }, [friends.refetch, matches.refetch, inbox.refetch]),
   );
 
   /**
@@ -331,6 +337,10 @@ function ListHeader({
 
       {loading && <ActivityIndicator color={colors.primary} />}
       {!!error && <ErrorNotice error={error} onRetry={onRetry} />}
+
+      {/* Above both sections: somebody asking to be your friend is waiting on an answer,
+          and the two lists below are not. It draws nothing when nothing is pending. */}
+      <FriendRequestsSection />
     </View>
   );
 }

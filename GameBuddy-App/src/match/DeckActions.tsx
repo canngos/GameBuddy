@@ -1,5 +1,4 @@
 import { Heart, RotateCcw, X } from 'lucide-react-native';
-import type { ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
@@ -20,15 +19,6 @@ type DeckActionsProps = {
   canRewind?: boolean;
   /** Coins a rewind costs here. Zero on Gold, and shown so the price is never a surprise. */
   rewindCost?: number;
-  /**
-   * The Boost control, rendered on the right so the row reads undo · pass · match · boost.
-   *
-   * Passed in rather than built here because Boost owns its own queries and countdown,
-   * and this component is otherwise presentational. It sits in this row rather than the
-   * header because the header already carried filters, admirers and the like count — a
-   * fourth control there wrapped the screen title onto two lines.
-   */
-  boost?: ReactNode;
 };
 
 /**
@@ -45,7 +35,6 @@ export function DeckActions({
   onRewind,
   canRewind = false,
   rewindCost = 0,
-  boost,
 }: DeckActionsProps) {
   const t = useT();
   return (
@@ -95,9 +84,11 @@ export function DeckActions({
         <Icon as={Heart} size={30} tone="inverse" fill="#FFFFFF" strokeWidth={0} />
       </CircleButton>
 
-      {/* Mirrors the rewind spacer, so Pass and Match stay centred whether or not
-          either optional control is present. */}
-      {boost ?? <View className="w-14" />}
+      {/* Mirrors the rewind spacer, so Pass and Match stay centred. The deck boost used to
+          sit here — the row read undo · pass · match · boost — and it was retired: what it
+          promoted was a face inside somebody else's stack, so the buyer had no way to see
+          it had worked. Boosting moved to lobbies, where the result is visible on a list. */}
+      <View className="w-14" />
     </View>
   );
 }

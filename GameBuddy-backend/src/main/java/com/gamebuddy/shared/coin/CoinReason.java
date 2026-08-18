@@ -32,7 +32,13 @@ public enum CoinReason {
 
     // --- Sinks -------------------------------------------------------------
     COSMETIC,
+    /**
+     * The retired deck boost. Kept because the ledger is a history: rows referencing it
+     * exist and must keep resolving. Nothing writes it any more — see {@link #LOBBY_BOOST}.
+     */
     BOOST,
+    /** Pinning a lobby to the top of the browse list until it starts. */
+    LOBBY_BOOST,
     REWIND,
     SUPER_LIKE,
     EXTRA_LIKES,
@@ -45,7 +51,14 @@ public enum CoinReason {
     public boolean isFaucet() {
         return switch (this) {
             case DAILY_STREAK, WEEKLY_QUEST, GOLD_STIPEND, BADGE_REWARD, REWARDED_AD, COIN_PACK -> true;
-            case COSMETIC, BOOST, REWIND, SUPER_LIKE, EXTRA_LIKES, UNLOCK_ADMIRER, REFUND -> false;
+            case COSMETIC,
+                    BOOST,
+                    LOBBY_BOOST,
+                    REWIND,
+                    SUPER_LIKE,
+                    EXTRA_LIKES,
+                    UNLOCK_ADMIRER,
+                    REFUND -> false;
         };
     }
 }

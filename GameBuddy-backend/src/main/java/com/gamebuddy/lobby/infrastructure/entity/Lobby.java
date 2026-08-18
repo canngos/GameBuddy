@@ -83,6 +83,17 @@ public class Lobby implements Serializable {
     @Column(name = "ended_at")
     private Instant endedAt;
 
+    /**
+     * When the owner paid to pin this lobby to the top of the browse list. Null means never.
+     *
+     * <p>A stamp rather than an expiry, because the boost has no clock of its own: browse
+     * only ever shows OPEN lobbies, so being pinned ends exactly when the lobby locks,
+     * starts, ends or is cancelled. There is nothing to sweep and nothing that can leave a
+     * dead lobby sitting at the top of the list.
+     */
+    @Column(name = "boosted_at")
+    private Instant boostedAt;
+
     @Version
     private Long version;
 

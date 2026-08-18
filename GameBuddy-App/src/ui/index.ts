@@ -29,3 +29,5 @@ export { useSoundEnabled } from './sound';
 export { useHapticsEnabled } from './haptics';
 export { BackHeader } from './BackHeader';
 export { ReportSheet } from './ReportSheet';
+export { ActionSheet, type SheetAction } from './ActionSheet';
+export { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog';

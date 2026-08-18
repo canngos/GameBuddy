@@ -51,6 +51,15 @@ export const socialApi = {
   sendRequest: (userId: string) => api.post<void>('/application/send/friend', { userId }),
 
   /**
+   * Takes back a request you sent, leaving no trace on either side.
+   *
+   * Not the same call as `reject`: that one answers a request you *received*, and a
+   * sender calling it gets FRIEND_NO_REQUEST (116) because they are not on their own
+   * waiting list. Until this existed a mistaken tap on "add friend" could not be undone.
+   */
+  withdraw: (userId: string) => api.post<void>('/application/withdraw/friend', { userId }),
+
+  /**
    * Blocking is mutual and total: a blocked gamer stops appearing in the feed, cannot
    * be paired, and cannot send messages, in both directions.
    */

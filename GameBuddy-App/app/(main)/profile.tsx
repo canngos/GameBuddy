@@ -1,19 +1,16 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Crown, Settings, Shirt } from 'lucide-react-native';
-import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
 import { profileApi } from '../../src/api/catalogue';
 import { socialApi } from '../../src/api/social';
-import type { GamerSummary } from '../../src/api/types';
 import { useUpper } from '../../src/i18n/case';
 import { useCountryName } from '../../src/i18n/countryNames';
 import { useT } from '../../src/i18n/useT';
 import { useThemeColors } from '../../src/theme';
 import {
-  Button,
   Card,
   ErrorNotice,
   FramedAvatar,
@@ -31,7 +28,6 @@ export default function Profile() {
   const localize = useCountryName();
 
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
-  const requests = useQuery({ queryKey: ['friendRequests'], queryFn: socialApi.pendingRequests });
   const friends = useQuery({ queryKey: ['friends'], queryFn: socialApi.friends });
 
   // Same key the Market, the deck and the paywall use, so react-query serves all of them
@@ -140,11 +136,10 @@ export default function Profile() {
           </Card>
         )}
 
-        {/* The one thing on this screen waiting on the gamer rather than describing
-            them, so it stays here rather than moving to the friends list with the
-            friends themselves — an answerable prompt one tap deeper is one that gets
-            missed. It renders nothing when there is nothing to answer. */}
-        <FriendRequests query={requests} />
+        {/* Friend requests used to sit here. They are now at the top of the messages
+            tab (`src/social/FriendRequestsSection.tsx`): a request is somebody asking
+            for a conversation, and testers went looking for it among the conversations
+            rather than on the screen that describes them. */}
       </View>
     </Screen>
   );
@@ -297,103 +292,3 @@ function Tags({
   );
 }
 
-/** Pending requests, each answerable in place. */
-function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSummary[]>> }) {
-  const t = useT();
-  const upper = useUpper();
-  const queryClient = useQueryClient();
-
-  const answer = useMutation({
-    mutationFn: ({ userId, accept }: { userId: string; accept: boolean }) =>
-      accept ? socialApi.accept(userId) : socialApi.reject(userId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['friendRequests'] });
-      void queryClient.invalidateQueries({ queryKey: ['friends'] });
-    },
-  });
-
-  // Stable, so the rows below can actually bail out of re-rendering.
-  const onAnswer = useCallback(
-    (userId: string, accept: boolean) => answer.mutate({ userId, accept }),
-    [answer],
-  );
-
-  const requests = query.data ?? [];
-  if (requests.length === 0) return null;
-
-  return (
-    <View className="gap-3">
-      <Text variant="overline">{upper(t.profile.friendRequests(requests.length))}</Text>
-
-      {/* Left as a `map` rather than virtualized, deliberately: this is a *section* inside
-          the profile's ScrollView, and a FlatList nested in one is the layout React Native
-          warns about — it would un-virtualize itself and gain nothing. Pending requests are
-          also self-limiting, because answering them is the whole point of the section. The
-          per-render cost is what mattered here, and that is what the memo below removes. */}
-      <View className="gap-2">
-        {requests.map((person) => (
-          <RequestRow
-            key={person.userId}
-            person={person}
-            busy={answer.isPending}
-            onAnswer={onAnswer}
-          />
-        ))}
-      </View>
-
-      {answer.error && <ErrorNotice error={answer.error} />}
-    </View>
-  );
-}
-
-/**
- * One pending friend request.
- *
- * Memoised on primitives and a stable `onAnswer`, so answering one request does not
- * re-render the rest of them — and neither does anything else on the profile, which is
- * the screen this section happens to live on.
- */
-const RequestRow = memo(function RequestRow({
-  person,
-  busy,
-  onAnswer,
-}: {
-  person: GamerSummary;
-  busy: boolean;
-  onAnswer: (userId: string, accept: boolean) => void;
-}) {
-  const t = useT();
-  const localize = useCountryName();
-  const accept = useCallback(() => onAnswer(person.userId, true), [onAnswer, person.userId]);
-  const decline = useCallback(() => onAnswer(person.userId, false), [onAnswer, person.userId]);
-  const meta = useMemo(
-    () => [person.age, localize(person.country)].filter(Boolean).join(' · '),
-    [person.age, person.country, localize],
-  );
-
-  return (
-    <Card className="flex-row items-center gap-3 p-4">
-      <FramedAvatar
-        frame={person.frame}
-        source={person.avatar}
-        name={person.username}
-        colorSeed={person.userId}
-        size={44}
-      />
-      <View className="flex-1 gap-0.5">
-        <Text variant="bodyStrong">{person.username}</Text>
-        <Text variant="caption">{meta}</Text>
-      </View>
-
-      <Button label={t.profile.accept} size="md" className="px-4" disabled={busy} onPress={accept} />
-      <Button
-        label={t.profile.no}
-        variant="ghost"
-        size="md"
-        className="px-3"
-        disabled={busy}
-        onPress={decline}
-      />
-    </Card>
-  );
-});

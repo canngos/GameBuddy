@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
-import { lobbyApi } from '../../../src/api/lobby';
+import { LOBBY_BOOST_COST_COINS, lobbyApi } from '../../../src/api/lobby';
 import type { LobbyDetail, LobbyMember, LobbyMessage } from '../../../src/api/types';
 import { useUpper } from '../../../src/i18n/case';
 import { useT } from '../../../src/i18n/useT';
@@ -76,6 +76,20 @@ export default function LobbyScreen() {
   const unlock = useMutation({ mutationFn: () => lobbyApi.unlock(lobbyId!), onSuccess: invalidate });
   const end = useMutation({ mutationFn: () => lobbyApi.end(lobbyId!), onSuccess: invalidate });
   const cancel = useMutation({ mutationFn: () => lobbyApi.cancel(lobbyId!), onSuccess: invalidate });
+
+  const boost = useMutation({
+    mutationFn: () => lobbyApi.boost(lobbyId!),
+    onSuccess: (fresh) => {
+      // The response is the whole refreshed lobby, so the frame and the button both change
+      // without a second request. The coin balance moved as well, which the Market header
+      // and the profile both show.
+      queryClient.setQueryData(['lobby', lobbyId], fresh);
+      void queryClient.invalidateQueries({ queryKey: ['my-lobbies'] });
+      void queryClient.invalidateQueries({ queryKey: ['lobbies'] });
+      void queryClient.invalidateQueries({ queryKey: ['me'] });
+      void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
+    },
+  });
 
   const answer = useMutation({
     mutationFn: ({ userId, accept }: { userId: string; accept: boolean }) =>
@@ -155,7 +169,7 @@ export default function LobbyScreen() {
 
   const firstError =
     join.error ?? leave.error ?? lock.error ?? unlock.error ?? end.error ?? cancel.error ??
-    answer.error ?? kick.error ?? null;
+    boost.error ?? answer.error ?? kick.error ?? null;
 
   return (
     <Screen edges={['top']} padded={false}>
@@ -186,6 +200,7 @@ export default function LobbyScreen() {
                 unlock: unlock.isPending,
                 end: end.isPending,
                 cancel: cancel.isPending,
+                boost: boost.isPending,
               }}
               on={{
                 join: () => join.mutate(),
@@ -199,6 +214,7 @@ export default function LobbyScreen() {
                 unlock: () => unlock.mutate(),
                 end: () => end.mutate(),
                 cancel: () => cancel.mutate(),
+                boost: () => boost.mutate(),
               }}
             />
 
@@ -382,7 +398,10 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
   );
 }
 
-type ActionHandlers = Record<'join' | 'leave' | 'lock' | 'unlock' | 'end' | 'cancel', () => void>;
+type ActionHandlers = Record<
+  'join' | 'leave' | 'lock' | 'unlock' | 'end' | 'cancel' | 'boost',
+  () => void
+>;
 type ActionPending = Record<keyof ActionHandlers, boolean>;
 
 /**
@@ -408,18 +427,41 @@ function ActionRow({
   if (lobby.myStatus === 'OWNER') {
     if (status === 'OPEN') {
       return (
-        <View className="flex-row gap-2">
-          <View className="flex-1">
-            <Button label={t.lobby.detail.lockTeam} loading={pending.lock} onPress={on.lock} />
+        <View className="gap-2">
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <Button label={t.lobby.detail.lockTeam} loading={pending.lock} onPress={on.lock} />
+            </View>
+            <View className="flex-1">
+              <Button
+                label={t.lobby.detail.cancelLobby}
+                variant="danger"
+                loading={pending.cancel}
+                onPress={on.cancel}
+              />
+            </View>
           </View>
-          <View className="flex-1">
-            <Button
-              label={t.lobby.detail.cancelLobby}
-              variant="danger"
-              loading={pending.cancel}
-              onPress={on.cancel}
-            />
-          </View>
+
+          {/* Below the two lifecycle buttons, and only while there is something to promote.
+              An already-boosted lobby says so instead of offering a second one, which the
+              server refuses anyway. */}
+          {/* Gold, not accent: accent is the like/match colour, and next to the red Cancel
+              button it read as something having gone wrong rather than as a thing bought. */}
+          {lobby.boosted ? (
+            <Text variant="caption" className="text-gold">
+              {t.lobby.boost.activeCaption}
+            </Text>
+          ) : (
+            <View className="gap-1">
+              <Button
+                label={t.lobby.boost.action(LOBBY_BOOST_COST_COINS)}
+                variant="secondary"
+                loading={pending.boost}
+                onPress={on.boost}
+              />
+              <Text variant="caption">{t.lobby.boost.caption}</Text>
+            </View>
+          )}
         </View>
       );
     }

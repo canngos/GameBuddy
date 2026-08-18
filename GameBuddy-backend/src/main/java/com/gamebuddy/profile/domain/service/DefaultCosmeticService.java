@@ -29,11 +29,19 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The cosmetics store.
  *
- * <p>Ownership has one rule, and it lives in {@link #owns}: a gamer owns a cosmetic if it
- * is free, or if there is a purchase row for it. Free items deliberately have no purchase
- * row — see {@link GamerCosmetic} — so anything that asks "did they buy it" instead of
- * "do they own it" will wrongly lock the free frames, which are exactly the ones a new
- * gamer with no coins is supposed to be able to wear.
+ * <p>Ownership has one rule and it lives in {@link #owns}: there is a row in
+ * {@code gamer_cosmetic}, or the gamer does not own it. No exceptions — not for free items,
+ * not for membership ones.
+ *
+ * <p><strong>Free used to mean owned, with no row at all</strong>, which made a free item
+ * something a gamer already had rather than something they got. The Steel frame simply
+ * appeared in every inventory, and {@link #buy} refused it with COSMETIC_ALREADY_OWNED, so
+ * there was no way to claim it even in principle. Now a free item is claimed like any other
+ * purchase and costs zero coins — the row is written, the ledger is not touched.
+ *
+ * <p>The change also closed a hole: membership items are priced at zero, so under the old
+ * rule {@code owns} returned true for them for <em>everybody</em>, and only the store's
+ * filtering kept non-members out. Equipping one directly by id would have worked.
  */
 @Slf4j
 @Service
@@ -53,7 +61,7 @@ public class DefaultCosmeticService implements CosmeticService {
     }
 
     /**
-     * Buys a cosmetic.
+     * Buys a cosmetic, or claims a free one — the same act, at a price of zero.
      *
      * <p>Read-check-write on the coin balance inside one transaction, so it runs under the
      * {@code @Version} optimistic lock on {@link Gamer}. Two taps of the buy button
@@ -67,12 +75,13 @@ public class DefaultCosmeticService implements CosmeticService {
         Gamer gamer = reload(principal);
         Cosmetic cosmetic = require(cosmeticId);
 
-        if (cosmetic.isFree() || ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), cosmetic.getId())) {
+        if (ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), cosmetic.getId())) {
             throw new BusinessException(TransactionCode.COSMETIC_ALREADY_OWNED);
         }
-        // A membership item has a price of zero and is not a free item: it cannot be
-        // bought at any price, because owning it is what says somebody is a member. The
-        // store never offers these, so reaching here means a crafted request.
+        // A membership item is also priced at zero and is emphatically not free: owning it
+        // is what says somebody is a member, so it is granted by the membership job and
+        // never sold. The store does not offer these, so reaching here means a crafted
+        // request — and this check is why a zero price is not a way in.
         if (cosmetic.isMembershipOnly()) {
             throw new BusinessException(TransactionCode.SUBSCRIPTION_REQUIRED);
         }
@@ -80,7 +89,11 @@ public class DefaultCosmeticService implements CosmeticService {
             throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
         }
 
-        coins.spend(gamer, cosmetic.getPrice(), CoinReason.COSMETIC);
+        // Nothing is spent on a claim, and nothing is written to the ledger for it either:
+        // a zero-coin entry is noise in a history whose job is to explain where coins went.
+        if (cosmetic.getPrice() > 0) {
+            coins.spend(gamer, cosmetic.getPrice(), CoinReason.COSMETIC);
+        }
         ownershipRepository.save(new GamerCosmetic(gamer.getUserId(), cosmetic.getId(), cosmetic.getPrice()));
 
         // The purchase badge is not awarded here. Counting bought cosmetics is what
@@ -124,13 +137,10 @@ public class DefaultCosmeticService implements CosmeticService {
     // =======================================================================
 
     /**
-     * The one ownership rule.
-     *
-     * <p>Free means owned, without a row. See the class comment.
+     * The one ownership rule: a row, or nothing. See the class comment.
      */
     private boolean owns(Gamer gamer, Cosmetic cosmetic) {
-        return cosmetic.isFree()
-                || ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), cosmetic.getId());
+        return ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), cosmetic.getId());
     }
 
     private void wear(Gamer gamer, CosmeticKind kind, Cosmetic cosmetic) {
@@ -181,7 +191,7 @@ public class DefaultCosmeticService implements CosmeticService {
                     dto.setImage(cosmeticUrls.urlFor(c));
                     dto.setAnimated(c.isAnimated());
                     dto.setPrice(c.getPrice());
-                    dto.setOwned(c.isFree() || owned.contains(c.getId()));
+                    dto.setOwned(owned.contains(c.getId()));
                     dto.setMembershipOnly(c.isMembershipOnly());
                     dto.setEquipped(c.getId().equals(equippedId));
                     return dto;

@@ -343,6 +343,10 @@ const Row = memo(function Row({
    * free. If that filter is ever loosened, this has to learn "With Gold" again — a
    * membership item is stored at price zero and would otherwise read as "Free", which is
    * the one thing it is not.
+   *
+   * Free no longer implies owned. A free item has to be claimed from this shelf like any
+   * other purchase — the button below says "Claim" and the request is the ordinary buy at
+   * a price of zero.
    */
   const free = item.price === 0;
   const cost = free ? t.market.shop.free : t.market.shop.coinsPrice(item.price);
@@ -420,11 +424,11 @@ const Row = memo(function Row({
           // report.
           accessibilityLabel={(() => {
             const name = `${item.name}${item.animated ? t.market.shop.animatedSuffix : ''}`;
-            return item.owned
-              ? t.market.shop.ownedA11y(name)
-              : affordable
-                ? t.market.shop.buyA11y(name, item.price)
-                : t.market.shop.cantAffordA11y(name, item.price);
+            if (item.owned) return t.market.shop.ownedA11y(name);
+            if (free) return t.market.shop.claimA11y(name);
+            return affordable
+              ? t.market.shop.buyA11y(name, item.price)
+              : t.market.shop.cantAffordA11y(name, item.price);
           })()}
           // Spelled out for the screen reader as well as greyed for everyone else. A
           // control that is only *visually* disabled is announced as tappable and then
@@ -451,11 +455,16 @@ const Row = memo(function Row({
             numberOfLines={1}
             className={item.owned || !affordable ? 'text-muted' : 'text-white'}
           >
+            {/* "Claim", not "Buy", for the one free item. It is the same request and the
+                same zero charge, but the word is the instruction: a free frame that says
+                Buy reads as a price that failed to load. */}
             {item.owned
               ? t.market.shop.owned
-              : affordable
-                ? t.market.shop.buy
-                : t.market.shop.notEnoughCoins}
+              : free
+                ? t.market.shop.claim
+                : affordable
+                  ? t.market.shop.buy
+                  : t.market.shop.notEnoughCoins}
           </Text>
         </Pressable>
       </View>

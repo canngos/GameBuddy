@@ -53,6 +53,12 @@ public interface LobbyService {
 
     DefaultMessageResponse kick(Gamer principal, UUID lobbyId, String userId);
 
+    /**
+     * Owner only: spends coins to pin this lobby to the top of the browse list until it
+     * stops being open. Returns the refreshed lobby so the screen redraws from one answer.
+     */
+    LobbyResponse boost(Gamer principal, UUID lobbyId);
+
     DefaultMessageResponse lock(Gamer principal, UUID lobbyId);
 
     DefaultMessageResponse unlock(Gamer principal, UUID lobbyId);

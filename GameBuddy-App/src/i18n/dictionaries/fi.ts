@@ -203,10 +203,18 @@ export const fi: Dictionary = {
       emptyBlurb: 'Avaa yksi, aseta aika ja valitse ketkä liittyvät.',
     },
 
+    boost: {
+      badge: 'Nostettu',
+      action: (cost: number) => `Nosta tämä aula · ${cost}`,
+      caption: 'Nostaa sen listan kärkeen, kunnes se alkaa.',
+      activeCaption: 'Nostettu — listan kärjessä, kunnes tämä aula alkaa.',
+    },
+
     detail: {
       fallbackTitle: 'Aula',
       gone: 'Tätä aulaa ei enää ole.',
       wantsToJoin: 'Haluaa liittyä',
+      requestSent: 'Pyyntö lähetetty. Ilmoitamme, kun omistaja vastaa.',
       team: (taken: number, total: number) => `Tiimi · ${taken}/${total}`,
       accept: 'Hyväksy',
       pass: 'Ohita',
@@ -226,7 +234,6 @@ export const fi: Dictionary = {
       unlock: 'Avaa lukitus',
       endLobby: 'Päätä aula',
       leaveLobby: 'Poistu aulasta',
-      requestSent: 'Pyyntö lähetetty. Ilmoitamme, kun omistaja vastaa.',
       withdraw: 'Peru pyyntö',
       rejected: 'Omistaja täytti tämän jollakulla toisella.',
       askToJoin: 'Pyydä liittymistä',
@@ -295,12 +302,6 @@ export const fi: Dictionary = {
       undoCost: (cost: number) => `Peru viimeisin pyyhkäisy, ${cost} kolikkoa`,
     },
 
-    boost: {
-      free: 'Ilmainen',
-      activeA11y: (remaining: string) => `Boost käynnissä, ${remaining} jäljellä`,
-      freeA11y: 'Käytä viikoittainen ilmainen boostisi',
-      costA11y: (cost: number) => `Boost ${cost} kolikolla`,
-    },
 
     match: {
       title: 'Se on match!',
@@ -404,6 +405,8 @@ export const fi: Dictionary = {
       boughtBody: 'Pue se Varastostasi.',
       owned: 'Omistat',
       buy: 'Osta',
+      claim: 'Lunasta',
+      claimA11y: (name: string) => `Lunasta ${name}, ilmainen`,
       free: 'Ilmainen',
       coinsPrice: (n: number) => `${n} kolikkoa`,
       animatedSuffix: ', animoitu',
@@ -425,6 +428,8 @@ export const fi: Dictionary = {
       earnedTitle: (n: number) => `+${n} kolikkoa`,
       earnedBody: 'Käytä ne kehyksiin, bannereihin tai tykkäyksiin.',
       watchedBody: 'Kiitos katselusta.',
+      rewardPendingTitle: 'Kolikot ovat tulossa',
+      rewardPendingBody: 'Tarkista saldosi hetken kuluttua uudelleen.',
       consentTitle: 'Videot vaativat mainossuostumuksen',
       consentBody: 'Muuta se kohdassa Asetukset → Mainosten tietosuoja.',
       watchVideo: 'Katso lyhyt video',
@@ -571,10 +576,9 @@ export const fi: Dictionary = {
     conversation: 'Keskustelu',
     viewProfileA11y: (name: string) => `Katso käyttäjän ${name} profiili`,
     thisGamer: 'tämä pelaaja',
-    alreadyFriends: 'Olette jo kavereita',
     acceptRequest: 'Hyväksy kaveripyyntö',
-    requestSent: 'Kaveripyyntö lähetetty',
     sendRequest: 'Lähetä kaveripyyntö',
+    alreadyFriends: 'Olette jo kavereita',
     reported: 'Ilmoitettu. Moderaattori katsoo sen.',
     placeholder: 'Viesti',
     connecting: 'Yhdistetään…',
@@ -604,7 +608,9 @@ export const fi: Dictionary = {
     games: 'Pelit',
     playsOn: 'Pelaa alustoilla',
     keywords: 'Avainsanat',
-    friendRequests: (n: number) => `Kaveripyynnöt · ${n}`,
+    friendRequestsShort: 'Kaveripyynnöt',
+    acceptRequestA11y: (name: string) => `Hyväksy käyttäjän ${name} pyyntö`,
+    declineRequestA11y: (name: string) => `Hylkää käyttäjän ${name} pyyntö`,
     accept: 'Hyväksy',
     no: 'Ei',
 
@@ -625,6 +631,17 @@ export const fi: Dictionary = {
     blockConfirmTitle: (name: string) => `Estetäänkö ${name}?`,
     blockConfirmBody:
       'Ette näe toisianne missään sovelluksessa, eikä kumpikaan voi lähettää toiselle viestiä. Voit perua tämän Asetuksista.',
+
+    moreActionsA11y: 'Lisää toimintoja',
+    matchBack: 'Tykkää takaisin',
+    matchBackCaption: 'Hän tykkäsi jo sinusta — tykkää takaisin ja aloita juttelu.',
+    matching: 'Matchataan…',
+    addFriend: 'Lisää kaveriksi',
+    addFriendCaption: 'Matchatkaa ensin, sitten voit lähettää kaveripyynnön.',
+    acceptRequest: 'Hyväksy pyyntö',
+    withdrawRequest: 'Peru pyyntö',
+    withdrawConfirmTitle: (name: string) => `Perutaanko pyyntösi käyttäjälle ${name}?`,
+    withdrawConfirmBody: 'Hän ei enää näe sitä. Voit lähettää uuden milloin tahansa.',
 
     admirersTitle: 'Ketkä tykkäsivät sinusta',
     peopleLikeYou: (n: number) => (n === 1 ? 'henkilö tykkää sinusta' : 'henkilöä tykkää sinusta'),
@@ -826,6 +843,7 @@ export const fi: Dictionary = {
       '163': 'Selauksesi ovat tältä päivältä loppu.',
       '168': 'GameBuddyn käyttö vaatii vähintään 18 vuoden iän.',
       '170': 'Viesti rikkoo sääntöjä.',
+      '173': 'Tämä aula on jo nostettu.',
       '179': 'Aula on jo täynnä.',
       '180': 'Aula ei ole enää auki.',
       '183': 'Päätä tai peruuta nykyinen aulasi ensin.',
