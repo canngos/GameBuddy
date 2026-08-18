@@ -36,7 +36,7 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080",
-        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": ""
+        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": "none"
       }
     },
     "lan": {
@@ -50,7 +50,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080",
         "EXPO_PUBLIC_REVENUECAT_API_KEY": "none",
-        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": ""
+        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": "none"
       }
     }
   },

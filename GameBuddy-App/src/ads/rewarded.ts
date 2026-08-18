@@ -40,12 +40,30 @@ const TEST_REWARDED_UNIT_ID = Platform.select({
   default: 'ca-app-pub-3940256099942544/5224354917',
 });
 
+const RAW_REWARDED_UNIT_ID = process.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID ?? '';
+
+/**
+ * What a build writes instead of a unit id when it is meant not to show real adverts.
+ *
+ * The same word, for the same reason, as `KEY_DISABLED` in `src/billing/purchases.ts` — see
+ * the comment there. The `gate` and `lan` profiles inherit their env from `production` and
+ * `extends` deep-merges rather than replaces, so the only way to drop the real unit is to
+ * overwrite it; empty string is the obvious way to say "none" and EAS rejects it outright:
+ * `"build.lan.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID" is not allowed to be empty`. That
+ * fails validation of the whole file, so one empty value blocks every build — including
+ * `production`, which is how it announced itself.
+ */
+const UNIT_DISABLED = 'none';
+
+/** Every real unit id starts this way; so does Google's test one. */
+const UNIT_PREFIX = 'ca-app-pub-';
+
 /**
  * The live rewarded unit, from the AdMob console.
  *
- * Empty until the account is approved and the unit is created. While it is empty the test
- * unit is used even in a release build — a missing id would otherwise fail to load an ad
- * and leave the button spinning, which is worse than showing a test ad to nobody.
+ * Empty when this build is not meant to have one. In that case the test unit is used even in
+ * a release build — a missing id would otherwise fail to load an ad and leave the button
+ * spinning, which is worse than showing a test ad to nobody.
  *
  * **That fallback is silent, and the silence cost us the feature.** Internal testers watched
  * adverts and were never paid: the variable was set nowhere — not in `.env`, not in
@@ -54,10 +72,17 @@ const TEST_REWARDED_UNIT_ID = Platform.select({
  * `earned`, and no callback ever reached `/ads/reward` to move a coin or spend a daily view.
  * Hence the warning below: the fallback stays, but a release build no longer takes it
  * quietly.
+ *
+ * Google's own test id is refused here as well as an absent one. It is a legal-looking value
+ * that a person could reasonably paste in, and it reproduces exactly the failure above —
+ * adverts that play and never pay. Whatever is true of no id must be true of that id too.
  */
-const LIVE_REWARDED_UNIT_ID = process.env.EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID ?? '';
+const LIVE_REWARDED_UNIT_ID =
+  RAW_REWARDED_UNIT_ID.startsWith(UNIT_PREFIX) && RAW_REWARDED_UNIT_ID !== TEST_REWARDED_UNIT_ID
+    ? RAW_REWARDED_UNIT_ID
+    : '';
 
-/** True when this build shows adverts that structurally cannot pay. */
+/** True when this build shows adverts that can actually pay. */
 export function rewardsAreLive(): boolean {
   return !__DEV__ && !!LIVE_REWARDED_UNIT_ID;
 }
@@ -65,11 +90,24 @@ export function rewardsAreLive(): boolean {
 export function rewardedUnitId(): string {
   if (__DEV__ || !LIVE_REWARDED_UNIT_ID) {
     if (!__DEV__) {
-      console.warn(
-        '[ads] EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID is unset in a release build — ' +
-          'falling back to the test unit, which never fires the reward callback. ' +
-          'Set it in eas.json and configure SSV on the unit in the AdMob console.',
-      );
+      if (RAW_REWARDED_UNIT_ID === UNIT_DISABLED) {
+        // Asked for. Said once so a build with no earnable adverts is explainable, but not
+        // at `warn`: shouting about a build behaving exactly as configured is how the real
+        // warning below gets skimmed past.
+        console.info('[ads] rewarded adverts are on the test unit in this build (LAN/gate profile).');
+      } else {
+        console.warn(
+          RAW_REWARDED_UNIT_ID === ''
+            ? '[ads] EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID is unset in a release build — ' +
+                'falling back to the test unit, which never fires the reward callback. ' +
+                'Set it in eas.json and configure SSV on the unit in the AdMob console.'
+            : `[ads] ignoring EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID "${RAW_REWARDED_UNIT_ID}": ` +
+                (RAW_REWARDED_UNIT_ID === TEST_REWARDED_UNIT_ID
+                  ? 'that is Google\'s test unit, which never fires the reward callback, so ' +
+                    'nobody would be paid for watching one.'
+                  : `expected it to start with "${UNIT_PREFIX}".`),
+        );
+      }
     }
     return TEST_REWARDED_UNIT_ID;
   }
