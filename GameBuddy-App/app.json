@@ -4,6 +4,7 @@
     "slug": "gamebuddy",
     "scheme": "gamebuddy",
     "version": "1.0.0",
+    "platforms": ["android", "ios"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

@@ -49,6 +49,17 @@
  * A real app id with Google's *test* unit is fine and is what the `gate` and `lan` profiles
  * inherit — test units are not tied to an account. It is only the live unit that has to be
  * asked for by the app that owns it.
+ *
+ * **This package is also why `app.json` pins `platforms` to Android and iOS.** Left unset,
+ * Expo exports every platform it supports, web included, and a web bundle fails outright:
+ * `react-native-google-mobile-ads` reaches for `codegenNativeComponent`, and importing React
+ * Native internals is not supported on web. The lazy `require` in `src/ads/sdk.ts` does not
+ * help — Metro resolves a literal `require` at build time whether or not it ever runs.
+ *
+ * Nothing is lost by dropping web: this app has never been served from a browser, and
+ * GameBuddy's actual website is the separate Astro project in `GameBuddy-Web`. The `web`
+ * favicon key left in `app.json` is scaffolding. Without the pin, `eas update` fails on the
+ * web bundle before it can publish anything for the platforms that are shipped.
  */
 function adMobPlugin(plugins, androidAppId, iosAppId) {
   return plugins.map((plugin) => {
