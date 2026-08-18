@@ -17,6 +17,8 @@ import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.ProfileChangedEvent;
+import com.gamebuddy.shared.mail.EmailContent;
+import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import java.time.Clock;
@@ -39,12 +41,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -84,7 +83,7 @@ class DefaultAuthServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private JavaMailSender emailSender;
+    private Mailer mailer;
 
     @Mock
     private ApplicationEventPublisher events;
@@ -120,8 +119,6 @@ class DefaultAuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(authService, "sender", "noreply@gamebuddy.app");
-
         gamer = new Gamer();
         gamer.setUserId(UUID.randomUUID().toString());
         gamer.setEmail(EMAIL);
@@ -348,7 +345,7 @@ class DefaultAuthServiceTest {
         void testRegister_whenEmailSendFails_ReturnError102() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
             when(passwordEncoder.encode(anyString())).thenReturn("encoded");
-            doThrow(new MailSendException("smtp down")).when(emailSender).send(any(SimpleMailMessage.class));
+            doThrow(new MailSendException("smtp down")).when(mailer).send(anyString(), any(EmailContent.class));
 
             var request = request(GOOD_PASSWORD);
             BusinessException ex = assertThrows(BusinessException.class, () -> authService.register(request));
@@ -616,7 +613,8 @@ class DefaultAuthServiceTest {
                     .thenReturn(Optional.of(live));
             when(passwordEncoder.matches("123456", hashOf(123456))).thenReturn(true);
 
-            String token = authService.verifyResetCode(verifyRequest(123456))
+            String token = authService
+                    .verifyResetCode(verifyRequest(123456))
                     .getBody()
                     .getData()
                     .getResetToken();
@@ -739,9 +737,14 @@ class DefaultAuthServiceTest {
 
             authService.resetPassword(resetRequest("raw-token", GOOD_PASSWORD));
 
-            ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
-            verify(emailSender).send(captor.capture());
-            assertEquals(Constants.EMAIL_SUBJECT_PASSWORD_CHANGED, captor.getValue().getSubject());
+            ArgumentCaptor<EmailContent> captor = ArgumentCaptor.forClass(EmailContent.class);
+            verify(mailer).send(eq(EMAIL), captor.capture());
+            assertEquals(
+                    Constants.EMAIL_SUBJECT_PASSWORD_CHANGED, captor.getValue().subject());
+            // No code in it, and nothing to click. Everything actionable in the reset flow
+            // is already visible to whoever holds the mailbox; this one exists so an owner
+            // who did not do it finds out, and it must hand an attacker nothing.
+            assertFalse(captor.getValue().hasCode());
         }
 
         /**
@@ -754,7 +757,7 @@ class DefaultAuthServiceTest {
             when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
             when(passwordEncoder.encode(GOOD_PASSWORD)).thenReturn("re-encoded");
-            doThrow(new MailSendException("relay down")).when(emailSender).send(any(SimpleMailMessage.class));
+            doThrow(new MailSendException("relay down")).when(mailer).send(anyString(), any(EmailContent.class));
 
             assertDoesNotThrow(() -> authService.resetPassword(resetRequest("raw-token", GOOD_PASSWORD)));
             assertEquals("re-encoded", gamer.getPwd());
@@ -859,18 +862,17 @@ class DefaultAuthServiceTest {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
 
             var request = request(true);
-            DefaultMessageResponse response =
-                    assertDoesNotThrow(() -> authService.sendVerificationEmail(request));
+            DefaultMessageResponse response = assertDoesNotThrow(() -> authService.sendVerificationEmail(request));
 
             assertNotNull(response);
-            verify(emailSender, never()).send(any(SimpleMailMessage.class));
+            verify(mailer, never()).send(anyString(), any(EmailContent.class));
             verify(verificationCodeRepository, never()).save(any(VerificationCode.class));
         }
 
         @Test
         void testSendVerificationEmail_whenErrorOccurWhileSendingMail_ReturnCode102() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            doThrow(new MailSendException("smtp down")).when(emailSender).send(any(SimpleMailMessage.class));
+            doThrow(new MailSendException("smtp down")).when(mailer).send(anyString(), any(EmailContent.class));
 
             var request = request(true);
             BusinessException ex =

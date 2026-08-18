@@ -18,6 +18,8 @@ import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
 import com.gamebuddy.shared.event.ProfileChangedEvent;
 import com.gamebuddy.shared.funnel.LikeCapCohort;
+import com.gamebuddy.shared.mail.EmailContent;
+import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
@@ -31,11 +33,8 @@ import java.time.Instant;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -94,14 +93,11 @@ public class DefaultAuthService implements AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender emailSender;
+    private final Mailer mailer;
     private final ApplicationEventPublisher events;
     private final AuthRateLimiters rateLimiters;
     private final TextModerationService textModeration;
     private final Clock clock;
-
-    @Value("${gamebuddy.mail.from:noreply@mail.findgamebuddy.com}")
-    private String sender;
 
     // =======================================================================
     // Unauthenticated
@@ -414,13 +410,15 @@ public class DefaultAuthService implements AuthService {
      * send them a courtesy note.
      */
     private void sendPasswordChangedNotice(String email) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(sender);
-        message.setTo(email);
-        message.setSubject(Constants.EMAIL_SUBJECT_PASSWORD_CHANGED);
-        message.setText(String.format(Constants.EMAIL_TEXT_PASSWORD_CHANGED, email));
+        EmailContent content = EmailContent.notice(
+                Constants.EMAIL_SUBJECT_PASSWORD_CHANGED,
+                Constants.EMAIL_PREHEADER_PASSWORD_CHANGED,
+                Constants.EMAIL_HEADING_PASSWORD_CHANGED,
+                String.format(Constants.EMAIL_INTRO_PASSWORD_CHANGED, email),
+                List.of(Constants.EMAIL_BODY_PASSWORD_CHANGED),
+                Constants.EMAIL_FOOTNOTE_PASSWORD_CHANGED);
         try {
-            emailSender.send(message);
+            mailer.send(email, content);
         } catch (MailException e) {
             log.warn("Password-changed notice to {} could not be sent", email, e);
         }
@@ -918,19 +916,27 @@ public class DefaultAuthService implements AuthService {
         verificationCodeRepository.save(verification);
 
         long minutes = CODE_TTL.toMinutes();
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(sender);
-        message.setTo(email);
-        if (forRegistration) {
-            message.setSubject(String.format(Constants.EMAIL_SUBJECT, code));
-            message.setText(String.format(Constants.EMAIL_TEXT, code, minutes));
-        } else {
-            message.setSubject(Constants.EMAIL_SUBJECT_FORGOT_PASSWORD);
-            message.setText(String.format(Constants.EMAIL_TEXT_FORGOT_PASSWORD, code, email, minutes));
-        }
+        String caption = String.format(Constants.EMAIL_CODE_CAPTION, minutes);
+        EmailContent content = forRegistration
+                ? EmailContent.withCode(
+                        String.format(Constants.EMAIL_SUBJECT, code),
+                        Constants.EMAIL_PREHEADER,
+                        Constants.EMAIL_HEADING,
+                        Constants.EMAIL_INTRO,
+                        String.valueOf(code),
+                        caption,
+                        Constants.EMAIL_FOOTNOTE)
+                : EmailContent.withCode(
+                        String.format(Constants.EMAIL_SUBJECT_FORGOT_PASSWORD, code),
+                        Constants.EMAIL_PREHEADER_FORGOT_PASSWORD,
+                        Constants.EMAIL_HEADING_FORGOT_PASSWORD,
+                        String.format(Constants.EMAIL_INTRO_FORGOT_PASSWORD, email),
+                        String.valueOf(code),
+                        caption,
+                        Constants.EMAIL_FOOTNOTE_FORGOT_PASSWORD);
 
         try {
-            emailSender.send(message);
+            mailer.send(email, content);
         } catch (MailException e) {
             // Propagating rolls the surrounding transaction back, so no orphaned
             // account or dangling code survives a mail outage.

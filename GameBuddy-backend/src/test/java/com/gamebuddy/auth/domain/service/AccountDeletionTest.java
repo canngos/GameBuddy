@@ -18,6 +18,7 @@ import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.Games;
 import com.gamebuddy.shared.entity.Keywords;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
+import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
 import java.time.Duration;
@@ -36,7 +37,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -81,7 +81,7 @@ class AccountDeletionTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private JavaMailSender emailSender;
+    private Mailer mailer;
 
     @Mock
     private ApplicationEventPublisher events;
