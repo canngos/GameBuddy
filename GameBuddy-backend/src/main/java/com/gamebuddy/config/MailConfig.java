@@ -1,15 +1,25 @@
 package com.gamebuddy.config;
 
+import jakarta.mail.Address;
+import jakarta.mail.MessagingException;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
+import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Properties;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.mail.MailParseException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessagePreparator;
@@ -130,22 +140,28 @@ public class MailConfig {
     /**
      * A {@link JavaMailSender} that logs.
      *
-     * <p>Only the {@code SimpleMailMessage} paths are implemented, because that is all
-     * {@code sendVerificationCode} uses. The MIME paths throw rather than quietly doing
-     * nothing: if a future code path starts sending real mail, that should fail visibly in
-     * local testing rather than silently vanish and be discovered in production.
+     * <p>The MIME paths are real, because the branded templates are MIME: a message is
+     * {@code multipart/related} around an alternative pair plus the logo, and a sender that
+     * refused to build one would make local signup impossible — which is the single thing
+     * log mode exists to allow.
+     *
+     * <p>What gets printed is the {@code text/plain} part. That is the readable half, it is
+     * where the six-digit code sits on a line of its own, and it keeps this console output
+     * identical in shape to what it was before the templates existed — which matters more
+     * than it sounds, because the functional suite reads codes out of exactly these lines
+     * (see {@code qa/functional/helpers/db.js}).
+     *
+     * <p>The {@link MimeMessagePreparator} paths still throw. Nothing here uses them, and a
+     * path that quietly sent nothing would be discovered in production rather than locally.
      */
     private static class LoggingMailSender implements JavaMailSender {
 
         @Override
         public void send(SimpleMailMessage message) {
-            // One line per field rather than toString(), so the six-digit code is easy to
-            // spot and copy out of a busy console.
-            log.info("--- email (not sent) -------------------------------------------");
-            log.info("  to:      {}", String.join(", ", message.getTo() == null ? new String[0] : message.getTo()));
-            log.info("  subject: {}", message.getSubject());
-            log.info("  body:    {}", message.getText());
-            log.info("----------------------------------------------------------------");
+            print(
+                    String.join(", ", message.getTo() == null ? new String[0] : message.getTo()),
+                    message.getSubject(),
+                    message.getText());
         }
 
         @Override
@@ -157,32 +173,91 @@ public class MailConfig {
 
         @Override
         public MimeMessage createMimeMessage() {
-            throw new UnsupportedOperationException("mail mode 'log' handles simple messages only");
+            // A session with no properties: nothing is ever transmitted, and the message is
+            // only ever built, read back and dropped.
+            return new MimeMessage(Session.getInstance(new Properties()));
         }
 
         @Override
         public MimeMessage createMimeMessage(InputStream contentStream) {
-            throw new UnsupportedOperationException("mail mode 'log' handles simple messages only");
+            try {
+                return new MimeMessage(Session.getInstance(new Properties()), contentStream);
+            } catch (MessagingException e) {
+                throw new MailParseException(e);
+            }
         }
 
         @Override
         public void send(MimeMessage mimeMessage) {
-            throw new UnsupportedOperationException("mail mode 'log' handles simple messages only");
+            try {
+                // What a real sender does before transmitting, and not optional here: until
+                // it runs, the Content-Type headers have not been written and every part of
+                // the message still reports the default, text/plain. Reading the body out of
+                // an unsaved message therefore finds the outermost part first and prints a
+                // MimeMultipart's toString() where the verification code should be.
+                mimeMessage.saveChanges();
+                print(
+                        Arrays.stream(
+                                        mimeMessage.getAllRecipients() == null
+                                                ? new Address[0]
+                                                : mimeMessage.getAllRecipients())
+                                .map(Address::toString)
+                                .collect(Collectors.joining(", ")),
+                        mimeMessage.getSubject(),
+                        plainTextOf(mimeMessage));
+            } catch (MessagingException | IOException e) {
+                throw new MailParseException(e);
+            }
         }
 
         @Override
         public void send(MimeMessage... mimeMessages) {
-            throw new UnsupportedOperationException("mail mode 'log' handles simple messages only");
+            for (MimeMessage mimeMessage : mimeMessages) {
+                send(mimeMessage);
+            }
         }
 
         @Override
         public void send(MimeMessagePreparator mimeMessagePreparator) {
-            throw new UnsupportedOperationException("mail mode 'log' handles simple messages only");
+            throw new UnsupportedOperationException("mail mode 'log' does not implement MimeMessagePreparator");
         }
 
         @Override
         public void send(MimeMessagePreparator... mimeMessagePreparators) {
-            throw new UnsupportedOperationException("mail mode 'log' handles simple messages only");
+            throw new UnsupportedOperationException("mail mode 'log' does not implement MimeMessagePreparator");
+        }
+
+        /** One line per field, so the six-digit code is easy to spot in a busy console. */
+        private void print(String to, String subject, String body) {
+            log.info("--- email (not sent) -------------------------------------------");
+            log.info("  to:      {}", to);
+            log.info("  subject: {}", subject);
+            log.info("  body:    {}", body);
+            log.info("----------------------------------------------------------------");
+        }
+
+        /**
+         * The first {@code text/plain} part, depth first.
+         *
+         * <p>Depth first because the structure is nested — the alternative pair is itself a
+         * part of the related multipart that carries the logo — and first because in an
+         * alternative the plain body precedes the HTML one.
+         */
+        private String plainTextOf(Part part) throws MessagingException, IOException {
+            Object content = part.getContent();
+            // Structure before headers: a container is a container whatever its declared
+            // type says, so descending on the content object cannot be fooled by a
+            // Content-Type that has not been written yet.
+            if (content instanceof Multipart multipart) {
+                for (int i = 0; i < multipart.getCount(); i++) {
+                    String found = plainTextOf(multipart.getBodyPart(i));
+                    if (found != null) {
+                        return found;
+                    }
+                }
+                return null;
+            }
+            return part.isMimeType("text/plain") && content instanceof String text ? text : null;
         }
     }
 }

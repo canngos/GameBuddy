@@ -5,26 +5,45 @@ public final class Constants {
 
     private Constants() {}
 
-    // --- Verification / password reset e-mails ------------------------------
-    public static final String EMAIL_SUBJECT = "GameBuddy - Your email verification code: %s";
-    public static final String EMAIL_TEXT = """
-            Thank you for registering on GameBuddy!
+    // --- Transactional e-mail copy -------------------------------------------
+    //
+    // Each message is a handful of pieces rather than one block of prose, because every
+    // email goes out with an HTML body and a plain-text one and those two have to say the
+    // same thing. Composed into an EmailContent at the call site and rendered twice; see
+    // com.gamebuddy.shared.mail.EmailRenderer.
+    //
+    // English only, in all seven of the app's languages. Localising them needs a
+    // MessageSource and a per-account language column, which is a larger change than it
+    // looks and is not this one.
 
-            Here is your verification code: %s
+    /**
+     * The code leads the subject line.
+     *
+     * <p>It is the whole content of the message and it is what makes the flow fast: on a
+     * phone the notification alone is often enough to type it in without opening anything.
+     * Standard practice for the same reason — every large service that mails a code puts it
+     * here.
+     */
+    public static final String EMAIL_SUBJECT = "%s is your GameBuddy code";
 
-            The code expires in %d minutes. If you did not request it, you can ignore this email.
+    public static final String EMAIL_PREHEADER = "Confirm your address and your account is ready.";
+    public static final String EMAIL_HEADING = "Confirm your email";
+    public static final String EMAIL_INTRO = "Enter this code in the app to finish setting up your GameBuddy account.";
+    public static final String EMAIL_CODE_CAPTION = "The code expires in %d minutes.";
+    public static final String EMAIL_FOOTNOTE =
+            "If you did not sign up for GameBuddy, ignore this email. The account cannot be used until this code "
+                    + "is entered.";
 
-            Have fun!""";
+    public static final String EMAIL_SUBJECT_FORGOT_PASSWORD = "%s is your GameBuddy password reset code";
+    public static final String EMAIL_PREHEADER_FORGOT_PASSWORD = "Use this code to choose a new password.";
+    public static final String EMAIL_HEADING_FORGOT_PASSWORD = "Reset your password";
 
-    public static final String EMAIL_SUBJECT_FORGOT_PASSWORD = "GameBuddy - Password Reset";
-    public static final String EMAIL_TEXT_FORGOT_PASSWORD = """
-            Someone requested a password reset for this account.
+    /** Names the address, because somebody with two accounts needs to know which one this is. */
+    public static final String EMAIL_INTRO_FORGOT_PASSWORD =
+            "Enter this code in the app to choose a new password for %s.";
 
-            Here is your verification code to continue: %s
-            Your email: %s
-
-            The code expires in %d minutes. If this was not you, just ignore this email \
-            and nothing will happen.""";
+    public static final String EMAIL_FOOTNOTE_FORGOT_PASSWORD =
+            "If you did not ask for this, ignore this email and your password stays as it is.";
 
     /**
      * Sent after a password is reset, to the address whose password changed.
@@ -34,18 +53,20 @@ public final class Constants {
      * silence would let a takeover finish unremarked. It names no code and carries no link —
      * there is nothing here for an attacker to use, only something for an owner to notice.
      */
-    public static final String EMAIL_SUBJECT_PASSWORD_CHANGED = "GameBuddy - Your password was changed";
+    public static final String EMAIL_SUBJECT_PASSWORD_CHANGED = "Your GameBuddy password was changed";
 
-    public static final String EMAIL_TEXT_PASSWORD_CHANGED = """
-            The password for your GameBuddy account was just changed, and every device that \
-            was signed in has been signed out.
+    public static final String EMAIL_PREHEADER_PASSWORD_CHANGED = "Every signed-in device has been signed out.";
+    public static final String EMAIL_HEADING_PASSWORD_CHANGED = "Your password was changed";
 
-            Your email: %s
+    public static final String EMAIL_INTRO_PASSWORD_CHANGED =
+            "The password for the GameBuddy account %s was just changed, and every device that was signed in "
+                    + "has been signed out.";
 
-            If this was you, there is nothing to do.
+    public static final String EMAIL_BODY_PASSWORD_CHANGED = "If that was you, there is nothing else to do.";
 
-            If it was not, someone else has access to this mailbox. Reset the password again \
-            straight away and secure your email account.""";
+    public static final String EMAIL_FOOTNOTE_PASSWORD_CHANGED =
+            "If it was not, somebody else can reach this mailbox. Reset the password again straight away, then "
+                    + "secure your email account.";
 
     // --- Push notification copy ---------------------------------------------
     public static final String FRIEND_REQUEST_TITLE = "New friend request!";
