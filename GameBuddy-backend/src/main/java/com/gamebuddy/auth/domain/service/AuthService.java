@@ -26,6 +26,15 @@ public interface AuthService {
 
     DefaultMessageResponse sendVerificationEmail(SendCodeRequest sendCodeRequest);
 
+    /**
+     * Step one of a forgotten-password reset: spend the mailed code, receive a short-lived
+     * ticket. Not a session — the caller has proved they can read the mailbox, nothing more.
+     */
+    ResetVerifyResponse verifyResetCode(ResetVerifyRequest resetVerifyRequest);
+
+    /** Step two: spend the ticket, set the password, and sign every device out. */
+    DefaultMessageResponse resetPassword(ResetPasswordRequest resetPasswordRequest);
+
     TokenResponse validateToken(String token);
 
     /**

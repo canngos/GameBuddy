@@ -47,6 +47,7 @@ export const de: Dictionary = {
   auth: {
     stepOne: 'SCHRITT 1',
     stepTwo: 'SCHRITT 2',
+    stepThree: 'SCHRITT 3',
     emailPlaceholder: 'du@beispiel.de',
 
     login: {
@@ -57,6 +58,7 @@ export const de: Dictionary = {
       submit: 'Anmelden',
       needsCode: 'Wir können dir einen neuen Code schicken, um das Konto fertig einzurichten.',
       emailCode: 'Code per E-Mail senden',
+      forgot: 'Passwort vergessen?',
     },
 
     register: {
@@ -88,6 +90,23 @@ export const de: Dictionary = {
       submit: 'Bestätigen',
       resend: 'Neuen Code senden',
       resendCooldown: (s: number) => `Neuen Code senden (${s}s)`,
+    },
+
+    forgot: {
+      title: 'Passwort zurücksetzen',
+      subtitle:
+        'Gib die E-Mail-Adresse ein, mit der du dich angemeldet hast. Wir schicken dir einen sechsstelligen Code.',
+      email: 'E-Mail',
+      submit: 'Code senden',
+      sentCodeBefore: 'Falls es dafür ein Konto gibt, ist ein sechsstelliger Code unterwegs an',
+      verifySubmit: 'Weiter',
+      resetTitle: 'Neues Passwort wählen',
+      resetSubtitle: 'Wer mit dem alten Passwort angemeldet ist, wird abgemeldet.',
+      resetSubmit: 'Neues Passwort setzen',
+      doneTitle: 'Melde dich mit dem neuen Passwort an',
+      doneBody:
+        'Alle Sitzungen mit dem alten Passwort sind beendet — auf diesem Gerät und auf allen anderen.',
+      signIn: 'Anmelden',
     },
   },
 

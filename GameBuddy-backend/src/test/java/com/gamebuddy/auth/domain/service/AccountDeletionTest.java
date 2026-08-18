@@ -93,6 +93,7 @@ class AccountDeletionTest {
     private AuthRateLimiters rateLimiters = new AuthRateLimiters(
             new RateLimiter(10, Duration.ofMinutes(15)),
             new RateLimiter(3, Duration.ofMinutes(15)),
+            new RateLimiter(10, Duration.ofMinutes(15)),
             new RateLimiter(10, Duration.ofMinutes(15)));
 
     private Gamer gamer;

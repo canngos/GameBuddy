@@ -41,18 +41,52 @@ function scalar(sql) {
 const esc = (s) => String(s).replace(/'/g, "''");
 
 /**
- * The verification code for an email.
+ * The verification code for an email, read out of the mail the backend printed.
  *
- * Read from the database rather than scraped from the log: docker-compose.yml sets
- * MAIL_MODE=smtp despite the comment above it claiming codes are printed, so the log may
- * not contain one at all. The table is authoritative either way.
+ * **It used to come from the database, and cannot any more.** `verification_code.code` was
+ * a plaintext integer; it is now a bcrypt hash, which is the whole point — a six-digit code
+ * sitting in the clear is one database read away from being anybody's account. Nothing can
+ * reverse it, including this helper, so the code has to come from the only other place it
+ * exists: the email.
+ *
+ * `docker-compose.yml` sets `MAIL_MODE: log`, so the backend prints every message instead of
+ * sending it, one field per line — see `LoggingMailSender`. Blocks are matched on the `to:`
+ * line, and every account these tests create has a unique address, so interleaved suites
+ * cannot hand each other the wrong code.
+ *
+ * The last matching block wins: re-requesting a code invalidates its predecessors, so the
+ * most recent one is the only usable one.
  */
 function verificationCode(email) {
-  return scalar(
-    `select code from gamebuddy.verification_code ` +
-    `where lower(email) = lower('${esc(email)}') order by created_at desc nulls last limit 1;`,
+  const out = execFileSync(
+    'docker',
+    ['compose', '-p', PROJECT, 'logs', '--tail', String(MAIL_LOG_LINES), 'backend'],
+    { encoding: 'utf8', cwd: ROOT, maxBuffer: 64 * 1024 * 1024 },
   );
+
+  const wanted = String(email).toLowerCase();
+  const lines = out.split(/\r?\n/);
+  let found = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].toLowerCase().includes(`to:      ${wanted}`)) continue;
+    // The body follows within a few lines of the recipient; the code is the only run of
+    // exactly six digits in it.
+    const block = lines.slice(i, i + 12).join('\n');
+    const match = block.match(/\b(\d{6})\b/);
+    if (match) found = match[1];
+  }
+
+  return found;
 }
+
+/**
+ * How much of the backend log to search.
+ *
+ * Generous, because a full suite run prints a lot between one account's code and the moment
+ * a test asks for it, and cheap, because this is a tail rather than the whole log.
+ */
+const MAIL_LOG_LINES = 4000;
 
 function gamerId(email) {
   return scalar(`select user_id from gamebuddy.gamer where lower(email) = lower('${esc(email)}');`);

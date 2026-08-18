@@ -14,6 +14,7 @@ import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.security.JwtService;
+import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.ProfileChangedEvent;
 import com.gamebuddy.shared.moderation.TextModerationService;
@@ -59,6 +60,9 @@ class DefaultAuthServiceTest {
     private VerificationCodeRepository verificationCodeRepository;
 
     @Mock
+    private PasswordResetTicketRepository passwordResetTicketRepository;
+
+    @Mock
     private GamesRepository gamesRepository;
 
     @Mock
@@ -93,6 +97,7 @@ class DefaultAuthServiceTest {
     private AuthRateLimiters rateLimiters = new AuthRateLimiters(
             new RateLimiter(10, Duration.ofMinutes(15)),
             new RateLimiter(3, Duration.ofMinutes(15)),
+            new RateLimiter(10, Duration.ofMinutes(15)),
             new RateLimiter(10, Duration.ofMinutes(15)));
 
     /**
@@ -134,11 +139,25 @@ class DefaultAuthServiceTest {
         when(jwtService.extractExpiration(anyString())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
     }
 
+    /** The stand-in for bcrypt output in these tests; see {@link #liveCode}. */
+    private static String hashOf(int code) {
+        return "bcrypt-of-" + code;
+    }
+
+    /**
+     * A usable code row.
+     *
+     * <p>The encoder is a mock, so the row stores a recognisable stand-in rather than real
+     * bcrypt output and each test stubs the one comparison it expects to succeed. A wrong
+     * guess needs no stub at all: an unstubbed {@code matches} returns false, which is
+     * exactly what a wrong guess is.
+     */
     private VerificationCode liveCode(int code) {
         VerificationCode vc = new VerificationCode();
         vc.setId(UUID.randomUUID());
         vc.setEmail(EMAIL);
-        vc.setCode(code);
+        vc.setCodeHash(hashOf(code));
+        vc.setPurpose(CodePurpose.REGISTRATION);
         vc.setIsValid(true);
         vc.setAttempts(0);
         vc.setCreatedAt(Instant.now());
@@ -395,7 +414,10 @@ class DefaultAuthServiceTest {
             assertNotNull(saved.getExpiresAt(), "codes must expire");
             assertTrue(saved.getExpiresAt().isAfter(Instant.now()));
             assertEquals(0, saved.getAttempts());
-            assertTrue(saved.getCode() >= 100000 && saved.getCode() <= 999999);
+            assertEquals(CodePurpose.REGISTRATION, saved.getPurpose(), "a signup code must not reset a password");
+            // The code itself is unreadable by design — all that can be checked is that
+            // something was hashed rather than the digits being stored.
+            assertNotNull(saved.getCodeHash());
         }
     }
 
@@ -437,8 +459,6 @@ class DefaultAuthServiceTest {
         @Test
         void testVerifyCode_whenValidCodeNotFound_ReturnError105() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            when(verificationCodeRepository.findByEmailAndCodeAndIsValidTrue(EMAIL, 123456))
-                    .thenReturn(Optional.empty());
             when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.empty());
 
@@ -452,8 +472,6 @@ class DefaultAuthServiceTest {
         void testVerifyCode_whenWrongGuess_IncrementsAttempts() {
             VerificationCode live = liveCode(111111);
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            when(verificationCodeRepository.findByEmailAndCodeAndIsValidTrue(eq(EMAIL), anyInt()))
-                    .thenReturn(Optional.empty());
             when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.of(live));
 
@@ -470,8 +488,6 @@ class DefaultAuthServiceTest {
             VerificationCode live = liveCode(111111);
             live.setAttempts(4);
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            when(verificationCodeRepository.findByEmailAndCodeAndIsValidTrue(eq(EMAIL), anyInt()))
-                    .thenReturn(Optional.empty());
             when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.of(live));
 
@@ -487,7 +503,7 @@ class DefaultAuthServiceTest {
             VerificationCode expired = liveCode(123456);
             expired.setExpiresAt(Instant.now().minus(Duration.ofMinutes(1)));
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            when(verificationCodeRepository.findByEmailAndCodeAndIsValidTrue(EMAIL, 123456))
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.of(expired));
 
             var request = request(123456);
@@ -499,8 +515,6 @@ class DefaultAuthServiceTest {
         @Test
         void testVerifyCode_whenTooManyRequests_ReturnRateLimited() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            when(verificationCodeRepository.findByEmailAndCodeAndIsValidTrue(eq(EMAIL), anyInt()))
-                    .thenReturn(Optional.empty());
             when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.empty());
 
@@ -518,8 +532,9 @@ class DefaultAuthServiceTest {
             VerificationCode live = liveCode(123456);
             gamer.setIsVerified(false);
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
-            when(verificationCodeRepository.findByEmailAndCodeAndIsValidTrue(EMAIL, 123456))
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.of(live));
+            when(passwordEncoder.matches("123456", hashOf(123456))).thenReturn(true);
 
             VerifyResponse response = authService.verifyCode(request(123456));
 
@@ -529,6 +544,287 @@ class DefaultAuthServiceTest {
             assertFalse(live.getIsValid(), "the consumed code must not be reusable");
             verify(verificationCodeRepository).invalidateAllForEmail(EMAIL);
             assertNotNull(gamer.getTokensValidFrom(), "verifying must revoke older tokens");
+        }
+    }
+
+    // =====================================================================
+    // Password reset
+    // =====================================================================
+
+    @Nested
+    class ResetPassword {
+
+        private ResetVerifyRequest verifyRequest(int code) {
+            ResetVerifyRequest r = new ResetVerifyRequest();
+            r.setEmail(EMAIL);
+            r.setVerificationCode(code);
+            return r;
+        }
+
+        private ResetPasswordRequest resetRequest(String token, String password) {
+            ResetPasswordRequest r = new ResetPasswordRequest();
+            r.setEmail(EMAIL);
+            r.setResetToken(token);
+            r.setPassword(password);
+            return r;
+        }
+
+        /** A live code issued for a reset rather than for signup. */
+        private VerificationCode resetCode(int code) {
+            VerificationCode vc = liveCode(code);
+            vc.setPurpose(CodePurpose.PASSWORD_RESET);
+            return vc;
+        }
+
+        private PasswordResetTicket ticket(String tokenHash) {
+            PasswordResetTicket t = new PasswordResetTicket();
+            t.setId(UUID.randomUUID());
+            t.setEmail(EMAIL);
+            t.setTokenHash(tokenHash);
+            t.setUsed(false);
+            t.setCreatedAt(Instant.now());
+            t.setExpiresAt(Instant.now().plus(Duration.ofMinutes(10)));
+            return t;
+        }
+
+        // --- step one: the code ------------------------------------------
+
+        @Test
+        @DisplayName("a correct reset code yields a ticket, and burns the code")
+        void testVerifyResetCode_whenValid_IssuesTicket() {
+            VerificationCode live = resetCode(123456);
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
+                    .thenReturn(Optional.of(live));
+            when(passwordEncoder.matches("123456", hashOf(123456))).thenReturn(true);
+
+            ResetVerifyResponse response = authService.verifyResetCode(verifyRequest(123456));
+
+            assertEquals("100", response.getStatus().getCode());
+            assertNotNull(response.getBody().getData().getResetToken());
+            assertFalse(live.getIsValid(), "the consumed code must not be reusable");
+            verify(verificationCodeRepository).invalidateAllForEmail(EMAIL);
+            verify(passwordResetTicketRepository).burnAllForEmail(EMAIL);
+        }
+
+        @Test
+        @DisplayName("the ticket is stored only as a hash, and is not the token handed out")
+        void testVerifyResetCode_whenValid_StoresOnlyTheHash() {
+            VerificationCode live = resetCode(123456);
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
+                    .thenReturn(Optional.of(live));
+            when(passwordEncoder.matches("123456", hashOf(123456))).thenReturn(true);
+
+            String token = authService.verifyResetCode(verifyRequest(123456))
+                    .getBody()
+                    .getData()
+                    .getResetToken();
+
+            ArgumentCaptor<PasswordResetTicket> captor = ArgumentCaptor.forClass(PasswordResetTicket.class);
+            verify(passwordResetTicketRepository).save(captor.capture());
+            PasswordResetTicket saved = captor.getValue();
+            assertNotEquals(token, saved.getTokenHash(), "the raw token must never be stored");
+            assertEquals(64, saved.getTokenHash().length(), "SHA-256 hex");
+            assertTrue(saved.getExpiresAt().isAfter(Instant.now()));
+        }
+
+        /**
+         * The purpose column earning its place.
+         *
+         * <p>Before it existed, the code mailed for a reset was redeemable at
+         * {@code /auth/verify} — which signs the account in. This is the other direction of
+         * the same rule, and it must answer exactly as a wrong code does so that nobody can
+         * learn which flow an address is part-way through.
+         */
+        @Test
+        @DisplayName("a signup code cannot reset a password, and is charged as a wrong guess")
+        void testVerifyResetCode_whenCodeIsForRegistration_Refuses() {
+            VerificationCode live = liveCode(123456); // REGISTRATION
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
+                    .thenReturn(Optional.of(live));
+            when(passwordEncoder.matches("123456", hashOf(123456))).thenReturn(true);
+
+            var request = verifyRequest(123456);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyResetCode(request));
+
+            assertEquals(105, ex.getTransactionCode().getId());
+            assertEquals(1, live.getAttempts(), "a mismatched purpose costs an attempt like any wrong guess");
+            verify(passwordResetTicketRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("and the reverse: a reset code cannot sign anyone in")
+        void testVerifyCode_whenCodeIsForPasswordReset_Refuses() {
+            VerificationCode live = resetCode(123456);
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
+                    .thenReturn(Optional.of(live));
+            when(passwordEncoder.matches("123456", hashOf(123456))).thenReturn(true);
+
+            var request = new VerifyRequest();
+            request.setEmail(EMAIL);
+            request.setVerificationCode(123456);
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyCode(request));
+            assertEquals(105, ex.getTransactionCode().getId());
+            assertFalse(Boolean.TRUE.equals(gamer.getIsVerified()) && gamer.getTokensValidFrom() != null);
+        }
+
+        @Test
+        void testVerifyResetCode_whenUserNotFound_LooksIdenticalToAWrongCode() {
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+
+            var request = verifyRequest(123456);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyResetCode(request));
+            assertEquals(105, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        void testVerifyResetCode_whenCodeExpired_ReturnError144() {
+            VerificationCode expired = resetCode(123456);
+            expired.setExpiresAt(Instant.now().minus(Duration.ofMinutes(1)));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
+                    .thenReturn(Optional.of(expired));
+
+            var request = verifyRequest(123456);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyResetCode(request));
+            assertEquals(144, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        void testVerifyResetCode_whenAttemptsExhausted_ReturnError145() {
+            VerificationCode live = resetCode(123456);
+            live.setAttempts(5);
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
+                    .thenReturn(Optional.of(live));
+
+            var request = verifyRequest(123456);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyResetCode(request));
+            assertEquals(145, ex.getTransactionCode().getId());
+            assertFalse(live.getIsValid());
+        }
+
+        // --- step two: the ticket ----------------------------------------
+
+        @Test
+        @DisplayName("a valid ticket sets the password and signs every device out")
+        void testResetPassword_whenValid_ChangesPasswordAndRevokes() {
+            PasswordResetTicket t = ticket("hash");
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(passwordEncoder.matches(eq(GOOD_PASSWORD), anyString())).thenReturn(false);
+            when(passwordEncoder.encode(GOOD_PASSWORD)).thenReturn("re-encoded");
+
+            authService.resetPassword(resetRequest("raw-token", GOOD_PASSWORD));
+
+            assertEquals("re-encoded", gamer.getPwd());
+            assertNotNull(gamer.getTokensValidFrom(), "a reset must revoke tokens issued before it");
+            verify(sessionRepository).deleteAllByEmail(EMAIL);
+            assertTrue(t.getUsed(), "the ticket must be single use");
+            verify(passwordResetTicketRepository).burnAllForEmail(EMAIL);
+            verify(verificationCodeRepository).invalidateAllForEmail(EMAIL);
+        }
+
+        @Test
+        @DisplayName("the account is told its password changed — the takeover victim's only signal")
+        void testResetPassword_whenValid_SendsNotice() {
+            PasswordResetTicket t = ticket("hash");
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(passwordEncoder.encode(GOOD_PASSWORD)).thenReturn("re-encoded");
+
+            authService.resetPassword(resetRequest("raw-token", GOOD_PASSWORD));
+
+            ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+            verify(emailSender).send(captor.capture());
+            assertEquals(Constants.EMAIL_SUBJECT_PASSWORD_CHANGED, captor.getValue().getSubject());
+        }
+
+        /**
+         * The notice is the one mail whose failure must not undo anything: the password has
+         * already changed and the sessions are already gone.
+         */
+        @Test
+        void testResetPassword_whenNoticeFails_StillSucceeds() {
+            PasswordResetTicket t = ticket("hash");
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(passwordEncoder.encode(GOOD_PASSWORD)).thenReturn("re-encoded");
+            doThrow(new MailSendException("relay down")).when(emailSender).send(any(SimpleMailMessage.class));
+
+            assertDoesNotThrow(() -> authService.resetPassword(resetRequest("raw-token", GOOD_PASSWORD)));
+            assertEquals("re-encoded", gamer.getPwd());
+        }
+
+        @Test
+        void testResetPassword_whenTicketUnknown_ReturnError105() {
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.empty());
+
+            var request = resetRequest("nope", GOOD_PASSWORD);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(request));
+            assertEquals(105, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        void testResetPassword_whenTicketAlreadyUsed_ReturnError105() {
+            PasswordResetTicket t = ticket("hash");
+            t.setUsed(true);
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+
+            var request = resetRequest("raw-token", GOOD_PASSWORD);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(request));
+            assertEquals(105, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        void testResetPassword_whenTicketExpired_ReturnError144() {
+            PasswordResetTicket t = ticket("hash");
+            t.setExpiresAt(Instant.now().minus(Duration.ofMinutes(1)));
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+
+            var request = resetRequest("raw-token", GOOD_PASSWORD);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(request));
+            assertEquals(144, ex.getTransactionCode().getId());
+        }
+
+        /** A ticket is bound to the address it was issued for. */
+        @Test
+        void testResetPassword_whenTicketBelongsToAnotherEmail_ReturnError105() {
+            PasswordResetTicket t = ticket("hash");
+            t.setEmail("someone.else@example.com");
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+
+            var request = resetRequest("raw-token", GOOD_PASSWORD);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(request));
+            assertEquals(105, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        void testResetPassword_whenPasswordWeak_ReturnError147() {
+            PasswordResetTicket t = ticket("hash");
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+
+            var request = resetRequest("raw-token", "weak");
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(request));
+            assertEquals(147, ex.getTransactionCode().getId());
+            assertNull(gamer.getTokensValidFrom(), "a refused password must change nothing");
+        }
+
+        @Test
+        void testResetPassword_whenSameAsCurrent_ReturnError112() {
+            PasswordResetTicket t = ticket("hash");
+            when(passwordResetTicketRepository.findByTokenHash(anyString())).thenReturn(Optional.of(t));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(passwordEncoder.matches(eq(GOOD_PASSWORD), anyString())).thenReturn(true);
+
+            var request = resetRequest("raw-token", GOOD_PASSWORD);
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.resetPassword(request));
+            assertEquals(112, ex.getTransactionCode().getId());
         }
     }
 

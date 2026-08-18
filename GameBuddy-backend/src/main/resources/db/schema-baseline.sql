@@ -765,13 +765,28 @@ COMMENT ON TABLE gamebuddy.unlocked_admirer IS 'Admirers revealed one at a time 
 
 CREATE TABLE gamebuddy.verification_code (
     attempts integer NOT NULL,
-    code integer NOT NULL,
     is_valid boolean NOT NULL,
     created_at timestamp(6) with time zone NOT NULL,
     expires_at timestamp(6) with time zone NOT NULL,
     id uuid NOT NULL,
     email character varying(255) NOT NULL,
+    code_hash character varying(60) NOT NULL,
+    purpose character varying(20) DEFAULT 'REGISTRATION'::character varying NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: password_reset_ticket; Type: TABLE; Schema: gamebuddy
+--
+
+CREATE TABLE gamebuddy.password_reset_ticket (
+    id uuid NOT NULL,
+    email character varying(255) NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    used boolean DEFAULT false NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    expires_at timestamp(6) with time zone NOT NULL
 );
 
 
@@ -1083,6 +1098,14 @@ ALTER TABLE ONLY gamebuddy.content_report
 
 
 --
+-- Name: password_reset_ticket password_reset_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.password_reset_ticket
+    ADD CONSTRAINT password_reset_ticket_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: verification_code verification_code_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1327,6 +1350,20 @@ CREATE INDEX idx_session_email ON gamebuddy.session USING btree (email);
 --
 
 CREATE INDEX idx_unlocked_admirer_user ON gamebuddy.unlocked_admirer USING btree (user_id);
+
+
+--
+-- Name: idx_password_reset_ticket_email; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_password_reset_ticket_email ON gamebuddy.password_reset_ticket USING btree (email);
+
+
+--
+-- Name: idx_password_reset_ticket_hash; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_password_reset_ticket_hash ON gamebuddy.password_reset_ticket USING btree (token_hash);
 
 
 --

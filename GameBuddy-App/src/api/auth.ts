@@ -41,6 +41,32 @@ export const authApi = {
     api.post<void>('/auth/sendCode', { email, isRegister }, { anonymous: true }),
 
   /**
+   * Step one of a forgotten-password reset: spends the mailed code for a ticket.
+   *
+   * The code is requested through `sendCode(email, false)` above — there is no separate
+   * "start a reset" call, and deliberately so: that endpoint already answers the same way
+   * whether or not the address has an account, and adding one would be an easier oracle.
+   *
+   * The ticket is a credential in its own right, valid for ten minutes and spendable once.
+   * It is returned exactly this once and is never stored server-side in a readable form.
+   */
+  resetVerify: (email: string, verificationCode: number) =>
+    api.post<{ resetToken: string }>(
+      '/auth/reset/verify',
+      { email, verificationCode },
+      { anonymous: true },
+    ),
+
+  /**
+   * Step two: sets the password and ends every session the account had.
+   *
+   * Returns no token on purpose. The caller has just proved control of the mailbox, not
+   * of the account, so the way back in is the ordinary login with the new password.
+   */
+  resetPassword: (email: string, resetToken: string, password: string) =>
+    api.post<void>('/auth/reset/pwd', { email, resetToken, password }, { anonymous: true }),
+
+  /**
    * Accepts either the username or the email.
    *
    * Refuses with code 109 until onboarding is finished — that is the intended flow,

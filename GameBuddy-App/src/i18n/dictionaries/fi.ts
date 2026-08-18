@@ -47,6 +47,7 @@ export const fi: Dictionary = {
   auth: {
     stepOne: 'VAIHE 1',
     stepTwo: 'VAIHE 2',
+    stepThree: 'VAIHE 3',
     emailPlaceholder: 'sina@esimerkki.fi',
 
     login: {
@@ -57,6 +58,7 @@ export const fi: Dictionary = {
       submit: 'Kirjaudu sisään',
       needsCode: 'Voimme lähettää uuden koodin sähköpostiisi tilin viimeistelyä varten.',
       emailCode: 'Lähetä koodi sähköpostiini',
+      forgot: 'Unohtuiko salasana?',
     },
 
     register: {
@@ -87,6 +89,23 @@ export const fi: Dictionary = {
       submit: 'Vahvista',
       resend: 'Lähetä uusi koodi',
       resendCooldown: (s: number) => `Lähetä uusi koodi (${s} s)`,
+    },
+
+    forgot: {
+      title: 'Nollaa salasanasi',
+      subtitle:
+        'Anna sähköpostiosoite, jolla rekisteröidyit, niin lähetämme sinulle kuusinumeroisen koodin.',
+      email: 'Sähköposti',
+      submit: 'Lähetä koodi',
+      sentCodeBefore: 'Jos osoitteella on tili, kuusinumeroinen koodi on matkalla osoitteeseen',
+      verifySubmit: 'Jatka',
+      resetTitle: 'Valitse uusi salasana',
+      resetSubtitle: 'Kaikki vanhalla salasanalla kirjautuneet kirjataan ulos.',
+      resetSubmit: 'Tallenna salasana',
+      doneTitle: 'Kirjaudu sisään uudella salasanallasi',
+      doneBody:
+        'Kaikki vanhaa salasanaa käyttäneet istunnot ovat päättyneet, tällä laitteella ja muilla.',
+      signIn: 'Kirjaudu sisään',
     },
   },
 

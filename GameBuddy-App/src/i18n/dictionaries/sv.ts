@@ -47,6 +47,7 @@ export const sv: Dictionary = {
   auth: {
     stepOne: 'STEG 1',
     stepTwo: 'STEG 2',
+    stepThree: 'STEG 3',
     emailPlaceholder: 'du@exempel.se',
 
     login: {
@@ -57,6 +58,7 @@ export const sv: Dictionary = {
       submit: 'Logga in',
       needsCode: 'Vi kan mejla en ny kod så att du kan slutföra kontot.',
       emailCode: 'Mejla mig en kod',
+      forgot: 'Glömt lösenordet?',
     },
 
     register: {
@@ -87,6 +89,22 @@ export const sv: Dictionary = {
       submit: 'Verifiera',
       resend: 'Skicka en ny kod',
       resendCooldown: (s: number) => `Skicka en ny kod (${s}s)`,
+    },
+
+    forgot: {
+      title: 'Återställ ditt lösenord',
+      subtitle: 'Ange e-postadressen du registrerade dig med, så skickar vi en sexsiffrig kod.',
+      email: 'E-post',
+      submit: 'Skicka koden',
+      sentCodeBefore: 'Om det finns ett konto för den är en sexsiffrig kod på väg till',
+      verifySubmit: 'Fortsätt',
+      resetTitle: 'Välj ett nytt lösenord',
+      resetSubtitle: 'Alla som är inloggade med det gamla lösenordet loggas ut.',
+      resetSubmit: 'Spara lösenordet',
+      doneTitle: 'Logga in med ditt nya lösenord',
+      doneBody:
+        'Alla sessioner som använde det gamla lösenordet har avslutats, på den här enheten och alla andra.',
+      signIn: 'Logga in',
     },
   },
 

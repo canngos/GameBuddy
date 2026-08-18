@@ -27,6 +27,7 @@ public class AuthRateLimitConfig {
         return new AuthRateLimiters(
                 new RateLimiter(10, Duration.ofMinutes(15)),
                 new RateLimiter(3, Duration.ofMinutes(15)),
+                new RateLimiter(10, Duration.ofMinutes(15)),
                 new RateLimiter(10, Duration.ofMinutes(15)));
     }
 

@@ -74,6 +74,16 @@ export default function Login() {
           returnKeyType="go"
         />
 
+        {/* Right under the field it rescues, which is where someone who has just failed
+            to remember a password is already looking. */}
+        <Text
+          variant="bodyStrong"
+          className="-mt-2 self-end text-primary"
+          onPress={() => router.push('/forgot')}
+        >
+          {t.auth.login.forgot}
+        </Text>
+
         {login.error && !needsCode && <ErrorNotice error={login.error} />}
 
         {needsCode && (

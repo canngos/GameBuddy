@@ -26,6 +26,27 @@ public final class Constants {
             The code expires in %d minutes. If this was not you, just ignore this email \
             and nothing will happen.""";
 
+    /**
+     * Sent after a password is reset, to the address whose password changed.
+     *
+     * <p>This is the only message that reaches somebody whose mailbox has been taken over:
+     * everything else in the reset flow is visible to whoever is holding the mailbox, and
+     * silence would let a takeover finish unremarked. It names no code and carries no link —
+     * there is nothing here for an attacker to use, only something for an owner to notice.
+     */
+    public static final String EMAIL_SUBJECT_PASSWORD_CHANGED = "GameBuddy - Your password was changed";
+
+    public static final String EMAIL_TEXT_PASSWORD_CHANGED = """
+            The password for your GameBuddy account was just changed, and every device that \
+            was signed in has been signed out.
+
+            Your email: %s
+
+            If this was you, there is nothing to do.
+
+            If it was not, someone else has access to this mailbox. Reset the password again \
+            straight away and secure your email account.""";
+
     // --- Push notification copy ---------------------------------------------
     public static final String FRIEND_REQUEST_TITLE = "New friend request!";
     public static final String FRIEND_REQUEST_BODY = "%s sent you a friend request.";

@@ -15,9 +15,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface VerificationCodeRepository extends JpaRepository<VerificationCode, UUID> {
 
-    Optional<VerificationCode> findByEmailAndCodeAndIsValidTrue(String email, Integer code);
-
-    /** The live code for an address, if any. Used to enforce the attempt cap. */
+    /**
+     * The live code for an address, if any.
+     *
+     * <p>The only way in now that the code is hashed: there is no finder taking a code,
+     * because bcrypt output cannot be matched with a WHERE clause. Callers fetch this row
+     * and compare against it, which is also what charges the attempt.
+     */
     Optional<VerificationCode> findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(String email);
 
     /**

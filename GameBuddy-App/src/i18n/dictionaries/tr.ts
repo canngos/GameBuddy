@@ -47,6 +47,7 @@ export const tr: Dictionary = {
   auth: {
     stepOne: 'ADIM 1',
     stepTwo: 'ADIM 2',
+    stepThree: 'ADIM 3',
     emailPlaceholder: 'sen@ornek.com',
 
     login: {
@@ -57,6 +58,7 @@ export const tr: Dictionary = {
       submit: 'Giriş yap',
       needsCode: 'Bu hesabı tamamlaman için sana yeni bir kod gönderebiliriz.',
       emailCode: 'Bana kod gönder',
+      forgot: 'Parolamı unuttum',
     },
 
     register: {
@@ -86,6 +88,21 @@ export const tr: Dictionary = {
       submit: 'Doğrula',
       resend: 'Yeni kod gönder',
       resendCooldown: (s: number) => `Yeni kod gönder (${s}sn)`,
+    },
+
+    forgot: {
+      title: 'Parolanı sıfırla',
+      subtitle: 'Kaydolurken kullandığın e-postayı yaz, sana altı haneli bir kod gönderelim.',
+      email: 'E-posta',
+      submit: 'Kodu gönder',
+      sentCodeBefore: 'Bu adrese ait bir hesap varsa altı haneli kod yolda:',
+      verifySubmit: 'Devam et',
+      resetTitle: 'Yeni bir parola seç',
+      resetSubtitle: 'Eski parolayla giriş yapmış olan herkesin oturumu kapanır.',
+      resetSubmit: 'Yeni parolayı kaydet',
+      doneTitle: 'Yeni parolanla giriş yap',
+      doneBody: 'Eski parolayı kullanan bütün oturumlar kapandı; bu cihazda da, diğerlerinde de.',
+      signIn: 'Giriş yap',
     },
   },
 
