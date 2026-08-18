@@ -183,6 +183,19 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
           icon: Clapperboard,
           tone: 'muted',
         });
+      } else if (outcome === 'error' || outcome === 'unavailable') {
+        // The advert never opened. Previously these two fell off the end of this chain and
+        // the row simply stopped spinning, which is the report that brought us here: the
+        // button did nothing and said nothing. It is not the gamer's fault and there is
+        // nothing for them to fix, so the copy asks them to try again rather than
+        // explaining an ad unit to them.
+        showToast({
+          id: 'ads:failed',
+          title: t.market.earn.adFailedTitle,
+          body: t.market.earn.adFailedBody,
+          icon: Clapperboard,
+          tone: 'muted',
+        });
       }
     } finally {
       setWatching(false);
@@ -281,10 +294,21 @@ function QuestRow({
   const t = useT();
   const done = quest.progress >= quest.target;
 
+  // The backend sends the title in English — it is a string on a Java enum, one per quest,
+  // with no notion of a locale — so a gamer reading the app in Turkish met three English
+  // rows among localised ones. Translated by `code`, which is on the payload and is the
+  // stable name of the quest rather than prose that can be reworded.
+  //
+  // Falls back to what the server sent when this build has never heard of the code. A
+  // quest added after it shipped then reads in English, which is worse than the dictionary
+  // and much better than an empty row.
+  const title =
+    (t.market.earn.questTitles as Record<string, string | undefined>)[quest.code] ?? quest.title;
+
   return (
     <ClaimRow
       icon={quest.claimed ? Check : Target}
-      title={quest.title}
+      title={title}
       detail={
         quest.claimed
           ? t.market.earn.questDone

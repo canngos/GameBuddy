@@ -386,6 +386,32 @@ public class DefaultProfileService implements ProfileService {
             throw new BusinessException(TransactionCode.ALREADY_SENT_REQUEST);
         }
 
+        // They asked first, and this is the same answer. Two people tapping "add friend"
+        // on each other before either has opened their requests list is ordinary — and it
+        // used to leave both requests pending, with each profile screen showing only the
+        // outgoing one. Neither side could reach an accept button, and the friendship both
+        // of them had just asked for could not happen. Crossing counts as agreeing.
+        if (gamer.getWaitingFriends().contains(user)) {
+            gamer.getWaitingFriends().remove(user);
+            gamer.getFriends().add(user);
+            user.getFriends().add(gamer);
+            gamerRepository.save(gamer);
+            gamerRepository.save(user);
+
+            // The other side is told their request was accepted, which is what happened
+            // from where they are standing. This gamer is not notified: they are holding
+            // the phone that did it, and the response tells them.
+            events.publishEvent(new NotificationRequestedEvent(
+                    user.getUserId(),
+                    user.getFcmToken(),
+                    Constants.FRIEND_REQUEST_ACCEPTED_TITLE,
+                    String.format(Constants.FRIEND_REQUEST_ACCEPTED_BODY, gamer.getGamerUsername()),
+                    NotificationKind.FRIEND_ACCEPTED,
+                    gamer.getUserId()));
+
+            return DefaultMessageResponse.of("Friend added successfully");
+        }
+
         user.getWaitingFriends().add(gamer);
         gamerRepository.save(user);
 

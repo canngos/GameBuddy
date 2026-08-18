@@ -357,6 +357,8 @@ export const en = {
       style: 'Style',
       inCommon: (n: number) => `${n} in common`,
       playsOnA11y: (list: string) => `Plays on ${list}`,
+      /** On the card while it is being dragged upwards. Two words, so it stays on one line. */
+      superStamp: 'SUPER',
     },
 
     actions: {
@@ -364,6 +366,11 @@ export const en = {
       passHint: 'Skip this gamer',
       match: 'Match',
       matchHint: 'Say yes to this gamer',
+      superLike: 'Super Like',
+      superLikeHint: 'Say yes and tell them straight away',
+      /** The count sits under the button, so the balance is visible before it is spent. */
+      superLikeLeft: (n: number) => `${n} left`,
+      superLikeNone: 'None left',
       undo: 'Undo last swipe',
       undoCost: (cost: number) => `Undo last swipe, ${cost} coins`,
     },
@@ -384,9 +391,12 @@ export const en = {
       swipesBody: 'The deck comes back tomorrow. Gold removes the daily limit.',
       goldTitle: 'GameBuddy Gold',
       goldBody: 'This one is part of Gold.',
+      superLikesTitle: 'Out of Super Likes',
+      superLikesBody: 'You can still match normally. Super Likes are bought with coins.',
       swipesLeft: 'Swipes left',
       likesLeft: 'Likes left',
       getGold: 'Get Gold — no daily limit',
+      getSuperLikes: 'Get more Super Likes',
       keepLooking: 'Keep looking',
     },
 
@@ -498,6 +508,8 @@ export const en = {
       rewardPendingBody: 'Check your balance again in a moment.',
       consentTitle: 'Videos need advert consent',
       consentBody: 'Change it in Settings → Advert privacy.',
+      adFailedTitle: 'No video right now',
+      adFailedBody: 'Nothing was available to show. Try again in a moment.',
       watchVideo: 'Watch a short video',
       videosLeft: (n: number) => `${n} left today`,
       videosDone: 'That is today’s videos — back tomorrow',
@@ -506,6 +518,19 @@ export const en = {
       stipendBack: (when: string) => `Back ${when}`,
       questDone: 'Done this week',
       questProgress: (progress: number, target: number) => `${progress} of ${target}`,
+      /**
+       * The weekly quests, by the code the backend sends alongside its own English title.
+       *
+       * Keyed by code rather than translated from that title, because the code is the
+       * quest's name and the title is prose somebody will reword. `CoinFaucet.Quest` on
+       * the backend is the list these must match; a code missing here falls back to the
+       * server's English rather than rendering blank.
+       */
+      questTitles: {
+        TALK: 'Send 10 messages',
+        MEET: 'Match with 2 gamers',
+        SQUAD: 'Join a lobby',
+      },
       claimA11y: (reward: number, title: string) => `Claim ${reward} coins: ${title}`,
       rowA11y: (title: string, detail: string) => `${title}, ${detail}`,
       claim: 'Claim',
@@ -892,6 +917,7 @@ export const en = {
       '108': 'Wrong username or password.',
       '113': 'This account is blocked.',
       '121': 'This gamer has blocked you.',
+      '186': 'You blocked this gamer, so you cannot message them.',
       '129': 'Not enough coins.',
       '144': 'That code has expired. Ask for a new one.',
       '145': 'Too many attempts. Wait a little and try again.',
@@ -947,6 +973,75 @@ export const en = {
     filterGenre: 'Genre',
     filterOther: 'Other',
     avatarN: (n: number) => `Avatar ${n}`,
+  },
+
+  /**
+   * The keyword catalogue's second line, keyed by the keyword's own name in lower case.
+   *
+   * Here rather than in the database because the `keywords` table has one `description`
+   * column and no locale, so the server can only ever answer in one language. See
+   * `src/i18n/keywords.ts` for the lookup and what happens to a keyword this list has
+   * never heard of.
+   *
+   * Written in the second person and about *matching* rather than about the word: somebody
+   * picking keywords is answering "who do I want to be put in front of", so the useful
+   * sentence is what picking it will get them. Kept to roughly seventy characters — it
+   * renders small, on the second line of a list row.
+   *
+   * The English here is the same copy as `upgrade-2026-16-keyword-descriptions.sql`, which
+   * remains what a gamer sees if a build ever loses this dictionary.
+   */
+  keywords: {
+    descriptions: {
+      'achievement hunter': 'You go for the full list, however long it takes.',
+      'aim training': 'You warm up before you play, and it shows.',
+      'anime fan': 'Anime art, anime games, anime everything.',
+      builder: 'You would rather build the base than defend it.',
+      casual: 'You play to unwind. No pressure, no schedule.',
+      chaotic: 'Plans are optional. Something will happen.',
+      chill: 'Relaxed sessions, easy company, nobody shouting.',
+      clutch: 'You are calm when the round is on the line.',
+      'co-op': 'You would rather beat the game with someone than alone.',
+      collector: 'Every skin, every mount, every card.',
+      'combo practice': 'You spend real time in the training room.',
+      competitive: 'You are here to win, and you play like it.',
+      completionist: 'The map is not done until all of it is done.',
+      'couch co-op': 'Two controllers, one sofa, same screen.',
+      decorator: 'Your base, island or house is the whole hobby.',
+      'emulator user': 'Older systems, running on whatever you have now.',
+      'endgame focused': 'The story is the tutorial. The endgame is the game.',
+      esports: 'You follow the pro scene and know the rosters.',
+      explorer: 'You take the side path before the main quest.',
+      grinder: 'Long, repetitive, satisfying. You do not mind the hours.',
+      'guild leader': 'You organise people, and you are good at it.',
+      'jumpscare enjoyer': 'Horror games, lights off, sound up.',
+      'long sessions': 'When you sit down it is for the evening.',
+      'loot goblin': 'You open every chest and pick up everything.',
+      'lore nerd': 'You have read the item descriptions. All of them.',
+      'min-maxer': 'Optimal build, optimal route, spreadsheet open.',
+      modder: 'You install mods, and probably write a few.',
+      'no mic': 'You play without voice chat, and prefer it that way.',
+      'no spoilers': 'Do not tell them anything. They are getting there.',
+      nostalgic: 'The games you grew up with still hit hardest.',
+      raider: 'Scheduled runs, full team, cleared bosses.',
+      'ranked grinder': 'Climbing the ladder is the reason you log in.',
+      roleplayer: 'You stay in character, and enjoy people who do too.',
+      'short sessions': 'Half an hour here and there, whenever you can.',
+      shotcaller: 'You make the calls so the team does not have to.',
+      'sim racer': 'Wheel, pedals, and lap times you actually care about.',
+      social: 'The people are the reason you are here.',
+      'solo player': 'You play alone, and you like it that way.',
+      speedrunner: 'You have a personal best and you are chasing it.',
+      'squad player': 'Always in a party, never queuing alone.',
+      'story-driven': 'You are here for the writing and the characters.',
+      streamer: 'You play with an audience watching.',
+      theorycrafter: 'You work out why it is good before you use it.',
+      'tournament goer': 'You show up in person, or at least sign up.',
+      'toxic-free': 'No abuse, no blaming. You leave lobbies that go that way.',
+      tryhard: 'Even the casual mode is played properly.',
+      'voice chat': 'Mic on, talking through it, calls being made.',
+      'waifu collector': 'Gacha pulls and a roster you are attached to.',
+    },
   },
 
   /** The pre-permission notification pitch. Push payload text itself is server-composed. */

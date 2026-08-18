@@ -162,8 +162,14 @@ public class ChatMessageService {
         if (!sender.isMatchedWith(receiver)) {
             throw new BusinessException(TransactionCode.NOT_MATCHED);
         }
-        if (sender.hasBlockRelationshipWith(receiver)) {
-            throw new BusinessException(TransactionCode.USER_BLOCKED);
+        // Which half of the block you are told about is your own. USER_BLOCKED said
+        // "Account is blocked" to both sides — a sentence written for a banned account,
+        // which read to the blocked gamer as though theirs was the account in trouble.
+        if (sender.hasBlocked(receiver)) {
+            throw new BusinessException(TransactionCode.USER_BLOCKED_BY_YOU);
+        }
+        if (sender.isBlockedBy(receiver)) {
+            throw new BusinessException(TransactionCode.USER_BLOCKED_YOU);
         }
         if (!AgeBand.compatible(sender.getAge(), receiver.getAge())) {
             throw new BusinessException(TransactionCode.AGE_BAND_MISMATCH);

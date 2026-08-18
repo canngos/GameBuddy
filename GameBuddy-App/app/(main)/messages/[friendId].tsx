@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { profileApi } from '../../../src/api/catalogue';
 import { chatApi } from '../../../src/api/chat';
@@ -43,7 +43,6 @@ export default function Chat() {
 
   const chat = useConversation(friendId);
   const [draft, setDraft] = useState('');
-  const listRef = useRef<FlatList<Conversation>>(null);
 
   const report = useMutation({
     mutationFn: (messageId: string) => chatApi.report(messageId),
@@ -62,10 +61,9 @@ export default function Chat() {
   // presence or typing frame — which arrive constantly over the socket — re-rendered
   // every message in the thread.
   const keyExtractor = useCallback((m: Conversation) => m.id, []);
-  const scrollToEnd = useCallback(
-    () => listRef.current?.scrollToEnd({ animated: false }),
-    [],
-  );
+  // The conversation arrives oldest first, which is the order it is written and read in.
+  // The list below is inverted, so it wants the other one.
+  const newestFirst = useMemo(() => [...chat.messages].reverse(), [chat.messages]);
   const onReport = useCallback((id: string) => report.mutate(id), [report]);
   const renderBubble = useCallback(
     ({ item }: { item: Conversation }) => (
@@ -129,13 +127,30 @@ export default function Chat() {
 
       {!chat.isLoading && !chat.error && (
         <FlatList
-          ref={listRef}
-          data={chat.messages}
+          // Newest first, drawn bottom-up. `inverted` flips the whole list on its vertical
+          // axis, so index 0 sits against the compose box and "the start of the list" —
+          // the only position a virtualised list can be sure of without measuring
+          // everything — is the latest message.
+          //
+          // The old shape was the natural one, oldest first with `scrollToEnd` on
+          // `onContentSizeChange`, and it opened long threads part-way up the history.
+          // That is a race it cannot win: with no `getItemLayout` to go on, the content
+          // height at that moment is ten measured bubbles plus an estimate for the rest,
+          // so it scrolled to an estimated end which then moved as the real heights
+          // arrived. Short threads fit in the first batch and looked fine, which is why
+          // this only ever reproduced on the conversations worth having.
+          //
+          // Inverting also removes the jump when a send refetches the history, and puts
+          // new messages where they belong with no scrolling at all.
+          inverted
+          data={newestFirst}
           keyExtractor={keyExtractor}
           contentContainerClassName="gap-2 p-4"
-          onContentSizeChange={scrollToEnd}
           ListEmptyComponent={
-            <View className="items-center gap-1 py-10">
+            // Inverted lists draw their children upside down, this one included. The flip
+            // is undone here rather than by leaving the empty state outside the list,
+            // which would mean laying it out twice.
+            <View className="items-center gap-1 py-10" style={{ transform: [{ scaleY: -1 }] }}>
               <Text variant="bodyStrong">{t.messages.noMessagesYet}</Text>
               <Text variant="caption" className="text-center">
                 {t.messages.emptyBlurb}

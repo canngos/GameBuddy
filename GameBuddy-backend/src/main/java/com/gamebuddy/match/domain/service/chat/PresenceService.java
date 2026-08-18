@@ -26,10 +26,20 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
  * thing. That is the definition a chat app needs; deriving it from the conversation screen
  * alone would have marked somebody offline the moment they went back to the deck.
  *
- * <p><strong>Fan-out is limited to matches who are themselves online.</strong> Presence is
- * only useful to somebody who is looking at a screen right now, and a gamer with hundreds
- * of matches would otherwise generate hundreds of sends into the void every time their
- * train went through a tunnel. Anyone offline learns the current state when they next ask.
+ * <p><strong>Every mutual match is told, whether or not they look online.</strong> This used
+ * to skip anyone the registry did not have a session for, on the reasoning that presence is
+ * only useful to somebody looking at a screen right now. The reasoning holds; the check does
+ * not, because it is asking about the recipient at the exact moment both connections are in
+ * motion. Two gamers whose sockets drop together — a backend restart, one flaky network —
+ * race to reconnect, and whichever reconnects first announces to somebody the registry has
+ * not caught up with yet. That announcement was dropped and never retried, so each side kept
+ * the last thing it heard, which was "offline", for as long as the app stayed open. It looked
+ * exactly like the bug it was reported as: both people offline, both people's messages
+ * arriving, and a restart fixing it.
+ *
+ * <p>The cost of the other choice is a frame the broker discards for a gamer who really is
+ * away — a map lookup. The cost of this check was a label that stayed wrong until the app was
+ * closed. Anyone genuinely offline still learns the current state when they next ask.
  */
 @Slf4j
 @Service
@@ -83,7 +93,7 @@ public class PresenceService {
     }
 
     /**
-     * Pushes a change to the gamer's online matches.
+     * Pushes a change to the gamer's mutual matches.
      *
      * <p>Runs inside the listener's transaction — see above. Failures are swallowed because
      * this is a websocket lifecycle callback, not part of anybody's request: a broken
@@ -102,9 +112,6 @@ public class PresenceService {
                     gamer.getApprovedMatches().stream().map(Gamer::getUserId).collect(Collectors.toSet());
 
             for (Gamer match : gamer.getApprovedMatches()) {
-                if (!registry.isOnline(match.getUserId())) {
-                    continue;
-                }
                 // Mutual matches only, the same rule chat itself applies. A one-sided like
                 // is not a relationship, and it must not leak when somebody is at their phone.
                 if (!match.getApprovedMatches().contains(gamer)) {

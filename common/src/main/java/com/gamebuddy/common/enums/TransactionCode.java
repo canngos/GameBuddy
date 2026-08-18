@@ -214,6 +214,18 @@ public enum TransactionCode {
      */
     LOBBY_REJECTED(185, "The owner already answered your request", HttpStatus.CONFLICT),
 
+    /**
+     * The sender is the one who blocked, and is writing to the person they blocked.
+     *
+     * <p>The counterpart to {@link #USER_BLOCKED_YOU}, which says the other side blocked
+     * you. Chat tells the two apart — {@link #USER_BLOCKED} covered both directions with
+     * one sentence written for a banned account, so whichever end you were, the message
+     * described somebody else's situation. Nothing is disclosed by separating them here:
+     * both people already know a block exists the moment a message will not send, and each
+     * is only ever told about their own half of it.
+     */
+    USER_BLOCKED_BY_YOU(186, "You have blocked this gamer", HttpStatus.FORBIDDEN),
+
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);
 

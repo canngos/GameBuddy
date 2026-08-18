@@ -36,4 +36,15 @@ public class SwipeAllowanceResponseBody implements BaseModel {
 
     /** When the budget returns, or null when unlimited. */
     private Instant resetsAt;
+
+    /**
+     * Super likes in hand. Bought rather than rationed, so no daily reset applies to it.
+     *
+     * <p>Here because this is the payload the deck already reads to know what it may do
+     * next, and a super like is one of the things it may do. It was previously returned
+     * only by the purchase call, which meant the only moment the client knew the balance
+     * was the moment it changed — so the deck could not offer the action at all, and a
+     * gamer who bought super likes had no way to spend them.
+     */
+    private int superLikes;
 }

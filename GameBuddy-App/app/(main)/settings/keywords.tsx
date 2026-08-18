@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '../../../src/api/auth';
 import { catalogueApi, profileApi } from '../../../src/api/catalogue';
+import { keywordDetail } from '../../../src/i18n/keywords';
 import { useT } from '../../../src/i18n/useT';
 import { CataloguePicker } from '../../../src/pickers/CataloguePicker';
 import { SelectionCount } from '../../../src/onboarding/SelectionCount';
@@ -39,9 +40,9 @@ export default function EditKeywords() {
       (keywords.data ?? []).map((k) => ({
         id: k.id,
         label: k.keywordName,
-        detail: k.description,
+        detail: keywordDetail(t, k),
       })),
-    [keywords.data],
+    [keywords.data, t],
   );
 
   const save = useMutation({

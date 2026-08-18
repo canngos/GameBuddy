@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../../src/api/auth';
 import { catalogueApi } from '../../src/api/catalogue';
+import { keywordDetail } from '../../src/i18n/keywords';
 import { useT } from '../../src/i18n/useT';
 import { useDraft } from '../../src/onboarding/draft';
 import { SelectionCount } from '../../src/onboarding/SelectionCount';
@@ -28,9 +29,9 @@ export default function Keywords() {
       (keywords.data ?? []).map((k) => ({
         id: k.id,
         label: k.keywordName,
-        detail: k.description,
+        detail: keywordDetail(t, k),
       })),
-    [keywords.data],
+    [keywords.data, t],
   );
 
   const submit = useMutation({

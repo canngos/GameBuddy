@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { chatApi } from '../../../src/api/chat';
@@ -10,7 +11,7 @@ import { useUpper } from '../../../src/i18n/case';
 import { useT } from '../../../src/i18n/useT';
 import { FriendRequestsSection } from '../../../src/social/FriendRequestsSection';
 import { useThemeColors } from '../../../src/theme';
-import { Card, ErrorNotice, FramedAvatar, Screen, Text } from '../../../src/ui';
+import { Card, ErrorNotice, FramedAvatar, Icon, Screen, Text } from '../../../src/ui';
 
 /**
  * One person you can talk to, however you came to know them.
@@ -386,13 +387,21 @@ const SectionHeader = memo(function SectionHeader({
 
       <View className="flex-1" />
 
-      {/* Rotated through `style`, not a class. A `rotate-*` utility present in one
-          state and absent in the other stops NativeWind painting the subtree — see
-          `src/ui/hairline.ts`. A transform value is just a number. */}
-      <View
-        className="h-2 w-2 border-b-2 border-r-2 border-muted"
-        style={{ transform: [{ rotate: open ? '45deg' : '-45deg' }] }}
-      />
+      {/* A real chevron, not two borders on a rotated box.
+
+          The hand-drawn version was an 8×8 square turned 45°, and a square turned 45° is
+          wider than it was: its diagonal is 8√2 ≈ 11.3dp, while layout still reserved the
+          8dp it started with. The tip therefore hung ~1.7dp outside its own box on every
+          side, and since this is the last child in the row that put the right-hand point
+          past the row's edge — which is what a tester saw and reported as an arrow cut
+          off at the screen edge.
+
+          Lucide measures honestly: the glyph is drawn inside the box it asks for, so
+          nothing overflows and the two states are the same size. Swapping the glyph rather
+          than rotating one also sidesteps the NativeWind rule that a `rotate-*` utility
+          present in one state and absent in the other stops the subtree painting — see
+          `src/ui/hairline.ts`. */}
+      <Icon as={open ? ChevronUp : ChevronDown} size={16} tone="muted" />
     </Pressable>
   );
 });

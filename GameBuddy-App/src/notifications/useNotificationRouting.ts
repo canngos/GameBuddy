@@ -14,6 +14,10 @@ import { useEffect } from 'react';
 export const NOTIFICATION_KINDS = [
   'MESSAGE',
   'MATCH',
+  // Not a match — nothing is open yet — so it is its own kind on the backend and has to be
+  // its own here too. Missing from this list, it took the unknown-kind path: an OS banner
+  // the app could not suppress, opening the deck instead of the person who sent it.
+  'SUPER_LIKE',
   'FRIEND_REQUEST',
   'FRIEND_ACCEPTED',
   'BADGE',
@@ -62,6 +66,13 @@ export function routeFor(kind: string | undefined, targetId: string | undefined,
       // The conversation, not their profile. A match is an invitation to say something,
       // and the screen that lets you do it is the one worth opening.
       return targetId ? conversation(targetId) : '/messages';
+
+    case 'SUPER_LIKE':
+      // Their profile, not a conversation: there is no conversation yet. This is somebody
+      // saying yes and waiting for an answer, and the answer is given by looking at them.
+      return targetId
+        ? { pathname: '/messages/gamer/[userId]', params: { userId: targetId } }
+        : '/home';
 
     case 'FRIEND_REQUEST':
       // The profile tab, where requests are answered.

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
 import { ChevronUp } from 'lucide-react-native';
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { avatarGradient, avatarUri, initialsOf } from '../avatars';
 import { profileApi } from '../api/catalogue';
 import type { Candidate } from '../api/types';
@@ -41,6 +41,29 @@ const MAX_GAMES = 3;
 const MAX_KEYWORDS = 3;
 
 /**
+ * Below this many dp of screen height, the portrait is drawn smaller.
+ *
+ * **The card cannot shrink itself, so something has to decide for it.** The identity block
+ * is `flex-1` and the detail block below is sized to its content — see the note on the
+ * layout — which is right, but React Native defaults `flexShrink` to 0 (unlike the web), so
+ * the detail block never gives anything back and the identity block absorbs the entire
+ * shortfall on its own. Its contents are fixed: a 128dp portrait, 80dp of padding, a name,
+ * a subtitle and a row of platform glyphs come to roughly 286dp whatever the screen is. On
+ * a 360×760dp phone the block is handed around 266dp of it. Because the block is centred
+ * *and* clips, the missing 20dp comes off the top and bottom equally — which is exactly the
+ * report: avatars cut off along the top on a 5.8" phone, and nothing wrong on a tablet.
+ *
+ * 800 rather than 760 so the smallest common phones are not sized to the millimetre; the
+ * compact portrait saves about 64dp, which is enough headroom to survive a long username
+ * or a game name that wraps.
+ *
+ * Divided by the font scale, so somebody running large text gets the compact layout on a
+ * phone that would otherwise be comfortable. Their text is bigger everywhere on this card,
+ * which is the same shortfall arriving by a different route.
+ */
+const COMPACT_HEIGHT = 800;
+
+/**
  * One gamer, as a card. This is the app's front door.
  *
  * The identity block is a per-user gradient rather than a photo, because there is still no
@@ -64,6 +87,10 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
   const hasPhoto = !!avatarUri(candidate.avatar);
   const hairline = useHairline();
   const localize = useCountryName();
+
+  const { height } = useWindowDimensions();
+  const compact = height / PixelRatio.getFontScale() < COMPACT_HEIGHT;
+  const portrait = compact ? 96 : 128;
 
   const games = candidate.favoriteGames ?? [];
   const keywords = candidate.selectedKeywords ?? [];
@@ -105,24 +132,41 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
           pointerEvents="none"
         />
 
-        <View className="items-center justify-center px-6 py-10">
+        {/* Sized rather than classed, because the value is computed — see `COMPACT_HEIGHT`.
+            The vertical padding shrinks with the portrait: two thirds of what is saved here
+            is padding, and cutting only the picture would leave a small avatar swimming in
+            the space the big one needed. */}
+        <View className="items-center justify-center px-6" style={{ paddingVertical: compact ? 24 : 40 }}>
           {/* The frame goes over whichever portrait we drew — a photo, or the oversized
               monogram below. Someone who paid for a ring should see it whether or not
               they have uploaded a picture yet. */}
-          <View className="h-32 w-32 items-center justify-center">
+          <View className="items-center justify-center" style={{ width: portrait, height: portrait }}>
             {hasPhoto ? (
-              <Avatar source={candidate.avatar} name={candidate.gamerUsername} size={128} />
+              <Avatar source={candidate.avatar} name={candidate.gamerUsername} size={portrait} />
             ) : (
-              <View className="h-32 w-32 items-center justify-center rounded-full bg-white/25">
-                <Text className="font-bold text-[44px] leading-[52px] text-white">
+              <View
+                className="items-center justify-center rounded-full bg-white/25"
+                style={{ width: portrait, height: portrait }}
+              >
+                <Text
+                  className="font-bold text-white"
+                  // Scaled with the circle it sits in, so the monogram keeps the same
+                  // proportions rather than rattling around inside a smaller ring.
+                  style={{ fontSize: compact ? 34 : 44, lineHeight: compact ? 40 : 52 }}
+                >
                   {initialsOf(candidate.gamerUsername)}
                 </Text>
               </View>
             )}
-            <FrameOverlay frame={candidate.frame} size={128} />
+            <FrameOverlay frame={candidate.frame} size={portrait} />
           </View>
 
-          <Text variant="title" numberOfLines={1} className="mt-4 text-center text-white">
+          <Text
+            variant="title"
+            numberOfLines={1}
+            className="text-center text-white"
+            style={{ marginTop: compact ? 8 : 16 }}
+          >
             {candidate.gamerUsername}
           </Text>
           <Text className="font-medium text-[14px] leading-[20px] text-white/85">

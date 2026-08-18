@@ -39,8 +39,13 @@ import { isKnownKind } from './useNotificationRouting';
  * exported data in {@link useNotificationRouting} rather than a condition written out here
  * — a new kind is added in one place or it is inconsistent everywhere.
  *
- * <p>Everything reaches the notification list either way, so nothing is lost if a toast or
- * a celebration is dismissed without being read.
+ * <p><b>A suppressed kind is kept out of the system tray as well.</b> That is not a second
+ * decision but the same one: Android presents a notification if any of banner, list or
+ * alert is asked for, so "in the tray but no banner" is not a state that exists — asking
+ * for the tray alone produced the heads-up banner too, over the very screen showing the
+ * message. What is given up is a tray entry for something that arrived while the gamer was
+ * watching it arrive, and it is given up only in the foreground: a push that lands while
+ * the app is backgrounded or closed never reaches this handler and behaves normally.
  *
  * <p><b>No sound from the OS.</b> The app plays its own cue, paired with its own haptic, at
  * the moment the toast appears — see {@code src/ui/feedback.ts}. Leaving this true would
@@ -56,7 +61,13 @@ Notifications.setNotificationHandler({
 
     return {
       shouldShowBanner: !drawnInApp,
-      shouldShowList: true,
+      // Not `true`. On Android these are not the two separate places they read as: the
+      // native side presents the notification if *any* of banner, list or alert is set,
+      // and presenting it means a real system notification at the channel's importance —
+      // which for `messages` is a heads-up banner over whatever is on screen. Asking for
+      // the tray alone and getting the banner as well is how every message the app drew
+      // itself was also announced by Android, which is the report this fixes.
+      shouldShowList: !drawnInApp,
       shouldPlaySound: false,
       shouldSetBadge: false,
     };

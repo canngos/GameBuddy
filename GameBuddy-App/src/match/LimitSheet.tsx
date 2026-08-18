@@ -30,7 +30,23 @@ function copyFor(kind: Block['kind'], t: Dictionary): { title: string; body: str
       return { title: t.deck.limit.swipesTitle, body: t.deck.limit.swipesBody };
     case 'subscription':
       return { title: t.deck.limit.goldTitle, body: t.deck.limit.goldBody };
+    case 'no-super-likes':
+      return { title: t.deck.limit.superLikesTitle, body: t.deck.limit.superLikesBody };
   }
+}
+
+/**
+ * Where the primary button goes, and what it says.
+ *
+ * Every other block on this sheet is a limit Gold lifts, so the offer is Gold. Running out
+ * of Super Likes is not one of those: they are bought with coins in the Market and a
+ * subscription does not come with any, so offering Gold here would be selling the wrong
+ * thing to somebody who already knows what they want.
+ */
+function actionFor(kind: Block['kind'], t: Dictionary): { label: string; href: '/gold' | '/market' } {
+  return kind === 'no-super-likes'
+    ? { label: t.deck.limit.getSuperLikes, href: '/market' }
+    : { label: t.deck.limit.getGold, href: '/gold' };
 }
 
 /**
@@ -54,9 +70,13 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
 
   // The moment a limit actually bites. Recorded here rather than at the paywall because
   // this is where demand appears; whether it converts is the next event's job.
+  //
+  // Not for an empty Super Like balance: that sheet offers the Market rather than Gold, so
+  // counting it would inflate the paywall funnel with people who were never shown one.
+  const paywall = visible && block?.kind !== 'no-super-likes';
   useEffect(() => {
-    if (visible) trackFunnel('PAYWALL_TRIGGERED');
-  }, [visible]);
+    if (paywall) trackFunnel('PAYWALL_TRIGGERED');
+  }, [paywall]);
 
   useEffect(() => {
     progress.value = visible
@@ -72,6 +92,7 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
 
   if (!block) return null;
   const copy = copyFor(block.kind, t);
+  const action = actionFor(block.kind, t);
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
@@ -111,12 +132,12 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
                   gamer standing at it. */}
               <View className="gap-2">
                 <Button
-                  label={t.deck.limit.getGold}
+                  label={action.label}
                   onPress={() => {
                     // Dismiss first: the sheet is a positioned sibling of the deck rather
                     // than a Modal, so leaving it mounted would put it over the paywall.
                     onDismiss();
-                    router.push('/gold');
+                    router.push(action.href);
                   }}
                 />
                 <Button label={t.deck.limit.keepLooking} variant="ghost" onPress={onDismiss} />

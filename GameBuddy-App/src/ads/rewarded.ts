@@ -131,8 +131,19 @@ export { adsAvailable } from './sdk';
 export type RewardedOutcome =
   /** Watched to the end. AdMob's callback is on its way to our backend. */
   | 'earned'
-  /** Closed early, or no ad was available. Nothing was earned and nothing is wrong. */
+  /** Closed early. Nothing was earned and nothing is wrong. */
   | 'dismissed'
+  /**
+   * The advert could not be loaded or shown.
+   *
+   * Its own outcome rather than being folded into `dismissed`, which is what it used to be.
+   * The two look identical to this module and could not be less alike to the person
+   * holding the phone: one is them closing an advert, the other is the button doing
+   * nothing. Reported as the same thing, a misconfigured ad unit was indistinguishable
+   * from a gamer changing their mind — so nothing was shown, nothing was logged, and the
+   * feature was simply broken in a way no screen could say out loud.
+   */
+  | 'error'
   /** Consent for advertising was refused or never given. Recoverable, from Settings. */
   | 'consentRequired'
   /** This build has no AdMob in it, or the SDK failed to start. */
@@ -182,7 +193,14 @@ export async function showRewardedAd(userId: string): Promise<RewardedOutcome> {
           earned = true;
         }),
         ad.addAdEventListener(ads.AdEventType.CLOSED, () => finish(earned ? 'earned' : 'dismissed')),
-        ad.addAdEventListener(ads.AdEventType.ERROR, () => finish('dismissed')),
+        ad.addAdEventListener(ads.AdEventType.ERROR, (error) => {
+          // The code is the difference between "nobody had an advert to serve right now",
+          // which is ordinary and passes, and "this unit does not belong to this app",
+          // which is a build that will never show one. Both reach the same screen, so the
+          // detail is logged rather than shown.
+          console.warn('[ads] rewarded ad failed to load or show', error);
+          finish('error');
+        }),
       );
 
       ad.load();

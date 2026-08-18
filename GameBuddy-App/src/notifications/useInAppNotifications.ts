@@ -6,6 +6,7 @@ import {
   Award,
   Bell,
   MessageCircle,
+  Star,
   UserPlus,
   Users,
   type LucideIcon,
@@ -107,6 +108,9 @@ const PRESENTATION: Record<NotificationKind, { icon: LucideIcon; tone: Tone }> =
   MESSAGE: { icon: MessageCircle, tone: 'primary' },
   // Present for completeness of the record, never used — a match is celebrated, not toasted.
   MATCH: { icon: Users, tone: 'accent' },
+  // `accent` is the like/match/admirer colour, and this is the loudest of those. A star
+  // rather than a heart, matching the button that sends it.
+  SUPER_LIKE: { icon: Star, tone: 'accent' },
   FRIEND_REQUEST: { icon: UserPlus, tone: 'primary' },
   FRIEND_ACCEPTED: { icon: UserPlus, tone: 'primary' },
   BADGE: { icon: Award, tone: 'gold' },
@@ -130,6 +134,9 @@ const PRESENTATION: Record<NotificationKind, { icon: LucideIcon; tone: Tone }> =
 const REFRESH_ON: Record<NotificationKind, readonly QueryKeyRoot[]> = {
   MESSAGE: ['inbox'],
   MATCH: ['inbox', 'matches', 'allowance'],
+  // Somebody spent a super like on this gamer, so they are now an admirer — which is the
+  // list Gold reads and the count everyone else sees.
+  SUPER_LIKE: ['admirers'],
   // Was `['me']`, which refetched the whole profile and left the list this notification is
   // actually about untouched.
   FRIEND_REQUEST: ['friendRequests'],

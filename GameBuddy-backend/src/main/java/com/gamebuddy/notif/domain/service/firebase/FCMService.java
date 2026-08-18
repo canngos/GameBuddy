@@ -52,12 +52,16 @@ public class FCMService {
             message.putData("targetId", tokenRequest.getTargetId());
         }
 
+        AndroidConfig.Builder android =
+                AndroidConfig.builder().setPriority(priorityFor(tokenRequest.getKind()));
+
         // Collapse on the kind and target, so ten messages from one person while the
         // phone is in a pocket arrive as one line rather than ten. Android replaces a
         // pending message with the same key instead of stacking it.
-        AndroidConfig.Builder android = AndroidConfig.builder()
-                .setPriority(priorityFor(tokenRequest.getKind()))
-                .setCollapseKey(collapseKey(tokenRequest));
+        String collapseKey = collapseKey(tokenRequest);
+        if (collapseKey != null) {
+            android.setCollapseKey(collapseKey);
+        }
 
         // Which channel it lands on, which on Android 8+ is what decides whether it appears
         // over whatever the gamer is doing or only in the shade. Unclassifiable kinds are
@@ -151,14 +155,27 @@ public class FCMService {
     }
 
     /**
-     * What counts as "the same notification" for collapsing.
+     * What counts as "the same notification" for collapsing, or null to never collapse.
      *
-     * <p>Kind plus target: two messages from the same person collapse, a message and a
-     * like do not, and a like from two different people on two different posts stays two
-     * notifications. Falls back to the kind alone when there is no target.
+     * <p>Only conversation traffic collapses. Kind plus target: two messages from the same
+     * person arrive as one line, a message and a match do not, and two people writing at
+     * once stay two notifications. That is the case collapsing was meant for — a stream of
+     * updates where only the latest matters.
+     *
+     * <p><b>Everything else is sent uncollapsed</b>, because those kinds are single events
+     * rather than a running total, and FCM's collapse rule is "replace the pending one",
+     * not "merge them". A gamer who withdrew a friend request and sent it again produced
+     * two notifications one key apart; with the phone asleep the second replaced the first
+     * at FCM and the recipient was shown a request they had already been shown — which,
+     * once the first was dismissed, is a request that never appeared at all. There is only
+     * ever one live friend request between two people, so there is nothing to collapse and
+     * a whole class of vanishing notifications to avoid.
      */
     private String collapseKey(SendNotificationTokenRequest request) {
-        String kind = request.getKind() == null ? "general" : request.getKind();
+        if (categoryOf(request.getKind()) != NotificationCategory.MESSAGES) {
+            return null;
+        }
+        String kind = request.getKind();
         return request.getTargetId() == null ? kind : kind + ":" + request.getTargetId();
     }
 

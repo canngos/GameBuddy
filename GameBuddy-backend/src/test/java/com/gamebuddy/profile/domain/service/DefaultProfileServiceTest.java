@@ -638,5 +638,31 @@ class DefaultProfileServiceTest {
             assertTrue(other.getWaitingFriends().contains(gamer));
             verify(events).publishEvent(any(NotificationRequestedEvent.class));
         }
+
+        @Test
+        @DisplayName("both asking at once is agreeing, not two requests nobody can answer")
+        void testSendFriendRequest_whenTheyAlreadyAskedYou_BecomesAFriendship() {
+            matched(gamer, other);
+            // They asked first. This used to add a second, crossed request: each profile
+            // screen then showed its own outgoing one, so neither side could reach an
+            // accept button and the friendship both had asked for could not happen.
+            gamer.getWaitingFriends().add(other);
+
+            DefaultMessageResponse response = profileService.sendFriendRequest(gamer, request(other));
+
+            assertEquals("100", response.getStatus().getCode());
+            assertTrue(gamer.getFriends().contains(other));
+            assertTrue(other.getFriends().contains(gamer), "the other side must be linked too");
+            assertFalse(gamer.getWaitingFriends().contains(other), "their request is answered, not left pending");
+            assertFalse(other.getWaitingFriends().contains(gamer), "and no new one is created");
+
+            // They are told it was accepted, which is what happened from where they stand.
+            ArgumentCaptor<NotificationRequestedEvent> captor =
+                    ArgumentCaptor.forClass(NotificationRequestedEvent.class);
+            verify(events, atLeastOnce()).publishEvent(captor.capture());
+            assertTrue(captor.getAllValues().stream()
+                    .anyMatch(e -> "fcm-other".equals(e.fcmToken())
+                            && e.title().equals(com.gamebuddy.common.util.Constants.FRIEND_REQUEST_ACCEPTED_TITLE)));
+        }
     }
 }

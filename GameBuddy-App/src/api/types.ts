@@ -145,6 +145,8 @@ export type SwipeAllowance = {
   unlimited: boolean;
   /** ISO instant, or null when unlimited. */
   resetsAt: string | null;
+  /** Super Likes in hand. Bought, not rationed, so no reset applies to it. */
+  superLikes: number;
 };
 
 /** What GET /billing/subscription reports. The tier is derived, never the stored one. */

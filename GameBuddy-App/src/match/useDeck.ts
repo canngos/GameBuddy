@@ -5,13 +5,22 @@ import { matchApi } from '../api/match';
 import type { Candidate } from '../api/types';
 import { NO_FILTERS, type FeedFilters } from './filters';
 
-export type Decision = 'accept' | 'decline';
+/**
+ * `super` is an accept that spends a Super Like.
+ *
+ * The same swipe to the server — `/match/accept` with one flag set — because it is the
+ * same answer, told louder: the other gamer is notified straight away rather than finding
+ * out if and when they swipe back.
+ */
+export type Decision = 'accept' | 'decline' | 'super';
 
 /** Why the deck is refusing to take another decision. */
 export type Block =
   | { kind: 'accept-limit'; message: string }
   | { kind: 'swipe-limit'; message: string }
-  | { kind: 'subscription'; message: string };
+  | { kind: 'subscription'; message: string }
+  /** No Super Likes left. The way out is the Market, not waiting. */
+  | { kind: 'no-super-likes'; message: string };
 
 /**
  * The swipe deck's state machine.
@@ -70,15 +79,21 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
         await matchApi.decline(candidate.userId);
         return { matched: false, candidate };
       }
-      const result = await matchApi.accept(candidate.userId);
-      return { matched: result.matched, candidate };
+      const result = await matchApi.accept(candidate.userId, decision === 'super');
+      return { matched: result.matched, candidate, decision };
     },
 
-    onSuccess: ({ matched, candidate }) => {
+    onSuccess: ({ matched, candidate, decision }) => {
       if (matched) setMatchedWith(candidate);
       // Accepting spends budget and may open a conversation; both displays are now stale.
       void queryClient.invalidateQueries({ queryKey: ['allowance'] });
       if (matched) void queryClient.invalidateQueries({ queryKey: ['matches'] });
+      // A Super Like is spent from the same balance the Market sells and the inventory
+      // counts, so both of those are now one behind.
+      if (decision === 'super') {
+        void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
+        void queryClient.invalidateQueries({ queryKey: ['me'] });
+      }
     },
 
     onError: (error, variables) => {
@@ -88,6 +103,14 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
       setCursor((c) => Math.max(0, c - 1));
 
       if (error instanceof ApiError) {
+        // The backend spends a Super Like from the consumable balance and refuses with
+        // COIN_NOT_ENOUGH when there is none — the same code a purchase gets. It means
+        // something different here, so it is caught before it reaches the generic error
+        // strip: "not enough coins" would send somebody looking for coins they have.
+        if (variables.decision === 'super' && error.is(Code.COIN_NOT_ENOUGH)) {
+          setBlock({ kind: 'no-super-likes', message: error.message });
+          return;
+        }
         if (error.is(Code.ACCEPT_LIMIT_REACHED)) {
           setBlock({ kind: 'accept-limit', message: error.message });
           return;
