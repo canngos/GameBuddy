@@ -3,6 +3,8 @@ package com.gamebuddy.notif.domain.service.firebase;
 import com.gamebuddy.notif.interfaces.enums.NotificationParameter;
 import com.gamebuddy.notif.interfaces.request.SendNotificationTokenRequest;
 import com.gamebuddy.notif.interfaces.request.SendNotificationTopicRequest;
+import com.gamebuddy.shared.event.NotificationCategory;
+import com.gamebuddy.shared.event.NotificationKind;
 import com.google.firebase.messaging.*;
 import java.time.Duration;
 import java.util.concurrent.ExecutionException;
@@ -53,10 +55,21 @@ public class FCMService {
         // Collapse on the kind and target, so ten messages from one person while the
         // phone is in a pocket arrive as one line rather than ten. Android replaces a
         // pending message with the same key instead of stacking it.
-        message.setAndroidConfig(AndroidConfig.builder()
-                .setPriority(AndroidConfig.Priority.HIGH)
-                .setCollapseKey(collapseKey(tokenRequest))
-                .build());
+        AndroidConfig.Builder android = AndroidConfig.builder()
+                .setPriority(priorityFor(tokenRequest.getKind()))
+                .setCollapseKey(collapseKey(tokenRequest));
+
+        // Which channel it lands on, which on Android 8+ is what decides whether it appears
+        // over whatever the gamer is doing or only in the shade. Unclassifiable kinds are
+        // left unset on purpose: the app's manifest names a default channel, and letting it
+        // decide beats naming a channel that might not exist on an older install.
+        String channelId = channelIdFor(tokenRequest.getKind());
+        if (channelId != null) {
+            android.setNotification(
+                    AndroidNotification.builder().setChannelId(channelId).build());
+        }
+
+        message.setAndroidConfig(android.build());
 
         sendAndGetResponse(message.build());
         log.debug("Notification delivered to a device token");
@@ -78,6 +91,63 @@ public class FCMService {
                 .build();
         sendAndGetResponse(message);
         log.info("Notification broadcast to topic {}", topic);
+    }
+
+    /**
+     * The Android channel a kind belongs on, or null when it cannot be classified.
+     *
+     * <p>The categories are the ones {@link NotificationKind#category()} already defines for
+     * the per-account settings toggles, so the switch a gamer sees in the app and the
+     * channel Android gives them control of describe the same three groups rather than two
+     * different carvings of the same nine kinds.
+     *
+     * <p><strong>These ids are a contract with the client</strong>, which creates the
+     * channels at launch — see {@code src/notifications/channel.ts} in GameBuddy-App. A
+     * channel named here that the device has not created is not shown as we intend; the FCM
+     * SDK falls back to the manifest's default channel. That fallback is why this is safe to
+     * deploy, but the client build should still go out first.
+     *
+     * <p>An unknown or missing kind returns null rather than guessing. A build that adds a
+     * kind and forgets this switch then delivers on the manifest default, which is a quiet
+     * notification rather than a missing one.
+     */
+    private String channelIdFor(String kind) {
+        NotificationCategory category = categoryOf(kind);
+        if (category == null) {
+            return null;
+        }
+        return switch (category) {
+            case MESSAGES -> "messages";
+            case SOCIAL -> "social";
+            case REMINDERS -> "reminders";
+        };
+    }
+
+    /**
+     * How urgently FCM should wake the device.
+     *
+     * <p>HIGH for anything somebody caused — a message, a match, a friend request — because
+     * those are worth delivering now. NORMAL for the "come back" nudge, which may wait for
+     * the device to leave Doze on its own: it is the one notification nobody asked for, and
+     * spending a wakeup on it is how an app earns a battery warning.
+     */
+    private AndroidConfig.Priority priorityFor(String kind) {
+        return categoryOf(kind) == NotificationCategory.REMINDERS
+                ? AndroidConfig.Priority.NORMAL
+                : AndroidConfig.Priority.HIGH;
+    }
+
+    /** The category a kind belongs to, or null when this build does not recognise it. */
+    private NotificationCategory categoryOf(String kind) {
+        if (kind == null) {
+            return null;
+        }
+        try {
+            return NotificationKind.valueOf(kind).category();
+        } catch (IllegalArgumentException unknownKind) {
+            log.warn("No notification category for kind {}; falling back to the app's default channel", kind);
+            return null;
+        }
     }
 
     /**

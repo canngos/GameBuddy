@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
 import { secureStorage } from '../session/storage';
+import { ensureNotificationChannels } from './channel';
 
 /**
  * Whether we have already made our case for notifications.
@@ -48,16 +48,12 @@ export async function markPrimed(): Promise<void> {
  *
  * <p>The channel is created first because Android 13+ will not show anything from an app
  * with no channel, and expo-notifications documents that it must exist before a token is
- * requested.
+ * requested. It is created here <em>and</em> on every launch — see
+ * {@link ensureNotificationChannels} — because permission can also be granted from Android's
+ * own settings, which never runs this function.
  */
 export async function requestSystemPermission(): Promise<boolean> {
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'GameBuddy',
-      importance: Notifications.AndroidImportance.DEFAULT,
-      lightColor: '#FF4D67',
-    });
-  }
+  await ensureNotificationChannels();
   const result = await Notifications.requestPermissionsAsync();
   await markPrimed();
   return result.granted;
