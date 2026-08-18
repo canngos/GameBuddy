@@ -8,6 +8,8 @@ import { billingApi } from '../../src/api/billing';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import { ApiError, Code } from '../../src/api/envelope';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
+import { useUpper } from '../../src/i18n/case';
+import { useT } from '../../src/i18n/useT';
 import { CoinBalance } from '../../src/market/CoinBalance';
 import { CoinShop } from '../../src/market/CoinShop';
 import { ConsumableShelf } from '../../src/market/ConsumableShelf';
@@ -42,6 +44,8 @@ const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill
 export default function Market() {
   const colors = useThemeColors();
   const router = useRouter();
+  const t = useT();
+  const upper = useUpper();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'EARN' | 'SHOP'>('EARN');
   const [kind, setKind] = useState<'FRAME' | 'BANNER'>('FRAME');
@@ -122,10 +126,10 @@ export default function Market() {
       feedback.purchase();
       showToast({
         id: `bought:${id}`,
-        title: bought ? `${bought.name} is yours` : 'Bought',
+        title: bought ? t.market.shop.boughtTitle(bought.name) : t.market.shop.bought,
         // Says where it went, and goes there. Buying no longer puts the thing on, so
         // without this the purchase ends with an item the buyer cannot find.
-        body: 'Put it on from your Inventory.',
+        body: t.market.shop.boughtBody,
         icon: Sparkles,
         tone: 'gold',
         onPress: () => router.push('/inventory'),
@@ -157,8 +161,8 @@ export default function Market() {
     <Screen scroll edges={['top']} scrollRef={scrollRef}>
       <View className="flex-row items-end justify-between pb-5 pt-8">
         <View className="gap-1">
-          <Text variant="overline">MARKET</Text>
-          <Text variant="title">Show off</Text>
+          <Text variant="overline">{upper(t.market.shop.header)}</Text>
+          <Text variant="title">{t.market.shop.title}</Text>
         </View>
         {/* The balance goes in the header rather than beside each price: the one
             question a gamer has on this screen is what they can afford. It counts to its
@@ -182,8 +186,8 @@ export default function Market() {
       <GoldCard />
 
       <View className="flex-row gap-2 pb-6">
-        <Segment label="Earn" active={tab === 'EARN'} onPress={() => setTab('EARN')} />
-        <Segment label="Shop" active={tab === 'SHOP'} onPress={() => setTab('SHOP')} />
+        <Segment label={t.market.shop.earnTab} active={tab === 'EARN'} onPress={() => setTab('EARN')} />
+        <Segment label={t.market.shop.shopTab} active={tab === 'SHOP'} onPress={() => setTab('SHOP')} />
       </View>
 
       {tab === 'EARN' && <EarnCoins />}
@@ -202,14 +206,22 @@ export default function Market() {
           {/* Cosmetics are what everything else is spent on, and the one section that
               keeps working with an empty balance — the free frames are here. */}
           <View className="gap-1 pb-3">
-            <Text variant="overline">FRAMES AND BANNERS</Text>
-            <Text variant="caption">Worn on your profile, and on every card you appear in.</Text>
+            <Text variant="overline">{upper(t.market.shop.framesAndBanners)}</Text>
+            <Text variant="caption">{t.market.shop.framesAndBannersBlurb}</Text>
           </View>
 
           <View className="pb-5">
             <SegmentRow>
-              <Segment label="Frames" active={kind === 'FRAME'} onPress={() => setKind('FRAME')} />
-              <Segment label="Banners" active={kind === 'BANNER'} onPress={() => setKind('BANNER')} />
+              <Segment
+                label={t.market.shop.frames}
+                active={kind === 'FRAME'}
+                onPress={() => setKind('FRAME')}
+              />
+              <Segment
+                label={t.market.shop.banners}
+                active={kind === 'BANNER'}
+                onPress={() => setKind('BANNER')}
+              />
             </SegmentRow>
           </View>
 
@@ -226,9 +238,9 @@ export default function Market() {
 
           {shortOfCoins && (
             <Card className="mb-3">
-              <Text variant="bodyStrong">Not enough coins</Text>
+              <Text variant="bodyStrong">{t.market.shop.notEnoughCoins}</Text>
               <Text variant="caption" className="mt-1">
-                You have {store.data?.coins ?? 0}. Badges earn coins, or you can top up.
+                {t.market.shop.notEnoughCoinsBody(store.data?.coins ?? 0)}
               </Text>
               <Pressable
                 onPress={showCoinPacks}
@@ -236,7 +248,7 @@ export default function Market() {
                 className="mt-3 self-start rounded-full bg-primary/15 px-4 py-2 active:opacity-70"
               >
                 <Text variant="label" className="text-primary">
-                  See coin packs
+                  {t.market.shop.seeCoinPacks}
                 </Text>
               </Pressable>
             </Card>
@@ -265,7 +277,7 @@ export default function Market() {
               className="items-center rounded-card py-3 active:opacity-70"
             >
               <Text variant="label" className="text-primary">
-                Equip what you own in your Inventory
+                {t.market.shop.equipInInventory}
               </Text>
             </Pressable>
 
@@ -309,6 +321,7 @@ const Row = memo(function Row({
   busy: boolean;
   onBuy: (id: string) => void;
 }) {
+  const t = useT();
   const isBanner = item.kind === 'BANNER';
   const press = useCallback(() => onBuy(item.id), [onBuy, item.id]);
 
@@ -331,7 +344,8 @@ const Row = memo(function Row({
    * membership item is stored at price zero and would otherwise read as "Free", which is
    * the one thing it is not.
    */
-  const cost = item.price === 0 ? 'Free' : `${item.price} coins`;
+  const free = item.price === 0;
+  const cost = free ? t.market.shop.free : t.market.shop.coinsPrice(item.price);
 
   /*
    * The price wears the money colour, like every other price in the Market.
@@ -344,7 +358,7 @@ const Row = memo(function Row({
    * "Free" stays muted. Gold means coins here, and a free frame costs none — colouring it
    * like a price would be the same mistake in the other direction.
    */
-  const costClass = cost === 'Free' ? 'text-muted' : 'font-medium text-gold';
+  const costClass = free ? 'text-muted' : 'font-medium text-gold';
 
   return (
     <Card>
@@ -404,13 +418,14 @@ const Row = memo(function Row({
           // that is exactly the argument for keeping it in the label, because it is the
           // one difference between two frames that a screen reader could not otherwise
           // report.
-          accessibilityLabel={
-            item.owned
-              ? `${item.name}${item.animated ? ', animated' : ''}, owned. Equip it from your Inventory.`
+          accessibilityLabel={(() => {
+            const name = `${item.name}${item.animated ? t.market.shop.animatedSuffix : ''}`;
+            return item.owned
+              ? t.market.shop.ownedA11y(name)
               : affordable
-                ? `Buy ${item.name}${item.animated ? ', animated' : ''}, ${item.price} coins`
-                : `${item.name}${item.animated ? ', animated' : ''}, ${item.price} coins, not enough coins`
-          }
+                ? t.market.shop.buyA11y(name, item.price)
+                : t.market.shop.cantAffordA11y(name, item.price);
+          })()}
           // Spelled out for the screen reader as well as greyed for everyone else. A
           // control that is only *visually* disabled is announced as tappable and then
           // does nothing, which is worse than one that was never offered.
@@ -436,7 +451,11 @@ const Row = memo(function Row({
             numberOfLines={1}
             className={item.owned || !affordable ? 'text-muted' : 'text-white'}
           >
-            {item.owned ? 'Owned' : affordable ? 'Buy' : 'Not enough coins'}
+            {item.owned
+              ? t.market.shop.owned
+              : affordable
+                ? t.market.shop.buy
+                : t.market.shop.notEnoughCoins}
           </Text>
         </Pressable>
       </View>
@@ -458,6 +477,7 @@ const Row = memo(function Row({
  */
 function GoldCard() {
   const router = useRouter();
+  const t = useT();
   const subscription = useQuery({
     queryKey: ['subscription'],
     queryFn: billingApi.subscription,
@@ -469,7 +489,9 @@ function GoldCard() {
     <Pressable
       onPress={() => router.push('/gold')}
       accessibilityRole="button"
-      accessibilityLabel={isGold ? 'Your Gold membership' : 'Get GameBuddy Gold'}
+      accessibilityLabel={
+        isGold ? t.market.shop.goldCardMemberA11y : t.market.shop.goldCardGetA11y
+      }
       className="mb-5 active:opacity-80"
     >
       <Card>
@@ -478,11 +500,11 @@ function GoldCard() {
             <Text variant="overline" className="text-gold">
               GAMEBUDDY GOLD
             </Text>
-            <Text variant="heading">{isGold ? 'You are a member' : 'See who likes you'}</Text>
+            <Text variant="heading">
+              {isGold ? t.market.shop.goldCardTitleMember : t.market.shop.goldCardTitle}
+            </Text>
             <Text variant="caption">
-              {isGold
-                ? 'The Gold frame and banner are yours while your membership lasts.'
-                : 'No daily limit, advanced filters, and the Gold frame and banner.'}
+              {isGold ? t.market.shop.goldCardBodyMember : t.market.shop.goldCardBody}
             </Text>
           </View>
           <View className="h-2 w-2 rotate-45 border-r-2 border-t-2 border-muted" />

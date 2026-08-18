@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { openAdPrivacyOptions, useAdConsent } from '../../../src/ads/consent';
 import { authApi } from '../../../src/api/auth';
 import { profileApi } from '../../../src/api/catalogue';
 import { LanguagePicker } from '../../../src/i18n/LanguagePicker';
@@ -39,6 +40,7 @@ export default function Settings() {
   const lang = useLangStore((s) => s.lang);
   const t = useT();
   const upper = useUpper();
+  const adPrivacyRequired = useAdConsent((s) => s.privacyOptionsRequired);
 
   // Built from the catalogue rather than imported as a module constant: a `const` array
   // of labels is evaluated once at import time, long before anybody has chosen a
@@ -149,7 +151,7 @@ export default function Settings() {
             <Pressable
               onPress={() => setPickingLanguage(true)}
               accessibilityRole="button"
-              accessibilityLabel={`Language, currently ${LANG_NAMES[lang]}`}
+              accessibilityLabel={t.language.current(LANG_NAMES[lang])}
               className="flex-row items-center gap-3 px-4 py-3.5 active:opacity-70"
             >
               <Flag lang={lang} size={28} />
@@ -200,6 +202,11 @@ export default function Settings() {
             />
           </RowGroup>
 
+          {/* The advert row is here only where Google says it has to be: UMP reports
+              `privacyOptionsRequirementStatus` as required in the EEA, the UK and some US
+              states, and nowhere else. Showing it everywhere would offer most of the world
+              a form that opens onto nothing. It also moves Privacy off the bottom of the
+              group, hence the computed position rather than a hardcoded "last". */}
           <RowGroup>
             <LinkRow
               label={t.settings.terms}
@@ -211,8 +218,16 @@ export default function Settings() {
               label={t.settings.privacy}
               hint={t.settings.privacyHint}
               onPress={() => void openPrivacy()}
-              position="last"
+              position={adPrivacyRequired ? 'middle' : 'last'}
             />
+            {adPrivacyRequired && (
+              <LinkRow
+                label={t.settings.adPrivacy}
+                hint={t.settings.adPrivacyHint}
+                onPress={() => void openAdPrivacyOptions()}
+                position="last"
+              />
+            )}
           </RowGroup>
 
           <Text variant="caption" className="px-1">

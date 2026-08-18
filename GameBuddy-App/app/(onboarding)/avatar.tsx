@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import { useT } from '../../src/i18n/useT';
 import { useDraft } from '../../src/onboarding/draft';
 import { StepHeader } from '../../src/onboarding/StepHeader';
 import { AvatarPicker } from '../../src/pickers/AvatarPicker';
@@ -16,6 +17,7 @@ import { Button, Screen, Text } from '../../src/ui';
  */
 export default function AvatarStep() {
   const router = useRouter();
+  const t = useT();
   const draft = useDraft();
   const [touched, setTouched] = useState(false);
 
@@ -30,16 +32,16 @@ export default function AvatarStep() {
       scroll
       footer={
         <View className="gap-2">
-          <Button label="Continue" onPress={next} />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+          <Button label={t.common.continue} onPress={next} />
+          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
       <StepHeader
         step={3}
         total={6}
-        title="Pick your look"
-        subtitle="This is what people see first. You can upload a real photo later, from your profile."
+        title={t.onboarding.avatar.title}
+        subtitle={t.onboarding.avatar.subtitle}
       />
 
       <AvatarPicker
@@ -52,7 +54,7 @@ export default function AvatarStep() {
 
       {touched && !draft.avatarId && (
         <Text variant="caption" className="mt-4 text-danger">
-          Pick one to carry on.
+          {t.onboarding.avatar.pickOne}
         </Text>
       )}
     </Screen>

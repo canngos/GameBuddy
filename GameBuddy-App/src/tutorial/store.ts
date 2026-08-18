@@ -7,35 +7,20 @@ const SEEN_KEY = 'gamebuddy.tutorialSeen';
  * The five tabs, in the order the tutorial walks them.
  *
  * The deck first because it is where the app opens and what it is for; settings last
- * because it is the one somebody will find on their own.
+ * because it is the one somebody will find on their own. Structure only: the copy lives
+ * in the dictionary under `tutorial.steps`, keyed by `key`, and is resolved at render —
+ * a module-level array of sentences would be evaluated before a language is chosen.
  */
 export const TUTORIAL_STEPS = [
-  {
-    route: '/home',
-    title: 'Find someone to play with',
-    body: 'Swipe through gamers who play what you play. Right if you want to play together, left if not. When you both swipe right, you match.',
-  },
-  {
-    route: '/messages',
-    title: 'Talk to your matches',
-    body: 'Matching opens a private chat. Nobody can message you unless you both agreed to it, and you can block or report anyone from inside a conversation.',
-  },
-  {
-    route: '/lobby',
-    title: 'Team up in a lobby',
-    body: 'Open lobbies are games looking for players — the game, the time, and the vibe are on the card. Ask to join, and the owner picks the team. Opening your own comes with Gold.',
-  },
-  {
-    route: '/market',
-    title: 'Make your profile yours',
-    body: 'Frames and banners for your profile, plus extra daily likes if you run out. Everything here is optional — the app works without spending anything.',
-  },
-  {
-    route: '/profile',
-    title: 'Your profile, and everything else',
-    body: 'Your games, your keywords, your friends and your badges. Settings live behind the gear, including this tutorial if you want it again.',
-  },
-] as const;
+  { route: '/home', key: 'home' },
+  { route: '/messages', key: 'messages' },
+  { route: '/lobby', key: 'lobby' },
+  { route: '/market', key: 'market' },
+  { route: '/profile', key: 'profile' },
+] as const satisfies readonly {
+  route: string;
+  key: keyof import('../i18n/dictionaries/en').Dictionary['tutorial']['steps'];
+}[];
 
 type TutorialState = {
   /** Which step is showing, or null when the tutorial is not running. */

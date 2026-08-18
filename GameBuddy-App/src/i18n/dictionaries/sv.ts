@@ -2,6 +2,8 @@ import type { Dictionary } from './en';
 
 /** Svenska — Swedish. Typed against `en`, so a missing key is a build error. */
 export const sv: Dictionary = {
+  locale: 'sv',
+
   common: {
     back: 'Tillbaka',
     cancel: 'Avbryt',
@@ -10,8 +12,23 @@ export const sv: Dictionary = {
     close: 'Stäng',
     retry: 'Försök igen',
     continue: 'Fortsätt',
+    next: 'Nästa',
+    finish: 'Slutför',
+    skip: 'Hoppa över',
+    search: 'Sök',
+    send: 'Skicka',
+    edit: 'Redigera',
     done: 'Klar',
     somethingWentWrong: 'Något gick fel. Försök igen.',
+  },
+
+  time: {
+    now: 'nu',
+    minutesShort: (n: number) => `${n} min`,
+    hoursShort: (n: number) => `${n} h`,
+    daysShort: (n: number) => `${n} d`,
+    inPhrase: (phrase: string) => `om ${phrase}`,
+    agoPhrase: (phrase: string) => `för ${phrase} sedan`,
   },
 
   welcome: {
@@ -30,6 +47,7 @@ export const sv: Dictionary = {
   auth: {
     stepOne: 'STEG 1',
     stepTwo: 'STEG 2',
+    emailPlaceholder: 'du@exempel.se',
 
     login: {
       title: 'Välkommen tillbaka',
@@ -43,10 +61,23 @@ export const sv: Dictionary = {
 
     register: {
       title: 'Skapa ditt konto',
+      subtitle: 'Vi mejlar en sexsiffrig kod för att bekräfta adressen.',
       email: 'E-post',
       password: 'Lösenord',
       passwordHint: 'Minst 8 tecken, med en bokstav och en siffra.',
       signInInstead: 'Logga in i stället',
+      consent: [
+        { text: 'Jag bekräftar att jag är ' },
+        { text: '18 år eller äldre', bold: true },
+        { text: ' och godkänner ' },
+        { text: 'användarvillkoren', bold: true, link: 'terms' },
+        { text: ' och ' },
+        { text: 'integritetspolicyn', bold: true, link: 'privacy' },
+        { text: '.' },
+      ],
+      consentA11y: 'Jag är 18 eller äldre och godkänner användarvillkoren och integritetspolicyn',
+      consentRequired: 'Du måste godkänna detta för att skapa ett konto.',
+      emailTaken: 'Den e-postadressen är redan registrerad.',
     },
 
     verify: {
@@ -55,6 +86,71 @@ export const sv: Dictionary = {
       code: 'Verifieringskod',
       submit: 'Verifiera',
       resend: 'Skicka en ny kod',
+      resendCooldown: (s: number) => `Skicka en ny kod (${s}s)`,
+    },
+  },
+
+  onboarding: {
+    stepOf: (step: number, total: number) => `Steg ${step} av ${total}`,
+    moreToGo: (n: number) => `${n} kvar`,
+
+    profile: {
+      title: 'Om dig',
+      subtitle:
+        'GameBuddy är för vuxna. Ditt födelsedatum bekräftar att du är 18 eller äldre — det visas aldrig för någon.',
+      ageHint: (n: number) => `Du måste vara ${n} eller äldre.`,
+      countryRequired: 'Välj ditt land',
+      gender: 'Kön',
+      genderMan: 'Man',
+      genderWoman: 'Kvinna',
+      genderOther: 'Annat',
+      genderNone: 'Vill inte säga',
+    },
+
+    username: {
+      title: 'Välj ett användarnamn',
+      subtitle: 'Det är vad andra spelare ser. Du kan ändra det senare.',
+      label: 'Användarnamn',
+      taken: 'Det användarnamnet är upptaget. Prova ett annat.',
+      hint: 'Bokstäver, siffror och understreck.',
+      placeholder: 'headshot_hjalte',
+    },
+
+    avatar: {
+      title: 'Välj din look',
+      subtitle:
+        'Det här är det första folk ser. Du kan ladda upp ett riktigt foto senare, från din profil.',
+      pickOne: 'Välj en för att fortsätta.',
+    },
+
+    games: {
+      title: 'Vad spelar du?',
+      subtitle: (n: number) => `Välj minst ${n}. Det mesta av rekommendationerna bygger på detta.`,
+      searchPlaceholder: 'Sök spel',
+    },
+
+    platforms: {
+      title: 'Vad spelar du på?',
+      subtitle: 'Välj allt du använder. Andra spelare filtrerar på detta, så fler är bättre än färre.',
+    },
+
+    keywords: {
+      title: 'Hur spelar du?',
+      subtitle: (n: number) => `Välj minst ${n}. Det är vanorna och stämningarna vi matchar på.`,
+    },
+
+    birthDate: {
+      day: 'Dag',
+      month: 'Månad',
+      year: 'År',
+    },
+
+    country: {
+      label: 'Land',
+      choose: 'Välj ett land',
+      currentA11y: (name: string) => `Land: ${name}`,
+      title: 'Var är du?',
+      noMatch: (query: string) => `Inget land matchar ”${query}”.`,
     },
   },
 
@@ -64,6 +160,479 @@ export const sv: Dictionary = {
     messages: 'Meddelanden',
     market: 'Butik',
     profile: 'Profil',
+  },
+
+  lobby: {
+    tones: {
+      competitive: 'Tävling',
+      chill: 'Chill',
+      casual: 'Avslappnat',
+      learning: 'Lärande',
+    },
+
+    card: {
+      plays: (when: string) => `Startar ${when}`,
+      unknownGame: 'Okänt spel',
+      byOwner: (name: string) => `av ${name}`,
+      unknownOwner: 'någon',
+      seatsFull: (seats: string) => `${seats} fullt`,
+      seatsPlayers: (seats: string) => `${seats} spelare`,
+      requested: 'Förfrågan skickad',
+      statusLocked: 'Laget låst',
+      statusEnded: 'Spelad',
+      statusCancelled: 'Inställd',
+    },
+
+    list: {
+      title: 'Hitta ditt lag',
+      open: 'Öppna en lobby',
+      ownsLive: 'Du har en öppen lobby. Avsluta eller ställ in den för att öppna en ny.',
+      yourLobby: 'Din lobby',
+      yourLobbies: 'Dina lobbys',
+      openLobbies: 'Öppna lobbys',
+      soon: 'Nu',
+      soonA11y: 'Startar inom 15 minuter',
+      emptySoonTitle: 'Inget startar just nu',
+      emptySoonBlurb:
+        'Inget drar igång de närmaste 15 minuterna. Stäng av Nu för att se vad som är planerat senare.',
+      emptyToneTitle: 'Inget med den stämningen',
+      emptyToneBlurb: 'Inget med den stämningen just nu. Prova ett annat filter, eller öppna en egen.',
+      emptyTitle: 'Inga öppna lobbys just nu',
+      emptyBlurb: 'Öppna en, sätt en tid och välj vilka som får vara med.',
+    },
+
+    detail: {
+      fallbackTitle: 'Lobby',
+      gone: 'Den här lobbyn finns inte längre.',
+      wantsToJoin: 'Vill gå med',
+      team: (taken: number, total: number) => `Lag · ${taken}/${total}`,
+      accept: 'Acceptera',
+      pass: 'Avböj',
+      chat: 'Lobbychatt',
+      chatReadOnly: 'Lobbychatt · skrivskyddad',
+      emptyChatTitle: 'Inget sagt än',
+      emptyChatBlurb: 'Red ut detaljerna med ditt lag här.',
+      composerPlaceholder: 'Meddelande till laget',
+      playsBy: (when: string, owner: string) => `Startar ${when} · av ${owner}`,
+      requirements: 'Krav',
+      statusLocked: 'Laget låst — tar inte emot förfrågningar',
+      statusEnded: 'Spelad och stängd',
+      statusCancelled: 'Inställd',
+      statusArchived: 'Arkiverad',
+      lockTeam: 'Lås laget',
+      cancelLobby: 'Ställ in lobbyn',
+      unlock: 'Lås upp',
+      endLobby: 'Avsluta lobbyn',
+      leaveLobby: 'Lämna lobbyn',
+      requestSent: 'Förfrågan skickad. Vi säger till när ägaren svarar.',
+      withdraw: 'Dra tillbaka förfrågan',
+      rejected: 'Ägaren fyllde den här med någon annan.',
+      askToJoin: 'Be att få gå med',
+      full: 'Den här lobbyn är full.',
+      owner: 'Lobbyägare',
+      unknownGamer: 'Okänd spelare',
+    },
+
+    create: {
+      title: 'Öppna en lobby',
+      goldTitle: 'Att öppna en lobby ingår i Gold',
+      goldBlurb: 'Att bläddra bland lobbys och be att få gå med är alltid gratis.',
+      getGold: 'Skaffa Gold',
+      game: 'Spel',
+      change: 'Byt',
+      searchGame: 'Sök efter spelet',
+      titlePlaceholder: 'Titel',
+      descriptionPlaceholder: 'Vad är planen? (valfritt)',
+      requirementsPlaceholder: 'Krav — mick, rank, röstchatt i spelet (valfritt)',
+      approveHint: 'Berätta vad du söker. Du godkänner varje förfrågan själv.',
+      tone: 'Stämning',
+      players: 'Spelare (inklusive dig)',
+      when: 'När',
+      presetNow: 'Nu',
+      presetIn1h: 'Om 1 timme',
+      presetIn3h: 'Om 3 timmar',
+      pickATime: 'Välj en tid',
+      hour: 'Timme',
+      minute: 'Minut',
+      tooFar: 'Lobbys kan planeras upp till två veckor framåt.',
+      playsAt: (stamp: string) => `Startar ${stamp}.`,
+      use24h: 'Använd 24-timmarsklocka.',
+      zoneHint: (zone: string) => `Satt i din tidszon (${zone}). Alla ser den i sin egen.`,
+      zoneHintNoZone: 'Alla ser den här tiden i sin egen tidszon.',
+      submit: 'Öppna lobbyn',
+    },
+  },
+
+  deck: {
+    header: {
+      discover: 'Upptäck',
+      title: 'Vilka spelar',
+      likesLeft: 'likes kvar',
+      filter: 'Filtrera',
+      filtersA11y: 'Filter',
+      filtersOnA11y: (n: number) => `Filter, ${n} på`,
+      loading: 'Letar efter folk som spelar det du spelar…',
+    },
+
+    card: {
+      tapForProfile: 'Tryck för hela profilen',
+      plays: 'Spelar',
+      playsOn: 'Spelar på',
+      style: 'Stil',
+      inCommon: (n: number) => `${n} gemensamma`,
+      playsOnA11y: (list: string) => `Spelar på ${list}`,
+    },
+
+    actions: {
+      pass: 'Passa',
+      passHint: 'Hoppa över den här spelaren',
+      match: 'Matcha',
+      matchHint: 'Säg ja till den här spelaren',
+      undo: 'Ångra senaste svepet',
+      undoCost: (cost: number) => `Ångra senaste svepet, ${cost} mynt`,
+    },
+
+    boost: {
+      free: 'Gratis',
+      activeA11y: (remaining: string) => `Boost aktiv, ${remaining} kvar`,
+      freeA11y: 'Använd din gratis veckoboost',
+      costA11y: (cost: number) => `Boost för ${cost} mynt`,
+    },
+
+    match: {
+      title: 'Det är en match!',
+      body: (name: string) => `Du och ${name} sa båda ja.`,
+      message: 'Skicka ett meddelande',
+      keep: 'Fortsätt svepa',
+      someone: 'Någon',
+    },
+
+    limit: {
+      likesTitle: 'Det var dagens likes',
+      likesBody: 'Du kan fortsätta titta och passa. Gold lyfter taket.',
+      swipesTitle: 'Det var dagens svep',
+      swipesBody: 'Kortleken kommer tillbaka i morgon. Gold tar bort dagsgränsen.',
+      goldTitle: 'GameBuddy Gold',
+      goldBody: 'Det här ingår i Gold.',
+      swipesLeft: 'Svep kvar',
+      likesLeft: 'Likes kvar',
+      getGold: 'Skaffa Gold — ingen dagsgräns',
+      keepLooking: 'Fortsätt titta',
+    },
+
+    filters: {
+      title: 'Filter',
+      subtitle: 'Smalna av kortleken till dem du faktiskt vill spela med.',
+      subtitleLocked: 'Ingår i Gold. Ta en titt på vad det gör.',
+      game: 'Spel',
+      gameHint: 'Bara folk som spelar det här.',
+      gameHintEmpty: 'Lägg till spel i din profil för att filtrera på dem.',
+      anyGame: 'Alla spel',
+      region: 'Region',
+      regionHint: 'Samma tidszon, samma servrar, samma kväll.',
+      regionHintEmpty: 'Ange ditt land i din profil för att filtrera på det.',
+      onlyIn: (country: string) => `Bara spelare i ${country}`,
+      onlyNearMe: 'Bara spelare nära mig',
+      platform: 'Plattform',
+      platformHint: 'De du faktiskt får in i en lobby.',
+      anyPlatform: 'Alla plattformar',
+      availability: 'Tillgänglighet',
+      availabilityHint: 'Aktiva de senaste 15 minuterna.',
+      onlineNow: 'Online nu',
+      showFilters: (n: number) => (n === 1 ? 'Visa med 1 filter' : `Visa med ${n} filter`),
+      showEveryone: 'Visa alla',
+      clearFilters: 'Rensa filter',
+      unlock: 'Lås upp filter med Gold',
+      notNow: 'Inte nu',
+    },
+
+    locked: {
+      title: 'Filter ingår i Gold',
+      blurb: 'Smalna av kortleken till ett spel, din region eller folk som är online just nu.',
+      getGold: 'Skaffa Gold',
+      showEveryone: 'Visa alla i stället',
+    },
+
+    exhausted: {
+      filteredTitle: 'Det var alla som matchar dina filter',
+      title: 'Det var alla för nu',
+      filteredBlurb: 'Bredare filter tar tillbaka fler i kortleken.',
+      blurb: 'Nya spelare ansluter hela tiden, och de du passade dyker upp igen efter ett tag.',
+      lookAgain: 'Titta igen',
+    },
+  },
+
+  billing: {
+    promptTitle: 'Det funkar',
+    promptBody: 'Du har matchat med någon. Gold är för när du vill ha mer av det.',
+    benefitNoLimit: 'Ingen daglig like-gräns',
+    benefitSeeLikes: 'Se alla som gillat dig',
+    benefitFilters: 'Filtrera kortleken på spel, region och vem som är online',
+    seeGold: 'Se Gold',
+    notNow: 'Inte nu',
+    coinsAdded: 'Mynt tillagda',
+    coinsAddedBody: 'De finns i ditt saldo nu.',
+    goldYours: 'Gold är ditt',
+    goldYoursBody: 'Ingen dagsgräns, avancerade filter och Gold-ramen.',
+    storeUnavailable: 'Köp är inte tillgängliga i den här versionen än.',
+    storeNotInBuild:
+      'Den här versionen kan inte göra köp. Den installerades innan köp i appen lades till.',
+    storePlanMissing: 'Det abonnemanget är inte tillgängligt just nu.',
+  },
+
+  market: {
+    shop: {
+      header: 'Butik',
+      title: 'Visa upp dig',
+      earnTab: 'Tjäna',
+      shopTab: 'Köp',
+      framesAndBanners: 'Ramar och banners',
+      framesAndBannersBlurb: 'Bärs på din profil och på varje kort där du syns.',
+      frames: 'Ramar',
+      banners: 'Banners',
+      notEnoughCoins: 'Inte tillräckligt med mynt',
+      notEnoughCoinsBody: (n: number) =>
+        `Du har ${n}. Utmärkelser ger mynt, eller så kan du fylla på.`,
+      seeCoinPacks: 'Se myntpaket',
+      equipInInventory: 'Ta på det du äger i ditt Förråd',
+      boughtTitle: (name: string) => `${name} är ditt`,
+      bought: 'Köpt',
+      boughtBody: 'Ta på det från ditt Förråd.',
+      owned: 'Ägd',
+      buy: 'Köp',
+      free: 'Gratis',
+      coinsPrice: (n: number) => `${n} mynt`,
+      animatedSuffix: ', animerad',
+      ownedA11y: (name: string) => `${name}, ägd. Ta på den från ditt Förråd.`,
+      buyA11y: (name: string, price: number) => `Köp ${name}, ${price} mynt`,
+      cantAffordA11y: (name: string, price: number) =>
+        `${name}, ${price} mynt, inte tillräckligt med mynt`,
+      goldCardMemberA11y: 'Ditt Gold-medlemskap',
+      goldCardGetA11y: 'Skaffa GameBuddy Gold',
+      goldCardTitleMember: 'Du är medlem',
+      goldCardTitle: 'Se vem som gillar dig',
+      goldCardBodyMember: 'Gold-ramen och bannern är dina så länge medlemskapet varar.',
+      goldCardBody: 'Ingen dagsgräns, avancerade filter samt Gold-ramen och bannern.',
+    },
+
+    earn: {
+      header: 'Tjäna',
+      blurb: 'Mynten kommer tillbaka varje dag. Inget här kostar pengar.',
+      earnedTitle: (n: number) => `+${n} mynt`,
+      earnedBody: 'Lägg dem på ramar, banners eller likes.',
+      watchedBody: 'Tack för att du tittade.',
+      consentTitle: 'Videor kräver annonssamtycke',
+      consentBody: 'Ändra det i Inställningar → Annonsintegritet.',
+      watchVideo: 'Titta på en kort video',
+      videosLeft: (n: number) => `${n} kvar i dag`,
+      videosDone: 'Det var dagens videor — åter i morgon',
+      stipendTitle: 'Golds månadsbonus',
+      stipendReady: 'Din den här månaden',
+      stipendBack: (when: string) => `Åter ${when}`,
+      questDone: 'Klart den här veckan',
+      questProgress: (progress: number, target: number) => `${progress} av ${target}`,
+      claimA11y: (reward: number, title: string) => `Hämta ${reward} mynt: ${title}`,
+      rowA11y: (title: string, detail: string) => `${title}, ${detail}`,
+      claim: 'Hämta',
+      soon: 'snart',
+      inAMoment: 'om en stund',
+      inMinutes: (n: number) => `om ${n} min`,
+      inHours: (n: number) => `om ${n} h`,
+      inDays: (n: number) => `om ${n} d`,
+      streakHeader: 'Daglig svit',
+      day: (n: number) => `Dag ${n}`,
+      notStarted: 'Inte påbörjad',
+      claimCoins: (n: number) => `Hämta ${n} mynt`,
+      nextDay: (day: number, readyIn: string, weekTotal: number) =>
+        `Dag ${day} låses upp ${readyIn} — en hel vecka ger ${weekTotal} mynt.`,
+      back: (readyIn: string) => `Åter ${readyIn}.`,
+    },
+
+    consumables: {
+      header: 'Använd dina mynt',
+      blurb: 'Förbrukas när du använder dem, ägs inte för alltid.',
+      superLike: 'Super-like',
+      superLikeDetail: 'Personen får veta det direkt, och det sticker ut.',
+      extraLikes: '5 likes till i dag',
+      extraLikesDetail: 'Utöver ditt dagliga tak. Bara i dag.',
+      itemA11y: (title: string, cost: number) => `${title}, ${cost} mynt`,
+      addedTitle: (title: string) => `${title} tillagd`,
+      added: 'Tillagd',
+      addedBody: 'Använd den från kortleken.',
+      goldHint: 'Köper du ofta likes? Gold tar bort gränsen',
+    },
+
+    coins: {
+      header: 'Mynt',
+      blurbBuy:
+        'Fyll på nu, eller tjäna dem gratis under Tjäna — daglig svit, uppdrag och utmärkelser.',
+      blurbNoBuy:
+        'Tjäna dem under Tjäna: daglig svit, uppdrag och utmärkelser. Köp är inte tillgängligt i den här versionen än.',
+      packCoins: (n: string) => `${n} mynt`,
+      takesYouTo: (n: string) => `Tar dig till ${n}`,
+      packA11y: (coins: number, price: string) => `Köp ${coins} mynt för ${price}`,
+      onTheWay: 'Dina mynt är på väg',
+      onTheWayBody: 'De kan dröja en stund. Du behöver inte köpa igen.',
+    },
+
+    season: {
+      header: 'Säsongspass',
+      coming: 'Kommer snart',
+      blurb: 'Nya belöningar varje säsong.',
+      a11y: 'Säsongspass. Kommer snart — nya belöningar varje säsong.',
+    },
+
+    gold: {
+      done: 'Klar',
+      continuePrice: (price: string) => `Fortsätt — ${price}`,
+      unavailable: 'Köp inte tillgängliga än',
+      notNow: 'Inte nu',
+      heroThanks: 'Tack för att du stöttar GameBuddy.',
+      heroPitch: 'Hela appen, utan något i vägen.',
+      benefitLikesTitle: 'Se vem som gillat dig',
+      benefitLikesBody: 'Varje ansikte, inte bara siffran.',
+      benefitLimitTitle: 'Ingen dagsgräns',
+      benefitLimitBody: 'Svep och gilla så mycket du vill.',
+      benefitFiltersTitle: 'Avancerade filter',
+      benefitFiltersBody: 'Smalna av kortleken efter spel, region och vem som är online nu.',
+      choosePlan: 'Välj ett abonnemang',
+      planWeekly: 'Varje vecka',
+      planMonthly: 'Varje månad',
+      planYearly: 'Varje år',
+      periodWeek: '1 vecka',
+      periodMonth: '1 månad',
+      periodYear: '12 månader',
+      noteTrial: '3 dagars gratis provperiod',
+      noteYearly: 'Spara 58 %',
+      billedEvery: (period: string) => `Faktureras varje ${period}`,
+      purchasePending: 'Ditt köp är på väg',
+      purchasePendingBody:
+        'Det kan dröja en stund. Gold slås på av sig självt — du behöver inte köpa igen.',
+      cancelNote:
+        'Avsluta när du vill från ditt butikskonto. Ett abonnemang förnyas tills du avslutar det.',
+      member: 'Du är medlem',
+      runsUntil: (date: string) => `Ditt medlemskap gäller till ${date}.`,
+      active: 'Ditt medlemskap är aktivt.',
+      wearBelow: 'Gold-ramen och bannern är dina — ta på dem nedan.',
+      yoursToWear: 'Att bära',
+      membersOnly: 'Bara för medlemmar',
+      withGold: 'Med Gold',
+      worn: 'På',
+      equip: 'Ta på',
+      equipA11y: (name: string) => `Ta på ${name}`,
+      banner: 'Banner',
+      frame: 'Ram',
+    },
+
+    inventory: {
+      title: 'Förråd',
+      subtitle: 'Vad du äger, och vad du har på dig',
+      noFramesYet: 'Inga ramar än',
+      noBannersYet: 'Inga banners än',
+      emptyBlurbFrames:
+        'Allt du köper i Butiken hamnar här. Gratisramarna är redan dina.',
+      emptyBlurbBanners: 'Allt du köper i Butiken hamnar här. Gratisbanners är redan dina.',
+      goToMarket: 'Gå till Butiken',
+      takeOffFrame: 'Ta av min ram',
+      takeOffBanner: 'Ta av min banner',
+    },
+
+    badges: {
+      title: 'Utmärkelser',
+      subtitle: 'Klara uppdrag, hämta mynt, visa upp tre',
+      showcaseFull: (slots: number) => `Du kan visa ${slots} utmärkelser. Ta av en först.`,
+      earned: 'Upplåst',
+      tileA11y: (title: string, status: string) => `${title}. ${status}`,
+      progressOf: (value: number, target: number) => `${value} av ${target}`,
+      claimCoins: (n: number) => `Hämta ${n} mynt`,
+      removeFromProfile: 'Ta bort från profilen',
+      showOnProfile: 'Visa på profilen',
+    },
+  },
+
+  messages: {
+    header: 'Meddelanden',
+    title: 'Dina konversationer',
+    friends: 'Vänner',
+    matches: 'Matchningar',
+    friendsEmpty: 'Ingen än. Du kan lägga till någon som vän när ni har matchat.',
+    matchesEmpty: 'Inga matchningar än. Svep på Hem-fliken för att hitta någon.',
+    sectionA11y: (title: string, count: number) => `${title}, ${count}`,
+    conversationWith: (name: string) => `Konversation med ${name}`,
+    startConversationWith: (name: string) => `Starta en konversation med ${name}`,
+    noMessagesYet: 'Inga meddelanden än',
+    sayFirst: 'Säg något först',
+    emptyBlurb: 'Ni matchade — någon måste börja.',
+    conversation: 'Konversation',
+    viewProfileA11y: (name: string) => `Visa ${name}s profil`,
+    thisGamer: 'den här spelaren',
+    alreadyFriends: 'Redan vänner',
+    acceptRequest: 'Acceptera vänförfrågan',
+    requestSent: 'Vänförfrågan skickad',
+    sendRequest: 'Skicka en vänförfrågan',
+    reported: 'Anmält. En moderator tittar på det.',
+    placeholder: 'Meddelande',
+    connecting: 'Ansluter…',
+    reconnecting: 'Återansluter…',
+    offline: 'Offline',
+    typing: 'skriver…',
+    online: 'Online',
+    lastSeen: (when: string) => `Senast sedd ${when}`,
+    justNow: 'nyss',
+    minutesAgo: (n: number) => `${n} min sedan`,
+    hoursAgo: (n: number) => `${n} h sedan`,
+    aWhileAgo: 'för ett tag sedan',
+    reportHint: 'Håll intryckt för att anmäla det här meddelandet',
+  },
+
+  profile: {
+    header: 'Du',
+    title: 'Profil',
+    inventoryA11y: 'Förråd',
+    settingsA11y: 'Inställningar',
+    badgesA11y: 'Utmärkelser',
+    goldMemberA11y: 'GameBuddy Gold-medlem',
+    friends: 'Vänner',
+    coins: 'Mynt',
+    badges: 'Utmärkelser',
+    noShowcase: 'Inga utmärkelser visas än — tryck för att välja',
+    games: 'Spel',
+    playsOn: 'Spelar på',
+    keywords: 'Nyckelord',
+    friendRequests: (n: number) => `Vänförfrågningar · ${n}`,
+    accept: 'Acceptera',
+    no: 'Nej',
+
+    friendsTitle: 'Vänner',
+    noFriendsTitle: 'Inga vänner än',
+    noFriendsBody: 'Du kan lägga till någon som vän när ni har matchat.',
+    removeConfirmTitle: (name: string) => `Ta bort ${name}?`,
+    removeConfirmBody:
+      'Ni blir en matchning igen — ni kan fortfarande skriva till varandra, och vem som helst av er kan skicka en ny vänförfrågan.',
+    thisGamer: 'den här spelaren',
+
+    fallbackTitle: 'Profil',
+    actions: 'Åtgärder',
+    reported: 'Anmält. En moderator tittar på det.',
+    removeFriend: 'Ta bort vän',
+    reportProfile: 'Anmäl profil',
+    block: 'Blockera',
+    blockConfirmTitle: (name: string) => `Blockera ${name}?`,
+    blockConfirmBody:
+      'Ni ser inte varandra någonstans i appen, och ingen av er kan skriva till den andra. Du kan ångra det i Inställningar.',
+
+    admirersTitle: 'Vem som gillat dig',
+    peopleLikeYou: (n: number) => (n === 1 ? 'person gillar dig' : 'personer gillar dig'),
+    upgradeToSee: ' — uppgradera för att se vilka',
+    admirersEmptyTitle: 'Ingen än',
+    admirersEmptyBody:
+      'När någon gillar dig dyker de upp här, oavsett om du gillat dem tillbaka.',
+    revealing: 'Avslöjar…',
+    revealOne: (cost: number) => `Avslöja en för ${cost} mynt`,
+    orGold: 'Eller skaffa Gold: varje ansikte, och ingen daglig like-gräns.',
+    seeWhoLikesYou: 'Se vem som gillar dig',
+    likedYouBadge: 'gillade dig',
+    likedYouBadgeA11y: (n: number) => `${n} personer gillade dig`,
   },
 
   settings: {
@@ -97,10 +666,107 @@ export const sv: Dictionary = {
     termsHint: 'Inklusive reglerna för innehåll och uppförande',
     privacy: 'Integritetspolicy',
     privacyHint: 'Vad vi samlar in och vad vi gör med det',
+    adPrivacy: 'Annonsintegritet',
+    adPrivacyHint: 'Ändra vad annonser får använda om dig',
     password: 'Lösenord',
     passwordHint: 'Loggar ut dig överallt',
     blocked: 'Blockerade',
     blockedHint: 'Vilka du har blockerat',
+    gamesScreen: {
+      title: 'Spel du spelar',
+      subtitle: (n: number) => `Minst ${n}. Ändrar du dessa ändras vem du visas för.`,
+    },
+    notificationsScreen: {
+      title: 'Aviseringar',
+      offTitle: 'Aviseringar är avstängda för GameBuddy',
+      offBody:
+        'Android blockerar dem, så inget nedan når dig förrän de slås på igen.',
+      turnOn: 'Slå på aviseringar',
+      openSystem: 'Öppna systeminställningar',
+      whatToSend: 'Vad vi skickar',
+      messagesTitle: 'Meddelanden',
+      messagesBody: 'När någon du matchat med skickar ett meddelande.',
+      socialTitle: 'Matchningar och vänner',
+      socialBody: 'Nya matchningar, vänförfrågningar och svar, lobbyaktivitet, utmärkelser du får.',
+      remindersTitle: 'Påminnelser',
+      remindersBody: 'En knuff då och då när du varit borta och något väntar.',
+      quietNote:
+        'Att stänga av allt här håller appen tyst utan att stänga av dess aviseringar helt — det du slår på igen senare fungerar direkt.',
+      onThisPhone: 'På den här telefonen',
+      soundsTitle: 'Ljud',
+      soundsBody: 'En kort signal när något händer i appen — en matchning, ett köp, ett meddelande.',
+      vibrationTitle: 'Vibration',
+      vibrationBody: 'Ett kort surr vid ett svep, en matchning eller ett köp.',
+      cuesNote:
+        'Signaler spelas aldrig över ljudlöst läge, och de avbryter aldrig musik du redan lyssnar på.',
+    },
+
+    avatarScreen: {
+      title: 'Din avatar',
+      subtitle: 'Ladda upp ett foto, eller välj ett av våra.',
+      saveLabel: 'Använd den här avataren',
+      yourPhoto: 'Ditt eget foto',
+      takePhoto: 'Ta ett foto',
+      fromPhotos: 'Välj bland foton',
+      fromFiles: 'Välj en fil',
+      uploading: 'Laddar upp och kontrollerar…',
+      privacyNote:
+        'Ditt foto kontrolleras innan någon annan kan se det, och platsdata tas bort automatiskt.',
+      orOurs: 'Eller välj ett av våra',
+      cameraDenied:
+        'GameBuddy kan inte öppna kameran utan tillåtelse. Du kan ge den i telefonens inställningar, välja ett befintligt foto, eller ta ett av våra nedan.',
+      photosDenied:
+        'GameBuddy kan inte öppna dina foton utan tillåtelse. Du kan ge den i telefonens inställningar, ta ett foto i stället, eller välja ett av våra nedan.',
+      tooLarge: (sizeMb: string, limitMb: number) =>
+        `Den filen är ${sizeMb}MB och gränsen är ${limitMb}MB. Allt från din kamerarulle ligger långt under.`,
+      approvedTitle: 'Det är din avatar nu',
+      approvedBody: 'Alla kan se den.',
+      pendingTitle: 'Väntar på kontroll',
+      pendingBody:
+        'Någon tittar på det inom kort. Tills dess är du den enda som ser det — alla andra ser fortfarande din gamla avatar.',
+      rejectedTitle: 'Det fotot godkändes inte',
+      rejectedBody:
+        'Det verkar bryta mot reglerna om sexuellt innehåll. Ingen annan har sett det. Prova ett annat foto, eller välj ett av våra.',
+    },
+
+    age: {
+      title: 'Födelsedatum',
+      subtitle:
+        'Används för att bekräfta att du är gammal nog att vara här. Andra ser din ålder, aldrig datumet.',
+      recordedNote: (min: number) =>
+        `Ändringar av födelsedatum registreras. GameBuddy är bara för vuxna, och ett datum som gör dig yngre än ${min} avvisas.`,
+    },
+
+    keywordsScreen: {
+      title: 'Hur du spelar',
+      subtitle: (n: number) => `Minst ${n}. Det är vanorna och stämningarna vi matchar på.`,
+    },
+
+    platformsScreen: {
+      title: 'Vad du spelar på',
+      subtitle: 'Välj allt du använder. Andra spelare filtrerar på detta, så fler är bättre än färre.',
+    },
+
+    passwordScreen: {
+      title: 'Byt lösenord',
+      subtitle: 'Det loggar ut dig på alla enheter, inklusive den här.',
+      changedTitle: 'Lösenordet är bytt',
+      signedOutTitle: 'Du har loggats ut överallt',
+      signedOutBody:
+        'Att byta lösenord avslutar varje session, på den här enheten och alla andra. Det är avsiktligt — hade någon annan ditt gamla lösenord är den personen också ute.',
+      signInAgain: 'Logga in igen',
+      current: 'Nuvarande lösenord',
+      next: 'Nytt lösenord',
+      wrongCurrent: 'Det är inte ditt nuvarande lösenord.',
+      sameAsOld: 'Välj något annat än det gamla.',
+    },
+
+    blockedScreen: {
+      body: 'Blockering gäller åt båda hållen och täcker allt: ni visas inte för varandra någonstans, och ingen av er kan skriva till den andra.',
+      emptyTitle: 'Ingen är blockerad',
+      emptyBody: 'Du kan blockera någon från deras profil om du behöver.',
+      unblock: 'Avblockera',
+    },
     signOut: 'Logga ut',
     deleteAccount: 'Radera mitt konto',
     deleteTitle: 'Detta går inte att ångra',
@@ -161,8 +827,89 @@ export const sv: Dictionary = {
     },
   },
 
+  validation: {
+    emailEmpty: 'Ange din e-postadress',
+    emailInvalid: 'Det ser inte ut som en e-postadress',
+    passwordEmpty: 'Ange ett lösenord',
+    atLeastChars: (n: number) => `Minst ${n} tecken`,
+    atMostChars: (n: number) => `Högst ${n} tecken`,
+    letterAndNumber: 'Ta med minst en bokstav och en siffra',
+    usernameEmpty: 'Välj ett användarnamn',
+    usernameCharset: 'Bara bokstäver, siffror och understreck',
+    usernameLetterOrNumber: 'Ta med minst en bokstav eller siffra',
+    usernameUnavailable: 'Användarnamnet är inte tillgängligt',
+    birthDateEmpty: 'Ange ditt födelsedatum',
+    notARealDate: 'Det datumet finns inte',
+    dateInFuture: 'Datumet ligger i framtiden',
+    mustBeAge: (n: number) => `Du måste vara ${n} eller äldre för att använda GameBuddy`,
+    checkYear: 'Kontrollera årtalet',
+    sixDigitCode: 'Ange den 6-siffriga koden',
+  },
+
+  pickers: {
+    noMatchesQueryFiltered: (query: string) => `Inget matchar ”${query}” med de här filtren.`,
+    noMatchesFiltered: 'Inget matchar de här filtren.',
+    noMatchesQuery: (query: string) => `Inget matchar ”${query}”.`,
+    clearFilters: (n: number) => (n === 1 ? 'Rensa 1 filter' : `Rensa ${n} filter`),
+    clearFiltersA11y: 'Rensa alla filter',
+    filterPlatform: 'Plattform',
+    filterGenre: 'Genre',
+    filterOther: 'Övrigt',
+    avatarN: (n: number) => `Avatar ${n}`,
+  },
+
+  notifications: {
+    header: 'Aviseringar',
+    primerTitle: 'Missa inte det bästa',
+    primerBody:
+      'GameBuddy är andra människor. Det mesta som händer här händer medan appen är stängd.',
+    reasonMatchTitle: 'När du matchar',
+    reasonMatchBody: 'Ni sa båda ja — det är då en konversation kan börja.',
+    reasonMessageTitle: 'När någon skriver till dig',
+    reasonMessageBody: 'Så att ett svar inte väntar tills du råkar öppna appen nästa gång.',
+    reasonLobbyTitle: 'När någon vill in i din lobby',
+    reasonLobbyBody: 'Och när ägaren av en släpper in dig.',
+    turnOn: 'Slå på aviseringar',
+    notNow: 'Inte nu',
+    changeLater: 'Du kan ändra det när som helst i Inställningar och välja vilka slag du vill ha.',
+  },
+
+  tutorial: {
+    steps: {
+      home: {
+        title: 'Hitta någon att spela med',
+        body: 'Svep bland spelare som spelar det du spelar. Höger om du vill spela ihop, vänster om inte. När ni båda sveper höger matchar ni.',
+      },
+      messages: {
+        title: 'Prata med dina matchningar',
+        body: 'En matchning öppnar en privat chatt. Ingen kan skriva till dig utan att ni båda gått med på det, och du kan blockera eller anmäla vem som helst inifrån en konversation.',
+      },
+      lobby: {
+        title: 'Bilda lag i en lobby',
+        body: 'Öppna lobbys är matcher som söker spelare — spelet, tiden och stämningen står på kortet. Be att få gå med, så väljer ägaren laget. Att öppna en egen ingår i Gold.',
+      },
+      market: {
+        title: 'Gör profilen till din',
+        body: 'Ramar och banners till din profil, plus extra dagliga likes om de tar slut. Allt här är frivilligt — appen funkar utan att du spenderar något.',
+      },
+      profile: {
+        title: 'Din profil, och allt annat',
+        body: 'Dina spel, dina nyckelord, dina vänner och dina utmärkelser. Inställningarna finns bakom kugghjulet, inklusive den här guiden om du vill se den igen.',
+      },
+    },
+    stepOf: (n: number, total: number) => `${n} av ${total}`,
+    startPlaying: 'Börja spela',
+  },
+
   language: {
     label: 'Språk',
     choose: 'Välj språk',
+    current: (name: string) => `Språk: ${name}`,
+  },
+
+  errorScreen: {
+    title: 'GameBuddy stötte på ett problem',
+    blurb: 'Det här är en bugg, inget du har gjort. Detaljerna nedan är precis vad vi behöver för att fixa den.',
+    copyHint: 'Texten ovan kan markeras och kopieras.',
   },
 };

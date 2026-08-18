@@ -1,4 +1,6 @@
 import { View } from 'react-native';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { cn } from '../ui/cn';
 import { Text } from '../ui/Text';
 
@@ -16,6 +18,8 @@ type StepHeaderProps = {
  * to do, where a part-filled bar reads as an unknown amount of work remaining.
  */
 export function StepHeader({ step, total, title, subtitle }: StepHeaderProps) {
+  const t = useT();
+  const upper = useUpper();
   return (
     <View className="gap-2 pb-6 pt-8">
       <View
@@ -34,9 +38,7 @@ export function StepHeader({ step, total, title, subtitle }: StepHeaderProps) {
         ))}
       </View>
 
-      <Text variant="overline">
-        STEP {step} OF {total}
-      </Text>
+      <Text variant="overline">{upper(t.onboarding.stepOf(step, total))}</Text>
       <Text variant="title">{title}</Text>
       {subtitle && (
         <Text variant="body" className="text-muted">

@@ -1,4 +1,5 @@
 import { View } from 'react-native';
+import { useT } from '../i18n/useT';
 import { cn } from '../ui/cn';
 import { Text } from '../ui/Text';
 
@@ -14,6 +15,7 @@ type SelectionCountProps = {
  * a row of unfilled dots shows how many are still needed without being read.
  */
 export function SelectionCount({ picked, minimum }: SelectionCountProps) {
+  const t = useT();
   const remaining = minimum - picked;
 
   return (
@@ -27,7 +29,7 @@ export function SelectionCount({ picked, minimum }: SelectionCountProps) {
         ))}
       </View>
       <Text variant="caption">
-        {remaining > 0 ? `${remaining} more to go` : `${picked} selected`}
+        {remaining > 0 ? t.onboarding.moreToGo(remaining) : t.settings.selected(picked)}
       </Text>
     </View>
   );

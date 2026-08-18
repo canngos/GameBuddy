@@ -15,6 +15,9 @@ import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
 import { profileApi } from '../api/catalogue';
 import { moderationApi } from '../api/moderation';
 import { socialApi } from '../api/social';
+import { useUpper } from '../i18n/case';
+import { useCountryName } from '../i18n/countryNames';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import {
   BackHeader,
@@ -53,6 +56,9 @@ type GamerProfileScreenProps = {
 export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
+  const localize = useCountryName();
   const queryClient = useQueryClient();
   const { userId, username } = useLocalSearchParams<{
     userId: string;
@@ -112,12 +118,12 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
 
   const confirmRemove = () =>
     Alert.alert(
-      `Remove ${gamer.data?.username ?? 'this gamer'}?`,
-      'They go back to being a match — you can still message each other, and either of you can send a new friend request.',
+      t.profile.removeConfirmTitle(gamer.data?.username ?? t.profile.thisGamer),
+      t.profile.removeConfirmBody,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Remove',
+          text: t.common.remove,
           style: 'destructive',
           onPress: () => remove.mutate(),
         },
@@ -126,11 +132,11 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
 
   const confirmBlock = () =>
     Alert.alert(
-      `Block ${gamer.data?.username ?? 'this gamer'}?`,
-      'You will not see each other anywhere in the app, and neither of you can message the other. You can undo this in Settings.',
+      t.profile.blockConfirmTitle(gamer.data?.username ?? t.profile.thisGamer),
+      t.profile.blockConfirmBody,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Block', style: 'destructive', onPress: () => block.mutate() },
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.profile.block, style: 'destructive', onPress: () => block.mutate() },
       ],
     );
 
@@ -146,7 +152,7 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
         contentContainerClassName="grow px-6 pb-8"
         showsVerticalScrollIndicator={false}
       >
-        <BackHeader title={gamer.data?.username ?? username ?? 'Profile'} />
+        <BackHeader title={gamer.data?.username ?? username ?? t.profile.fallbackTitle} />
 
         {gamer.isPending && <ActivityIndicator color={colors.primary} />}
         {gamer.error && <ErrorNotice error={gamer.error} onRetry={() => gamer.refetch()} />}
@@ -167,7 +173,7 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                 <View className="flex-1 gap-0.5 pb-1">
                   <Text variant="heading">{gamer.data.username}</Text>
                   <Text variant="caption">
-                    {[gamer.data.age, gamer.data.country].filter(Boolean).join(' · ')}
+                    {[gamer.data.age, localize(gamer.data.country)].filter(Boolean).join(' · ')}
                   </Text>
                 </View>
               </View>
@@ -197,12 +203,12 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
               <View className="h-px bg-line" />
 
               <Tags
-                title="Games"
+                title={t.profile.games}
                 items={gamer.data.games.map((game) => game.gameName)}
                 accent
               />
               <Tags
-                title="Keywords"
+                title={t.profile.keywords}
                 items={gamer.data.keywords.map((keyword) => keyword.keywordName)}
               />
             </Card>
@@ -211,20 +217,20 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
               the signed-in gamer, and a "Block yourself" button would be absurd. */}
             {!isSelf && (
               <View className="gap-2 pb-8">
-                <Text variant="overline">ACTIONS</Text>
+                <Text variant="overline">{upper(t.profile.actions)}</Text>
 
                 {remove.error && <ErrorNotice error={remove.error} />}
                 {block.error && <ErrorNotice error={block.error} />}
                 {report.error && <ErrorNotice error={report.error} />}
                 {reported && (
                   <Card>
-                    <Text variant="caption">Reported. A moderator will look at it.</Text>
+                    <Text variant="caption">{t.profile.reported}</Text>
                   </Card>
                 )}
 
                 {isFriend && (
                   <Button
-                    label="Remove friend"
+                    label={t.profile.removeFriend}
                     variant="ghost"
                     disabled={busy}
                     onPress={confirmRemove}
@@ -235,13 +241,13 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                   moderator to look; blocking is a decision the gamer makes alone and
                   takes effect immediately, so it sits closest to the bottom. */}
                 <Button
-                  label="Report profile"
+                  label={t.profile.reportProfile}
                   variant="danger"
                   disabled={busy}
                   onPress={() => setReporting(true)}
                 />
                 <Button
-                  label="Block"
+                  label={t.profile.block}
                   variant="danger"
                   loading={block.isPending}
                   disabled={busy}

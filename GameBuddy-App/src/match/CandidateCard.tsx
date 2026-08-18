@@ -8,6 +8,8 @@ import { profileApi } from '../api/catalogue';
 import type { Candidate } from '../api/types';
 import { PlatformIcon } from '../profile/PlatformIcon';
 import { useUpper } from '../i18n/case';
+import { useCountryName } from '../i18n/countryNames';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { platformIdOf } from '../profile/platforms';
 import { Avatar } from '../ui/Avatar';
@@ -58,8 +60,10 @@ const MAX_KEYWORDS = 3;
  * competing for the same vertical drag, and the pan has no axis constraint to lose with.
  */
 export function CandidateCard({ candidate, muted = false }: CandidateCardProps) {
+  const t = useT();
   const hasPhoto = !!avatarUri(candidate.avatar);
   const hairline = useHairline();
+  const localize = useCountryName();
 
   const games = candidate.favoriteGames ?? [];
   const keywords = candidate.selectedKeywords ?? [];
@@ -122,7 +126,7 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
             {candidate.gamerUsername}
           </Text>
           <Text className="font-medium text-[14px] leading-[20px] text-white/85">
-            {[candidate.age, candidate.country].filter(Boolean).join(' · ')}
+            {[candidate.age, localize(candidate.country)].filter(Boolean).join(' · ')}
           </Text>
 
           {/* Platforms live up here as bare glyphs rather than as a "PLAYS ON" section
@@ -146,7 +150,7 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
         />
 
         <KeywordRow
-          title="Style"
+          title={t.deck.card.style}
           items={keywords.slice(0, MAX_KEYWORDS)}
           hidden={keywords.length - MAX_KEYWORDS}
         />
@@ -155,7 +159,7 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
             that cannot be tapped is worse than saying nothing. */}
         {!muted && (
           <View className="flex-row items-center justify-center gap-1.5">
-            <Text variant="caption">Tap for full profile</Text>
+            <Text variant="caption">{t.deck.card.tapForProfile}</Text>
             <Icon as={ChevronUp} size={14} tone="muted" />
           </View>
         )}
@@ -219,17 +223,19 @@ export function GameRow({
   hidden?: number;
   shared?: number;
 }) {
+  const t = useT();
+  const upper = useUpper();
   if (games.length === 0) return null;
 
   return (
     <View className="gap-2">
       <View className="flex-row items-center justify-between gap-3">
-        <Text variant="overline">PLAYS</Text>
+        <Text variant="overline">{upper(t.deck.card.plays)}</Text>
         {/* The payoff of ordering by shared games: say so, or the reordering is invisible
             and reads as an arbitrary sort. */}
         {shared > 0 && (
           <Text variant="caption" className="text-primary">
-            {shared} in common
+            {t.deck.card.inCommon(shared)}
           </Text>
         )}
       </View>
@@ -281,12 +287,13 @@ export function GameRow({
  * reader, which cannot see a controller.
  */
 function PlatformGlyphs({ platforms }: { platforms: string[] }) {
+  const t = useT();
   const known = platforms.map((platform) => ({ platform, id: platformIdOf(platform) }));
 
   return (
     <View
       className="mt-3 flex-row items-center gap-3"
-      accessibilityLabel={`Plays on ${platforms.join(', ')}`}
+      accessibilityLabel={t.deck.card.playsOnA11y(platforms.join(', '))}
     >
       {known.map(({ platform, id }) =>
         id ? <PlatformIcon key={platform} platform={id} color="#FFFFFF" size={16} /> : null,
@@ -298,10 +305,12 @@ function PlatformGlyphs({ platforms }: { platforms: string[] }) {
 /** What they play on, with the hand-drawn hardware glyphs rather than bare labels. */
 export function PlatformRow({ platforms }: { platforms: string[] }) {
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
 
   return (
     <View className="gap-2">
-      <Text variant="overline">PLAYS ON</Text>
+      <Text variant="overline">{upper(t.deck.card.playsOn)}</Text>
       <View className="flex-row flex-wrap gap-2">
         {platforms.map((platform) => {
           // Tolerant of both the enum name and the label — the two DTOs disagree about

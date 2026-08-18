@@ -5,6 +5,7 @@ import { cn } from '../ui/cn';
 import { Flag } from './Flag';
 import { LANG_NAMES, LANGS, type Lang } from './languages';
 import { useLangStore } from './store';
+import { useT } from './useT';
 
 /**
  * The language chooser: seven flags, each with the language's own name under it.
@@ -18,6 +19,7 @@ import { useLangStore } from './store';
 export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const lang = useLangStore((s) => s.lang);
   const setLang = useLangStore((s) => s.setLang);
+  const t = useT();
 
   const choose = (next: Lang) => {
     setLang(next);
@@ -31,7 +33,7 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
       <Pressable
         onPress={onClose}
         accessibilityRole="button"
-        accessibilityLabel="Close"
+        accessibilityLabel={t.common.close}
         className="flex-1 justify-end bg-black/50"
       >
         {/* Stops a tap inside the sheet from closing it. */}
@@ -90,12 +92,13 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
  */
 export function LanguageButton({ onPress, size = 32 }: { onPress: () => void; size?: number }) {
   const lang = useLangStore((s) => s.lang);
+  const t = useT();
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`Language: ${LANG_NAMES[lang]}`}
+      accessibilityLabel={t.language.current(LANG_NAMES[lang])}
       hitSlop={12}
       className="active:opacity-70"
     >

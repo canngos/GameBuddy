@@ -4,24 +4,17 @@ import { Heart, Sparkles } from 'lucide-react-native';
 import { Pressable, View } from 'react-native';
 import { matchApi } from '../api/match';
 import type { Consumables } from '../api/types';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { Icon, Text, feedback, messageOf, showToast } from '../ui';
 
-/** Mirrors Consumable.java and BoostPolicy. A price shown wrong is worse than not shown. */
+/**
+ * Mirrors Consumable.java and BoostPolicy. A price shown wrong is worse than not shown.
+ * Codes and prices only — the words come from the dictionary at render time.
+ */
 const ITEMS = [
-  {
-    code: 'SUPER_LIKE' as const,
-    icon: Sparkles,
-    title: 'Super Like',
-    detail: 'They are told straight away, and it stands out.',
-    cost: 100,
-  },
-  {
-    code: 'EXTRA_LIKES' as const,
-    icon: Heart,
-    title: '5 more likes today',
-    detail: 'On top of your daily cap. Today only.',
-    cost: 200,
-  },
+  { code: 'SUPER_LIKE' as const, icon: Sparkles, cost: 100 },
+  { code: 'EXTRA_LIKES' as const, icon: Heart, cost: 200 },
 ];
 
 /**
@@ -39,6 +32,13 @@ const ITEMS = [
 export function ConsumableShelf({ balance }: { balance: number }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const t = useT();
+  const upper = useUpper();
+
+  const labels: Record<(typeof ITEMS)[number]['code'], { title: string; detail: string }> = {
+    SUPER_LIKE: { title: t.market.consumables.superLike, detail: t.market.consumables.superLikeDetail },
+    EXTRA_LIKES: { title: t.market.consumables.extraLikes, detail: t.market.consumables.extraLikesDetail },
+  };
 
   const buy = useMutation({
     mutationFn: matchApi.buyConsumable,
@@ -67,8 +67,8 @@ export function ConsumableShelf({ balance }: { balance: number }) {
       feedback.purchase();
       showToast({
         id: `consumable:${code}:${Date.now()}`,
-        title: item ? `${item.title} added` : 'Added',
-        body: 'Use it from the deck.',
+        title: item ? t.market.consumables.addedTitle(labels[item.code].title) : t.market.consumables.added,
+        body: t.market.consumables.addedBody,
         icon: item?.icon ?? Sparkles,
         tone: 'accent',
       });
@@ -78,8 +78,8 @@ export function ConsumableShelf({ balance }: { balance: number }) {
   return (
     <View className="gap-3 pb-6">
       <View className="gap-1">
-        <Text variant="overline">USE YOUR COINS</Text>
-        <Text variant="caption">Spent when you use them, not owned forever.</Text>
+        <Text variant="overline">{upper(t.market.consumables.header)}</Text>
+        <Text variant="caption">{t.market.consumables.blurb}</Text>
       </View>
 
       {buy.error && (
@@ -92,6 +92,7 @@ export function ConsumableShelf({ balance }: { balance: number }) {
 
       {ITEMS.map((item) => {
         const affordable = balance >= item.cost;
+        const { title, detail } = labels[item.code];
 
         return (
           <Pressable
@@ -99,7 +100,7 @@ export function ConsumableShelf({ balance }: { balance: number }) {
             onPress={() => buy.mutate(item.code)}
             disabled={!affordable || buy.isPending}
             accessibilityRole="button"
-            accessibilityLabel={`${item.title}, ${item.cost} coins`}
+            accessibilityLabel={t.market.consumables.itemA11y(title, item.cost)}
             accessibilityState={{ disabled: !affordable || buy.isPending }}
             className={[
               'flex-row items-center gap-3 rounded-card border border-line bg-raised p-4',
@@ -113,8 +114,8 @@ export function ConsumableShelf({ balance }: { balance: number }) {
             </View>
 
             <View className="flex-1 gap-0.5">
-              <Text variant="bodyStrong">{item.title}</Text>
-              <Text variant="caption">{item.detail}</Text>
+              <Text variant="bodyStrong">{title}</Text>
+              <Text variant="caption">{detail}</Text>
             </View>
 
             <Text
@@ -138,7 +139,7 @@ export function ConsumableShelf({ balance }: { balance: number }) {
         className="items-center rounded-card py-2 active:opacity-70"
       >
         <Text variant="caption" className="text-gold">
-          Buying likes often? Gold removes the limit
+          {t.market.consumables.goldHint}
         </Text>
       </Pressable>
     </View>

@@ -12,6 +12,9 @@ import { Pressable, View } from 'react-native';
 import { REWARDED_AD_COINS, adsAvailable, showRewardedAd } from '../ads/rewarded';
 import { earnApi } from '../api/coins';
 import type { Earn, Quest } from '../api/types';
+import { useUpper } from '../i18n/case';
+import type { Dictionary } from '../i18n/dictionaries/en';
+import { useT } from '../i18n/useT';
 import { useSession } from '../session/store';
 import { Icon, Text, feedback, messageOf, showToast } from '../ui';
 import { StreakStrip } from './StreakStrip';
@@ -28,6 +31,8 @@ const EARN_KEY = ['earn'];
  */
 export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: number) => void }) {
   const queryClient = useQueryClient();
+  const t = useT();
+  const upper = useUpper();
 
   const earn = useQuery({
     queryKey: EARN_KEY,
@@ -67,8 +72,8 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
     feedback.reward();
     showToast({
       id: `earned:${next.coinBalance}`,
-      title: `+${gained} coins`,
-      body: 'Spend them on frames, banners or likes.',
+      title: t.market.earn.earnedTitle(gained),
+      body: t.market.earn.earnedBody,
       icon: Coins,
       tone: 'gold',
     });
@@ -111,12 +116,23 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
           feedback.reward();
           showToast({
             id: `earned:${after}`,
-            title: `+${after - before} coins`,
-            body: 'Thanks for watching.',
+            title: t.market.earn.earnedTitle(after - before),
+            body: t.market.earn.watchedBody,
             icon: Coins,
             tone: 'gold',
           });
         }
+      } else if (outcome === 'consentRequired') {
+        // Says why rather than doing nothing. Refusing consent is a legitimate choice and
+        // the button stays where it is, so without this the row would just look broken —
+        // and the way back is a screen away, which nobody would guess at.
+        showToast({
+          id: 'ads:consent',
+          title: t.market.earn.consentTitle,
+          body: t.market.earn.consentBody,
+          icon: Clapperboard,
+          tone: 'muted',
+        });
       }
     } finally {
       setWatching(false);
@@ -132,8 +148,8 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
   return (
     <View className="gap-3 pb-6">
       <View className="gap-1">
-        <Text variant="overline">EARN</Text>
-        <Text variant="caption">Coins come back every day. Nothing here costs money.</Text>
+        <Text variant="overline">{upper(t.market.earn.header)}</Text>
+        <Text variant="caption">{t.market.earn.blurb}</Text>
       </View>
 
       {failure && (
@@ -156,7 +172,7 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
         earn={state}
         busy={busy}
         onClaim={() => daily.mutate()}
-        readyIn={relative(state.dailyReadyAt)}
+        readyIn={relative(state.dailyReadyAt, t)}
       />
 
       {/* Only where the build can actually show one. An older development build has no
@@ -165,11 +181,11 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
       {adsAvailable() && (
         <ClaimRow
           icon={Clapperboard}
-          title="Watch a short video"
+          title={t.market.earn.watchVideo}
           detail={
             state.adsLeftToday > 0
-              ? `${state.adsLeftToday} left today`
-              : 'That is today’s videos — back tomorrow'
+              ? t.market.earn.videosLeft(state.adsLeftToday)
+              : t.market.earn.videosDone
           }
           reward={REWARDED_AD_COINS}
           ready={state.adsLeftToday > 0}
@@ -187,8 +203,12 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
       {(state.stipendAvailable || state.stipendReadyAt) && (
         <ClaimRow
           icon={Crown}
-          title="Gold monthly bonus"
-          detail={state.stipendAvailable ? 'Yours this month' : `Back ${relative(state.stipendReadyAt)}`}
+          title={t.market.earn.stipendTitle}
+          detail={
+            state.stipendAvailable
+              ? t.market.earn.stipendReady
+              : t.market.earn.stipendBack(relative(state.stipendReadyAt, t))
+          }
           reward={state.stipendAmount}
           ready={state.stipendAvailable}
           busy={busy}
@@ -208,13 +228,18 @@ function QuestRow({
   busy: boolean;
   onPress: () => void;
 }) {
+  const t = useT();
   const done = quest.progress >= quest.target;
 
   return (
     <ClaimRow
       icon={quest.claimed ? Check : Target}
       title={quest.title}
-      detail={quest.claimed ? 'Done this week' : `${quest.progress} of ${quest.target}`}
+      detail={
+        quest.claimed
+          ? t.market.earn.questDone
+          : t.market.earn.questProgress(quest.progress, quest.target)
+      }
       reward={quest.reward}
       ready={done && !quest.claimed}
       busy={busy}
@@ -246,12 +271,15 @@ function ClaimRow({
   progress?: number;
   onPress: () => void;
 }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
       disabled={!ready || busy}
       accessibilityRole="button"
-      accessibilityLabel={ready ? `Claim ${reward} coins: ${title}` : `${title}, ${detail}`}
+      accessibilityLabel={
+        ready ? t.market.earn.claimA11y(reward, title) : t.market.earn.rowA11y(title, detail)
+      }
       accessibilityState={{ disabled: !ready || busy }}
       className={[
         'flex-row items-center gap-3 rounded-card border p-4',
@@ -286,7 +314,7 @@ function ClaimRow({
         </Text>
         {ready && (
           <Text variant="caption" className="text-gold">
-            Claim
+            {t.market.earn.claim}
           </Text>
         )}
       </View>
@@ -295,11 +323,11 @@ function ClaimRow({
 }
 
 /** "in 3h", "in 12m", or "soon" — enough to know whether to wait. */
-function relative(iso: string | null): string {
-  if (!iso) return 'soon';
+function relative(iso: string | null, t: Dictionary): string {
+  if (!iso) return t.market.earn.soon;
   const seconds = Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000));
-  if (seconds < 60) return 'in a moment';
-  if (seconds < 3600) return `in ${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `in ${Math.floor(seconds / 3600)}h`;
-  return `in ${Math.floor(seconds / 86400)}d`;
+  if (seconds < 60) return t.market.earn.inAMoment;
+  if (seconds < 3600) return t.market.earn.inMinutes(Math.floor(seconds / 60));
+  if (seconds < 86400) return t.market.earn.inHours(Math.floor(seconds / 3600));
+  return t.market.earn.inDays(Math.floor(seconds / 86400));
 }

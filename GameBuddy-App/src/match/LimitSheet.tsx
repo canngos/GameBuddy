@@ -9,6 +9,8 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import type { SwipeAllowance } from '../api/types';
+import type { Dictionary } from '../i18n/dictionaries/en';
+import { useT } from '../i18n/useT';
 import { Button } from '../ui/Button';
 import { Text } from '../ui/Text';
 import type { Block } from './useDeck';
@@ -19,20 +21,17 @@ type LimitSheetProps = {
   onDismiss: () => void;
 };
 
-const COPY: Record<Block['kind'], { title: string; body: string }> = {
-  'accept-limit': {
-    title: "That's today's likes",
-    body: 'You can keep looking and passing. Gold lifts the cap.',
-  },
-  'swipe-limit': {
-    title: "That's today's swipes",
-    body: 'The deck comes back tomorrow. Gold removes the daily limit.',
-  },
-  subscription: {
-    title: 'GameBuddy Gold',
-    body: 'This one is part of Gold.',
-  },
-};
+/** Resolved per render rather than a module constant, so the copy follows the language. */
+function copyFor(kind: Block['kind'], t: Dictionary): { title: string; body: string } {
+  switch (kind) {
+    case 'accept-limit':
+      return { title: t.deck.limit.likesTitle, body: t.deck.limit.likesBody };
+    case 'swipe-limit':
+      return { title: t.deck.limit.swipesTitle, body: t.deck.limit.swipesBody };
+    case 'subscription':
+      return { title: t.deck.limit.goldTitle, body: t.deck.limit.goldBody };
+  }
+}
 
 /**
  * Shown when the backend refuses a decision because of a limit.
@@ -49,6 +48,7 @@ const COPY: Record<Block['kind'], { title: string; body: string }> = {
  */
 export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
   const router = useRouter();
+  const t = useT();
   const visible = !!block;
   const progress = useSharedValue(0);
 
@@ -71,14 +71,14 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
   }));
 
   if (!block) return null;
-  const copy = COPY[block.kind];
+  const copy = copyFor(block.kind, t);
 
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
           {/* Tapping the dimmed area closes, which is the gesture people try first. */}
-          <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel="Close" />
+          <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel={t.common.close} />
 
           <Animated.View style={sheetStyle}>
             <View className="gap-4 rounded-t-[28px] bg-surface p-6 pb-10">
@@ -99,8 +99,8 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
 
               {allowance && !allowance.unlimited && (
                 <View className="flex-row gap-3">
-                  <Tally label="Swipes left" value={allowance.remainingSwipes} />
-                  <Tally label="Likes left" value={allowance.remainingAccepts} />
+                  <Tally label={t.deck.limit.swipesLeft} value={allowance.remainingSwipes} />
+                  <Tally label={t.deck.limit.likesLeft} value={allowance.remainingAccepts} />
                 </View>
               )}
 
@@ -111,7 +111,7 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
                   gamer standing at it. */}
               <View className="gap-2">
                 <Button
-                  label="Get Gold — no daily limit"
+                  label={t.deck.limit.getGold}
                   onPress={() => {
                     // Dismiss first: the sheet is a positioned sibling of the deck rather
                     // than a Modal, so leaving it mounted would put it over the paywall.
@@ -119,7 +119,7 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
                     router.push('/gold');
                   }}
                 />
-                <Button label="Keep looking" variant="ghost" onPress={onDismiss} />
+                <Button label={t.deck.limit.keepLooking} variant="ghost" onPress={onDismiss} />
               </View>
             </View>
           </Animated.View>

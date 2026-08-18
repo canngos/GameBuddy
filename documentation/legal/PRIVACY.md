@@ -67,16 +67,26 @@ Three companies receive data about you, and they are worth describing individual
 than hiding behind the phrase "our partners".
 
 **Google AdMob — adverts.** GameBuddy has one advert: an optional video you can watch in
-exchange for coins. Nothing else in the app shows advertising. The advert code starts only
-when you tap to watch one, so if you never do, it never runs. When you do, Google receives
-your device's advertising identifier, your IP address, whether you watched to the end, and
-technical diagnostics — and your account id, because Google's server is what tells ours to
-pay you, and without an id there is nobody to pay. You can reset or delete the advertising
-identifier in your Android settings.
+exchange for coins. Nothing else in the app shows advertising. When you watch one, Google
+receives your device's advertising identifier, your IP address, whether you watched to the
+end, and technical diagnostics — and your account id, because Google's server is what tells
+ours to pay you, and without an id there is nobody to pay. You can reset or delete the
+advertising identifier in your Android settings.
 
-At present these are personalised adverts. If you are in the EEA or the UK you have to be
-asked for consent before that is allowed, and a consent screen is not in the app yet. Until
-it is, this is a gap we are naming rather than glossing over, and it is being fixed.
+These are personalised adverts, which in the EEA, the UK and Switzerland you have to agree
+to first. So the app asks, on the first launch, with a form provided by Google. Say no and
+the app still works — you simply cannot trade a video for coins. You can change the answer
+whenever you like, in **Settings → Advert privacy**, and withdrawing is as easy as giving it.
+
+Be aware of what agreeing covers, because "Google" is doing a lot of work in that sentence.
+Personalised advertising runs through an industry framework, and consenting admits not only
+Google but the advertising partners it works with — currently around two hundred of them.
+The form names every one before you decide, under **List of partners**, and refusing is what
+keeps that list at zero.
+
+Being precise about the order, because it is the part people assume: the advert code starts
+when the app starts, in order to ask that question. It does not wait until you tap the
+button. Outside the regions where consent is required, no form appears and nothing is asked.
 
 **Google Crashlytics — crash reports.** When the app crashes, a report goes to Google:
 what the app was doing, the device and operating-system version, and your account id. The
@@ -88,8 +98,9 @@ profile data.
 account id when you sign in — not only when you buy something — along with what you have
 bought and whether a subscription is active. It never sees your card details; neither do we.
 
-None of the three receives your messages, your photograph, your games and keywords, or who
-you liked.
+None of them — nor any advertising partner — receives your messages, your photograph, your
+games and keywords, or who you liked. What the advertising side gets is the identifier and
+the technical detail described above, and nothing from inside your profile.
 
 ## 5. Who your data is shared with
 
@@ -134,9 +145,8 @@ toimisto*) if you think we have handled your data wrongly.
 - **Legitimate interests** — keeping the service safe, preventing abuse, and improving
   recommendations.
 - **Legal obligation** — retaining what the law requires us to retain.
-- **Consent** — push notifications, which you can withdraw at any time in Settings, and
-  personalised adverts, which need consent in the EEA and the UK and will be asked for by
-  the screen described in section 4.
+- **Consent** — push notifications and personalised adverts. Both are asked for, and both
+  can be withdrawn at any time in Settings.
 
 ## 9. Children
 

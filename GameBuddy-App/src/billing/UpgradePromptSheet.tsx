@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { billingApi } from '../api/billing';
 import { trackFunnel } from '../api/funnel';
+import { useT } from '../i18n/useT';
 import { Button } from '../ui/Button';
 import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
@@ -37,6 +38,7 @@ type UpgradePromptSheetProps = {
  */
 export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
 
   // Latched, not read straight from `due`. Acknowledging it invalidates the subscription
@@ -96,16 +98,16 @@ export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
     <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
-          <Pressable className="flex-1" onPress={close} accessibilityLabel="Close" />
+          <Pressable className="flex-1" onPress={close} accessibilityLabel={t.common.close} />
 
           <Animated.View style={sheetStyle}>
             <View className="gap-4 rounded-t-[28px] bg-surface p-6 pb-10">
               <View className="h-1 w-10 self-center rounded-full bg-line" />
 
               <View className="gap-2">
-                <Text variant="title">It's working</Text>
+                <Text variant="title">{t.billing.promptTitle}</Text>
                 <Text variant="body" className="text-muted">
-                  You've matched with someone. Gold is for when you want to do more of it.
+                  {t.billing.promptBody}
                 </Text>
               </View>
 
@@ -113,14 +115,14 @@ export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
                   than a feature list. Somebody three days in has seen the like cap, has
                   wondered who liked them, and has watched the deck run dry. */}
               <View className="gap-2 rounded-card bg-raised p-4">
-                <Benefit text="No daily like limit" />
-                <Benefit text="See everyone who liked you" />
-                <Benefit text="Filter the deck by game, region and who's online" />
+                <Benefit text={t.billing.benefitNoLimit} />
+                <Benefit text={t.billing.benefitSeeLikes} />
+                <Benefit text={t.billing.benefitFilters} />
               </View>
 
               <View className="gap-2">
                 <Button
-                  label="See Gold"
+                  label={t.billing.seeGold}
                   onPress={() => {
                     close();
                     router.push('/gold');
@@ -128,7 +130,7 @@ export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
                 />
                 {/* "Not now" rather than "No thanks": this is asked once, and the wording
                     should not make declining feel like a door closing. */}
-                <Button label="Not now" variant="ghost" onPress={close} />
+                <Button label={t.billing.notNow} variant="ghost" onPress={close} />
               </View>
             </View>
           </Animated.View>

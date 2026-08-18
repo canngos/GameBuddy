@@ -16,6 +16,9 @@
  * describes the synthetic population the recommender was evaluated against, not where
  * real users are.
  */
+import { countryName } from './i18n/countryNames';
+import type { Lang } from './i18n/languages';
+
 export const SUGGESTED_COUNTRIES = [
   'Finland',
   'Sweden',
@@ -34,7 +37,7 @@ export const SUGGESTED_COUNTRIES = [
   'Australia',
 ] as const;
 
-export const COUNTRIES: string[] = [
+export const COUNTRIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia',
   'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados',
   'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
@@ -60,20 +63,41 @@ export const COUNTRIES: string[] = [
   'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Uganda', 'Ukraine',
   'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan',
   'Venezuela', 'Vietnam', 'Yemen', 'Zambia', 'Zimbabwe',
-];
+] as const;
 
-export function searchCountries(query: string): string[] {
+/**
+ * The canonical set, as a type. `src/i18n/countryNames.ts` types each language's map
+ * against this, so adding a country here is a build error there until every language
+ * names it — the same lockstep the dictionaries enforce.
+ */
+export type CountryName = (typeof COUNTRIES)[number];
+
+/**
+ * Search and ordering in the reader's language, over canonical English values.
+ *
+ * Matches the localized name *and* the English one — someone may know either ("Deu…"
+ * and "Ger…" both find Deutschland) — and always returns the canonical English names,
+ * because those are what the API stores; rendering localizes at display time.
+ */
+export function searchCountries(query: string, lang: Lang): CountryName[] {
   const q = query.trim().toLowerCase();
-  if (!q) return [...SUGGESTED_COUNTRIES, ...COUNTRIES.filter(notSuggested)];
+  if (!q) {
+    // Suggested stay pinned in their curated order; the rest collate by localized name.
+    const rest = COUNTRIES.filter(notSuggested).sort((a, b) =>
+      countryName(a, lang).localeCompare(countryName(b, lang), lang),
+    );
+    return [...SUGGESTED_COUNTRIES, ...rest];
+  }
 
   // Prefix matches first: typing "ind" should offer India before Indonesia, and both
   // before anything that merely contains "ind".
-  const prefix: string[] = [];
-  const contains: string[] = [];
+  const prefix: CountryName[] = [];
+  const contains: CountryName[] = [];
   for (const country of COUNTRIES) {
-    const lower = country.toLowerCase();
-    if (lower.startsWith(q)) prefix.push(country);
-    else if (lower.includes(q)) contains.push(country);
+    const en = country.toLowerCase();
+    const local = countryName(country, lang).toLocaleLowerCase(lang);
+    if (en.startsWith(q) || local.startsWith(q)) prefix.push(country);
+    else if (en.includes(q) || local.includes(q)) contains.push(country);
   }
   return [...prefix, ...contains];
 }

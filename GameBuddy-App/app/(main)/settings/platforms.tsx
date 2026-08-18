@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { authApi } from '../../../src/api/auth';
 import { profileApi } from '../../../src/api/catalogue';
+import { useT } from '../../../src/i18n/useT';
 import { SelectionCount } from '../../../src/onboarding/SelectionCount';
 import { PlatformPicker } from '../../../src/profile/PlatformPicker';
 import { MIN_PLATFORMS, PLATFORMS, type PlatformId } from '../../../src/profile/platforms';
@@ -17,6 +18,7 @@ import { EditScreen } from '../../../src/ui/EditScreen';
  */
 export default function EditPlatforms() {
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
@@ -40,8 +42,8 @@ export default function EditPlatforms() {
 
   return (
     <EditScreen
-      title="What you play on"
-      subtitle="Pick everything you use. Other players filter by this, so more is better than fewer."
+      title={t.settings.platformsScreen.title}
+      subtitle={t.settings.platformsScreen.subtitle}
       onSave={() => save.mutate()}
       saving={save.isPending}
       canSave={current.length >= MIN_PLATFORMS}

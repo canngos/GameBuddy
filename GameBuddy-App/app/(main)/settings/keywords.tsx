@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '../../../src/api/auth';
 import { catalogueApi, profileApi } from '../../../src/api/catalogue';
+import { useT } from '../../../src/i18n/useT';
 import { CataloguePicker } from '../../../src/pickers/CataloguePicker';
 import { SelectionCount } from '../../../src/onboarding/SelectionCount';
 import { EditScreen, EditTitle } from '../../../src/ui/EditScreen';
@@ -10,6 +11,7 @@ import { MIN_KEYWORDS } from '../../../src/validation';
 
 export default function EditKeywords() {
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
@@ -52,8 +54,8 @@ export default function EditKeywords() {
     },
   });
 
-  const title = 'How you play';
-  const subtitle = `At least ${MIN_KEYWORDS}. These are the habits and moods we match on.`;
+  const title = t.settings.keywordsScreen.title;
+  const subtitle = t.settings.keywordsScreen.subtitle(MIN_KEYWORDS);
 
   return (
     <EditScreen

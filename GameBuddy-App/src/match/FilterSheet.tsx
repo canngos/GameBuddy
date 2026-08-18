@@ -11,6 +11,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { profileApi } from '../api/catalogue';
 import { useUpper } from '../i18n/case';
+import { useCountryName } from '../i18n/countryNames';
+import { useT } from '../i18n/useT';
 import { PLATFORMS } from '../profile/platforms';
 import { Button } from '../ui/Button';
 import { Text } from '../ui/Text';
@@ -46,6 +48,8 @@ type FilterSheetProps = {
  */
 export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: FilterSheetProps) {
   const router = useRouter();
+  const t = useT();
+  const localize = useCountryName();
   const progress = useSharedValue(0);
   const [draft, setDraft] = useState<FeedFilters>(filters);
 
@@ -77,7 +81,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
     <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
-          <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel="Close" />
+          <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel={t.common.close} />
 
           <Animated.View style={sheetStyle}>
             <View className="max-h-[80%] rounded-t-[28px] bg-surface pb-10 pt-3">
@@ -85,11 +89,9 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
 
               <View className="flex-row items-center justify-between gap-4 px-6 pb-3">
                 <View className="flex-1">
-                  <Text variant="title">Filters</Text>
+                  <Text variant="title">{t.deck.filters.title}</Text>
                   <Text variant="caption">
-                    {unlocked
-                      ? 'Narrow the deck to the people you actually want to play with.'
-                      : 'Part of Gold. Have a look at what it does.'}
+                    {unlocked ? t.deck.filters.subtitle : t.deck.filters.subtitleLocked}
                   </Text>
                 </View>
                 {!unlocked && <GoldPill />}
@@ -97,15 +99,11 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
 
               <ScrollView className="px-6" contentContainerClassName="gap-6 pb-4">
                 <Section
-                  title="Game"
-                  hint={
-                    myGames.length
-                      ? 'Only people who play this one.'
-                      : 'Add games to your profile to filter by them.'
-                  }>
+                  title={t.deck.filters.game}
+                  hint={myGames.length ? t.deck.filters.gameHint : t.deck.filters.gameHintEmpty}>
                   <View className="flex-row flex-wrap gap-2">
                     <GameChip
-                      label="Any game"
+                      label={t.deck.filters.anyGame}
                       selected={draft.gameId === null}
                       disabled={!unlocked}
                       onPress={() => setDraft((d) => ({ ...d, gameId: null }))}
@@ -131,14 +129,14 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                 </Section>
 
                 <Section
-                  title="Region"
-                  hint={
-                    myCountry
-                      ? 'Same timezone, same servers, same evening.'
-                      : 'Set your country on your profile to filter by it.'
-                  }>
+                  title={t.deck.filters.region}
+                  hint={myCountry ? t.deck.filters.regionHint : t.deck.filters.regionHintEmpty}>
                   <Toggle
-                    label={myCountry ? `Only players in ${myCountry}` : 'Only players near me'}
+                    label={
+                      myCountry
+                        ? t.deck.filters.onlyIn(localize(myCountry))
+                        : t.deck.filters.onlyNearMe
+                    }
                     value={draft.country !== null}
                     // Nothing to compare against without a country of our own, and
                     // sending an empty one would filter the deck down to nobody.
@@ -151,10 +149,10 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                     the profile: there the question is "what do you own", here it is "who
                     can I play with tonight", and that is one answer. Somebody on PC and
                     Switch shows up under either. */}
-                <Section title="Platform" hint="Whoever you can actually get in a lobby with.">
+                <Section title={t.deck.filters.platform} hint={t.deck.filters.platformHint}>
                   <View className="flex-row flex-wrap gap-2">
                     <GameChip
-                      label="Any platform"
+                      label={t.deck.filters.anyPlatform}
                       selected={draft.platform === null}
                       disabled={!unlocked}
                       onPress={() => setDraft((d) => ({ ...d, platform: null }))}
@@ -176,9 +174,9 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                   </View>
                 </Section>
 
-                <Section title="Availability" hint="Active in the last 15 minutes.">
+                <Section title={t.deck.filters.availability} hint={t.deck.filters.availabilityHint}>
                   <Toggle
-                    label="Online now"
+                    label={t.deck.filters.onlineNow}
                     value={draft.onlineNow}
                     disabled={!unlocked}
                     onChange={(on) => setDraft((d) => ({ ...d, onlineNow: on }))}
@@ -190,7 +188,9 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                 {unlocked ? (
                   <>
                     <Button
-                      label={count > 0 ? `Show ${count === 1 ? '1 filter' : `${count} filters`}` : 'Show everyone'}
+                      label={
+                        count > 0 ? t.deck.filters.showFilters(count) : t.deck.filters.showEveryone
+                      }
                       onPress={() => {
                         onApply(draft);
                         onDismiss();
@@ -198,7 +198,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                     />
                     {isNarrowing(filters) && (
                       <Button
-                        label="Clear filters"
+                        label={t.deck.filters.clearFilters}
                         variant="ghost"
                         onPress={() => {
                           onApply(NO_FILTERS);
@@ -210,7 +210,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                 ) : (
                   <>
                     <Button
-                      label="Unlock filters with Gold"
+                      label={t.deck.filters.unlock}
                       onPress={() => {
                         // Dismiss first — this sheet is a positioned sibling of the deck,
                         // so leaving it mounted would cover the paywall it opens.
@@ -218,7 +218,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                         router.push('/gold');
                       }}
                     />
-                    <Button label="Not now" variant="ghost" onPress={onDismiss} />
+                    <Button label={t.deck.filters.notNow} variant="ghost" onPress={onDismiss} />
                   </>
                 )}
               </View>

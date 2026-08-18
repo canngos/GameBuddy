@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../../src/api/auth';
 import { ApiError, Code } from '../../src/api/envelope';
+import { useT } from '../../src/i18n/useT';
 import { StepHeader } from '../../src/onboarding/StepHeader';
 import { useSession } from '../../src/session/store';
 import { Button, ErrorNotice, Screen, TextField } from '../../src/ui';
@@ -11,6 +12,7 @@ import { usernameError } from '../../src/validation';
 
 export default function Username() {
   const router = useRouter();
+  const t = useT();
   const usernameChosen = useSession((s) => s.usernameChosen);
 
   const [username, setUsername] = useState('');
@@ -38,18 +40,18 @@ export default function Username() {
       <StepHeader
         step={1}
         total={6}
-        title="Pick a username"
-        subtitle="This is what other players see. You can change it later."
+        title={t.onboarding.username.title}
+        subtitle={t.onboarding.username.subtitle}
       />
 
       <View className="gap-5">
         <TextField
-          label="Username"
+          label={t.onboarding.username.label}
           value={username}
           onChangeText={setUsername}
-          error={problem ?? (taken ? 'That username is taken. Try another.' : null)}
-          hint="Letters, numbers and underscores."
-          placeholder="headshot_hero"
+          error={(problem ? problem(t) : null) ?? (taken ? t.onboarding.username.taken : null)}
+          hint={t.onboarding.username.hint}
+          placeholder={t.onboarding.username.placeholder}
           maxLength={20}
           onSubmitEditing={send}
           returnKeyType="go"
@@ -59,7 +61,7 @@ export default function Username() {
       </View>
 
       <View className="mt-auto pt-10">
-        <Button label="Continue" loading={submit.isPending} onPress={send} />
+        <Button label={t.common.continue} loading={submit.isPending} onPress={send} />
       </View>
     </Screen>
   );

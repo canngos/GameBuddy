@@ -10,6 +10,7 @@ import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { gatherAdConsent } from '../src/ads/consent';
 import { identifyForCrashReports } from '../src/diagnostics/crashReporting';
 import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
@@ -125,6 +126,22 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
+
+  /*
+   * Ask for advertising consent, once the splash has lifted.
+   *
+   * Google's order is to gather consent as early as possible so an advert can be requested
+   * the moment one is wanted. "As early as possible" still means after the intro, though:
+   * the form is a native modal, and putting one behind the draw-on splash would either
+   * fight it for the screen or be dismissed by somebody who never saw what they answered.
+   *
+   * Not awaited, and nothing renders differently while it runs — the form appears over the
+   * first real screen. `gatherAdConsent` keeps its own once-per-process flag, so a remount
+   * cannot ask twice.
+   */
+  useEffect(() => {
+    if (introDone) void gatherAdConsent();
+  }, [introDone]);
 
   // Fonts failing to load is not worth blocking launch over — the system font is ugly,
   // not broken — but it should be visible in the logs rather than silent.

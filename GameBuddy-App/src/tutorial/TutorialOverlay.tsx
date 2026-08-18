@@ -2,6 +2,8 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Modal, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { Button, Text } from '../ui';
 import { TUTORIAL_STEPS, useTutorial } from './store';
 
@@ -21,6 +23,8 @@ import { TUTORIAL_STEPS, useTutorial } from './store';
  */
 export function TutorialOverlay() {
   const router = useRouter();
+  const t = useT();
+  const upper = useUpper();
   const insets = useSafeAreaInsets();
 
   const step = useTutorial((s) => s.step);
@@ -37,6 +41,7 @@ export function TutorialOverlay() {
 
   if (!current || step === null) return null;
 
+  const copy = t.tutorial.steps[current.key];
   const isLast = step === TUTORIAL_STEPS.length - 1;
 
   return (
@@ -52,18 +57,18 @@ export function TutorialOverlay() {
         >
           <View className="flex-row items-center justify-between">
             <Text variant="overline">
-              {step + 1} OF {TUTORIAL_STEPS.length}
+              {upper(t.tutorial.stepOf(step + 1, TUTORIAL_STEPS.length))}
             </Text>
             <Pressable onPress={() => void finish()} hitSlop={12} accessibilityRole="button">
               <Text variant="label" className="text-muted">
-                Skip
+                {t.common.skip}
               </Text>
             </Pressable>
           </View>
 
-          <Text variant="heading">{current.title}</Text>
+          <Text variant="heading">{copy.title}</Text>
           <Text variant="body" className="text-muted">
-            {current.body}
+            {copy.body}
           </Text>
 
           {/* Progress dots, mirroring the segmented bar onboarding uses, so the two
@@ -78,7 +83,7 @@ export function TutorialOverlay() {
           </View>
 
           <View className="pt-2">
-            <Button label={isLast ? 'Start playing' : 'Next'} onPress={next} />
+            <Button label={isLast ? t.tutorial.startPlaying : t.common.next} onPress={next} />
           </View>
         </Pressable>
       </Pressable>

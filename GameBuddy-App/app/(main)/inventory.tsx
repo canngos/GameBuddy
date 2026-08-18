@@ -6,6 +6,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import type { Cosmetic, CosmeticStore } from '../../src/api/types';
+import { useT } from '../../src/i18n/useT';
 import { useThemeColors } from '../../src/theme';
 import {
   BackHeader,
@@ -42,6 +43,7 @@ const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill
 export default function Inventory() {
   const colors = useThemeColors();
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const [kind, setKind] = useState<'FRAME' | 'BANNER'>('FRAME');
@@ -85,15 +87,21 @@ export default function Inventory() {
   // every time anything on this screen moves.
   const onEquip = useCallback((id: string) => equip.mutate(id), [equip]);
 
-  const noun = kind === 'FRAME' ? 'frame' : 'banner';
-
   return (
     <Screen scroll edges={['top']}>
-      <BackHeader title="Inventory" subtitle="What you own, and what you are wearing" />
+      <BackHeader title={t.market.inventory.title} subtitle={t.market.inventory.subtitle} />
 
       <SegmentRow>
-        <Segment label="Frames" active={kind === 'FRAME'} onPress={() => setKind('FRAME')} />
-        <Segment label="Banners" active={kind === 'BANNER'} onPress={() => setKind('BANNER')} />
+        <Segment
+          label={t.market.shop.frames}
+          active={kind === 'FRAME'}
+          onPress={() => setKind('FRAME')}
+        />
+        <Segment
+          label={t.market.shop.banners}
+          active={kind === 'BANNER'}
+          onPress={() => setKind('BANNER')}
+        />
       </SegmentRow>
 
       <View className="pt-5">
@@ -111,8 +119,14 @@ export default function Inventory() {
         {!store.isPending && !store.error && owned.length === 0 && (
           <EmptyState
             icon={Shirt}
-            title={`No ${noun}s yet`}
-            blurb={`Anything you buy in the Market lands here. Free ${noun}s are already yours.`}
+            title={
+              kind === 'FRAME' ? t.market.inventory.noFramesYet : t.market.inventory.noBannersYet
+            }
+            blurb={
+              kind === 'FRAME'
+                ? t.market.inventory.emptyBlurbFrames
+                : t.market.inventory.emptyBlurbBanners
+            }
           >
             <Pressable
               onPress={() => router.push('/market')}
@@ -120,7 +134,7 @@ export default function Inventory() {
               className="rounded-full bg-primary px-5 py-3 active:opacity-70"
             >
               <Text variant="label" className="text-white">
-                Go to the Market
+                {t.market.inventory.goToMarket}
               </Text>
             </Pressable>
           </EmptyState>
@@ -147,7 +161,9 @@ export default function Inventory() {
                 className="items-center rounded-card py-3 active:opacity-70"
               >
                 <Text variant="label" className="text-muted">
-                  Take off my {noun}
+                  {kind === 'FRAME'
+                    ? t.market.inventory.takeOffFrame
+                    : t.market.inventory.takeOffBanner}
                 </Text>
               </Pressable>
             )}
@@ -174,6 +190,7 @@ const Row = memo(function Row({
   busy: boolean;
   onEquip: (id: string) => void;
 }) {
+  const t = useT();
   const isBanner = item.kind === 'BANNER';
   const equipThis = useCallback(() => onEquip(item.id), [onEquip, item.id]);
 
@@ -210,25 +227,29 @@ const Row = memo(function Row({
               already owned. A membership item stops being yours when the membership does,
               and that is worth knowing before you get attached to it. */}
           <Text variant="caption" numberOfLines={1} className={item.membershipOnly ? 'text-gold' : ''}>
-            {item.membershipOnly ? 'With Gold' : isBanner ? 'Banner' : 'Frame'}
+            {item.membershipOnly
+              ? t.market.gold.withGold
+              : isBanner
+                ? t.market.gold.banner
+                : t.market.gold.frame}
           </Text>
         </View>
 
         {item.equipped ? (
           <Text variant="label" className="shrink-0 text-primary">
-            Worn
+            {t.market.gold.worn}
           </Text>
         ) : (
           <Pressable
             disabled={busy}
             onPress={equipThis}
             accessibilityRole="button"
-            accessibilityLabel={`Equip ${item.name}`}
+            accessibilityLabel={t.market.gold.equipA11y(item.name)}
             accessibilityState={{ disabled: busy }}
             className="shrink-0 rounded-full border-2 border-primary bg-transparent px-4 py-2 active:opacity-70"
           >
             <Text variant="label" className="text-primary">
-              Equip
+              {t.market.gold.equip}
             </Text>
           </Pressable>
         )}

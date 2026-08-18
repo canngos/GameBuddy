@@ -3,6 +3,7 @@ import { Zap } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { matchApi } from '../api/match';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { messageOf } from '../ui/ErrorNotice';
 import * as feedback from '../ui/feedback';
@@ -29,6 +30,7 @@ export const REWIND_COST_COINS = 50;
 export function BoostButton() {
   const queryClient = useQueryClient();
   const colors = useThemeColors();
+  const t = useT();
   const [failure, setFailure] = useState<string | null>(null);
 
   const status = useQuery({
@@ -70,7 +72,11 @@ export function BoostButton() {
   if (!boost) return null;
 
   const active = boost.active && remaining > 0;
-  const label = active ? formatRemaining(remaining) : boost.freeAvailable ? 'Free' : String(boost.cost);
+  const label = active
+    ? formatRemaining(remaining)
+    : boost.freeAvailable
+      ? t.deck.boost.free
+      : String(boost.cost);
 
   return (
     <View className="items-center">
@@ -80,10 +86,10 @@ export function BoostButton() {
         accessibilityRole="button"
         accessibilityLabel={
           active
-            ? `Boost active, ${formatRemaining(remaining)} left`
+            ? t.deck.boost.activeA11y(formatRemaining(remaining))
             : boost.freeAvailable
-              ? 'Use your free weekly boost'
-              : `Boost for ${boost.cost} coins`
+              ? t.deck.boost.freeA11y
+              : t.deck.boost.costA11y(boost.cost)
         }
         accessibilityState={{ disabled: active }}
         hitSlop={8}

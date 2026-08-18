@@ -10,6 +10,8 @@ import {
 } from '../../../src/notifications/permission';
 import { registerDeviceToken } from '../../../src/notifications/usePushRegistration';
 import { useFocusEffect } from 'expo-router';
+import { useUpper } from '../../../src/i18n/case';
+import { useT } from '../../../src/i18n/useT';
 import { useThemeColors } from '../../../src/theme';
 import {
   BackHeader,
@@ -35,6 +37,8 @@ const KEY = ['notificationPreferences'];
  */
 export default function NotificationSettings() {
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
   const queryClient = useQueryClient();
   const [system, setSystem] = useState<PermissionState | null>(null);
   const [asking, setAsking] = useState(false);
@@ -85,7 +89,7 @@ export default function NotificationSettings() {
 
   return (
     <Screen scroll edges={['top']}>
-      <BackHeader title="Notifications" />
+      <BackHeader title={t.settings.notificationsScreen.title} />
 
       {prefs.isPending && <ActivityIndicator color={colors.primary} />}
       {prefs.error && <ErrorNotice error={prefs.error} onRetry={() => prefs.refetch()} />}
@@ -100,17 +104,14 @@ export default function NotificationSettings() {
       {system !== null && system !== 'granted' && (
         <Card className="mb-4 gap-3">
           <View className="gap-1">
-            <Text variant="bodyStrong">Notifications are off for GameBuddy</Text>
-            <Text variant="caption">
-              Android is blocking them, so nothing below can reach you until they are turned
-              back on.
-            </Text>
+            <Text variant="bodyStrong">{t.settings.notificationsScreen.offTitle}</Text>
+            <Text variant="caption">{t.settings.notificationsScreen.offBody}</Text>
           </View>
           {system === 'undetermined' ? (
             // The system will still ask, so ask — sending somebody to Settings for a
             // dialog we can show right here is a detour with a worse success rate.
             <Button
-              label="Turn on notifications"
+              label={t.settings.notificationsScreen.turnOn}
               variant="secondary"
               size="md"
               loading={asking}
@@ -120,7 +121,7 @@ export default function NotificationSettings() {
             // openSettings, not a request: once the system prompt is spent, asking again
             // does nothing and would look like the button was broken.
             <Button
-              label="Open system settings"
+              label={t.settings.notificationsScreen.openSystem}
               variant="secondary"
               size="md"
               onPress={() => void Linking.openSettings()}
@@ -131,35 +132,32 @@ export default function NotificationSettings() {
 
       {prefs.data && (
         <View className="gap-3 pb-8">
-          <Text variant="overline">WHAT TO SEND</Text>
+          <Text variant="overline">{upper(t.settings.notificationsScreen.whatToSend)}</Text>
 
           <Card className="gap-1">
             <Row
-              title="Messages"
-              body="When someone you matched with sends you a message."
+              title={t.settings.notificationsScreen.messagesTitle}
+              body={t.settings.notificationsScreen.messagesBody}
               value={prefs.data.messages}
               onToggle={() => toggle('messages')}
             />
             <Divider />
             <Row
-              title="Matches and friends"
-              body="New matches, friend requests and answers, lobby activity, badges you earn."
+              title={t.settings.notificationsScreen.socialTitle}
+              body={t.settings.notificationsScreen.socialBody}
               value={prefs.data.social}
               onToggle={() => toggle('social')}
             />
             <Divider />
             <Row
-              title="Reminders"
-              body="The occasional nudge when you have been away and something is waiting."
+              title={t.settings.notificationsScreen.remindersTitle}
+              body={t.settings.notificationsScreen.remindersBody}
               value={prefs.data.reminders}
               onToggle={() => toggle('reminders')}
             />
           </Card>
 
-          <Text variant="caption">
-            Turning everything off here keeps the app quiet without switching notifications off
-            for it entirely — so anything you turn back on later still works.
-          </Text>
+          <Text variant="caption">{t.settings.notificationsScreen.quietNote}</Text>
         </View>
       )}
 
@@ -183,6 +181,8 @@ export default function NotificationSettings() {
  * needs none.
  */
 function SoundSetting() {
+  const t = useT();
+  const upper = useUpper();
   const enabled = useSoundEnabled((s) => s.enabled);
   const setEnabled = useSoundEnabled((s) => s.setEnabled);
   const haptics = useHapticsEnabled((s) => s.enabled);
@@ -190,12 +190,12 @@ function SoundSetting() {
 
   return (
     <View className="gap-3 pb-8">
-      <Text variant="overline">ON THIS PHONE</Text>
+      <Text variant="overline">{upper(t.settings.notificationsScreen.onThisPhone)}</Text>
 
       <Card className="gap-1">
         <Row
-          title="Sounds"
-          body="A short cue when something happens in the app — a match, a purchase, a message."
+          title={t.settings.notificationsScreen.soundsTitle}
+          body={t.settings.notificationsScreen.soundsBody}
           value={enabled}
           onToggle={() => setEnabled(!enabled)}
         />
@@ -206,17 +206,14 @@ function SoundSetting() {
             a person who had turned it off from a device where the feedback simply never
             arrived. See `src/ui/haptics.ts`. */}
         <Row
-          title="Vibration"
-          body="A short buzz on a swipe, a match, or a purchase."
+          title={t.settings.notificationsScreen.vibrationTitle}
+          body={t.settings.notificationsScreen.vibrationBody}
           value={haptics}
           onToggle={() => setHaptics(!haptics)}
         />
       </Card>
 
-      <Text variant="caption">
-        Cues never play over the silent switch, and they never interrupt music you are already
-        listening to.
-      </Text>
+      <Text variant="caption">{t.settings.notificationsScreen.cuesNote}</Text>
     </View>
   );
 }

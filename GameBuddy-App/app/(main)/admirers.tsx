@@ -4,6 +4,7 @@ import { useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { matchApi } from '../../src/api/match';
 import type { Candidate } from '../../src/api/types';
+import { useT } from '../../src/i18n/useT';
 import { AdmirerCard } from '../../src/match/AdmirerCard';
 import { useThemeColors } from '../../src/theme';
 import { BackHeader, Button, ErrorNotice, Screen, Text } from '../../src/ui';
@@ -28,6 +29,7 @@ const COLUMN = StyleSheet.create({ row: { gap: 12 } }).row;
 export default function Admirers() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
 
   const admirers = useQuery({
     queryKey: ['admirers'],
@@ -82,7 +84,7 @@ export default function Admirers() {
   return (
     <Screen edges={['top']} padded={false}>
       <View className="px-6">
-        <BackHeader title="Who liked you" />
+        <BackHeader title={t.profile.admirersTitle} />
       </View>
 
       {admirers.isPending && (
@@ -126,10 +128,10 @@ export default function Admirers() {
                   and read as a squeeze. */}
               <UnlockOne />
               <Text variant="caption" className="text-center">
-                Or get Gold: every face, and no daily like limit.
+                {t.profile.orGold}
               </Text>
               <Button
-                label="See who likes you"
+                label={t.profile.seeWhoLikesYou}
                 variant="secondary"
                 onPress={() => router.push('/gold')}
               />
@@ -150,6 +152,7 @@ export default function Admirers() {
  * the thing Gold is built around.
  */
 function UnlockOne() {
+  const t = useT();
   const queryClient = useQueryClient();
 
   const unlock = useMutation({
@@ -165,7 +168,7 @@ function UnlockOne() {
   return (
     <View className="gap-2">
       <Button
-        label={unlock.isPending ? 'Revealing…' : 'Reveal one for 150 coins'}
+        label={unlock.isPending ? t.profile.revealing : t.profile.revealOne(150)}
         loading={unlock.isPending}
         onPress={() => unlock.mutate()}
       />
@@ -181,27 +184,29 @@ function UnlockOne() {
  * real count whether or not any face has been paid for.
  */
 function CountHeader({ count, locked }: { count: number; locked: boolean }) {
+  const t = useT();
   return (
     <View className="gap-1 pb-4">
       <Text variant="display" className="text-accent">
         {count}
       </Text>
       <Text variant="body" className="text-muted">
-        {count === 1 ? 'person likes you' : 'people like you'}
-        {locked ? ' — upgrade to see who' : ''}
+        {t.profile.peopleLikeYou(count)}
+        {locked ? t.profile.upgradeToSee : ''}
       </Text>
     </View>
   );
 }
 
 function Empty() {
+  const t = useT();
   return (
     <View className="flex-1 items-center justify-center gap-2 px-10">
       <Text variant="heading" className="text-center">
-        Nobody yet
+        {t.profile.admirersEmptyTitle}
       </Text>
       <Text variant="body" className="text-center text-muted">
-        When somebody likes you they show up here, whether or not you have liked them back.
+        {t.profile.admirersEmptyBody}
       </Text>
     </View>
   );
@@ -216,6 +221,7 @@ function Empty() {
  */
 export function AdmirersBadge() {
   const router = useRouter();
+  const t = useT();
   const admirers = useQuery({
     queryKey: ['admirers'],
     queryFn: matchApi.likedYou,
@@ -229,14 +235,14 @@ export function AdmirersBadge() {
     <Pressable
       onPress={() => router.push('/admirers')}
       accessibilityRole="button"
-      accessibilityLabel={`${count} people liked you`}
+      accessibilityLabel={t.profile.likedYouBadgeA11y(count)}
       hitSlop={8}
       className="items-center active:opacity-70"
     >
       <View className="min-w-6 items-center justify-center rounded-full bg-accent px-1.5 py-0.5">
         <Text className="font-semibold text-[13px] leading-[17px] text-white">{count}</Text>
       </View>
-      <Text variant="caption">liked you</Text>
+      <Text variant="caption">{t.profile.likedYouBadge}</Text>
     </Pressable>
   );
 }

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../../src/api/auth';
 import { catalogueApi } from '../../src/api/catalogue';
+import { useT } from '../../src/i18n/useT';
 import { useDraft } from '../../src/onboarding/draft';
 import { SelectionCount } from '../../src/onboarding/SelectionCount';
 import { StepHeader } from '../../src/onboarding/StepHeader';
@@ -15,6 +16,7 @@ import { MIN_GAMES, MIN_KEYWORDS, parseBirthDate, toIsoDate } from '../../src/va
 
 export default function Keywords() {
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
   const draft = useDraft();
   const detailsCompleted = useSession((s) => s.detailsCompleted);
@@ -78,12 +80,12 @@ export default function Keywords() {
           {!!submit.error && <ErrorNotice error={submit.error} />}
           <SelectionCount picked={draft.keywordIds.length} minimum={MIN_KEYWORDS} />
           <Button
-            label="Finish"
+            label={t.common.finish}
             disabled={draft.keywordIds.length < MIN_KEYWORDS}
             loading={submit.isPending}
             onPress={() => submit.mutate()}
           />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
@@ -92,8 +94,8 @@ export default function Keywords() {
           <StepHeader
             step={6}
             total={6}
-            title="How do you play?"
-            subtitle={`Pick at least ${MIN_KEYWORDS}. These are the habits and moods we match on.`}
+            title={t.onboarding.keywords.title}
+            subtitle={t.onboarding.keywords.subtitle(MIN_KEYWORDS)}
           />
         }
         items={items}

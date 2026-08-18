@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 import { profileApi } from '../api/catalogue';
+import { tNow } from '../i18n/useT';
 import type { QueryKeyRoot } from '../query/keys';
 import { useCelebration } from '../match/celebration';
 
@@ -64,7 +65,7 @@ export function useMatchNotifications(enabled: boolean) {
         .then((profile) => {
           celebrate({
             userId: otherId,
-            username: profile.username ?? 'Someone',
+            username: profile.username ?? tNow().deck.match.someone,
             avatar: profile.avatar,
             frame: profile.frame,
           });

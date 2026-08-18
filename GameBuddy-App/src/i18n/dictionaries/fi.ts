@@ -2,6 +2,8 @@ import type { Dictionary } from './en';
 
 /** Suomi — Finnish. Typed against `en`, so a missing key is a build error. */
 export const fi: Dictionary = {
+  locale: 'fi',
+
   common: {
     back: 'Takaisin',
     cancel: 'Peruuta',
@@ -10,8 +12,23 @@ export const fi: Dictionary = {
     close: 'Sulje',
     retry: 'Yritä uudelleen',
     continue: 'Jatka',
+    next: 'Seuraava',
+    finish: 'Viimeistele',
+    skip: 'Ohita',
+    search: 'Hae',
+    send: 'Lähetä',
+    edit: 'Muokkaa',
     done: 'Valmis',
     somethingWentWrong: 'Jokin meni pieleen. Yritä uudelleen.',
+  },
+
+  time: {
+    now: 'nyt',
+    minutesShort: (n: number) => `${n} min`,
+    hoursShort: (n: number) => `${n} t`,
+    daysShort: (n: number) => `${n} pv`,
+    inPhrase: (phrase: string) => `${phrase} päästä`,
+    agoPhrase: (phrase: string) => `${phrase} sitten`,
   },
 
   welcome: {
@@ -30,6 +47,7 @@ export const fi: Dictionary = {
   auth: {
     stepOne: 'VAIHE 1',
     stepTwo: 'VAIHE 2',
+    emailPlaceholder: 'sina@esimerkki.fi',
 
     login: {
       title: 'Tervetuloa takaisin',
@@ -43,10 +61,23 @@ export const fi: Dictionary = {
 
     register: {
       title: 'Luo tilisi',
+      subtitle: 'Lähetämme sähköpostiisi kuusinumeroisen koodin osoitteen vahvistamiseksi.',
       email: 'Sähköposti',
       password: 'Salasana',
       passwordHint: 'Vähintään 8 merkkiä, mukana kirjain ja numero.',
       signInInstead: 'Kirjaudu sen sijaan',
+      consent: [
+        { text: 'Vahvistan olevani ' },
+        { text: 'vähintään 18-vuotias', bold: true },
+        { text: ' ja hyväksyn ' },
+        { text: 'käyttöehdot', bold: true, link: 'terms' },
+        { text: ' ja ' },
+        { text: 'tietosuojaselosteen', bold: true, link: 'privacy' },
+        { text: '.' },
+      ],
+      consentA11y: 'Olen vähintään 18-vuotias ja hyväksyn käyttöehdot ja tietosuojaselosteen',
+      consentRequired: 'Tämä on hyväksyttävä, jotta tilin voi luoda.',
+      emailTaken: 'Tämä sähköposti on jo rekisteröity.',
     },
 
     verify: {
@@ -55,6 +86,73 @@ export const fi: Dictionary = {
       code: 'Vahvistuskoodi',
       submit: 'Vahvista',
       resend: 'Lähetä uusi koodi',
+      resendCooldown: (s: number) => `Lähetä uusi koodi (${s} s)`,
+    },
+  },
+
+  onboarding: {
+    stepOf: (step: number, total: number) => `Vaihe ${step}/${total}`,
+    moreToGo: (n: number) => `Vielä ${n}`,
+
+    profile: {
+      title: 'Sinusta',
+      subtitle:
+        'GameBuddy on aikuisille. Syntymäaikasi vahvistaa, että olet vähintään 18 — sitä ei näytetä kenellekään.',
+      ageHint: (n: number) => `Sinun on oltava vähintään ${n}.`,
+      countryRequired: 'Valitse maasi',
+      gender: 'Sukupuoli',
+      genderMan: 'Mies',
+      genderWoman: 'Nainen',
+      genderOther: 'Muu',
+      genderNone: 'En halua kertoa',
+    },
+
+    username: {
+      title: 'Valitse käyttäjänimi',
+      subtitle: 'Muut pelaajat näkevät sinut tällä nimellä. Voit vaihtaa sen myöhemmin.',
+      label: 'Käyttäjänimi',
+      taken: 'Käyttäjänimi on varattu. Kokeile toista.',
+      hint: 'Kirjaimia, numeroita ja alaviivoja.',
+      placeholder: 'headshot_sankari',
+    },
+
+    avatar: {
+      title: 'Valitse tyylisi',
+      subtitle:
+        'Tämä näkyy muille ensimmäisenä. Voit ladata oikean kuvan myöhemmin profiilistasi.',
+      pickOne: 'Valitse yksi jatkaaksesi.',
+    },
+
+    games: {
+      title: 'Mitä pelaat?',
+      subtitle: (n: number) => `Valitse vähintään ${n}. Suositukset perustuvat pitkälti tähän.`,
+      searchPlaceholder: 'Hae pelejä',
+    },
+
+    platforms: {
+      title: 'Millä pelaat?',
+      subtitle:
+        'Valitse kaikki mitä käytät. Muut pelaajat suodattavat tämän mukaan, joten enemmän on parempi.',
+    },
+
+    keywords: {
+      title: 'Miten pelaat?',
+      subtitle: (n: number) =>
+        `Valitse vähintään ${n}. Nämä ovat tavat ja tunnelmat, joiden mukaan matchaamme.`,
+    },
+
+    birthDate: {
+      day: 'Päivä',
+      month: 'Kuukausi',
+      year: 'Vuosi',
+    },
+
+    country: {
+      label: 'Maa',
+      choose: 'Valitse maa',
+      currentA11y: (name: string) => `Maa: ${name}`,
+      title: 'Missä olet?',
+      noMatch: (query: string) => `Mikään maa ei vastaa hakua ”${query}”.`,
     },
   },
 
@@ -64,6 +162,482 @@ export const fi: Dictionary = {
     messages: 'Viestit',
     market: 'Kauppa',
     profile: 'Profiili',
+  },
+
+  lobby: {
+    tones: {
+      competitive: 'Kilpailullinen',
+      chill: 'Chill',
+      casual: 'Rento',
+      learning: 'Opettelu',
+    },
+
+    card: {
+      plays: (when: string) => `Alkaa ${when}`,
+      unknownGame: 'Tuntematon peli',
+      byOwner: (name: string) => `avaaja: ${name}`,
+      unknownOwner: 'joku',
+      seatsFull: (seats: string) => `${seats} täynnä`,
+      seatsPlayers: (seats: string) => `${seats} pelaajaa`,
+      requested: 'Pyyntö lähetetty',
+      statusLocked: 'Tiimi lukittu',
+      statusEnded: 'Pelattu',
+      statusCancelled: 'Peruttu',
+    },
+
+    list: {
+      title: 'Löydä tiimisi',
+      open: 'Avaa aula',
+      ownsLive: 'Sinulla on jo avoin aula. Päätä tai peru se ennen uutta.',
+      yourLobby: 'Aulasi',
+      yourLobbies: 'Aulasi',
+      openLobbies: 'Avoimet aulat',
+      soon: 'Nyt',
+      soonA11y: 'Alkaa 15 minuutin sisällä',
+      emptySoonTitle: 'Mikään ei ala juuri nyt',
+      emptySoonBlurb:
+        'Mikään ei ala seuraavan 15 minuutin sisällä. Ota Nyt pois päältä nähdäksesi myöhemmät.',
+      emptyToneTitle: 'Ei mitään tällä tunnelmalla',
+      emptyToneBlurb: 'Juuri nyt tällä tunnelmalla ei ole mitään. Kokeile toista suodatinta tai avaa oma.',
+      emptyTitle: 'Ei avoimia auloja juuri nyt',
+      emptyBlurb: 'Avaa yksi, aseta aika ja valitse ketkä liittyvät.',
+    },
+
+    detail: {
+      fallbackTitle: 'Aula',
+      gone: 'Tätä aulaa ei enää ole.',
+      wantsToJoin: 'Haluaa liittyä',
+      team: (taken: number, total: number) => `Tiimi · ${taken}/${total}`,
+      accept: 'Hyväksy',
+      pass: 'Ohita',
+      chat: 'Aulan chat',
+      chatReadOnly: 'Aulan chat · vain luku',
+      emptyChatTitle: 'Ei vielä mitään',
+      emptyChatBlurb: 'Sopikaa yksityiskohdista tiimisi kanssa täällä.',
+      composerPlaceholder: 'Viesti tiimille',
+      playsBy: (when: string, owner: string) => `Alkaa ${when} · avaaja: ${owner}`,
+      requirements: 'Vaatimukset',
+      statusLocked: 'Tiimi lukittu — ei ota pyyntöjä',
+      statusEnded: 'Pelattu ja suljettu',
+      statusCancelled: 'Peruttu',
+      statusArchived: 'Arkistoitu',
+      lockTeam: 'Lukitse tiimi',
+      cancelLobby: 'Peru aula',
+      unlock: 'Avaa lukitus',
+      endLobby: 'Päätä aula',
+      leaveLobby: 'Poistu aulasta',
+      requestSent: 'Pyyntö lähetetty. Ilmoitamme, kun omistaja vastaa.',
+      withdraw: 'Peru pyyntö',
+      rejected: 'Omistaja täytti tämän jollakulla toisella.',
+      askToJoin: 'Pyydä liittymistä',
+      full: 'Tämä aula on täynnä.',
+      owner: 'Aulan omistaja',
+      unknownGamer: 'Tuntematon pelaaja',
+    },
+
+    create: {
+      title: 'Avaa aula',
+      goldTitle: 'Aulan avaaminen kuuluu Goldiin',
+      goldBlurb: 'Aulojen selaaminen ja liittymisen pyytäminen ovat aina ilmaisia.',
+      getGold: 'Hanki Gold',
+      game: 'Peli',
+      change: 'Vaihda',
+      searchGame: 'Hae peliä',
+      titlePlaceholder: 'Otsikko',
+      descriptionPlaceholder: 'Mikä on suunnitelma? (valinnainen)',
+      requirementsPlaceholder: 'Vaatimukset — mikki, rank, pelin sisäinen chat (valinnainen)',
+      approveHint: 'Kerro mitä haet. Hyväksyt jokaisen pyynnön itse.',
+      tone: 'Tunnelma',
+      players: 'Pelaajat (sinä mukaan lukien)',
+      when: 'Milloin',
+      presetNow: 'Nyt',
+      presetIn1h: '1 tunnin päästä',
+      presetIn3h: '3 tunnin päästä',
+      pickATime: 'Valitse aika',
+      hour: 'Tunti',
+      minute: 'Minuutti',
+      tooFar: 'Aulan voi suunnitella enintään kaksi viikkoa eteenpäin.',
+      playsAt: (stamp: string) => `Alkaa ${stamp}.`,
+      use24h: 'Käytä 24 tunnin kelloa.',
+      zoneHint: (zone: string) =>
+        `Asetettu aikavyöhykkeelläsi (${zone}). Kaikki näkevät sen omassaan.`,
+      zoneHintNoZone: 'Kaikki näkevät tämän ajan omalla aikavyöhykkeellään.',
+      submit: 'Avaa aula',
+    },
+  },
+
+  deck: {
+    header: {
+      discover: 'Löydä',
+      title: 'Ketkä pelaavat',
+      likesLeft: 'tykkäystä jäljellä',
+      filter: 'Suodata',
+      filtersA11y: 'Suodattimet',
+      filtersOnA11y: (n: number) => `Suodattimet, ${n} käytössä`,
+      loading: 'Etsitään pelaajia, jotka pelaavat samaa kuin sinä…',
+    },
+
+    card: {
+      tapForProfile: 'Napauta nähdäksesi koko profiilin',
+      plays: 'Pelaa',
+      playsOn: 'Pelaa alustoilla',
+      style: 'Tyyli',
+      inCommon: (n: number) => `${n} yhteistä`,
+      playsOnA11y: (list: string) => `Pelaa alustoilla ${list}`,
+    },
+
+    actions: {
+      pass: 'Ohita',
+      passHint: 'Ohita tämä pelaaja',
+      match: 'Match',
+      matchHint: 'Sano kyllä tälle pelaajalle',
+      undo: 'Peru viimeisin pyyhkäisy',
+      undoCost: (cost: number) => `Peru viimeisin pyyhkäisy, ${cost} kolikkoa`,
+    },
+
+    boost: {
+      free: 'Ilmainen',
+      activeA11y: (remaining: string) => `Boost käynnissä, ${remaining} jäljellä`,
+      freeA11y: 'Käytä viikoittainen ilmainen boostisi',
+      costA11y: (cost: number) => `Boost ${cost} kolikolla`,
+    },
+
+    match: {
+      title: 'Se on match!',
+      body: (name: string) => `Sinä ja ${name} sanoitte molemmat kyllä.`,
+      message: 'Lähetä viesti',
+      keep: 'Jatka selaamista',
+      someone: 'Joku',
+    },
+
+    limit: {
+      likesTitle: 'Siinä olivat päivän tykkäykset',
+      likesBody: 'Voit jatkaa katselua ja ohittamista. Gold poistaa katon.',
+      swipesTitle: 'Siinä olivat päivän pyyhkäisyt',
+      swipesBody: 'Pakka palaa huomenna. Gold poistaa päivärajan.',
+      goldTitle: 'GameBuddy Gold',
+      goldBody: 'Tämä kuuluu Goldiin.',
+      swipesLeft: 'Pyyhkäisyjä jäljellä',
+      likesLeft: 'Tykkäyksiä jäljellä',
+      getGold: 'Hanki Gold — ei päivärajaa',
+      keepLooking: 'Jatka katselua',
+    },
+
+    filters: {
+      title: 'Suodattimet',
+      subtitle: 'Rajaa pakka pelaajiin, joiden kanssa oikeasti haluat pelata.',
+      subtitleLocked: 'Kuuluu Goldiin. Katso mitä se tekee.',
+      game: 'Peli',
+      gameHint: 'Vain tätä pelaavat.',
+      gameHintEmpty: 'Lisää profiiliisi pelejä suodattaaksesi niillä.',
+      anyGame: 'Mikä tahansa peli',
+      region: 'Alue',
+      regionHint: 'Sama aikavyöhyke, samat palvelimet, sama ilta.',
+      regionHintEmpty: 'Aseta maasi profiiliisi suodattaaksesi sillä.',
+      onlyIn: (country: string) => `Vain pelaajat: ${country}`,
+      onlyNearMe: 'Vain lähelläni olevat',
+      platform: 'Alusta',
+      platformHint: 'Ne, jotka oikeasti saat samaan aulaan.',
+      anyPlatform: 'Mikä tahansa alusta',
+      availability: 'Saatavuus',
+      availabilityHint: 'Aktiivisia viimeisen 15 minuutin aikana.',
+      onlineNow: 'Paikalla nyt',
+      showFilters: (n: number) =>
+        n === 1 ? 'Näytä 1 suodattimella' : `Näytä ${n} suodattimella`,
+      showEveryone: 'Näytä kaikki',
+      clearFilters: 'Tyhjennä suodattimet',
+      unlock: 'Avaa suodattimet Goldilla',
+      notNow: 'Ei nyt',
+    },
+
+    locked: {
+      title: 'Suodattimet kuuluvat Goldiin',
+      blurb: 'Rajaa pakka yhteen peliin, alueeseesi tai juuri nyt paikalla oleviin.',
+      getGold: 'Hanki Gold',
+      showEveryone: 'Näytä sen sijaan kaikki',
+    },
+
+    exhausted: {
+      filteredTitle: 'Siinä kaikki suodattimiisi sopivat',
+      title: 'Siinä kaikki tältä erää',
+      filteredBlurb: 'Väljentäminen tuo pakkaan lisää pelaajia.',
+      blurb: 'Uusia pelaajia liittyy koko ajan, ja ohittamasi palaavat jonkin ajan kuluttua.',
+      lookAgain: 'Katso uudelleen',
+    },
+  },
+
+  billing: {
+    promptTitle: 'Se toimii',
+    promptBody: 'Sait matchin. Gold on sitä varten, kun haluat niitä lisää.',
+    benefitNoLimit: 'Ei päivittäistä tykkäysrajaa',
+    benefitSeeLikes: 'Näe kaikki, jotka tykkäsivät sinusta',
+    benefitFilters: 'Suodata pakkaa pelin, alueen ja paikallaolon mukaan',
+    seeGold: 'Katso Gold',
+    notNow: 'Ei nyt',
+    coinsAdded: 'Kolikot lisätty',
+    coinsAddedBody: 'Ne ovat nyt saldossasi.',
+    goldYours: 'Gold on sinun',
+    goldYoursBody: 'Ei päivärajaa, edistyneet suodattimet ja Gold-kehys.',
+    storeUnavailable: 'Ostot eivät ole vielä käytettävissä tässä versiossa.',
+    storeNotInBuild:
+      'Tämä versio ei voi tehdä ostoja. Se asennettiin ennen sovelluksen sisäisten ostojen lisäämistä.',
+    storePlanMissing: 'Tuo tilaus ei ole juuri nyt saatavilla.',
+  },
+
+  market: {
+    shop: {
+      header: 'Kauppa',
+      title: 'Näytä tyylisi',
+      earnTab: 'Ansaitse',
+      shopTab: 'Osta',
+      framesAndBanners: 'Kehykset ja bannerit',
+      framesAndBannersBlurb: 'Näkyvät profiilissasi ja jokaisessa kortissa, jossa esiinnyt.',
+      frames: 'Kehykset',
+      banners: 'Bannerit',
+      notEnoughCoins: 'Kolikot eivät riitä',
+      notEnoughCoinsBody: (n: number) =>
+        `Sinulla on ${n}. Saavutukset tuovat kolikoita, tai voit ostaa lisää.`,
+      seeCoinPacks: 'Katso kolikkopaketit',
+      equipInInventory: 'Pue omistamasi varusteet Varastossa',
+      boughtTitle: (name: string) => `${name} on sinun`,
+      bought: 'Ostettu',
+      boughtBody: 'Pue se Varastostasi.',
+      owned: 'Omistat',
+      buy: 'Osta',
+      free: 'Ilmainen',
+      coinsPrice: (n: number) => `${n} kolikkoa`,
+      animatedSuffix: ', animoitu',
+      ownedA11y: (name: string) => `${name}, omistat. Pue se Varastostasi.`,
+      buyA11y: (name: string, price: number) => `Osta ${name}, ${price} kolikkoa`,
+      cantAffordA11y: (name: string, price: number) =>
+        `${name}, ${price} kolikkoa, kolikot eivät riitä`,
+      goldCardMemberA11y: 'Gold-jäsenyytesi',
+      goldCardGetA11y: 'Hanki GameBuddy Gold',
+      goldCardTitleMember: 'Olet jäsen',
+      goldCardTitle: 'Näe kuka tykkää sinusta',
+      goldCardBodyMember: 'Gold-kehys ja -banneri ovat sinun niin kauan kuin jäsenyys kestää.',
+      goldCardBody: 'Ei päivärajaa, edistyneet suodattimet sekä Gold-kehys ja -banneri.',
+    },
+
+    earn: {
+      header: 'Ansaitse',
+      blurb: 'Kolikot palaavat joka päivä. Mikään täällä ei maksa rahaa.',
+      earnedTitle: (n: number) => `+${n} kolikkoa`,
+      earnedBody: 'Käytä ne kehyksiin, bannereihin tai tykkäyksiin.',
+      watchedBody: 'Kiitos katselusta.',
+      consentTitle: 'Videot vaativat mainossuostumuksen',
+      consentBody: 'Muuta se kohdassa Asetukset → Mainosten tietosuoja.',
+      watchVideo: 'Katso lyhyt video',
+      videosLeft: (n: number) => `${n} jäljellä tänään`,
+      videosDone: 'Siinä olivat päivän videot — huomenna taas',
+      stipendTitle: 'Goldin kuukausibonus',
+      stipendReady: 'Sinun tässä kuussa',
+      stipendBack: (when: string) => `Palaa ${when}`,
+      questDone: 'Tehty tällä viikolla',
+      questProgress: (progress: number, target: number) => `${progress}/${target}`,
+      claimA11y: (reward: number, title: string) => `Lunasta ${reward} kolikkoa: ${title}`,
+      rowA11y: (title: string, detail: string) => `${title}, ${detail}`,
+      claim: 'Lunasta',
+      soon: 'pian',
+      inAMoment: 'hetken päästä',
+      inMinutes: (n: number) => `${n} min päästä`,
+      inHours: (n: number) => `${n} t päästä`,
+      inDays: (n: number) => `${n} pv päästä`,
+      streakHeader: 'Päivittäinen putki',
+      day: (n: number) => `Päivä ${n}`,
+      notStarted:'Ei aloitettu',
+      claimCoins: (n: number) => `Lunasta ${n} kolikkoa`,
+      nextDay: (day: number, readyIn: string, weekTotal: number) =>
+        `Päivä ${day} aukeaa ${readyIn} — koko viikko on ${weekTotal} kolikkoa.`,
+      back: (readyIn: string) => `Palaa ${readyIn}.`,
+    },
+
+    consumables: {
+      header: 'Käytä kolikkosi',
+      blurb: 'Kuluvat käytettäessä; eivät jää omaksi.',
+      superLike: 'Super-tykkäys',
+      superLikeDetail: 'Toinen saa tiedon heti, ja se erottuu.',
+      extraLikes: '5 tykkäystä lisää tänään',
+      extraLikesDetail: 'Päivärajasi päälle. Vain tänään.',
+      itemA11y: (title: string, cost: number) => `${title}, ${cost} kolikkoa`,
+      addedTitle: (title: string) => `${title} lisätty`,
+      added: 'Lisätty',
+      addedBody: 'Käytä se pakasta.',
+      goldHint: 'Ostatko usein tykkäyksiä? Gold poistaa rajan',
+    },
+
+    coins: {
+      header: 'Kolikot',
+      blurbBuy:
+        'Osta nyt tai ansaitse ilmaiseksi Ansaitse-välilehdellä — päivittäinen putki, tehtävät ja saavutukset.',
+      blurbNoBuy:
+        'Ansaitse niitä Ansaitse-välilehdellä: päivittäinen putki, tehtävät ja saavutukset. Ostaminen ei ole vielä käytettävissä tässä versiossa.',
+      packCoins: (n: string) => `${n} kolikkoa`,
+      takesYouTo: (n: string) => `Saldosi nousee lukemaan ${n}`,
+      packA11y: (coins: number, price: string) => `Osta ${coins} kolikkoa hintaan ${price}`,
+      onTheWay: 'Kolikkosi ovat tulossa',
+      onTheWayBody: 'Niiden saapuminen voi kestää hetken. Uutta ostoa ei tarvita.',
+    },
+
+    season: {
+      header: 'Kausipassi',
+      coming: 'Tulossa pian',
+      blurb: 'Uusia palkintoja joka kausi.',
+      a11y: 'Kausipassi. Tulossa pian — uusia palkintoja joka kausi.',
+    },
+
+    gold: {
+      done: 'Valmis',
+      continuePrice: (price: string) => `Jatka — ${price}`,
+      unavailable: 'Ostot eivät ole vielä käytettävissä',
+      notNow: 'Ei nyt',
+      heroThanks: 'Kiitos, että tuet GameBuddya.',
+      heroPitch: 'Koko sovellus, ilman mitään esteitä.',
+      benefitLikesTitle: 'Näe kuka tykkäsi sinusta',
+      benefitLikesBody: 'Jokainen kasvo, ei vain lukumäärä.',
+      benefitLimitTitle: 'Ei päivärajaa',
+      benefitLimitBody: 'Selaa ja tykkää niin paljon kuin haluat.',
+      benefitFiltersTitle: 'Edistyneet suodattimet',
+      benefitFiltersBody: 'Rajaa pakkaa pelin, alueen ja juuri nyt paikalla olevien mukaan.',
+      choosePlan: 'Valitse tilaus',
+      planWeekly: 'Viikoittainen',
+      planMonthly: 'Kuukausittainen',
+      planYearly: 'Vuosittainen',
+      periodWeek: '1 viikon',
+      periodMonth: '1 kuukauden',
+      periodYear: '12 kuukauden',
+      noteTrial: '3 päivän ilmainen kokeilu',
+      noteYearly: 'Säästä 58 %',
+      billedEvery: (period: string) => `Laskutetaan ${period} välein`,
+      purchasePending: 'Ostosi on käsittelyssä',
+      purchasePendingBody:
+        'Sen saapuminen voi kestää hetken. Gold kytkeytyy päälle itsestään — uutta ostoa ei tarvita.',
+      cancelNote:
+        'Peru milloin tahansa kauppapaikan tililtäsi. Tilaus uusiutuu, kunnes perut sen.',
+      member: 'Olet jäsen',
+      runsUntil: (date: string) => `Jäsenyytesi on voimassa ${date} asti.`,
+      active: 'Jäsenyytesi on voimassa.',
+      wearBelow: 'Gold-kehys ja -banneri ovat sinun — pue ne alta.',
+      yoursToWear: 'Puettavissasi',
+      membersOnly: 'Vain jäsenille',
+      withGold: 'Goldilla',
+      worn: 'Päällä',
+      equip: 'Pue',
+      equipA11y: (name: string) => `Pue ${name}`,
+      banner: 'Banneri',
+      frame: 'Kehys',
+    },
+
+    inventory: {
+      title: 'Varasto',
+      subtitle: 'Mitä omistat ja mitä sinulla on päällä',
+      noFramesYet: 'Ei vielä kehyksiä',
+      noBannersYet: 'Ei vielä bannereita',
+      emptyBlurbFrames:
+        'Kaikki Kaupasta ostamasi päätyy tänne. Ilmaiset kehykset ovat jo sinun.',
+      emptyBlurbBanners:
+        'Kaikki Kaupasta ostamasi päätyy tänne. Ilmaiset bannerit ovat jo sinun.',
+      goToMarket: 'Siirry Kauppaan',
+      takeOffFrame: 'Riisu kehykseni',
+      takeOffBanner: 'Riisu bannerini',
+    },
+
+    badges: {
+      title: 'Saavutukset',
+      subtitle: 'Suorita tehtäviä, lunasta kolikot, näytä kolme',
+      showcaseFull: (slots: number) => `Voit näyttää ${slots} saavutusta. Ota ensin yksi pois.`,
+      earned: 'Ansaittu',
+      tileA11y: (title: string, status: string) => `${title}. ${status}`,
+      progressOf: (value: number, target: number) => `${value}/${target}`,
+      claimCoins: (n: number) => `Lunasta ${n} kolikkoa`,
+      removeFromProfile: 'Poista profiilista',
+      showOnProfile: 'Näytä profiilissa',
+    },
+  },
+
+  messages: {
+    header: 'Viestit',
+    title: 'Keskustelusi',
+    friends: 'Kaverit',
+    matches: 'Matchit',
+    friendsEmpty: 'Ei vielä ketään. Voit lisätä jonkun kaveriksi, kun olette matchanneet.',
+    matchesEmpty: 'Ei vielä matcheja. Selaa Koti-välilehdellä löytääksesi jonkun.',
+    sectionA11y: (title: string, count: number) => `${title}, ${count}`,
+    conversationWith: (name: string) => `Keskustelu: ${name}`,
+    startConversationWith: (name: string) => `Aloita keskustelu: ${name}`,
+    noMessagesYet: 'Ei vielä viestejä',
+    sayFirst: 'Sano jotain ensin',
+    emptyBlurb: 'Matchasitte — jonkun on aloitettava.',
+    conversation: 'Keskustelu',
+    viewProfileA11y: (name: string) => `Katso käyttäjän ${name} profiili`,
+    thisGamer: 'tämä pelaaja',
+    alreadyFriends: 'Olette jo kavereita',
+    acceptRequest: 'Hyväksy kaveripyyntö',
+    requestSent: 'Kaveripyyntö lähetetty',
+    sendRequest: 'Lähetä kaveripyyntö',
+    reported: 'Ilmoitettu. Moderaattori katsoo sen.',
+    placeholder: 'Viesti',
+    connecting: 'Yhdistetään…',
+    reconnecting: 'Yhdistetään uudelleen…',
+    offline: 'Offline',
+    typing: 'kirjoittaa…',
+    online: 'Paikalla',
+    lastSeen: (when: string) => `Nähty viimeksi ${when}`,
+    justNow: 'juuri äsken',
+    minutesAgo: (n: number) => `${n} min sitten`,
+    hoursAgo: (n: number) => `${n} t sitten`,
+    aWhileAgo: 'jokin aika sitten',
+    reportHint: 'Ilmoita tästä viestistä painamalla pitkään',
+  },
+
+  profile: {
+    header: 'Sinä',
+    title: 'Profiili',
+    inventoryA11y: 'Varasto',
+    settingsA11y: 'Asetukset',
+    badgesA11y: 'Saavutukset',
+    goldMemberA11y: 'GameBuddy Gold -jäsen',
+    friends: 'Kaverit',
+    coins: 'Kolikot',
+    badges: 'Saavutukset',
+    noShowcase: 'Ei vielä esillä olevia saavutuksia — napauta valitaksesi',
+    games: 'Pelit',
+    playsOn: 'Pelaa alustoilla',
+    keywords: 'Avainsanat',
+    friendRequests: (n: number) => `Kaveripyynnöt · ${n}`,
+    accept: 'Hyväksy',
+    no: 'Ei',
+
+    friendsTitle: 'Kaverit',
+    noFriendsTitle: 'Ei vielä kavereita',
+    noFriendsBody: 'Voit lisätä jonkun kaveriksi, kun olette matchanneet.',
+    removeConfirmTitle: (name: string) => `Poistetaanko ${name}?`,
+    removeConfirmBody:
+      'Hän palaa matchiksi — voitte yhä viestitellä, ja kumpi tahansa voi lähettää uuden kaveripyynnön.',
+    thisGamer: 'tämä pelaaja',
+
+    fallbackTitle: 'Profiili',
+    actions: 'Toiminnot',
+    reported: 'Ilmoitettu. Moderaattori katsoo sen.',
+    removeFriend: 'Poista kaveri',
+    reportProfile: 'Ilmoita profiilista',
+    block: 'Estä',
+    blockConfirmTitle: (name: string) => `Estetäänkö ${name}?`,
+    blockConfirmBody:
+      'Ette näe toisianne missään sovelluksessa, eikä kumpikaan voi lähettää toiselle viestiä. Voit perua tämän Asetuksista.',
+
+    admirersTitle: 'Ketkä tykkäsivät sinusta',
+    peopleLikeYou: (n: number) => (n === 1 ? 'henkilö tykkää sinusta' : 'henkilöä tykkää sinusta'),
+    upgradeToSee: ' — päivitä nähdäksesi ketkä',
+    admirersEmptyTitle: 'Ei vielä ketään',
+    admirersEmptyBody:
+      'Kun joku tykkää sinusta, hän näkyy täällä — olitpa tykännyt hänestä tai et.',
+    revealing: 'Paljastetaan…',
+    revealOne: (cost: number) => `Paljasta yksi ${cost} kolikolla`,
+    orGold: 'Tai hanki Gold: jokainen kasvo, eikä päivittäistä tykkäysrajaa.',
+    seeWhoLikesYou: 'Näe kuka tykkää sinusta',
+    likedYouBadge: 'tykkäsi sinusta',
+    likedYouBadgeA11y: (n: number) => `${n} henkilöä tykkäsi sinusta`,
   },
 
   settings: {
@@ -97,10 +671,108 @@ export const fi: Dictionary = {
     termsHint: 'Sisältää sisältö- ja käytössäännöt',
     privacy: 'Tietosuojaseloste',
     privacyHint: 'Mitä keräämme ja mitä sillä teemme',
+    adPrivacy: 'Mainosten tietosuoja',
+    adPrivacyHint: 'Muuta, mitä mainokset saavat käyttää sinusta',
     password: 'Salasana',
     passwordHint: 'Kirjaa sinut ulos kaikkialta',
     blocked: 'Estetyt',
     blockedHint: 'Ketkä olet estänyt',
+    gamesScreen: {
+      title: 'Pelaamasi pelit',
+      subtitle: (n: number) =>
+        `Vähintään ${n}. Näiden muuttaminen muuttaa sitä, kenelle sinut näytetään.`,
+    },
+    notificationsScreen: {
+      title: 'Ilmoitukset',
+      offTitle: 'GameBuddyn ilmoitukset ovat pois päältä',
+      offBody:
+        'Android estää ne, joten mikään alla olevista ei tavoita sinua ennen kuin ne kytketään takaisin.',
+      turnOn: 'Kytke ilmoitukset päälle',
+      openSystem: 'Avaa järjestelmän asetukset',
+      whatToSend: 'Mitä lähetetään',
+      messagesTitle: 'Viestit',
+      messagesBody: 'Kun joku, jonka kanssa matchasit, lähettää sinulle viestin.',
+      socialTitle: 'Matchit ja kaverit',
+      socialBody: 'Uudet matchit, kaveripyynnöt ja vastaukset, aulojen tapahtumat, ansaitsemasi saavutukset.',
+      remindersTitle: 'Muistutukset',
+      remindersBody: 'Satunnainen tönäisy, kun olet ollut poissa ja jokin odottaa sinua.',
+      quietNote:
+        'Kaiken sulkeminen täältä pitää sovelluksen hiljaisena sammuttamatta sen ilmoituksia kokonaan — se minkä kytket myöhemmin takaisin, toimii heti.',
+      onThisPhone: 'Tällä puhelimella',
+      soundsTitle: 'Äänet',
+      soundsBody: 'Lyhyt merkkiääni, kun sovelluksessa tapahtuu jotain — match, ostos, viesti.',
+      vibrationTitle: 'Värinä',
+      vibrationBody: 'Lyhyt värinä pyyhkäisystä, matchista tai ostoksesta.',
+      cuesNote:
+        'Merkkiäänet eivät koskaan soi äänettömän tilan yli eivätkä koskaan keskeytä kuuntelemaasi musiikkia.',
+    },
+
+    avatarScreen: {
+      title: 'Avatarisi',
+      subtitle: 'Lataa kuva tai valitse yksi meidän kuvistamme.',
+      saveLabel: 'Käytä tätä avataria',
+      yourPhoto: 'Oma kuvasi',
+      takePhoto: 'Ota kuva',
+      fromPhotos: 'Valitse kuvista',
+      fromFiles: 'Valitse tiedosto',
+      uploading: 'Ladataan ja tarkistetaan…',
+      privacyNote:
+        'Kuvasi tarkistetaan ennen kuin kukaan muu näkee sen, ja sijaintitiedot poistetaan siitä automaattisesti.',
+      orOurs: 'Tai valitse yksi meidän kuvistamme',
+      cameraDenied:
+        'GameBuddy ei voi avata kameraa ilman lupaa. Voit antaa luvan puhelimen asetuksista, valita olemassa olevan kuvan tai valita alta yhden meidän kuvistamme.',
+      photosDenied:
+        'GameBuddy ei voi avata kuviasi ilman lupaa. Voit antaa luvan puhelimen asetuksista, ottaa kuvan tai valita alta yhden meidän kuvistamme.',
+      tooLarge: (sizeMb: string, limitMb: number) =>
+        `Tiedosto on ${sizeMb} Mt ja raja on ${limitMb} Mt. Kaikki kamerarullaltasi jää reilusti sen alle.`,
+      approvedTitle: 'Tuo on nyt avatarisi',
+      approvedBody: 'Kaikki näkevät sen.',
+      pendingTitle: 'Odottaa tarkistusta',
+      pendingBody:
+        'Joku katsoo sen pian. Siihen asti vain sinä näet sen — kaikki muut näkevät yhä vanhan avatarisi.',
+      rejectedTitle: 'Kuvaa ei hyväksytty',
+      rejectedBody:
+        'Se näyttää rikkovan seksuaalisen sisällön sääntöjä. Kukaan muu ei ole nähnyt sitä. Kokeile toista kuvaa tai valitse yksi meidän kuvistamme.',
+    },
+
+    age: {
+      title: 'Syntymäaika',
+      subtitle:
+        'Vahvistaa, että olet tarpeeksi vanha ollaksesi täällä. Muut näkevät ikäsi, eivät koskaan päivämäärää.',
+      recordedNote: (min: number) =>
+        `Syntymäajan muutokset kirjataan. GameBuddy on vain aikuisille, ja päivämäärä, joka veisi sinut alle ${min} vuoden, hylätään.`,
+    },
+
+    keywordsScreen: {
+      title: 'Miten pelaat',
+      subtitle: (n: number) => `Vähintään ${n}. Nämä ovat tavat ja tunnelmat, joiden mukaan matchaamme.`,
+    },
+
+    platformsScreen: {
+      title: 'Millä pelaat',
+      subtitle: 'Valitse kaikki mitä käytät. Muut pelaajat suodattavat tämän mukaan, joten enemmän on parempi.',
+    },
+
+    passwordScreen: {
+      title: 'Vaihda salasana',
+      subtitle: 'Tämä kirjaa sinut ulos jokaiselta laitteelta, myös tältä.',
+      changedTitle: 'Salasana vaihdettu',
+      signedOutTitle: 'Sinut on kirjattu ulos kaikkialta',
+      signedOutBody:
+        'Salasanan vaihto päättää jokaisen istunnon tällä ja kaikilla muilla laitteilla. Se on tarkoituksellista — jos jollakulla oli vanha salasanasi, hänkin on nyt ulkona.',
+      signInAgain: 'Kirjaudu uudelleen',
+      current: 'Nykyinen salasana',
+      next: 'Uusi salasana',
+      wrongCurrent: 'Tuo ei ole nykyinen salasanasi.',
+      sameAsOld: 'Valitse jotain muuta kuin vanha.',
+    },
+
+    blockedScreen: {
+      body: 'Esto toimii molempiin suuntiin ja kattaa kaiken: teitä ei näytetä toisillenne missään, eikä kumpikaan voi lähettää toiselle viestiä.',
+      emptyTitle: 'Ketään ei ole estetty',
+      emptyBody: 'Voit tarvittaessa estää jonkun hänen profiilistaan.',
+      unblock: 'Poista esto',
+    },
     signOut: 'Kirjaudu ulos',
     deleteAccount: 'Poista tilini',
     deleteTitle: 'Tätä ei voi perua',
@@ -161,8 +833,89 @@ export const fi: Dictionary = {
     },
   },
 
+  validation: {
+    emailEmpty: 'Kirjoita sähköpostiosoitteesi',
+    emailInvalid: 'Tämä ei näytä sähköpostiosoitteelta',
+    passwordEmpty: 'Kirjoita salasana',
+    atLeastChars: (n: number) => `Vähintään ${n} merkkiä`,
+    atMostChars: (n: number) => `Enintään ${n} merkkiä`,
+    letterAndNumber: 'Mukana on oltava kirjain ja numero',
+    usernameEmpty: 'Valitse käyttäjänimi',
+    usernameCharset: 'Vain kirjaimia, numeroita ja alaviivoja',
+    usernameLetterOrNumber: 'Mukana on oltava kirjain tai numero',
+    usernameUnavailable: 'Käyttäjänimi ei ole käytettävissä',
+    birthDateEmpty: 'Kirjoita syntymäaikasi',
+    notARealDate: 'Tuota päivämäärää ei ole',
+    dateInFuture: 'Päivämäärä on tulevaisuudessa',
+    mustBeAge: (n: number) => `GameBuddyn käyttö vaatii vähintään ${n} vuoden iän`,
+    checkYear: 'Tarkista vuosi',
+    sixDigitCode: 'Kirjoita 6-numeroinen koodi',
+  },
+
+  pickers: {
+    noMatchesQueryFiltered: (query: string) => `Mikään ei vastaa hakua ”${query}” näillä suodattimilla.`,
+    noMatchesFiltered: 'Mikään ei vastaa näitä suodattimia.',
+    noMatchesQuery: (query: string) => `Mikään ei vastaa hakua ”${query}”.`,
+    clearFilters: (n: number) => (n === 1 ? 'Tyhjennä 1 suodatin' : `Tyhjennä ${n} suodatinta`),
+    clearFiltersA11y: 'Tyhjennä kaikki suodattimet',
+    filterPlatform: 'Alusta',
+    filterGenre: 'Lajityyppi',
+    filterOther: 'Muu',
+    avatarN: (n: number) => `Avatar ${n}`,
+  },
+
+  notifications: {
+    header: 'Ilmoitukset',
+    primerTitle: 'Älä missaa parasta osaa',
+    primerBody:
+      'GameBuddy on muita ihmisiä. Suurin osa täällä tapahtuvasta tapahtuu, kun sovellus on kiinni.',
+    reasonMatchTitle: 'Kun matchaat',
+    reasonMatchBody: 'Sanoitte molemmat kyllä — juuri silloin keskustelu voi alkaa.',
+    reasonMessageTitle: 'Kun joku lähettää sinulle viestin',
+    reasonMessageBody: 'Jotta vastaus ei odota siihen asti, kun satut avaamaan sovelluksen.',
+    reasonLobbyTitle: 'Kun joku haluaa aulaasi',
+    reasonLobbyBody: 'Ja kun aulan omistaja päästää sinut sisään.',
+    turnOn: 'Kytke ilmoitukset päälle',
+    notNow: 'Ei nyt',
+    changeLater: 'Voit muuttaa tätä milloin tahansa Asetuksista ja valita mitä lajeja haluat.',
+  },
+
+  tutorial: {
+    steps: {
+      home: {
+        title: 'Löydä pelikaveri',
+        body: 'Selaa pelaajia, jotka pelaavat samaa kuin sinä. Oikealle jos haluat pelata yhdessä, vasemmalle jos et. Kun molemmat pyyhkäisette oikealle, matchaatte.',
+      },
+      messages: {
+        title: 'Juttele matchiesi kanssa',
+        body: 'Match avaa yksityisen chatin. Kukaan ei voi lähettää sinulle viestiä, ellette molemmat ole suostuneet siihen, ja voit estää tai ilmoittaa kenet tahansa keskustelun sisältä.',
+      },
+      lobby: {
+        title: 'Kokoa tiimi aulassa',
+        body: 'Avoimet aulat ovat pelejä, jotka etsivät pelaajia — peli, aika ja tunnelma näkyvät kortissa. Pyydä liittymistä; omistaja valitsee tiimin. Oman avaaminen kuuluu Goldiin.',
+      },
+      market: {
+        title: 'Tee profiilistasi omasi',
+        body: 'Kehyksiä ja bannereita profiiliisi sekä lisää päivittäisiä tykkäyksiä, jos ne loppuvat. Kaikki täällä on valinnaista — sovellus toimii ilman mitään ostoksia.',
+      },
+      profile: {
+        title: 'Profiilisi ja kaikki muu',
+        body: 'Pelisi, avainsanasi, kaverisi ja saavutuksesi. Asetukset ovat rattaan takana, myös tämä esittely jos haluat sen uudelleen.',
+      },
+    },
+    stepOf: (n: number, total: number) => `${n}/${total}`,
+    startPlaying: 'Ala pelata',
+  },
+
   language: {
     label: 'Kieli',
     choose: 'Valitse kieli',
+    current: (name: string) => `Kieli: ${name}`,
+  },
+
+  errorScreen: {
+    title: 'GameBuddy törmäsi ongelmaan',
+    blurb: 'Tämä on ohjelmavirhe, ei sinun syytäsi. Alla olevat tiedot ovat juuri se, mitä korjaamiseen tarvitaan.',
+    copyHint: 'Yllä olevan tekstin voi valita ja kopioida.',
   },
 };

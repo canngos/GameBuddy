@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authApi } from '../../../src/api/auth';
 import { catalogueApi, profileApi } from '../../../src/api/catalogue';
+import { useT } from '../../../src/i18n/useT';
 import { CataloguePicker } from '../../../src/pickers/CataloguePicker';
 import { gameFilters, toGameItem } from '../../../src/pickers/gameFilters';
 import { SelectionCount } from '../../../src/onboarding/SelectionCount';
@@ -11,6 +12,7 @@ import { MIN_GAMES } from '../../../src/validation';
 
 export default function EditGames() {
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
@@ -37,7 +39,7 @@ export default function EditGames() {
   );
 
   const items = useMemo(() => (games.data ?? []).map(toGameItem), [games.data]);
-  const filters = useMemo(() => gameFilters(games.data ?? []), [games.data]);
+  const filters = useMemo(() => gameFilters(games.data ?? [], t), [games.data, t]);
 
   const save = useMutation({
     mutationFn: () => authApi.changeGames(current),
@@ -52,8 +54,8 @@ export default function EditGames() {
 
   // Named once and used twice: EditScreen still takes them, and with `scroll={false}` the
   // title block is drawn by the picker's list header instead of by the screen.
-  const title = 'Games you play';
-  const subtitle = `At least ${MIN_GAMES}. Changing these changes who you are shown.`;
+  const title = t.settings.gamesScreen.title;
+  const subtitle = t.settings.gamesScreen.subtitle(MIN_GAMES);
 
   return (
     <EditScreen
@@ -76,7 +78,7 @@ export default function EditGames() {
         error={games.error}
         onRetry={() => games.refetch()}
         layout="grid"
-        searchPlaceholder="Search games"
+        searchPlaceholder={t.onboarding.games.searchPlaceholder}
         filters={filters}
       />
     </EditScreen>
