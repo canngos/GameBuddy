@@ -118,56 +118,72 @@ INSERT INTO games (game_id, game_name, category, description, game_icon, avg_vot
 ON CONFLICT (game_id) DO NOTHING;
 
 -- Keywords: the free-text tastes a gamer picks alongside their games.
+--
+-- The descriptions are the ones from upgrade-2026-16-keyword-descriptions.sql, and they
+-- belong here rather than only in that migration. Every one of these used to be the
+-- keyword repeated back at the reader — "chill" described as "chill" — which is what the
+-- migration exists to fix; leaving the seed as it was meant every fresh environment
+-- recreated the bug and then needed the migration run against it to undo it. The two
+-- must not disagree: if you edit a description, edit it in both.
+--
+-- Written in the second person and about *matching* rather than about the word. Somebody
+-- picking keywords is answering "who do I want to be put in front of", so the useful
+-- sentence is what picking it will get them. Roughly seventy characters — this renders in
+-- a small font on the second line of a list row.
+--
+-- The ON CONFLICT updates the description rather than doing nothing, so a database seeded
+-- before this change picks the new copy up on the next run.
 INSERT INTO keywords (id, keyword_name, description, created_date) VALUES
-  ('449fef62-ece3-5ad4-9de9-868e67573d2b', 'achievement hunter', 'achievement hunter', NOW()),
-  ('a445deca-7c41-53af-800e-c557c023bfd3', 'aim training', 'aim training', NOW()),
-  ('3e9b4de2-b73a-5c67-b9bc-974152216eec', 'anime fan', 'anime fan', NOW()),
-  ('2f89e16a-f7a5-5b11-b6f6-43f1274180b9', 'builder', 'builder', NOW()),
-  ('95df7514-7183-580e-b234-cd8325ee034a', 'casual', 'casual', NOW()),
-  ('e873002d-5e1a-5066-ad6e-beb26d9914db', 'chaotic', 'chaotic', NOW()),
-  ('9f713f18-8abc-5432-9c7b-e6c2300d600e', 'chill', 'chill', NOW()),
-  ('d2ec3a17-fd1e-55a7-b178-c58f42d7185a', 'clutch', 'clutch', NOW()),
-  ('a3c5df97-eade-5b9d-9aba-6c68593625b4', 'co-op', 'co-op', NOW()),
-  ('520a7c85-a12c-5094-b934-74103e228465', 'collector', 'collector', NOW()),
-  ('c792bd9c-0123-556f-b387-4427960b75fd', 'combo practice', 'combo practice', NOW()),
-  ('3dae5b9d-e93d-5e1b-bfe1-2c90e2462bac', 'competitive', 'competitive', NOW()),
-  ('49673a22-3f1d-5925-894a-ddc49c9efb8b', 'completionist', 'completionist', NOW()),
-  ('0322639c-7e73-5a0a-9bea-1e4d58bf984d', 'couch co-op', 'couch co-op', NOW()),
-  ('72aaad3f-8b44-5dbd-8670-d44b7c3d284b', 'decorator', 'decorator', NOW()),
-  ('d066e7b5-6da2-5e75-ae24-c9ffd2880e4b', 'emulator user', 'emulator user', NOW()),
-  ('675b0742-290f-5fc9-8d48-c13126420bb3', 'endgame focused', 'endgame focused', NOW()),
-  ('16764886-bc26-5d2d-8343-a0a48b021d7f', 'esports', 'esports', NOW()),
-  ('a7f6511c-63de-595e-813d-20e76b509977', 'explorer', 'explorer', NOW()),
-  ('50d64a20-4423-5af7-b407-b4b5b61d6b53', 'grinder', 'grinder', NOW()),
-  ('73dc1f84-9884-5b80-bf57-a0752c20ce3f', 'guild leader', 'guild leader', NOW()),
-  ('ff08e815-226f-50ec-b051-4f360efc5deb', 'jumpscare enjoyer', 'jumpscare enjoyer', NOW()),
-  ('6c291244-aa6b-5f8d-b648-c77ba85559e7', 'long sessions', 'long sessions', NOW()),
-  ('6171944d-2a0f-5941-aa48-950b362c1793', 'loot goblin', 'loot goblin', NOW()),
-  ('5d7074a7-0cc6-5560-b825-1d0f330ad3ae', 'lore nerd', 'lore nerd', NOW()),
-  ('98992d9c-0405-59d6-bedb-23991d7d04bc', 'min-maxer', 'min-maxer', NOW()),
-  ('9627c966-8ad1-5e8d-bc30-16580af8ddb5', 'modder', 'modder', NOW()),
-  ('258104f3-501e-5452-bfe4-508aa7f08f69', 'no mic', 'no mic', NOW()),
-  ('266faaa3-b4ad-5154-99a2-f49e6c67643a', 'no spoilers', 'no spoilers', NOW()),
-  ('7917e8c7-2e2c-53d3-95d1-388d353dbfa0', 'nostalgic', 'nostalgic', NOW()),
-  ('770caa11-cdd9-5c38-b2d1-4b2c2ea84508', 'raider', 'raider', NOW()),
-  ('d789fdac-bbc4-56b7-894c-50e3cfc6d046', 'ranked grinder', 'ranked grinder', NOW()),
-  ('9948c803-b749-5bf8-9999-96369cb208cf', 'roleplayer', 'roleplayer', NOW()),
-  ('6144c245-5c30-512e-ab09-0e788ee3a43f', 'short sessions', 'short sessions', NOW()),
-  ('f766c128-dd41-52c9-aa8b-f823a8dad522', 'shotcaller', 'shotcaller', NOW()),
-  ('2252074b-eb12-5a53-be20-a1e62cf45abc', 'sim racer', 'sim racer', NOW()),
-  ('e28d20c0-b3dd-506c-9aac-742241148003', 'social', 'social', NOW()),
-  ('e3f47f11-4f84-5056-8157-68a5fe76d79f', 'solo player', 'solo player', NOW()),
-  ('91094ecf-0f93-5113-88a2-af5606336bfa', 'speedrunner', 'speedrunner', NOW()),
-  ('8e4723e9-7517-5b35-b0b5-1ca54874b37b', 'squad player', 'squad player', NOW()),
-  ('48bdbede-2e99-5b61-9014-62ee1de779fa', 'story-driven', 'story-driven', NOW()),
-  ('4bb6afe0-9b54-5f21-9b19-8463ea20c797', 'streamer', 'streamer', NOW()),
-  ('5dcd8466-eed3-5437-8069-3394f909682c', 'theorycrafter', 'theorycrafter', NOW()),
-  ('51e21bfa-c532-5548-9845-6ae9c2aac9fd', 'tournament goer', 'tournament goer', NOW()),
-  ('b8ceb8bc-0413-5ad1-8ffa-d50d4597e199', 'toxic-free', 'toxic-free', NOW()),
-  ('5391df75-c852-5045-92c2-911542bdf49d', 'tryhard', 'tryhard', NOW()),
-  ('b1346860-7b70-53b9-83f5-4163863d4f7c', 'voice chat', 'voice chat', NOW()),
-  ('117b690a-68c4-55a1-9e29-78fe000fbe8b', 'waifu collector', 'waifu collector', NOW())
-ON CONFLICT (id) DO NOTHING;
+  ('449fef62-ece3-5ad4-9de9-868e67573d2b', 'achievement hunter', 'You go for the full list, however long it takes.', NOW()),
+  ('a445deca-7c41-53af-800e-c557c023bfd3', 'aim training', 'You warm up before you play, and it shows.', NOW()),
+  ('3e9b4de2-b73a-5c67-b9bc-974152216eec', 'anime fan', 'Anime art, anime games, anime everything.', NOW()),
+  ('2f89e16a-f7a5-5b11-b6f6-43f1274180b9', 'builder', 'You would rather build the base than defend it.', NOW()),
+  ('95df7514-7183-580e-b234-cd8325ee034a', 'casual', 'You play to unwind. No pressure, no schedule.', NOW()),
+  ('e873002d-5e1a-5066-ad6e-beb26d9914db', 'chaotic', 'Plans are optional. Something will happen.', NOW()),
+  ('9f713f18-8abc-5432-9c7b-e6c2300d600e', 'chill', 'Relaxed sessions, easy company, nobody shouting.', NOW()),
+  ('d2ec3a17-fd1e-55a7-b178-c58f42d7185a', 'clutch', 'You are calm when the round is on the line.', NOW()),
+  ('a3c5df97-eade-5b9d-9aba-6c68593625b4', 'co-op', 'You would rather beat the game with someone than alone.', NOW()),
+  ('520a7c85-a12c-5094-b934-74103e228465', 'collector', 'Every skin, every mount, every card.', NOW()),
+  ('c792bd9c-0123-556f-b387-4427960b75fd', 'combo practice', 'You spend real time in the training room.', NOW()),
+  ('3dae5b9d-e93d-5e1b-bfe1-2c90e2462bac', 'competitive', 'You are here to win, and you play like it.', NOW()),
+  ('49673a22-3f1d-5925-894a-ddc49c9efb8b', 'completionist', 'The map is not done until all of it is done.', NOW()),
+  ('0322639c-7e73-5a0a-9bea-1e4d58bf984d', 'couch co-op', 'Two controllers, one sofa, same screen.', NOW()),
+  ('72aaad3f-8b44-5dbd-8670-d44b7c3d284b', 'decorator', 'Your base, island or house is the whole hobby.', NOW()),
+  ('d066e7b5-6da2-5e75-ae24-c9ffd2880e4b', 'emulator user', 'Older systems, running on whatever you have now.', NOW()),
+  ('675b0742-290f-5fc9-8d48-c13126420bb3', 'endgame focused', 'The story is the tutorial. The endgame is the game.', NOW()),
+  ('16764886-bc26-5d2d-8343-a0a48b021d7f', 'esports', 'You follow the pro scene and know the rosters.', NOW()),
+  ('a7f6511c-63de-595e-813d-20e76b509977', 'explorer', 'You take the side path before the main quest.', NOW()),
+  ('50d64a20-4423-5af7-b407-b4b5b61d6b53', 'grinder', 'Long, repetitive, satisfying. You do not mind the hours.', NOW()),
+  ('73dc1f84-9884-5b80-bf57-a0752c20ce3f', 'guild leader', 'You organise people, and you are good at it.', NOW()),
+  ('ff08e815-226f-50ec-b051-4f360efc5deb', 'jumpscare enjoyer', 'Horror games, lights off, sound up.', NOW()),
+  ('6c291244-aa6b-5f8d-b648-c77ba85559e7', 'long sessions', 'When you sit down it is for the evening.', NOW()),
+  ('6171944d-2a0f-5941-aa48-950b362c1793', 'loot goblin', 'You open every chest and pick up everything.', NOW()),
+  ('5d7074a7-0cc6-5560-b825-1d0f330ad3ae', 'lore nerd', 'You have read the item descriptions. All of them.', NOW()),
+  ('98992d9c-0405-59d6-bedb-23991d7d04bc', 'min-maxer', 'Optimal build, optimal route, spreadsheet open.', NOW()),
+  ('9627c966-8ad1-5e8d-bc30-16580af8ddb5', 'modder', 'You install mods, and probably write a few.', NOW()),
+  ('258104f3-501e-5452-bfe4-508aa7f08f69', 'no mic', 'You play without voice chat, and prefer it that way.', NOW()),
+  ('266faaa3-b4ad-5154-99a2-f49e6c67643a', 'no spoilers', 'Do not tell them anything. They are getting there.', NOW()),
+  ('7917e8c7-2e2c-53d3-95d1-388d353dbfa0', 'nostalgic', 'The games you grew up with still hit hardest.', NOW()),
+  ('770caa11-cdd9-5c38-b2d1-4b2c2ea84508', 'raider', 'Scheduled runs, full team, cleared bosses.', NOW()),
+  ('d789fdac-bbc4-56b7-894c-50e3cfc6d046', 'ranked grinder', 'Climbing the ladder is the reason you log in.', NOW()),
+  ('9948c803-b749-5bf8-9999-96369cb208cf', 'roleplayer', 'You stay in character, and enjoy people who do too.', NOW()),
+  ('6144c245-5c30-512e-ab09-0e788ee3a43f', 'short sessions', 'Half an hour here and there, whenever you can.', NOW()),
+  ('f766c128-dd41-52c9-aa8b-f823a8dad522', 'shotcaller', 'You make the calls so the team does not have to.', NOW()),
+  ('2252074b-eb12-5a53-be20-a1e62cf45abc', 'sim racer', 'Wheel, pedals, and lap times you actually care about.', NOW()),
+  ('e28d20c0-b3dd-506c-9aac-742241148003', 'social', 'The people are the reason you are here.', NOW()),
+  ('e3f47f11-4f84-5056-8157-68a5fe76d79f', 'solo player', 'You play alone, and you like it that way.', NOW()),
+  ('91094ecf-0f93-5113-88a2-af5606336bfa', 'speedrunner', 'You have a personal best and you are chasing it.', NOW()),
+  ('8e4723e9-7517-5b35-b0b5-1ca54874b37b', 'squad player', 'Always in a party, never queuing alone.', NOW()),
+  ('48bdbede-2e99-5b61-9014-62ee1de779fa', 'story-driven', 'You are here for the writing and the characters.', NOW()),
+  ('4bb6afe0-9b54-5f21-9b19-8463ea20c797', 'streamer', 'You play with an audience watching.', NOW()),
+  ('5dcd8466-eed3-5437-8069-3394f909682c', 'theorycrafter', 'You work out why it is good before you use it.', NOW()),
+  ('51e21bfa-c532-5548-9845-6ae9c2aac9fd', 'tournament goer', 'You show up in person, or at least sign up.', NOW()),
+  ('b8ceb8bc-0413-5ad1-8ffa-d50d4597e199', 'toxic-free', 'No abuse, no blaming. You leave lobbies that go that way.', NOW()),
+  ('5391df75-c852-5045-92c2-911542bdf49d', 'tryhard', 'Even the casual mode is played properly.', NOW()),
+  ('b1346860-7b70-53b9-83f5-4163863d4f7c', 'voice chat', 'Mic on, talking through it, calls being made.', NOW()),
+  ('117b690a-68c4-55a1-9e29-78fe000fbe8b', 'waifu collector', 'Gacha pulls and a roster you are attached to.', NOW())
+ON CONFLICT (id) DO UPDATE SET
+  keyword_name = EXCLUDED.keyword_name, description = EXCLUDED.description;
 
 -- Default avatars. Object keys, not URLs: which host serves them is a deployment
 -- concern that changes, and a stored URL would bake today's answer into twelve rows.
@@ -210,6 +226,12 @@ COMMIT;
 -- why free stopped meaning "already owned". Everything else is bought, starting at the
 -- 100-coin entry tier. Animated frames cost more than static ones because they took more
 -- to make and are the thing people actually want.
+--
+-- The two Gold items are neither free nor for sale: membership_only means they arrive
+-- with a subscription and are withdrawn when it lapses, which is why their price is 0 and
+-- why the store never lists them. They match upgrade-2026-18-membership-cosmetics.sql row
+-- for row, ids included — the seed used to sell the Gold frame for 400 coins, so a
+-- database built from it alone put a Gold-exclusive item back on the shelf.
 -- membership_only is listed explicitly rather than left to the column default.
 -- The migration that added it supplies `DEFAULT false`; the entity does not declare
 -- one, so a schema built by Hibernate from the entities has the column NOT NULL with
@@ -219,13 +241,14 @@ INSERT INTO cosmetic (id, kind, name, asset_key, animated, price, sort_order, me
   ('c65bd3d8-6b59-546a-ac85-8f9bd080b279', 'FRAME', 'Signature', 'frames/frame-brand.png', false, 100, 1, false, now()),
   ('202e2cb8-5e54-577e-8ea1-2a56d4aa6a5d', 'FRAME', 'Reticle', 'frames/frame-reticle.png', false, 150, 2, false, now()),
   ('772595df-1b8a-5c40-b18a-fafa83de3297', 'FRAME', 'Bronze', 'frames/frame-bronze.png', false, 200, 3, false, now()),
-  ('7767adda-3c57-5bb8-9c19-66e3668d961c', 'FRAME', 'Gold', 'frames/frame-gold.png', false, 400, 4, false, now()),
+  ('7767adda-3c57-5bb8-9c19-66e3668d961c', 'FRAME', 'Gold', 'frames/frame-gold.png', false, 0, 4, true, now()),
   ('5111d8c6-c0e3-5320-8a22-e06fe89883c1', 'FRAME', 'Pulse', 'frames/frame-pulse.webp', true, 600, 5, false, now()),
   ('df6369a3-e370-5c22-9fa5-4e51bab9cdec', 'FRAME', 'Sweep', 'frames/frame-sweep.webp', true, 750, 6, false, now()),
   ('089fed4f-abc2-5193-ac25-5aa437fd52a0', 'FRAME', 'Orbit', 'frames/frame-orbit.webp', true, 900, 7, false, now()),
   ('0473126d-f42e-5971-8e64-d6e2a26bed08', 'FRAME', 'Toxic', 'frames/frame-toxic.webp', true, 900, 8, false, now()),
   ('90f6a11b-fa77-561b-9722-6c5b0ee79d09', 'FRAME', 'Rotor', 'frames/frame-rotor.webp', true, 1200, 9, false, now()),
   ('32fa7c71-9011-59d9-9155-4e5e710e974c', 'FRAME', 'Ember', 'frames/frame-ember.webp', true, 1500, 10, false, now()),
+  ('1f0c9f4e-2b6a-4d3e-9c47-5a8b1e7d6c20', 'BANNER', 'Gold', 'banners/banner-gold.jpg', false, 0, 0, true, now()),
   ('5c03c249-15e3-5e97-98e7-e2b659e3c444', 'BANNER', 'Hex', 'banners/banner-hex.jpg', false, 100, 0, false, now()),
   ('c4793a6f-b11f-544e-8fb5-50070bc6e7c3', 'BANNER', 'CRT', 'banners/banner-crt.jpg', false, 100, 1, false, now()),
   ('40fe7f85-d3e0-5def-942e-4be7d6c36fc3', 'BANNER', 'Bokeh', 'banners/banner-bokeh.jpg', false, 200, 2, false, now()),
@@ -236,4 +259,5 @@ INSERT INTO cosmetic (id, kind, name, asset_key, animated, price, sort_order, me
   ('10db4e23-1579-5f41-83f9-e4db8f75d93a', 'BANNER', 'Synthwave', 'banners/banner-synthwave.jpg', false, 800, 7, false, now())
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name, asset_key = EXCLUDED.asset_key, animated = EXCLUDED.animated,
-  price = EXCLUDED.price, sort_order = EXCLUDED.sort_order;
+  price = EXCLUDED.price, sort_order = EXCLUDED.sort_order,
+  membership_only = EXCLUDED.membership_only;

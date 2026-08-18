@@ -7,6 +7,7 @@ import { ApiError, Code } from '../../src/api/envelope';
 import { useSession } from '../../src/session/store';
 import { useT } from '../../src/i18n/useT';
 import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
+import { normalisePassword } from '../../src/validation';
 
 export default function Login() {
   const t = useT();
@@ -18,7 +19,7 @@ export default function Login() {
 
   const login = useMutation({
     mutationFn: async () => {
-      const session = await authApi.login(identifier.trim(), password);
+      const session = await authApi.login(identifier.trim(), normalisePassword(password));
       await signIn(session.accessToken, session.userId);
     },
     onSuccess: () => router.replace('/home'),
@@ -42,7 +43,8 @@ export default function Login() {
       router.replace({ pathname: '/verify', params: { email: identifier.trim() } }),
   });
 
-  const canSubmit = identifier.trim().length > 0 && password.length > 0;
+  const canSubmit =
+    identifier.trim().length > 0 && normalisePassword(password).length > 0;
 
   return (
     <Screen scroll>

@@ -7,7 +7,7 @@ import { useT } from '../i18n/useT';
 import { useSession } from '../session/store';
 import { Button, Card, Screen, Text, TextField } from '../ui';
 import { EditScreen } from '../ui/EditScreen';
-import { passwordError } from '../validation';
+import { normalisePassword, passwordError } from '../validation';
 
 /**
  * Changing your own password.
@@ -28,10 +28,13 @@ export function ChangePasswordScreen() {
   const problem = touched ? passwordError(next) : null;
   // Checked here as well as by the backend (PASSWORD_SAME, 112), because being told
   // "that is the same password" after a round trip is worse than being told now.
-  const unchanged = next.length > 0 && next === current;
+  // Compared as they will be sent, so a password that differs only by a stray space is
+  // caught here rather than by the backend's PASSWORD_SAME after a round trip.
+  const unchanged = next.length > 0 && normalisePassword(next) === normalisePassword(current);
 
   const save = useMutation({
-    mutationFn: () => authApi.changePassword(current, next),
+    mutationFn: () =>
+      authApi.changePassword(normalisePassword(current), normalisePassword(next)),
   });
 
   const wrongCurrent =

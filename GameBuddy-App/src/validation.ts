@@ -39,11 +39,32 @@ export function emailError(value: string): Msg | null {
   return null;
 }
 
+/**
+ * The password as it is sent and as it is stored: surrounding whitespace removed.
+ *
+ * **A password is trimmed everywhere or nowhere.** Every screen that sends one calls this,
+ * because the hash is computed over exactly these bytes — trimming when signing in but not
+ * when registering would lock out the account it was trying to rescue.
+ *
+ * The trailing space is not hypothetical. Android's keyboard offers one after an
+ * autocompleted word, phones insert one after a double tap on the space bar, and a password
+ * pasted from a notes app usually brings one with it. None of that is visible in a field
+ * that renders dots, so the report is "it says my password is wrong and it is not" — which
+ * is what a tester sent us. A space is not a character anybody means to put at either end
+ * of a password, so no real password loses anything by this.
+ */
+export function normalisePassword(value: string): string {
+  return value.trim();
+}
+
 export function passwordError(value: string): Msg | null {
-  if (!value) return (t) => t.validation.passwordEmpty;
-  if (value.length < PASSWORD_MIN) return (t) => t.validation.atLeastChars(PASSWORD_MIN);
-  if (value.length > PASSWORD_MAX) return (t) => t.validation.atMostChars(PASSWORD_MAX);
-  if (!/[a-zA-Z]/.test(value) || !/[0-9]/.test(value)) {
+  // Measured after trimming, so the rules agree with what is actually sent. Otherwise
+  // "1234567 " passes an eight-character minimum here and fails it on the server.
+  const password = normalisePassword(value);
+  if (!password) return (t) => t.validation.passwordEmpty;
+  if (password.length < PASSWORD_MIN) return (t) => t.validation.atLeastChars(PASSWORD_MIN);
+  if (password.length > PASSWORD_MAX) return (t) => t.validation.atMostChars(PASSWORD_MAX);
+  if (!/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
     return (t) => t.validation.letterAndNumber;
   }
   return null;

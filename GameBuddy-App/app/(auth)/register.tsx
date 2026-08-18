@@ -7,7 +7,7 @@ import { ApiError, Code } from '../../src/api/envelope';
 import { openPrivacy, openTerms } from '../../src/legal';
 import { useT } from '../../src/i18n/useT';
 import { Button, Checkbox, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { emailError, passwordError } from '../../src/validation';
+import { emailError, normalisePassword, passwordError } from '../../src/validation';
 
 export default function Register() {
   const t = useT();
@@ -24,7 +24,7 @@ export default function Register() {
   const consentProblem = touched && !accepted;
 
   const register = useMutation({
-    mutationFn: () => authApi.register(email.trim(), password, accepted),
+    mutationFn: () => authApi.register(email.trim(), normalisePassword(password), accepted),
     onSuccess: () => {
       // Replace, not push: the account now exists and the code has been sent, so
       // coming back here to submit the same address again can only cause confusion.

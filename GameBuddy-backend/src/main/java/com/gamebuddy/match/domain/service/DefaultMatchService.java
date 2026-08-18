@@ -511,7 +511,8 @@ public class DefaultMatchService implements MatchService {
                 allowance.unlimited() ? 0 : allowance.remainingSwipes(),
                 allowance.unlimited() ? 0 : allowance.remainingAccepts(),
                 allowance.unlimited(),
-                allowance.resetsAt());
+                allowance.resetsAt(),
+                gamer.getSuperLikes());
 
         SwipeAllowanceResponse response = new SwipeAllowanceResponse();
         response.setBody(new BaseBody<>(body));

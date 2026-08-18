@@ -189,6 +189,7 @@ export default function Deck() {
           canRewind={deck.canRewind}
           // Gold gets rewinds as an entitlement; everyone else pays, and sees the price.
           rewindCost={unlocked ? 0 : REWIND_COST_COINS}
+          superLikes={deck.allowance?.superLikes ?? 0}
         />
       )}
 

@@ -628,6 +628,16 @@ public class Gamer implements RevocableUser {
         return blockedFriends.contains(other) || other.getBlockedFriends().contains(this);
     }
 
+    /** True when this gamer is the one who blocked. The half of a block they chose. */
+    public boolean hasBlocked(Gamer other) {
+        return blockedFriends.contains(other);
+    }
+
+    /** True when the other side blocked this gamer. The half done to them. */
+    public boolean isBlockedBy(Gamer other) {
+        return other.getBlockedFriends().contains(this);
+    }
+
     /**
      * Whether the uploaded avatar may be shown to anyone other than its owner.
      *

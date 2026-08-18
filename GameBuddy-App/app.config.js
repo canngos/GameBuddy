@@ -36,6 +36,19 @@
  * interpolation, so the literal string would reach `AndroidManifest.xml`, and the Google
  * Mobile Ads SDK **crashes the app at launch** on a malformed application id — which is
  * exactly the failure mode a placeholder is supposed to avoid.
+ *
+ * **The app id and the rewarded unit id must belong to the same AdMob account.** They are
+ * set in two different places — this variable writes the manifest, and
+ * `EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID` is read at runtime by `src/ads/rewarded.ts` — and
+ * for a while only the second of them was in `eas.json`. Every store build therefore asked
+ * for our live unit while identifying itself as Google's sample app, which AdMob refuses:
+ * the load fails, and testers reported the advert simply never opening. Local builds hid it
+ * because `.env` supplies this id and `__DEV__` forces the test unit, so the pair matched
+ * on the one machine anybody was looking at.
+ *
+ * A real app id with Google's *test* unit is fine and is what the `gate` and `lan` profiles
+ * inherit — test units are not tied to an account. It is only the live unit that has to be
+ * asked for by the app that owns it.
  */
 function adMobPlugin(plugins, androidAppId, iosAppId) {
   return plugins.map((plugin) => {

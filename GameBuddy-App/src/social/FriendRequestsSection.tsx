@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, X } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
+import { Check, ChevronDown, ChevronUp, X } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { socialApi } from '../api/social';
@@ -38,7 +39,31 @@ export function FriendRequestsSection() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(true);
 
-  const query = useQuery({ queryKey: ['friendRequests'], queryFn: socialApi.pendingRequests });
+  /*
+   * Never served stale, and re-asked whenever this screen comes back.
+   *
+   * A friend request has no socket event behind it — unlike a message, a presence change or
+   * anything to do with a lobby — so the only things that could put one on screen were a
+   * push notification and the global five-minute `staleTime`. That is a long time to sit on
+   * an empty list looking at a section that renders nothing when it is empty, and it is
+   * indistinguishable from the request never having been sent. A gamer who withdrew a
+   * request and sent it again reported exactly that, and this is the half of it the client
+   * owns; the other half was the push being collapsed away, fixed in `FCMService`.
+   *
+   * Focus is the right trigger because it is when somebody has come to look.
+   */
+  const query = useQuery({
+    queryKey: ['friendRequests'],
+    queryFn: socialApi.pendingRequests,
+    staleTime: 0,
+  });
+
+  const refetch = query.refetch;
+  useFocusEffect(
+    useCallback(() => {
+      void refetch();
+    }, [refetch]),
+  );
 
   const answer = useMutation({
     mutationFn: ({ userId, accept }: { userId: string; accept: boolean }) =>
@@ -77,13 +102,10 @@ export function FriendRequestsSection() {
 
         <View className="flex-1" />
 
-        {/* Rotated through `style`, not a class: a `rotate-*` utility present in one state
-            and absent in the other stops NativeWind painting the subtree — see
-            `src/ui/hairline.ts`. Matches the chevron on the sections below. */}
-        <View
-          className="h-2 w-2 border-b-2 border-r-2 border-muted"
-          style={{ transform: [{ rotate: open ? '45deg' : '-45deg' }] }}
-        />
+        {/* Matches the chevron on the sections below, and must keep matching it — the two
+            headers sit one above the other on the same tab. See the note there for why
+            this is a Lucide glyph rather than a rotated bordered box. */}
+        <Icon as={open ? ChevronUp : ChevronDown} size={16} tone="muted" />
       </Pressable>
 
       {open && (

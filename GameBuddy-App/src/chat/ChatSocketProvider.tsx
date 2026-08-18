@@ -102,7 +102,29 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
 
     const timers = typingTimers.current;
     const instance = createChatSocket(token, {
-      onStatus: setStatus,
+      onStatus: (next) => {
+        setStatus(next);
+        // Losing the socket invalidates every presence value we are holding, for the same
+        // reason the cleanup below clears them: these are pushed updates, and once nobody
+        // is pushing, what we have is only a record of what was true when the connection
+        // died. That cleanup was the *only* place this happened, and it runs on sign-out
+        // and unmount — never on a reconnect, which stompjs handles internally.
+        //
+        // The cost of not doing it here was the reported bug. Two gamers whose sockets
+        // drop together each keep a pushed "offline" for the other; the conversation
+        // screen prefers a pushed value over the fresh one it fetches on reconnect, so
+        // both stayed greyed out, with their messages arriving normally, until the app was
+        // closed and reopened — which ran this cleanup and fixed it.
+        //
+        // Cleared rather than refetched: with nothing pushed, each screen falls through to
+        // its own `GET /presence/{id}`, which is already asked for on reconnect.
+        if (next !== 'connected') {
+          setPresence({});
+          setTyping({});
+          timers.forEach(clearTimeout);
+          timers.clear();
+        }
+      },
       onMessage: (notification) => {
         // A message ends the typing indicator: they have stopped typing by definition,
         // and leaving it up next to the thing they just sent looks broken.

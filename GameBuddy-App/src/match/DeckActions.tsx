@@ -1,4 +1,4 @@
-import { Heart, RotateCcw, X } from 'lucide-react-native';
+import { Heart, RotateCcw, Star, X } from 'lucide-react-native';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
@@ -19,6 +19,8 @@ type DeckActionsProps = {
   canRewind?: boolean;
   /** Coins a rewind costs here. Zero on Gold, and shown so the price is never a surprise. */
   rewindCost?: number;
+  /** Super Likes in hand. The button is not offered at zero — see below. */
+  superLikes?: number;
 };
 
 /**
@@ -35,8 +37,10 @@ export function DeckActions({
   onRewind,
   canRewind = false,
   rewindCost = 0,
+  superLikes = 0,
 }: DeckActionsProps) {
   const t = useT();
+  const colors = useThemeColors();
   return (
     <View className="flex-row items-center justify-center gap-6 py-5">
       {/* Left of Pass, and smaller than both. Undo is a recovery action, not a third
@@ -84,11 +88,32 @@ export function DeckActions({
         <Icon as={Heart} size={30} tone="inverse" fill="#FFFFFF" strokeWidth={0} />
       </CircleButton>
 
-      {/* Mirrors the rewind spacer, so Pass and Match stay centred. The deck boost used to
-          sit here — the row read undo · pass · match · boost — and it was retired: what it
-          promoted was a face inside somebody else's stack, so the buyer had no way to see
-          it had worked. Boosting moved to lobbies, where the result is visible on a list. */}
-      <View className="w-14" />
+      {/* Where the retired deck boost used to sit — the row read undo · pass · match ·
+          boost. A Super Like belongs in that slot far better than a spacer did: it is a
+          third answer to the same question the other two buttons ask, and until now it was
+          a thing you could buy and then never use. Sized between Pass and Match, because
+          it is a stronger yes than a like and a rarer one than either.
+
+          Hidden entirely at zero rather than shown disabled. A greyed-out button on the
+          main screen is a permanent advertisement for something you do not have, and the
+          swipe still offers the same purchase prompt for anyone who wants one. */}
+      {superLikes > 0 ? (
+        <CircleButton
+          label={t.deck.actions.superLike}
+          hint={t.deck.actions.superLikeHint}
+          caption={t.deck.actions.superLikeLeft(superLikes)}
+          onPress={() => {
+            commit();
+            onDecide('super');
+          }}
+          disabled={disabled}
+          className="border-gold/60 bg-surface"
+        >
+          <Icon as={Star} size={26} tone="gold" fill={colors.gold} strokeWidth={0} />
+        </CircleButton>
+      ) : (
+        <View className="w-14" />
+      )}
     </View>
   );
 }
@@ -138,6 +163,7 @@ function RewindButton({
 function CircleButton({
   label,
   hint,
+  caption,
   onPress,
   disabled,
   className,
@@ -148,6 +174,8 @@ function CircleButton({
 }: {
   label: string;
   hint: string;
+  /** Replaces the label under the button. The label still goes to assistive technology. */
+  caption?: string;
   onPress: () => void;
   disabled?: boolean;
   className?: string;
@@ -202,7 +230,10 @@ function CircleButton({
         )}
         {children}
       </Pressable>
-      <Text variant="caption">{label}</Text>
+      {/* The caption is what the eye needs — a count is more use than a name it can already
+          read from the icon — while `accessibilityLabel` above keeps saying what the button
+          is, which is what a screen reader needs. */}
+      <Text variant="caption">{caption ?? label}</Text>
     </View>
   );
 }

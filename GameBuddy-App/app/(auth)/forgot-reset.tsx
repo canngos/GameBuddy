@@ -6,7 +6,7 @@ import { authApi } from '../../src/api/auth';
 import { useT } from '../../src/i18n/useT';
 import { usePasswordReset } from '../../src/session/passwordReset';
 import { Button, Card, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { passwordError } from '../../src/validation';
+import { normalisePassword, passwordError } from '../../src/validation';
 
 /**
  * Step three of three: the new password.
@@ -28,7 +28,7 @@ export default function ForgotReset() {
   const [touched, setTouched] = useState(false);
 
   const save = useMutation({
-    mutationFn: () => authApi.resetPassword(email, ticket, password),
+    mutationFn: () => authApi.resetPassword(email, ticket, normalisePassword(password)),
   });
 
   function submit() {
