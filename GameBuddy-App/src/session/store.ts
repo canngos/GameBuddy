@@ -3,6 +3,7 @@ import { authApi } from '../api/auth';
 import { profileApi } from '../api/catalogue';
 import { setSessionExpiredHandler, setTokenProvider } from '../api/client';
 import type { UserInfo } from '../api/types';
+import { clearAccountState } from './clearAccountState';
 import { secureStorage } from './storage';
 import { shouldRefresh } from './tokenClock';
 
@@ -184,6 +185,11 @@ export const useSession = create<SessionState>((set, get) => ({
   },
 
   signIn: async (token, userId) => {
+    // Belt and braces. Signing out already clears this, but sign-in is the point where
+    // stale data becomes *somebody else's* data, so it does not depend on the sign-out
+    // path having run — a token adopted after a crash, or a future flow that switches
+    // account directly, would otherwise inherit the cache.
+    clearAccountState();
     await persist(token, userId);
     // Before the status, so the profile call below has a token to send.
     set({ token, userId });
@@ -212,6 +218,11 @@ export const useSession = create<SessionState>((set, get) => ({
     // Clear the state before storage: the guard should redirect immediately rather
     // than wait on a keychain write.
     set({ status: 'signedOut', token: null, userId: null });
+    // ...and before anything else, everything the account left in memory. The token is
+    // not the only thing that identifies a session: the query cache holds that account's
+    // profile, inbox and friends, and without this the next person to sign in is shown
+    // them. See `clearAccountState`.
+    clearAccountState();
     await Promise.all([
       secureStorage.remove(TOKEN_KEY),
       secureStorage.remove(USER_ID_KEY),
