@@ -27,6 +27,15 @@ export function useErrorText(): (error: unknown) => string {
   const t = useT();
 
   return (error: unknown) => {
+    // Matched by name rather than instanceof, so this file does not import the billing
+    // module (which lazy-loads native store code) just to recognise its error type.
+    if (error instanceof Error && error.name === 'StoreUnavailableError') {
+      const reason = (error as { reason?: string }).reason;
+      if (reason === 'notInBuild') return t.billing.storeNotInBuild;
+      if (reason === 'productMissing') return t.billing.storePlanMissing;
+      return t.billing.storeUnavailable;
+    }
+
     if (!(error instanceof ApiError)) return t.errors.generic;
 
     if (error.code === ApiError.NETWORK) return t.errors.network;

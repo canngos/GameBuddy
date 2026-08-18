@@ -49,7 +49,7 @@ export default function Register() {
         <Text variant="overline">{t.auth.stepOne}</Text>
         <Text variant="title">{t.auth.register.title}</Text>
         <Text variant="body" className="text-muted">
-          We will email a six-digit code to confirm the address.
+          {t.auth.register.subtitle}
         </Text>
       </View>
 
@@ -58,18 +58,18 @@ export default function Register() {
           label={t.auth.register.email}
           value={email}
           onChangeText={setEmail}
-          error={emailProblem}
+          error={emailProblem && emailProblem(t)}
           keyboardType="email-address"
           textContentType="emailAddress"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder={t.auth.emailPlaceholder}
         />
 
         <TextField
           label={t.auth.register.password}
           value={password}
           onChangeText={setPassword}
-          error={passwordProblem}
+          error={passwordProblem && passwordProblem(t)}
           hint={t.auth.register.passwordHint}
           secure
           textContentType="newPassword"
@@ -82,25 +82,35 @@ export default function Register() {
           <Checkbox
             checked={accepted}
             onChange={setAccepted}
-            accessibilityLabel="I am 18 or over and accept the Terms and Privacy Policy"
+            accessibilityLabel={t.auth.register.consentA11y}
           >
+            {/* The sentence arrives as ordered segments so each language keeps its own
+                word order around the bold age phrase and the two document links. */}
             <Text variant="body">
-              I confirm I am <Text variant="bodyStrong">18 years of age or older</Text> and I
-              accept the{' '}
-              <Text variant="bodyStrong" className="text-primary" onPress={openTerms}>
-                Terms of Service
-              </Text>{' '}
-              and{' '}
-              <Text variant="bodyStrong" className="text-primary" onPress={openPrivacy}>
-                Privacy Policy
-              </Text>
-              .
+              {t.auth.register.consent.map((segment, index) =>
+                segment.link ? (
+                  <Text
+                    key={index}
+                    variant="bodyStrong"
+                    className="text-primary"
+                    onPress={segment.link === 'terms' ? openTerms : openPrivacy}
+                  >
+                    {segment.text}
+                  </Text>
+                ) : segment.bold ? (
+                  <Text key={index} variant="bodyStrong">
+                    {segment.text}
+                  </Text>
+                ) : (
+                  segment.text
+                ),
+              )}
             </Text>
           </Checkbox>
 
           {consentProblem && (
             <Text variant="caption" className="text-danger">
-              You need to accept this to create an account.
+              {t.auth.register.consentRequired}
             </Text>
           )}
         </View>
@@ -110,7 +120,7 @@ export default function Register() {
         {emailTaken && (
           <View className="gap-3 rounded-card border border-danger/40 bg-danger/10 p-4">
             <Text variant="bodyStrong" className="text-danger">
-              That email is already registered.
+              {t.auth.register.emailTaken}
             </Text>
             <Button
               label={t.auth.register.signInInstead}

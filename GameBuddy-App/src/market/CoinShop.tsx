@@ -5,6 +5,8 @@ import { trackFunnel } from '../api/funnel';
 import { COIN_PACKS, bonusPercent, type CoinPack } from '../api/billing';
 import { storeAvailable } from '../billing/purchases';
 import { usePurchase } from '../billing/usePurchase';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { Card, ErrorNotice, Icon, Text } from '../ui';
 
 /**
@@ -34,6 +36,8 @@ export function CoinShop({
    */
   onLayoutY?: (y: number) => void;
 }) {
+  const t = useT();
+  const upper = useUpper();
   const buy = usePurchase('coins');
   const canBuy = storeAvailable();
 
@@ -49,11 +53,9 @@ export function CoinShop({
       onLayout={(event) => onLayoutY?.(event.nativeEvent.layout.y)}
     >
       <View className="gap-1">
-        <Text variant="overline">COINS</Text>
+        <Text variant="overline">{upper(t.market.coins.header)}</Text>
         <Text variant="caption">
-          {canBuy
-            ? 'Top up now, or earn them free under Earn — a daily streak, quests and badges.'
-            : 'Earn them under Earn: a daily streak, quests and badges. Buying is not available in this build yet.'}
+          {canBuy ? t.market.coins.blurbBuy : t.market.coins.blurbNoBuy}
         </Text>
       </View>
 
@@ -74,9 +76,9 @@ export function CoinShop({
           buying the same pack twice. */}
       {buy.awaitingEntitlement && (
         <Card>
-          <Text variant="bodyStrong">Your coins are on the way</Text>
+          <Text variant="bodyStrong">{t.market.coins.onTheWay}</Text>
           <Text variant="caption" className="mt-1">
-            They can take a moment to arrive. There is no need to buy again.
+            {t.market.coins.onTheWayBody}
           </Text>
         </Card>
       )}
@@ -95,6 +97,7 @@ function PackRow({
   disabled: boolean;
   onPress: () => void;
 }) {
+  const t = useT();
   const bonus = bonusPercent(pack);
 
   return (
@@ -102,7 +105,7 @@ function PackRow({
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={`Buy ${pack.coins} coins for ${pack.price}`}
+      accessibilityLabel={t.market.coins.packA11y(pack.coins, pack.price)}
       accessibilityState={{ disabled }}
       className={[
         'flex-row items-center justify-between gap-4 rounded-card border border-line bg-raised p-4',
@@ -115,7 +118,9 @@ function PackRow({
         </View>
         <View className="gap-0.5">
           <View className="flex-row items-center gap-2">
-            <Text variant="bodyStrong">{pack.coins.toLocaleString()} coins</Text>
+            <Text variant="bodyStrong">
+              {t.market.coins.packCoins(pack.coins.toLocaleString(t.locale))}
+            </Text>
             {bonus !== null && (
               <View className="rounded-full bg-gold/15 px-2 py-0.5">
                 <Text className="font-semibold text-[11px] leading-[15px] text-gold">
@@ -126,7 +131,9 @@ function PackRow({
           </View>
           {/* What the balance becomes, not just what the pack contains. The question on
               this screen is always "can I afford that frame", and this answers it. */}
-          <Text variant="caption">Takes you to {(balance + pack.coins).toLocaleString()}</Text>
+          <Text variant="caption">
+            {t.market.coins.takesYouTo((balance + pack.coins).toLocaleString(t.locale))}
+          </Text>
         </View>
       </View>
 

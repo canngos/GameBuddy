@@ -6,7 +6,18 @@
  * `PasswordPolicy.java` and the bean-validation annotations on the auth requests; if
  * those change, these are wrong until updated, which is the accepted cost of not
  * making the user wait for a round trip to be told their password is too short.
+ *
+ * Validators return a *message selector* — `(t) => t.validation.…` — rather than an
+ * English string. The caller resolves it against the current dictionary at render time
+ * (`problem && problem(t)`), so the module stays free of React and the compiler forces
+ * every call site to translate rather than leak English. Limits like `PASSWORD_MIN` are
+ * baked in here, not hardcoded in seven dictionaries, so the policy has one source.
  */
+
+import type { Dictionary } from './i18n/dictionaries/en';
+
+/** A validation message, waiting to be resolved against the current language. */
+export type Msg = (t: Dictionary) => string;
 
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
@@ -22,18 +33,18 @@ export const MAX_AGE = 99;
 /** Deliberately loose. Address validity is decided by whether the code arrives. */
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function emailError(value: string): string | null {
-  if (!value.trim()) return 'Enter your email address';
-  if (!EMAIL.test(value.trim())) return 'That does not look like an email address';
+export function emailError(value: string): Msg | null {
+  if (!value.trim()) return (t) => t.validation.emailEmpty;
+  if (!EMAIL.test(value.trim())) return (t) => t.validation.emailInvalid;
   return null;
 }
 
-export function passwordError(value: string): string | null {
-  if (!value) return 'Enter a password';
-  if (value.length < PASSWORD_MIN) return `At least ${PASSWORD_MIN} characters`;
-  if (value.length > PASSWORD_MAX) return `At most ${PASSWORD_MAX} characters`;
+export function passwordError(value: string): Msg | null {
+  if (!value) return (t) => t.validation.passwordEmpty;
+  if (value.length < PASSWORD_MIN) return (t) => t.validation.atLeastChars(PASSWORD_MIN);
+  if (value.length > PASSWORD_MAX) return (t) => t.validation.atMostChars(PASSWORD_MAX);
   if (!/[a-zA-Z]/.test(value) || !/[0-9]/.test(value)) {
-    return 'Include at least one letter and one number';
+    return (t) => t.validation.letterAndNumber;
   }
   return null;
 }
@@ -58,15 +69,17 @@ const RESERVED = new Set([
   'undefined',
 ]);
 
-export function usernameError(value: string): string | null {
+export function usernameError(value: string): Msg | null {
   const trimmed = value.trim();
-  if (!trimmed) return 'Pick a username';
-  if (trimmed.length < 3) return 'At least 3 characters';
-  if (trimmed.length > 20) return 'At most 20 characters';
-  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return 'Letters, numbers and underscores only';
-  if (!/[a-zA-Z0-9]/.test(trimmed)) return 'Include at least one letter or number';
+  if (!trimmed) return (t) => t.validation.usernameEmpty;
+  if (trimmed.length < 3) return (t) => t.validation.atLeastChars(3);
+  if (trimmed.length > 20) return (t) => t.validation.atMostChars(20);
+  if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) return (t) => t.validation.usernameCharset;
+  if (!/[a-zA-Z0-9]/.test(trimmed)) return (t) => t.validation.usernameLetterOrNumber;
   const lower = trimmed.toLowerCase();
-  if (RESERVED.has(lower) || lower.startsWith('deleted_')) return 'That username is not available';
+  if (RESERVED.has(lower) || lower.startsWith('deleted_')) {
+    return (t) => t.validation.usernameUnavailable;
+  }
   return null;
 }
 
@@ -100,16 +113,16 @@ export function parseBirthDate(day: string, month: string, year: string): Date |
   return parsed;
 }
 
-export function birthDateError(day: string, month: string, year: string): string | null {
-  if (!day.trim() || !month.trim() || !year.trim()) return 'Enter your date of birth';
+export function birthDateError(day: string, month: string, year: string): Msg | null {
+  if (!day.trim() || !month.trim() || !year.trim()) return (t) => t.validation.birthDateEmpty;
 
   const parsed = parseBirthDate(day, month, year);
-  if (!parsed) return 'That is not a real date';
-  if (parsed > new Date()) return 'That date is in the future';
+  if (!parsed) return (t) => t.validation.notARealDate;
+  if (parsed > new Date()) return (t) => t.validation.dateInFuture;
 
   const age = ageFrom(parsed);
-  if (age < MIN_AGE) return `You must be ${MIN_AGE} or over to use GameBuddy`;
-  if (age > MAX_AGE) return 'Check the year';
+  if (age < MIN_AGE) return (t) => t.validation.mustBeAge(MIN_AGE);
+  if (age > MAX_AGE) return (t) => t.validation.checkYear;
   return null;
 }
 
@@ -121,7 +134,7 @@ export function toIsoDate(date: Date): string {
 }
 
 /** Six digits. The backend rejects anything outside 100000–999999. */
-export function codeError(value: string): string | null {
-  if (!/^\d{6}$/.test(value.trim())) return 'Enter the 6-digit code';
+export function codeError(value: string): Msg | null {
+  if (!/^\d{6}$/.test(value.trim())) return (t) => t.validation.sixDigitCode;
   return null;
 }

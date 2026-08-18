@@ -20,3 +20,13 @@ export function useT(): Dictionary {
   const lang = useLangStore((s) => s.lang);
   return dictionaries[lang];
 }
+
+/**
+ * The dictionary at this instant, for code that runs outside React — toasts, alert
+ * builders, notification content. Not reactive: nothing re-renders when the language
+ * changes, which is fine for one-shot surfaces and wrong for anything that stays on
+ * screen. Use `useT()` in anything that renders.
+ */
+export function tNow(): Dictionary {
+  return dictionaries[useLangStore.getState().lang];
+}

@@ -8,6 +8,9 @@ import { billingApi } from '../../src/api/billing';
 import { profileApi } from '../../src/api/catalogue';
 import { socialApi } from '../../src/api/social';
 import type { GamerSummary } from '../../src/api/types';
+import { useUpper } from '../../src/i18n/case';
+import { useCountryName } from '../../src/i18n/countryNames';
+import { useT } from '../../src/i18n/useT';
 import { useThemeColors } from '../../src/theme';
 import {
   Button,
@@ -23,6 +26,9 @@ import {
 export default function Profile() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
+  const localize = useCountryName();
 
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
   const requests = useQuery({ queryKey: ['friendRequests'], queryFn: socialApi.pendingRequests });
@@ -38,8 +44,8 @@ export default function Profile() {
     <Screen scroll edges={['top']}>
       <View className="flex-row items-center justify-between pb-6 pt-8">
         <View>
-          <Text variant="overline">YOU</Text>
-          <Text variant="title">Profile</Text>
+          <Text variant="overline">{upper(t.profile.header)}</Text>
+          <Text variant="title">{t.profile.title}</Text>
         </View>
         <View className="flex-row items-center gap-2">
           {/* Inventory before Settings, because it is the one people come back to. A
@@ -48,7 +54,7 @@ export default function Profile() {
           <Pressable
             onPress={() => router.push('/inventory')}
             accessibilityRole="button"
-            accessibilityLabel="Inventory"
+            accessibilityLabel={t.profile.inventoryA11y}
             className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
           >
             <Icon as={Shirt} size={20} tone="content" />
@@ -57,7 +63,7 @@ export default function Profile() {
           <Pressable
             onPress={() => router.push('/settings')}
             accessibilityRole="button"
-            accessibilityLabel="Settings"
+            accessibilityLabel={t.profile.settingsA11y}
             className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
           >
             {/* A cog, not the three dots that used to be here. The dots said "there is a
@@ -98,7 +104,7 @@ export default function Profile() {
                   {isGold && <GoldTag />}
                 </View>
                 <Text variant="caption">
-                  {[me.data.age, me.data.country].filter(Boolean).join(' · ')}
+                  {[me.data.age, localize(me.data.country)].filter(Boolean).join(' · ')}
                 </Text>
               </View>
             </View>
@@ -110,13 +116,13 @@ export default function Profile() {
                   Market's job, and sending people there from here would be a shop
                   doorway in the middle of a profile. */}
               <Stat
-                label="Friends"
+                label={t.profile.friends}
                 value={friends.data?.length ?? 0}
                 onPress={() => router.push('/friends')}
               />
-              <Stat label="Coins" value={me.data.coin ?? 0} />
+              <Stat label={t.profile.coins} value={me.data.coin ?? 0} />
               <Stat
-                label="Badges"
+                label={t.profile.badges}
                 value={me.data.badgeCount ?? 0}
                 onPress={() => router.push('/badges')}
               />
@@ -126,11 +132,11 @@ export default function Profile() {
 
             <View className="h-px bg-line" />
 
-            <Tags title="Games" items={me.data.games.map((g) => g.gameName)} accent />
+            <Tags title={t.profile.games} items={me.data.games.map((g) => g.gameName)} accent />
             {/* Directly under games, because it is the second half of the same question:
                 what you play, and what you play it on. */}
-            <Tags title="Plays on" items={me.data.platforms ?? []} />
-            <Tags title="Keywords" items={me.data.keywords.map((k) => k.keywordName)} />
+            <Tags title={t.profile.playsOn} items={me.data.platforms ?? []} />
+            <Tags title={t.profile.keywords} items={me.data.keywords.map((k) => k.keywordName)} />
           </Card>
         )}
 
@@ -160,12 +166,13 @@ export default function Profile() {
  */
 function GoldTag() {
   const colors = useThemeColors();
+  const t = useT();
 
   return (
     <View
       className="shrink-0 flex-row items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5"
       accessibilityRole="text"
-      accessibilityLabel="GameBuddy Gold member"
+      accessibilityLabel={t.profile.goldMemberA11y}
     >
       <Icon as={Crown} size={12} tone="gold" fill={colors.gold} strokeWidth={2} />
       <Text className="font-semibold text-[11px] leading-[15px] text-gold">Gold</Text>
@@ -216,15 +223,16 @@ function Showcase({
   badges: { code: string; title: string; icon: string }[];
   onPress: () => void;
 }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel="Badges"
+      accessibilityLabel={t.profile.badgesA11y}
       className="flex-row items-center gap-3 active:opacity-70"
     >
       {badges.length === 0 ? (
-        <Text variant="caption">No badges on show yet — tap to pick some</Text>
+        <Text variant="caption">{t.profile.noShowcase}</Text>
       ) : (
         badges.map((badge) => (
           // Wide enough for two lines of the longest title in the set. At one line
@@ -291,6 +299,8 @@ function Tags({
 
 /** Pending requests, each answerable in place. */
 function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSummary[]>> }) {
+  const t = useT();
+  const upper = useUpper();
   const queryClient = useQueryClient();
 
   const answer = useMutation({
@@ -313,9 +323,7 @@ function FriendRequests({ query }: { query: ReturnType<typeof useQuery<GamerSumm
 
   return (
     <View className="gap-3">
-      <Text variant="overline">
-        FRIEND REQUESTS · {requests.length}
-      </Text>
+      <Text variant="overline">{upper(t.profile.friendRequests(requests.length))}</Text>
 
       {/* Left as a `map` rather than virtualized, deliberately: this is a *section* inside
           the profile's ScrollView, and a FlatList nested in one is the layout React Native
@@ -354,11 +362,13 @@ const RequestRow = memo(function RequestRow({
   busy: boolean;
   onAnswer: (userId: string, accept: boolean) => void;
 }) {
+  const t = useT();
+  const localize = useCountryName();
   const accept = useCallback(() => onAnswer(person.userId, true), [onAnswer, person.userId]);
   const decline = useCallback(() => onAnswer(person.userId, false), [onAnswer, person.userId]);
   const meta = useMemo(
-    () => [person.age, person.country].filter(Boolean).join(' · '),
-    [person.age, person.country],
+    () => [person.age, localize(person.country)].filter(Boolean).join(' · '),
+    [person.age, person.country, localize],
   );
 
   return (
@@ -375,9 +385,9 @@ const RequestRow = memo(function RequestRow({
         <Text variant="caption">{meta}</Text>
       </View>
 
-      <Button label="Accept" size="md" className="px-4" disabled={busy} onPress={accept} />
+      <Button label={t.profile.accept} size="md" className="px-4" disabled={busy} onPress={accept} />
       <Button
-        label="No"
+        label={t.profile.no}
         variant="ghost"
         size="md"
         className="px-3"

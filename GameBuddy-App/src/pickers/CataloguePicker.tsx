@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { cn } from '../ui/cn';
 import { ErrorNotice } from '../ui/ErrorNotice';
@@ -117,11 +118,12 @@ export function CataloguePicker({
   isLoading = false,
   error,
   onRetry,
-  searchPlaceholder = 'Search',
+  searchPlaceholder,
   filters,
   header,
   footer,
 }: CataloguePickerProps) {
+  const t = useT();
   const [query, setQuery] = useState('');
   /**
    * The field stays bound to `query` so typing is never held up; only the filtering reads
@@ -242,7 +244,7 @@ export function CataloguePicker({
           header={header}
           query={query}
           onQueryChange={setQuery}
-          searchPlaceholder={searchPlaceholder}
+          searchPlaceholder={searchPlaceholder ?? t.common.search}
           filters={filters}
           chosen={chosen}
           onToggleFilter={toggleFilter}
@@ -315,6 +317,7 @@ function PickerHeader({
   showEmpty: boolean;
 }) {
   const colors = useThemeColors();
+  const t = useT();
 
   return (
     <View className="gap-4 pb-1">
@@ -340,10 +343,10 @@ function PickerHeader({
       {showEmpty && (
         <Text className="text-center text-muted">
           {emptyQuery && activeCount > 0
-            ? `Nothing matches “${emptyQuery}” with these filters.`
+            ? t.pickers.noMatchesQueryFiltered(emptyQuery)
             : activeCount > 0
-              ? 'Nothing matches these filters.'
-              : `Nothing matches “${emptyQuery}”.`}
+              ? t.pickers.noMatchesFiltered
+              : t.pickers.noMatchesQuery(emptyQuery)}
         </Text>
       )}
 
@@ -361,11 +364,9 @@ function PickerHeader({
           onPress={onClearFilters}
           className="min-h-touch justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Clear all filters"
+          accessibilityLabel={t.pickers.clearFiltersA11y}
         >
-          <Text className="text-primary">
-            Clear {activeCount} filter{activeCount === 1 ? '' : 's'}
-          </Text>
+          <Text className="text-primary">{t.pickers.clearFilters(activeCount)}</Text>
         </Pressable>
       )}
 

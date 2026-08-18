@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 import { catalogueApi } from '../../src/api/catalogue';
+import { useT } from '../../src/i18n/useT';
 import { useDraft } from '../../src/onboarding/draft';
 import { SelectionCount } from '../../src/onboarding/SelectionCount';
 import { StepHeader } from '../../src/onboarding/StepHeader';
@@ -13,6 +14,7 @@ import { MIN_GAMES } from '../../src/validation';
 
 export default function Games() {
   const router = useRouter();
+  const t = useT();
   // Selectors rather than the whole store: `toggleGame` is then identity-stable, which is
   // what lets the picker's cards stay memoised and keeps a tap off the catalogue's render
   // path. It also stops an unrelated draft write from re-rendering this screen.
@@ -22,7 +24,7 @@ export default function Games() {
   const games = useQuery({ queryKey: ['games'], queryFn: catalogueApi.games });
 
   const items = useMemo(() => (games.data ?? []).map(toGameItem), [games.data]);
-  const filters = useMemo(() => gameFilters(games.data ?? []), [games.data]);
+  const filters = useMemo(() => gameFilters(games.data ?? [], t), [games.data, t]);
 
   return (
     // Not `scroll`: the picker is a FlatList and owns the scrolling, so the step header
@@ -32,11 +34,11 @@ export default function Games() {
         <View className="gap-2">
           <SelectionCount picked={gameIds.length} minimum={MIN_GAMES} />
           <Button
-            label="Continue"
+            label={t.common.continue}
             disabled={gameIds.length < MIN_GAMES}
             onPress={() => router.push('/platforms')}
           />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
@@ -45,8 +47,8 @@ export default function Games() {
           <StepHeader
             step={4}
             total={6}
-            title="What do you play?"
-            subtitle={`Pick at least ${MIN_GAMES}. This is most of what the recommendations are built from.`}
+            title={t.onboarding.games.title}
+            subtitle={t.onboarding.games.subtitle(MIN_GAMES)}
           />
         }
         items={items}
@@ -56,7 +58,7 @@ export default function Games() {
         error={games.error}
         onRetry={() => games.refetch()}
         layout="grid"
-        searchPlaceholder="Search games"
+        searchPlaceholder={t.onboarding.games.searchPlaceholder}
         filters={filters}
       />
     </Screen>

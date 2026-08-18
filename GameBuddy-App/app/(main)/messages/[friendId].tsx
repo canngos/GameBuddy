@@ -7,12 +7,15 @@ import { chatApi } from '../../../src/api/chat';
 import { socialApi } from '../../../src/api/social';
 import type { Conversation } from '../../../src/api/types';
 import { useConversation } from '../../../src/chat/useConversation';
+import type { Dictionary } from '../../../src/i18n/dictionaries/en';
+import { useT } from '../../../src/i18n/useT';
 import { useThemeColors } from '../../../src/theme';
 import { Avatar, cn, ErrorNotice, Screen, Text, TextField } from '../../../src/ui';
 
 export default function Chat() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
   const { friendId, username: passedUsername } = useLocalSearchParams<{
     friendId: string;
     username?: string;
@@ -80,7 +83,7 @@ export default function Chat() {
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
-          accessibilityLabel="Back"
+          accessibilityLabel={t.common.back}
           hitSlop={12}
           className="h-10 w-10 items-center justify-center active:opacity-60"
         >
@@ -98,13 +101,13 @@ export default function Chat() {
             } as never)
           }
           accessibilityRole="button"
-          accessibilityLabel={`View ${username ?? 'this gamer'}'s profile`}
+          accessibilityLabel={t.messages.viewProfileA11y(username ?? t.messages.thisGamer)}
           className="flex-1 flex-row items-center gap-3 active:opacity-70"
         >
           <Avatar source={null} name={username ?? '?'} colorSeed={friendId} size={36} />
 
           <View className="flex-1">
-            <Text variant="bodyStrong">{username ?? 'Conversation'}</Text>
+            <Text variant="bodyStrong">{username ?? t.messages.conversation}</Text>
             <StatusLabel status={chat.status} presence={chat.presence} isTyping={chat.isTyping} />
           </View>
         </Pressable>
@@ -133,9 +136,9 @@ export default function Chat() {
           onContentSizeChange={scrollToEnd}
           ListEmptyComponent={
             <View className="items-center gap-1 py-10">
-              <Text variant="bodyStrong">No messages yet</Text>
+              <Text variant="bodyStrong">{t.messages.noMessagesYet}</Text>
               <Text variant="caption" className="text-center">
-                You matched — someone has to go first.
+                {t.messages.emptyBlurb}
               </Text>
             </View>
           }
@@ -159,7 +162,7 @@ export default function Chat() {
       )}
       {report.isSuccess && (
         <View className="px-4 pb-2">
-          <Text variant="caption">Reported. A moderator will look at it.</Text>
+          <Text variant="caption">{t.messages.reported}</Text>
         </View>
       )}
 
@@ -174,7 +177,7 @@ export default function Chat() {
               // indicator up on the other side just as the message landed.
               if (text.length > 0) chat.notifyTyping();
             }}
-            placeholder="Message"
+            placeholder={t.messages.placeholder}
             multiline
             maxLength={2000}
             onSubmitEditing={submit}
@@ -185,7 +188,7 @@ export default function Chat() {
           onPress={submit}
           disabled={draft.trim().length === 0 || chat.sending}
           accessibilityRole="button"
-          accessibilityLabel="Send"
+          accessibilityLabel={t.common.send}
           className={cn(
             'h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80',
             (draft.trim().length === 0 || chat.sending) && 'opacity-40',
@@ -216,6 +219,7 @@ export default function Chat() {
  */
 function FriendAction({ userId }: { userId: string }) {
   const colors = useThemeColors();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const friends = useQuery({ queryKey: ['friends'], queryFn: socialApi.friends });
@@ -271,7 +275,7 @@ function FriendAction({ userId }: { userId: string }) {
     return (
       <View
         className="h-10 w-10 items-center justify-center"
-        accessibilityLabel="Already friends"
+        accessibilityLabel={t.messages.alreadyFriends}
       >
         <PersonIcon color={colors.primary} badge="check" background={colors.canvas} />
       </View>
@@ -285,10 +289,10 @@ function FriendAction({ userId }: { userId: string }) {
       accessibilityRole="button"
       accessibilityLabel={
         theyAsked
-          ? 'Accept friend request'
+          ? t.messages.acceptRequest
           : youAsked
-            ? 'Friend request sent'
-            : 'Send a friend request'
+            ? t.messages.requestSent
+            : t.messages.sendRequest
       }
       hitSlop={8}
       className="h-10 w-10 items-center justify-center active:opacity-60"
@@ -400,13 +404,14 @@ function StatusLabel({
   presence: ReturnType<typeof useConversation>['presence'];
   isTyping: boolean;
 }) {
+  const t = useT();
   if (status !== 'connected') {
     const label =
       status === 'connecting'
-        ? 'Connecting…'
+        ? t.messages.connecting
         : status === 'reconnecting'
-          ? 'Reconnecting…'
-          : 'Offline';
+          ? t.messages.reconnecting
+          : t.messages.offline;
     return (
       <Text variant="caption" className={status === 'idle' ? 'text-danger' : 'text-muted'}>
         {label}
@@ -417,7 +422,7 @@ function StatusLabel({
   if (isTyping) {
     return (
       <Text variant="caption" className="text-primary">
-        typing…
+        {t.messages.typing}
       </Text>
     );
   }
@@ -429,14 +434,16 @@ function StatusLabel({
   if (presence.online) {
     return (
       <Text variant="caption" className="text-primary">
-        Online
+        {t.messages.online}
       </Text>
     );
   }
 
   return (
     <Text variant="caption" className="text-muted">
-      {presence.lastSeenAt ? `Last seen ${timeAgo(presence.lastSeenAt)}` : 'Offline'}
+      {presence.lastSeenAt
+        ? t.messages.lastSeen(timeAgo(presence.lastSeenAt, t))
+        : t.messages.offline}
     </Text>
   );
 }
@@ -446,17 +453,16 @@ function StatusLabel({
  *
  * Rounded down and capped at a day, because presence is only interesting near the present:
  * the useful distinction is "just missed them" against "not around", and past a day the
- * exact figure says nothing a plain "Offline" would not. Nothing here is localised yet —
- * when that happens this is one of the strings that has to move.
+ * exact figure says nothing a plain "Offline" would not.
  */
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: Dictionary): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
-  if (seconds < 60) return 'just now';
+  if (seconds < 60) return t.messages.justNow;
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 60) return t.messages.minutesAgo(minutes);
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return 'a while ago';
+  if (hours < 24) return t.messages.hoursAgo(hours);
+  return t.messages.aWhileAgo;
 }
 
 const Bubble = memo(function Bubble({
@@ -468,6 +474,7 @@ const Bubble = memo(function Bubble({
   mine: boolean;
   onReport: (id: string) => void;
 }) {
+  const t = useT();
   const report = useCallback(() => onReport(message.id), [onReport, message.id]);
 
   return (
@@ -475,7 +482,7 @@ const Bubble = memo(function Bubble({
       // Reporting is only offered on messages you received: the backend refuses a
       // report on your own with RECEIVER_IS_DIFFERENT (143).
       onLongPress={mine ? undefined : report}
-      accessibilityHint={mine ? undefined : 'Long press to report this message'}
+      accessibilityHint={mine ? undefined : t.messages.reportHint}
       className={cn('max-w-[80%]', mine ? 'self-end' : 'self-start')}
     >
       <View

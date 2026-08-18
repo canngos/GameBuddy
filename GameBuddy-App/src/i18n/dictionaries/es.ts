@@ -2,6 +2,8 @@ import type { Dictionary } from './en';
 
 /** Español — Spanish. Typed against `en`, so a missing key is a build error. */
 export const es: Dictionary = {
+  locale: 'es',
+
   common: {
     back: 'Atrás',
     cancel: 'Cancelar',
@@ -10,8 +12,23 @@ export const es: Dictionary = {
     close: 'Cerrar',
     retry: 'Reintentar',
     continue: 'Continuar',
+    next: 'Siguiente',
+    finish: 'Terminar',
+    skip: 'Omitir',
+    search: 'Buscar',
+    send: 'Enviar',
+    edit: 'Editar',
     done: 'Listo',
     somethingWentWrong: 'Algo salió mal. Inténtalo de nuevo.',
+  },
+
+  time: {
+    now: 'ahora',
+    minutesShort: (n: number) => `${n} min`,
+    hoursShort: (n: number) => `${n} h`,
+    daysShort: (n: number) => `${n} d`,
+    inPhrase: (phrase: string) => `en ${phrase}`,
+    agoPhrase: (phrase: string) => `hace ${phrase}`,
   },
 
   welcome: {
@@ -30,6 +47,7 @@ export const es: Dictionary = {
   auth: {
     stepOne: 'PASO 1',
     stepTwo: 'PASO 2',
+    emailPlaceholder: 'tu@ejemplo.com',
 
     login: {
       title: 'Bienvenido de nuevo',
@@ -43,10 +61,23 @@ export const es: Dictionary = {
 
     register: {
       title: 'Crea tu cuenta',
+      subtitle: 'Te enviaremos un código de seis dígitos para confirmar la dirección.',
       email: 'Correo',
       password: 'Contraseña',
       passwordHint: 'Al menos 8 caracteres, con una letra y un número.',
       signInInstead: 'Mejor iniciar sesión',
+      consent: [
+        { text: 'Confirmo que tengo ' },
+        { text: '18 años o más', bold: true },
+        { text: ' y acepto los ' },
+        { text: 'Términos del servicio', bold: true, link: 'terms' },
+        { text: ' y la ' },
+        { text: 'Política de privacidad', bold: true, link: 'privacy' },
+        { text: '.' },
+      ],
+      consentA11y: 'Tengo 18 años o más y acepto los Términos y la Política de privacidad',
+      consentRequired: 'Tienes que aceptarlo para crear una cuenta.',
+      emailTaken: 'Ese correo ya está registrado.',
     },
 
     verify: {
@@ -55,6 +86,72 @@ export const es: Dictionary = {
       code: 'Código de verificación',
       submit: 'Verificar',
       resend: 'Enviar un código nuevo',
+      resendCooldown: (s: number) => `Enviar un código nuevo (${s}s)`,
+    },
+  },
+
+  onboarding: {
+    stepOf: (step: number, total: number) => `Paso ${step} de ${total}`,
+    moreToGo: (n: number) => (n === 1 ? 'Falta 1' : `Faltan ${n}`),
+
+    profile: {
+      title: 'Sobre ti',
+      subtitle:
+        'GameBuddy es para adultos. Usamos tu fecha de nacimiento para confirmar que tienes 18 años o más — nunca se muestra a nadie.',
+      ageHint: (n: number) => `Debes tener ${n} años o más.`,
+      countryRequired: 'Elige tu país',
+      gender: 'Género',
+      genderMan: 'Hombre',
+      genderWoman: 'Mujer',
+      genderOther: 'Otro',
+      genderNone: 'Prefiero no decirlo',
+    },
+
+    username: {
+      title: 'Elige un nombre de usuario',
+      subtitle: 'Es lo que ven los demás jugadores. Puedes cambiarlo más adelante.',
+      label: 'Nombre de usuario',
+      taken: 'Ese nombre ya está cogido. Prueba con otro.',
+      hint: 'Letras, números y guiones bajos.',
+      placeholder: 'heroe_del_headshot',
+    },
+
+    avatar: {
+      title: 'Elige tu look',
+      subtitle:
+        'Es lo primero que ve la gente. Más adelante podrás subir una foto real desde tu perfil.',
+      pickOne: 'Elige uno para continuar.',
+    },
+
+    games: {
+      title: '¿A qué juegas?',
+      subtitle: (n: number) =>
+        `Elige al menos ${n}. La mayor parte de las recomendaciones se construye con esto.`,
+      searchPlaceholder: 'Buscar juegos',
+    },
+
+    platforms: {
+      title: '¿En qué juegas?',
+      subtitle: 'Elige todo lo que uses. Los demás filtran por esto, así que más es mejor que menos.',
+    },
+
+    keywords: {
+      title: '¿Cómo juegas?',
+      subtitle: (n: number) => `Elige al menos ${n}. Son los hábitos y ánimos con los que emparejamos.`,
+    },
+
+    birthDate: {
+      day: 'Día',
+      month: 'Mes',
+      year: 'Año',
+    },
+
+    country: {
+      label: 'País',
+      choose: 'Elige un país',
+      currentA11y: (name: string) => `País: ${name}`,
+      title: '¿Dónde estás?',
+      noMatch: (query: string) => `Ningún país coincide con «${query}».`,
     },
   },
 
@@ -64,6 +161,481 @@ export const es: Dictionary = {
     messages: 'Mensajes',
     market: 'Tienda',
     profile: 'Perfil',
+  },
+
+  lobby: {
+    tones: {
+      competitive: 'Competitivo',
+      chill: 'Tranquilo',
+      casual: 'Casual',
+      learning: 'Aprendiendo',
+    },
+
+    card: {
+      plays: (when: string) => `Empieza ${when}`,
+      unknownGame: 'Juego desconocido',
+      byOwner: (name: string) => `de ${name}`,
+      unknownOwner: 'alguien',
+      seatsFull: (seats: string) => `${seats} completo`,
+      seatsPlayers: (seats: string) => `${seats} jugadores`,
+      requested: 'Solicitado',
+      statusLocked: 'Equipo cerrado',
+      statusEnded: 'Jugado',
+      statusCancelled: 'Cancelado',
+    },
+
+    list: {
+      title: 'Encuentra tu equipo',
+      open: 'Abrir un lobby',
+      ownsLive: 'Ya tienes un lobby abierto. Termínalo o cancélalo para abrir otro.',
+      yourLobby: 'Tu lobby',
+      yourLobbies: 'Tus lobbys',
+      openLobbies: 'Lobbys abiertos',
+      soon: 'Ahora',
+      soonA11y: 'Empieza en menos de 15 minutos',
+      emptySoonTitle: 'Nada empieza ahora mismo',
+      emptySoonBlurb:
+        'Nada empieza en los próximos 15 minutos. Desactiva Ahora para ver lo planeado para más tarde.',
+      emptyToneTitle: 'Nada con ese ambiente',
+      emptyToneBlurb: 'Ahora mismo no hay nada con ese ambiente. Prueba otro filtro o abre el tuyo.',
+      emptyTitle: 'No hay lobbys abiertos ahora',
+      emptyBlurb: 'Abre uno, pon una hora y elige quién se une.',
+    },
+
+    detail: {
+      fallbackTitle: 'Lobby',
+      gone: 'Este lobby ya no existe.',
+      wantsToJoin: 'Quieren unirse',
+      team: (taken: number, total: number) => `Equipo · ${taken}/${total}`,
+      accept: 'Aceptar',
+      pass: 'Pasar',
+      chat: 'Chat del lobby',
+      chatReadOnly: 'Chat del lobby · solo lectura',
+      emptyChatTitle: 'Nadie ha dicho nada aún',
+      emptyChatBlurb: 'Concreta los detalles con tu equipo aquí.',
+      composerPlaceholder: 'Mensaje al equipo',
+      playsBy: (when: string, owner: string) => `Empieza ${when} · de ${owner}`,
+      requirements: 'Requisitos',
+      statusLocked: 'Equipo cerrado — no acepta solicitudes',
+      statusEnded: 'Jugado y cerrado',
+      statusCancelled: 'Cancelado',
+      statusArchived: 'Archivado',
+      lockTeam: 'Cerrar equipo',
+      cancelLobby: 'Cancelar lobby',
+      unlock: 'Abrir equipo',
+      endLobby: 'Terminar lobby',
+      leaveLobby: 'Salir del lobby',
+      requestSent: 'Solicitud enviada. Te avisaremos cuando respondan.',
+      withdraw: 'Retirar solicitud',
+      rejected: 'El propietario llenó este lobby con otra persona.',
+      askToJoin: 'Pedir unirse',
+      full: 'Este lobby está lleno.',
+      owner: 'Propietario del lobby',
+      unknownGamer: 'Jugador desconocido',
+    },
+
+    create: {
+      title: 'Abrir un lobby',
+      goldTitle: 'Abrir un lobby viene con Gold',
+      goldBlurb: 'Mirar lobbys y pedir unirse es siempre gratis.',
+      getGold: 'Conseguir Gold',
+      game: 'Juego',
+      change: 'Cambiar',
+      searchGame: 'Busca el juego',
+      titlePlaceholder: 'Título',
+      descriptionPlaceholder: '¿Cuál es el plan? (opcional)',
+      requirementsPlaceholder: 'Requisitos — micro, rango, chat del juego (opcional)',
+      approveHint: 'Cuenta qué buscas. Cada solicitud la apruebas tú.',
+      tone: 'Ambiente',
+      players: 'Jugadores (contigo)',
+      when: 'Cuándo',
+      presetNow: 'Ahora',
+      presetIn1h: 'En 1 hora',
+      presetIn3h: 'En 3 horas',
+      pickATime: 'Elegir hora',
+      hour: 'Hora',
+      minute: 'Minuto',
+      tooFar: 'Los lobbys se pueden planear con hasta dos semanas de antelación.',
+      playsAt: (stamp: string) => `Empieza ${stamp}.`,
+      use24h: 'Usa el formato de 24 horas.',
+      zoneHint: (zone: string) => `Puesta en tu zona horaria (${zone}). Cada uno la ve en la suya.`,
+      zoneHintNoZone: 'Cada uno ve esta hora en su propia zona horaria.',
+      submit: 'Abrir lobby',
+    },
+  },
+
+  deck: {
+    header: {
+      discover: 'Descubrir',
+      title: 'Quién juega',
+      likesLeft: 'likes restantes',
+      filter: 'Filtrar',
+      filtersA11y: 'Filtros',
+      filtersOnA11y: (n: number) => `Filtros, ${n} activos`,
+      loading: 'Buscando gente que juega a lo que tú juegas…',
+    },
+
+    card: {
+      tapForProfile: 'Toca para ver el perfil completo',
+      plays: 'Juega a',
+      playsOn: 'Juega en',
+      style: 'Estilo',
+      inCommon: (n: number) => `${n} en común`,
+      playsOnA11y: (list: string) => `Juega en ${list}`,
+    },
+
+    actions: {
+      pass: 'Pasar',
+      passHint: 'Saltar a este jugador',
+      match: 'Match',
+      matchHint: 'Decir que sí a este jugador',
+      undo: 'Deshacer el último swipe',
+      undoCost: (cost: number) => `Deshacer el último swipe, ${cost} monedas`,
+    },
+
+    boost: {
+      free: 'Gratis',
+      activeA11y: (remaining: string) => `Boost activo, quedan ${remaining}`,
+      freeA11y: 'Usar tu boost semanal gratis',
+      costA11y: (cost: number) => `Boost por ${cost} monedas`,
+    },
+
+    match: {
+      title: '¡Es un match!',
+      body: (name: string) => `Tú y ${name} habéis dicho que sí.`,
+      message: 'Enviar un mensaje',
+      keep: 'Seguir deslizando',
+      someone: 'Alguien',
+    },
+
+    limit: {
+      likesTitle: 'Esos eran los likes de hoy',
+      likesBody: 'Puedes seguir mirando y pasando. Gold quita el tope.',
+      swipesTitle: 'Esos eran los swipes de hoy',
+      swipesBody: 'El mazo vuelve mañana. Gold elimina el límite diario.',
+      goldTitle: 'GameBuddy Gold',
+      goldBody: 'Esto es parte de Gold.',
+      swipesLeft: 'Swipes restantes',
+      likesLeft: 'Likes restantes',
+      getGold: 'Consigue Gold — sin límite diario',
+      keepLooking: 'Seguir mirando',
+    },
+
+    filters: {
+      title: 'Filtros',
+      subtitle: 'Reduce el mazo a la gente con la que de verdad quieres jugar.',
+      subtitleLocked: 'Parte de Gold. Mira lo que hace.',
+      game: 'Juego',
+      gameHint: 'Solo gente que juega a este.',
+      gameHintEmpty: 'Añade juegos a tu perfil para filtrar por ellos.',
+      anyGame: 'Cualquier juego',
+      region: 'Región',
+      regionHint: 'Misma zona horaria, mismos servidores, misma noche.',
+      regionHintEmpty: 'Pon tu país en tu perfil para filtrar por él.',
+      onlyIn: (country: string) => `Solo jugadores de ${country}`,
+      onlyNearMe: 'Solo jugadores cerca de mí',
+      platform: 'Plataforma',
+      platformHint: 'Con quien de verdad puedas entrar en un lobby.',
+      anyPlatform: 'Cualquier plataforma',
+      availability: 'Disponibilidad',
+      availabilityHint: 'Activos en los últimos 15 minutos.',
+      onlineNow: 'En línea ahora',
+      showFilters: (n: number) => (n === 1 ? 'Mostrar con 1 filtro' : `Mostrar con ${n} filtros`),
+      showEveryone: 'Mostrar a todos',
+      clearFilters: 'Quitar filtros',
+      unlock: 'Desbloquear filtros con Gold',
+      notNow: 'Ahora no',
+    },
+
+    locked: {
+      title: 'Los filtros son parte de Gold',
+      blurb: 'Reduce el mazo a un juego, tu región o la gente en línea ahora mismo.',
+      getGold: 'Conseguir Gold',
+      showEveryone: 'Mostrar a todos en su lugar',
+    },
+
+    exhausted: {
+      filteredTitle: 'No hay más gente con tus filtros',
+      title: 'No hay más gente por ahora',
+      filteredBlurb: 'Ampliarlos devuelve más gente al mazo.',
+      blurb:
+        'Se une gente nueva todo el tiempo, y quienes pasaste vuelven a aparecer después de un tiempo.',
+      lookAgain: 'Mirar otra vez',
+    },
+  },
+
+  billing: {
+    promptTitle: 'Está funcionando',
+    promptBody: 'Has hecho match con alguien. Gold es para cuando quieras más.',
+    benefitNoLimit: 'Sin límite diario de likes',
+    benefitSeeLikes: 'Ve a todos los que te dieron like',
+    benefitFilters: 'Filtra el mazo por juego, región y quién está en línea',
+    seeGold: 'Ver Gold',
+    notNow: 'Ahora no',
+    coinsAdded: 'Monedas añadidas',
+    coinsAddedBody: 'Ya están en tu saldo.',
+    goldYours: 'Gold es tuyo',
+    goldYoursBody: 'Sin límite diario, filtros avanzados y el marco Gold.',
+    storeUnavailable: 'Las compras aún no están disponibles en esta versión.',
+    storeNotInBuild:
+      'Esta versión no puede hacer compras. Se instaló antes de añadir las compras dentro de la app.',
+    storePlanMissing: 'Ese plan no está disponible ahora mismo.',
+  },
+
+  market: {
+    shop: {
+      header: 'Tienda',
+      title: 'Presume',
+      earnTab: 'Ganar',
+      shopTab: 'Comprar',
+      framesAndBanners: 'Marcos y banners',
+      framesAndBannersBlurb: 'Se lucen en tu perfil y en cada carta en la que apareces.',
+      frames: 'Marcos',
+      banners: 'Banners',
+      notEnoughCoins: 'No tienes monedas suficientes',
+      notEnoughCoinsBody: (n: number) =>
+        `Tienes ${n}. Las insignias dan monedas, o puedes recargar.`,
+      seeCoinPacks: 'Ver packs de monedas',
+      equipInInventory: 'Equipa lo tuyo desde tu Inventario',
+      boughtTitle: (name: string) => `${name} es tuyo`,
+      bought: 'Comprado',
+      boughtBody: 'Póntelo desde tu Inventario.',
+      owned: 'Tuyo',
+      buy: 'Comprar',
+      free: 'Gratis',
+      coinsPrice: (n: number) => `${n} monedas`,
+      animatedSuffix: ', animado',
+      ownedA11y: (name: string) => `${name}, tuyo. Equípalo desde tu Inventario.`,
+      buyA11y: (name: string, price: number) => `Comprar ${name}, ${price} monedas`,
+      cantAffordA11y: (name: string, price: number) =>
+        `${name}, ${price} monedas, no tienes suficientes`,
+      goldCardMemberA11y: 'Tu membresía Gold',
+      goldCardGetA11y: 'Conseguir GameBuddy Gold',
+      goldCardTitleMember: 'Eres miembro',
+      goldCardTitle: 'Ve quién te da like',
+      goldCardBodyMember: 'El marco y el banner Gold son tuyos mientras dure tu membresía.',
+      goldCardBody: 'Sin límite diario, filtros avanzados, y el marco y banner Gold.',
+    },
+
+    earn: {
+      header: 'Ganar',
+      blurb: 'Las monedas vuelven cada día. Nada aquí cuesta dinero.',
+      earnedTitle: (n: number) => `+${n} monedas`,
+      earnedBody: 'Gástalas en marcos, banners o likes.',
+      watchedBody: 'Gracias por mirar.',
+      consentTitle: 'Los vídeos requieren consentimiento de anuncios',
+      consentBody: 'Cámbialo en Ajustes → Privacidad de los anuncios.',
+      watchVideo: 'Mira un vídeo corto',
+      videosLeft: (n: number) => `Quedan ${n} hoy`,
+      videosDone: 'Esos eran los vídeos de hoy — vuelve mañana',
+      stipendTitle: 'Bono mensual de Gold',
+      stipendReady: 'Tuyo este mes',
+      stipendBack: (when: string) => `Vuelve ${when}`,
+      questDone: 'Hecho esta semana',
+      questProgress: (progress: number, target: number) => `${progress} de ${target}`,
+      claimA11y: (reward: number, title: string) => `Reclamar ${reward} monedas: ${title}`,
+      rowA11y: (title: string, detail: string) => `${title}, ${detail}`,
+      claim: 'Reclamar',
+      soon: 'pronto',
+      inAMoment: 'en un momento',
+      inMinutes: (n: number) => `en ${n} min`,
+      inHours: (n: number) => `en ${n} h`,
+      inDays: (n: number) => `en ${n} d`,
+      streakHeader: 'Racha diaria',
+      day: (n: number) => `Día ${n}`,
+      notStarted: 'Sin empezar',
+      claimCoins: (n: number) => `Reclamar ${n} monedas`,
+      nextDay: (day: number, readyIn: string, weekTotal: number) =>
+        `El día ${day} se desbloquea ${readyIn} — una semana completa son ${weekTotal} monedas.`,
+      back: (readyIn: string) => `Vuelve ${readyIn}.`,
+    },
+
+    consumables: {
+      header: 'Usa tus monedas',
+      blurb: 'Se gastan al usarlas; no son tuyas para siempre.',
+      superLike: 'Super Like',
+      superLikeDetail: 'Se lo decimos al instante, y destaca.',
+      extraLikes: '5 likes más hoy',
+      extraLikesDetail: 'Además de tu tope diario. Solo hoy.',
+      itemA11y: (title: string, cost: number) => `${title}, ${cost} monedas`,
+      addedTitle: (title: string) => `${title} añadido`,
+      added: 'Añadido',
+      addedBody: 'Úsalo desde el mazo.',
+      goldHint: '¿Compras likes a menudo? Gold quita el límite',
+    },
+
+    coins: {
+      header: 'Monedas',
+      blurbBuy:
+        'Recarga ahora, o gánalas gratis en Ganar — racha diaria, misiones e insignias.',
+      blurbNoBuy:
+        'Gánalas en Ganar: racha diaria, misiones e insignias. Comprar aún no está disponible en esta versión.',
+      packCoins: (n: string) => `${n} monedas`,
+      takesYouTo: (n: string) => `Te deja en ${n}`,
+      packA11y: (coins: number, price: string) => `Comprar ${coins} monedas por ${price}`,
+      onTheWay: 'Tus monedas están en camino',
+      onTheWayBody: 'Pueden tardar un momento. No hace falta volver a comprar.',
+    },
+
+    season: {
+      header: 'Pase de temporada',
+      coming: 'Muy pronto',
+      blurb: 'Nuevas recompensas cada temporada.',
+      a11y: 'Pase de temporada. Muy pronto — nuevas recompensas cada temporada.',
+    },
+
+    gold: {
+      done: 'Listo',
+      continuePrice: (price: string) => `Continuar — ${price}`,
+      unavailable: 'Compras aún no disponibles',
+      notNow: 'Ahora no',
+      heroThanks: 'Gracias por apoyar GameBuddy.',
+      heroPitch: 'La app entera, sin nada en medio.',
+      benefitLikesTitle: 'Ve quién te dio like',
+      benefitLikesBody: 'Cada cara, no solo el número.',
+      benefitLimitTitle: 'Sin límite diario',
+      benefitLimitBody: 'Desliza y da likes tanto como quieras.',
+      benefitFiltersTitle: 'Filtros avanzados',
+      benefitFiltersBody: 'Reduce el mazo por juego, región y quién está en línea ahora.',
+      choosePlan: 'Elige un plan',
+      planWeekly: 'Semanal',
+      planMonthly: 'Mensual',
+      planYearly: 'Anual',
+      periodWeek: '1 semana',
+      periodMonth: '1 mes',
+      periodYear: '12 meses',
+      noteTrial: '3 días de prueba gratis',
+      noteYearly: 'Ahorra un 58%',
+      billedEvery: (period: string) => `Se factura cada ${period}`,
+      purchasePending: 'Tu compra está en proceso',
+      purchasePendingBody:
+        'Puede tardar un momento. Gold se activará solo — no hace falta volver a comprar.',
+      cancelNote:
+        'Cancela cuando quieras desde tu cuenta de la tienda. La suscripción se renueva hasta que la canceles.',
+      member: 'Eres miembro',
+      runsUntil: (date: string) => `Tu membresía dura hasta el ${date}.`,
+      active: 'Tu membresía está activa.',
+      wearBelow: 'El marco y el banner Gold son tuyos — póntelos abajo.',
+      yoursToWear: 'Para ponerte',
+      membersOnly: 'Solo para miembros',
+      withGold: 'Con Gold',
+      worn: 'Puesto',
+      equip: 'Equipar',
+      equipA11y: (name: string) => `Equipar ${name}`,
+      banner: 'Banner',
+      frame: 'Marco',
+    },
+
+    inventory: {
+      title: 'Inventario',
+      subtitle: 'Lo que tienes y lo que llevas puesto',
+      noFramesYet: 'Aún no hay marcos',
+      noBannersYet: 'Aún no hay banners',
+      emptyBlurbFrames:
+        'Todo lo que compres en la Tienda llega aquí. Los marcos gratis ya son tuyos.',
+      emptyBlurbBanners:
+        'Todo lo que compres en la Tienda llega aquí. Los banners gratis ya son tuyos.',
+      goToMarket: 'Ir a la Tienda',
+      takeOffFrame: 'Quitarme el marco',
+      takeOffBanner: 'Quitarme el banner',
+    },
+
+    badges: {
+      title: 'Insignias',
+      subtitle: 'Termina misiones, reclama monedas, presume de tres',
+      showcaseFull: (slots: number) => `Puedes mostrar ${slots} insignias. Quita una primero.`,
+      earned: 'Conseguida',
+      tileA11y: (title: string, status: string) => `${title}. ${status}`,
+      progressOf: (value: number, target: number) => `${value} de ${target}`,
+      claimCoins: (n: number) => `Reclamar ${n} monedas`,
+      removeFromProfile: 'Quitar del perfil',
+      showOnProfile: 'Mostrar en el perfil',
+    },
+  },
+
+  messages: {
+    header: 'Mensajes',
+    title: 'Tus conversaciones',
+    friends: 'Amigos',
+    matches: 'Matches',
+    friendsEmpty: 'Nadie aún. Puedes añadir a alguien como amigo cuando hayáis hecho match.',
+    matchesEmpty: 'Aún no hay matches. Desliza en la pestaña Inicio para encontrar a alguien.',
+    sectionA11y: (title: string, count: number) => `${title}, ${count}`,
+    conversationWith: (name: string) => `Conversación con ${name}`,
+    startConversationWith: (name: string) => `Empezar una conversación con ${name}`,
+    noMessagesYet: 'Aún no hay mensajes',
+    sayFirst: 'Di algo primero',
+    emptyBlurb: 'Hicisteis match — alguien tiene que empezar.',
+    conversation: 'Conversación',
+    viewProfileA11y: (name: string) => `Ver el perfil de ${name}`,
+    thisGamer: 'esta persona',
+    alreadyFriends: 'Ya sois amigos',
+    acceptRequest: 'Aceptar solicitud de amistad',
+    requestSent: 'Solicitud de amistad enviada',
+    sendRequest: 'Enviar solicitud de amistad',
+    reported: 'Denunciado. Un moderador lo revisará.',
+    placeholder: 'Mensaje',
+    connecting: 'Conectando…',
+    reconnecting: 'Reconectando…',
+    offline: 'Sin conexión',
+    typing: 'escribiendo…',
+    online: 'En línea',
+    lastSeen: (when: string) => `Última vez ${when}`,
+    justNow: 'justo ahora',
+    minutesAgo: (n: number) => `hace ${n} min`,
+    hoursAgo: (n: number) => `hace ${n} h`,
+    aWhileAgo: 'hace un rato',
+    reportHint: 'Mantén pulsado para denunciar este mensaje',
+  },
+
+  profile: {
+    header: 'Tú',
+    title: 'Perfil',
+    inventoryA11y: 'Inventario',
+    settingsA11y: 'Ajustes',
+    badgesA11y: 'Insignias',
+    goldMemberA11y: 'Miembro de GameBuddy Gold',
+    friends: 'Amigos',
+    coins: 'Monedas',
+    badges: 'Insignias',
+    noShowcase: 'Aún no muestras insignias — toca para elegir algunas',
+    games: 'Juegos',
+    playsOn: 'Juega en',
+    keywords: 'Palabras clave',
+    friendRequests: (n: number) => `Solicitudes de amistad · ${n}`,
+    accept: 'Aceptar',
+    no: 'No',
+
+    friendsTitle: 'Amigos',
+    noFriendsTitle: 'Aún no hay amigos',
+    noFriendsBody: 'Puedes añadir a alguien como amigo cuando hayáis hecho match.',
+    removeConfirmTitle: (name: string) => `¿Quitar a ${name}?`,
+    removeConfirmBody:
+      'Vuelve a ser un match — podéis seguir escribiéndoos, y cualquiera de los dos puede enviar una nueva solicitud de amistad.',
+    thisGamer: 'esta persona',
+
+    fallbackTitle: 'Perfil',
+    actions: 'Acciones',
+    reported: 'Denunciado. Un moderador lo revisará.',
+    removeFriend: 'Quitar amigo',
+    reportProfile: 'Denunciar perfil',
+    block: 'Bloquear',
+    blockConfirmTitle: (name: string) => `¿Bloquear a ${name}?`,
+    blockConfirmBody:
+      'No os veréis en ninguna parte de la app, y ninguno de los dos podrá escribir al otro. Puedes deshacerlo en Ajustes.',
+
+    admirersTitle: 'Quién te dio like',
+    peopleLikeYou: (n: number) => (n === 1 ? 'persona te ha dado like' : 'personas te han dado like'),
+    upgradeToSee: ' — mejora para ver quiénes',
+    admirersEmptyTitle: 'Nadie aún',
+    admirersEmptyBody:
+      'Cuando alguien te da like aparece aquí, le hayas dado like tú o no.',
+    revealing: 'Revelando…',
+    revealOne: (cost: number) => `Revela uno por ${cost} monedas`,
+    orGold: 'O consigue Gold: cada cara, y sin límite diario de likes.',
+    seeWhoLikesYou: 'Ve quién te da like',
+    likedYouBadge: 'te dieron like',
+    likedYouBadgeA11y: (n: number) => `${n} personas te dieron like`,
   },
 
   settings: {
@@ -97,10 +669,107 @@ export const es: Dictionary = {
     termsHint: 'Incluye las reglas de contenido y conducta',
     privacy: 'Política de privacidad',
     privacyHint: 'Qué recogemos y qué hacemos con ello',
+    adPrivacy: 'Privacidad de los anuncios',
+    adPrivacyHint: 'Cambia qué pueden usar los anuncios sobre ti',
     password: 'Contraseña',
     passwordHint: 'Cierra tu sesión en todas partes',
     blocked: 'Bloqueados',
     blockedHint: 'A quién has bloqueado',
+    gamesScreen: {
+      title: 'Juegos a los que juegas',
+      subtitle: (n: number) => `Al menos ${n}. Cambiarlos cambia a quién se te muestra.`,
+    },
+    notificationsScreen: {
+      title: 'Notificaciones',
+      offTitle: 'Las notificaciones de GameBuddy están apagadas',
+      offBody:
+        'Android las está bloqueando, así que nada de lo de abajo puede llegarte hasta que se reactiven.',
+      turnOn: 'Activar notificaciones',
+      openSystem: 'Abrir ajustes del sistema',
+      whatToSend: 'Qué enviar',
+      messagesTitle: 'Mensajes',
+      messagesBody: 'Cuando alguien con quien hiciste match te envía un mensaje.',
+      socialTitle: 'Matches y amigos',
+      socialBody: 'Nuevos matches, solicitudes de amistad y respuestas, actividad de lobbys, insignias que ganas.',
+      remindersTitle: 'Recordatorios',
+      remindersBody: 'Un aviso ocasional cuando llevas tiempo fuera y algo te espera.',
+      quietNote:
+        'Apagarlo todo aquí mantiene la app en silencio sin desactivar sus notificaciones del todo — lo que reactives más tarde seguirá funcionando.',
+      onThisPhone: 'En este teléfono',
+      soundsTitle: 'Sonidos',
+      soundsBody: 'Una señal corta cuando algo pasa en la app — un match, una compra, un mensaje.',
+      vibrationTitle: 'Vibración',
+      vibrationBody: 'Un zumbido corto al deslizar, al hacer match o al comprar.',
+      cuesNote:
+        'Las señales nunca suenan con el modo silencio activado, y nunca interrumpen la música que ya escuchas.',
+    },
+
+    avatarScreen: {
+      title: 'Tu avatar',
+      subtitle: 'Sube una foto, o elige una de las nuestras.',
+      saveLabel: 'Usar este avatar',
+      yourPhoto: 'Tu propia foto',
+      takePhoto: 'Hacer una foto',
+      fromPhotos: 'Elegir de las fotos',
+      fromFiles: 'Elegir un archivo',
+      uploading: 'Subiendo y comprobando…',
+      privacyNote:
+        'Tu foto se revisa antes de que nadie más pueda verla, y los datos de ubicación se eliminan automáticamente.',
+      orOurs: 'O elige una de las nuestras',
+      cameraDenied:
+        'GameBuddy no puede abrir la cámara sin permiso. Puedes concederlo en los ajustes del teléfono, elegir una foto existente, o escoger una de las nuestras abajo.',
+      photosDenied:
+        'GameBuddy no puede abrir tus fotos sin permiso. Puedes concederlo en los ajustes del teléfono, hacer una foto, o escoger una de las nuestras abajo.',
+      tooLarge: (sizeMb: string, limitMb: number) =>
+        `Ese archivo pesa ${sizeMb}MB y el límite es ${limitMb}MB. Cualquier cosa de tu carrete queda muy por debajo.`,
+      approvedTitle: 'Ese es tu avatar ahora',
+      approvedBody: 'Todo el mundo puede verlo.',
+      pendingTitle: 'Esperando revisión',
+      pendingBody:
+        'Alguien lo revisará en breve. Hasta entonces solo tú puedes verlo — los demás siguen viendo tu avatar anterior.',
+      rejectedTitle: 'Esa foto no fue aceptada',
+      rejectedBody:
+        'Parece incumplir las reglas de contenido sexual. Nadie más la ha visto. Prueba con otra foto, o elige una de las nuestras.',
+    },
+
+    age: {
+      title: 'Fecha de nacimiento',
+      subtitle:
+        'Se usa para confirmar que tienes edad suficiente para estar aquí. Los demás ven tu edad, nunca la fecha.',
+      recordedNote: (min: number) =>
+        `Los cambios en tu fecha de nacimiento quedan registrados. GameBuddy es solo para adultos, y una fecha que te deje por debajo de ${min} será rechazada.`,
+    },
+
+    keywordsScreen: {
+      title: 'Cómo juegas',
+      subtitle: (n: number) => `Al menos ${n}. Son los hábitos y ánimos con los que emparejamos.`,
+    },
+
+    platformsScreen: {
+      title: 'En qué juegas',
+      subtitle: 'Elige todo lo que uses. Los demás filtran por esto, así que más es mejor que menos.',
+    },
+
+    passwordScreen: {
+      title: 'Cambiar contraseña',
+      subtitle: 'Esto cierra tu sesión en todos los dispositivos, incluido este.',
+      changedTitle: 'Contraseña cambiada',
+      signedOutTitle: 'Se cerró tu sesión en todas partes',
+      signedOutBody:
+        'Cambiar la contraseña termina todas las sesiones, en este dispositivo y en cualquier otro. Es a propósito — si alguien más tenía tu contraseña vieja, también quedó fuera.',
+      signInAgain: 'Iniciar sesión de nuevo',
+      current: 'Contraseña actual',
+      next: 'Contraseña nueva',
+      wrongCurrent: 'Esa no es tu contraseña actual.',
+      sameAsOld: 'Elige algo distinto de la anterior.',
+    },
+
+    blockedScreen: {
+      body: 'El bloqueo funciona en ambos sentidos y lo cubre todo: no se os muestra al uno al otro, y ninguno de los dos puede escribir al otro.',
+      emptyTitle: 'No hay nadie bloqueado',
+      emptyBody: 'Si lo necesitas, puedes bloquear a alguien desde su perfil.',
+      unblock: 'Desbloquear',
+    },
     signOut: 'Cerrar sesión',
     deleteAccount: 'Eliminar mi cuenta',
     deleteTitle: 'Esto no se puede deshacer',
@@ -161,8 +830,89 @@ export const es: Dictionary = {
     },
   },
 
+  validation: {
+    emailEmpty: 'Escribe tu correo',
+    emailInvalid: 'Eso no parece un correo',
+    passwordEmpty: 'Escribe una contraseña',
+    atLeastChars: (n: number) => `Al menos ${n} caracteres`,
+    atMostChars: (n: number) => `Como máximo ${n} caracteres`,
+    letterAndNumber: 'Incluye al menos una letra y un número',
+    usernameEmpty: 'Elige un nombre de usuario',
+    usernameCharset: 'Solo letras, números y guiones bajos',
+    usernameLetterOrNumber: 'Incluye al menos una letra o un número',
+    usernameUnavailable: 'Ese nombre de usuario no está disponible',
+    birthDateEmpty: 'Escribe tu fecha de nacimiento',
+    notARealDate: 'Esa fecha no existe',
+    dateInFuture: 'Esa fecha está en el futuro',
+    mustBeAge: (n: number) => `Debes tener ${n} años o más para usar GameBuddy`,
+    checkYear: 'Revisa el año',
+    sixDigitCode: 'Escribe el código de 6 dígitos',
+  },
+
+  pickers: {
+    noMatchesQueryFiltered: (query: string) => `Nada coincide con «${query}» con estos filtros.`,
+    noMatchesFiltered: 'Nada coincide con estos filtros.',
+    noMatchesQuery: (query: string) => `Nada coincide con «${query}».`,
+    clearFilters: (n: number) => (n === 1 ? 'Quitar 1 filtro' : `Quitar ${n} filtros`),
+    clearFiltersA11y: 'Quitar todos los filtros',
+    filterPlatform: 'Plataforma',
+    filterGenre: 'Género',
+    filterOther: 'Otros',
+    avatarN: (n: number) => `Avatar ${n}`,
+  },
+
+  notifications: {
+    header: 'Notificaciones',
+    primerTitle: 'No te pierdas lo bueno',
+    primerBody:
+      'GameBuddy es otra gente. La mayor parte de lo que pasa aquí ocurre con la app cerrada.',
+    reasonMatchTitle: 'Cuando haces match',
+    reasonMatchBody: 'Los dos dijisteis que sí — ahí es cuando puede empezar una conversación.',
+    reasonMessageTitle: 'Cuando alguien te escribe',
+    reasonMessageBody: 'Para que una respuesta no espere hasta la próxima vez que abras la app.',
+    reasonLobbyTitle: 'Cuando alguien quiere entrar en tu lobby',
+    reasonLobbyBody: 'Y cuando el dueño de uno te deja entrar.',
+    turnOn: 'Activar notificaciones',
+    notNow: 'Ahora no',
+    changeLater: 'Puedes cambiarlo cuando quieras en Ajustes, y elegir qué tipos quieres.',
+  },
+
+  tutorial: {
+    steps: {
+      home: {
+        title: 'Encuentra con quién jugar',
+        body: 'Desliza entre jugadores que juegan a lo mismo que tú. A la derecha si quieres jugar juntos, a la izquierda si no. Cuando ambos deslizáis a la derecha, hacéis match.',
+      },
+      messages: {
+        title: 'Habla con tus matches',
+        body: 'Hacer match abre un chat privado. Nadie puede escribirte sin que ambos lo hayáis aceptado, y puedes bloquear o denunciar a cualquiera desde una conversación.',
+      },
+      lobby: {
+        title: 'Haz equipo en un lobby',
+        body: 'Los lobbys abiertos son partidas buscando jugadores — el juego, la hora y el ambiente están en la carta. Pide unirte, y el dueño elige el equipo. Abrir el tuyo viene con Gold.',
+      },
+      market: {
+        title: 'Haz tuyo tu perfil',
+        body: 'Marcos y banners para tu perfil, más likes diarios extra si se te acaban. Todo aquí es opcional — la app funciona sin gastar nada.',
+      },
+      profile: {
+        title: 'Tu perfil, y todo lo demás',
+        body: 'Tus juegos, tus palabras clave, tus amigos y tus insignias. Los ajustes están tras el engranaje, incluido este tutorial si lo quieres otra vez.',
+      },
+    },
+    stepOf: (n: number, total: number) => `${n} de ${total}`,
+    startPlaying: 'Empezar a jugar',
+  },
+
   language: {
     label: 'Idioma',
     choose: 'Elige un idioma',
+    current: (name: string) => `Idioma: ${name}`,
+  },
+
+  errorScreen: {
+    title: 'GameBuddy ha tenido un problema',
+    blurb: 'Es un fallo de la app, no algo que hayas hecho tú. Los detalles de abajo son lo que necesitamos para arreglarlo.',
+    copyHint: 'El texto de arriba se puede seleccionar y copiar.',
   },
 };

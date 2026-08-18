@@ -1,6 +1,8 @@
 import { Check, Flame } from 'lucide-react-native';
 import { View } from 'react-native';
 import type { Earn } from '../api/types';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { Button } from '../ui/Button';
 import { cn } from '../ui/cn';
@@ -54,6 +56,8 @@ type StreakStripProps = {
  */
 export function StreakStrip({ earn, busy, onClaim, readyIn }: StreakStripProps) {
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
 
   /*
    * Which cell is "today".
@@ -90,11 +94,11 @@ export function StreakStrip({ earn, busy, onClaim, readyIn }: StreakStripProps) 
               fill={earn.streak > 0 ? colors.gold : 'none'}
             />
             <Text variant="overline" className="text-gold">
-              DAILY STREAK
+              {upper(t.market.earn.streakHeader)}
             </Text>
             <View className="flex-1" />
             <Text variant="caption">
-              {earn.streak > 0 ? `Day ${earn.streak}` : 'Not started'}
+              {earn.streak > 0 ? t.market.earn.day(earn.streak) : t.market.earn.notStarted}
             </Text>
           </View>
 
@@ -112,7 +116,7 @@ export function StreakStrip({ earn, busy, onClaim, readyIn }: StreakStripProps) 
 
           {earn.dailyAvailable ? (
             <Button
-              label={`Claim ${earn.dailyReward} coins`}
+              label={t.market.earn.claimCoins(earn.dailyReward)}
               loading={busy}
               onPress={onClaim}
             />
@@ -121,8 +125,8 @@ export function StreakStrip({ earn, busy, onClaim, readyIn }: StreakStripProps) 
             // a sentence answers the question without being tapped.
             <Text variant="caption" className="text-center">
               {earn.streak > 0
-                ? `Day ${earn.streak + 1} unlocks ${readyIn} — a full week is ${weekTotal} coins.`
-                : `Back ${readyIn}.`}
+                ? t.market.earn.nextDay(earn.streak + 1, readyIn, weekTotal)
+                : t.market.earn.back(readyIn)}
             </Text>
           )}
         </View>

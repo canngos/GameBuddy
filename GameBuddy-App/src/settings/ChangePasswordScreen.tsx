@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../api/auth';
 import { ApiError, Code } from '../api/envelope';
+import { useT } from '../i18n/useT';
 import { useSession } from '../session/store';
 import { Button, Card, Screen, Text, TextField } from '../ui';
 import { EditScreen } from '../ui/EditScreen';
@@ -17,6 +18,7 @@ import { passwordError } from '../validation';
  * rotate it, since the bootstrap deliberately refuses to.
  */
 export function ChangePasswordScreen() {
+  const t = useT();
   const signOut = useSession((s) => s.signOut);
 
   const [current, setCurrent] = useState('');
@@ -47,20 +49,16 @@ export function ChangePasswordScreen() {
     return (
       <Screen scroll edges={['top', 'bottom']}>
         <View className="gap-2 pb-6 pt-8">
-          <Text variant="title">Password changed</Text>
+          <Text variant="title">{t.settings.passwordScreen.changedTitle}</Text>
         </View>
 
         <Card className="gap-2">
-          <Text variant="bodyStrong">You have been signed out everywhere</Text>
-          <Text variant="caption">
-            Changing your password ends every session, on this device and any other.
-            That is deliberate — if someone else had your old password, they are out
-            too.
-          </Text>
+          <Text variant="bodyStrong">{t.settings.passwordScreen.signedOutTitle}</Text>
+          <Text variant="caption">{t.settings.passwordScreen.signedOutBody}</Text>
         </Card>
 
         <View className="mt-auto pt-10">
-          <Button label="Sign in again" onPress={() => void signOut()} />
+          <Button label={t.settings.passwordScreen.signInAgain} onPress={() => void signOut()} />
         </View>
       </Screen>
     );
@@ -68,9 +66,9 @@ export function ChangePasswordScreen() {
 
   return (
     <EditScreen
-      title="Change password"
-      subtitle="This signs you out on every device, including this one."
-      saveLabel="Change password"
+      title={t.settings.passwordScreen.title}
+      subtitle={t.settings.passwordScreen.subtitle}
+      saveLabel={t.settings.passwordScreen.title}
       onSave={() => {
         setTouched(true);
         if (passwordError(next) || unchanged || current.length === 0) return;
@@ -83,21 +81,24 @@ export function ChangePasswordScreen() {
     >
       <View className="gap-5">
         <TextField
-          label="Current password"
+          label={t.settings.passwordScreen.current}
           value={current}
           onChangeText={setCurrent}
-          error={wrongCurrent ? 'That is not your current password.' : null}
+          error={wrongCurrent ? t.settings.passwordScreen.wrongCurrent : null}
           secure
           textContentType="password"
           autoComplete="current-password"
         />
 
         <TextField
-          label="New password"
+          label={t.settings.passwordScreen.next}
           value={next}
           onChangeText={setNext}
-          error={problem ?? (unchanged ? 'Pick something different from the old one.' : null)}
-          hint="At least 8 characters, with a letter and a number."
+          error={
+            (problem ? problem(t) : null) ??
+            (unchanged ? t.settings.passwordScreen.sameAsOld : null)
+          }
+          hint={t.auth.register.passwordHint}
           secure
           textContentType="newPassword"
           autoComplete="new-password"

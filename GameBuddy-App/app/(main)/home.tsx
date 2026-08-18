@@ -15,6 +15,8 @@ import { FilterSheet } from '../../src/match/FilterSheet';
 import { LimitSheet } from '../../src/match/LimitSheet';
 import { SwipeCard } from '../../src/match/SwipeCard';
 import { NO_FILTERS, activeCount, type FeedFilters } from '../../src/match/filters';
+import { useUpper } from '../../src/i18n/case';
+import { useT } from '../../src/i18n/useT';
 import { useCelebration } from '../../src/match/celebration';
 import { useDeck } from '../../src/match/useDeck';
 import { useThemeColors } from '../../src/theme';
@@ -24,6 +26,8 @@ import { Button, EmptyState, ErrorNotice, Icon, Screen, Text } from '../../src/u
 export default function Deck() {
   const colors = useThemeColors();
   const router = useRouter();
+  const t = useT();
+  const upper = useUpper();
   const [filters, setFilters] = useState<FeedFilters>(NO_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const deck = useDeck(filters);
@@ -93,8 +97,8 @@ export default function Deck() {
     <Screen edges={['top']} padded={false}>
       <View className="flex-row items-center justify-between gap-4 px-6 pb-2 pt-2">
         <View className="flex-1">
-          <Text variant="overline">DISCOVER</Text>
-          <Text variant="heading">Who's playing</Text>
+          <Text variant="overline">{upper(t.deck.header.discover)}</Text>
+          <Text variant="heading">{t.deck.header.title}</Text>
         </View>
 
         {/* Settings used to live here. It moved to Profile once that tab existed —
@@ -114,7 +118,7 @@ export default function Deck() {
         {deck.isLoading && (
           <View className="flex-1 items-center justify-center gap-3">
             <ActivityIndicator color={colors.primary} />
-            <Text variant="caption">Finding people who play what you play…</Text>
+            <Text variant="caption">{t.deck.header.loading}</Text>
           </View>
         )}
 
@@ -218,6 +222,7 @@ export default function Deck() {
 
 /** Today's remaining likes, shown before the wall rather than at it. */
 function Allowance({ deck }: { deck: ReturnType<typeof useDeck> }) {
+  const t = useT();
   const allowance = deck.allowance;
   if (!allowance || allowance.unlimited) return null;
 
@@ -226,7 +231,7 @@ function Allowance({ deck }: { deck: ReturnType<typeof useDeck> }) {
       <Text className="font-semibold text-[15px] leading-[20px] text-accent">
         {allowance.remainingAccepts}
       </Text>
-      <Text variant="caption">likes left</Text>
+      <Text variant="caption">{t.deck.header.likesLeft}</Text>
     </View>
   );
 }
@@ -239,11 +244,14 @@ function Allowance({ deck }: { deck: ReturnType<typeof useDeck> }) {
  * app" rather than "you asked for Valorant players in Finland who are online".
  */
 function FilterButton({ count, onPress }: { count: number; onPress: () => void }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={count > 0 ? `Filters, ${count} on` : 'Filters'}
+      accessibilityLabel={
+        count > 0 ? t.deck.header.filtersOnA11y(count) : t.deck.header.filtersA11y
+      }
       hitSlop={8}
       className={[
         'h-9 flex-row items-center gap-1.5 rounded-full border px-3',
@@ -257,7 +265,7 @@ function FilterButton({ count, onPress }: { count: number; onPress: () => void }
           'font-semibold text-[13px] leading-[17px]',
           count > 0 ? 'text-primary' : 'text-muted',
         ].join(' ')}>
-        {count > 0 ? String(count) : 'Filter'}
+        {count > 0 ? String(count) : t.deck.header.filter}
       </Text>
     </Pressable>
   );
@@ -272,16 +280,17 @@ function FilterButton({ count, onPress }: { count: number; onPress: () => void }
  * of the app.
  */
 function FiltersLocked({ onUpgrade, onClear }: { onUpgrade: () => void; onClear: () => void }) {
+  const t = useT();
   return (
     <EmptyState
       icon={SlidersHorizontal}
-      title="Filters are part of Gold"
-      blurb="Narrow the deck to one game, your region, or people who are online right now."
+      title={t.deck.locked.title}
+      blurb={t.deck.locked.blurb}
       // An offer rather than the end of a list, so it gets the lit ring.
       accent
     >
-      <Button label="Get Gold" onPress={onUpgrade} />
-      <Button label="Show everyone instead" variant="ghost" onPress={onClear} />
+      <Button label={t.deck.locked.getGold} onPress={onUpgrade} />
+      <Button label={t.deck.locked.showEveryone} variant="ghost" onPress={onClear} />
     </EmptyState>
   );
 }
@@ -295,21 +304,18 @@ function Exhausted({
   filtered: boolean;
   onClearFilters: () => void;
 }) {
+  const t = useT();
   return (
     <View className="flex-1 justify-center">
       <EmptyState
         icon={Gamepad2}
-        title={filtered ? "That's everyone matching your filters" : "That's everyone for now"}
-        blurb={
-          filtered
-            ? 'Widening them brings more people back into the deck.'
-            : 'New players join all the time, and people you passed on come back around after a while.'
-        }
+        title={filtered ? t.deck.exhausted.filteredTitle : t.deck.exhausted.title}
+        blurb={filtered ? t.deck.exhausted.filteredBlurb : t.deck.exhausted.blurb}
       >
         {/* Offered before "look again", because refetching the same narrow filters is the
             one thing that will not produce anybody new. */}
-        {filtered && <Button label="Clear filters" onPress={onClearFilters} />}
-        <Button label="Look again" variant="secondary" onPress={onReload} />
+        {filtered && <Button label={t.deck.filters.clearFilters} onPress={onClearFilters} />}
+        <Button label={t.deck.exhausted.lookAgain} variant="secondary" onPress={onReload} />
       </EmptyState>
     </View>
   );

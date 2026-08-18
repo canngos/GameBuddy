@@ -3,6 +3,7 @@ import { Coins, Crown } from 'lucide-react-native';
 import { useCallback } from 'react';
 import { billingApi } from '../api/billing';
 import { cosmeticsApi } from '../api/cosmetics';
+import { tNow } from '../i18n/useT';
 import * as feedback from '../ui/feedback';
 import { showToast } from '../ui/toast';
 import { PurchaseCancelledError, entitlementArrived, purchase as openStoreSheet } from './purchases';
@@ -138,13 +139,13 @@ export function usePurchase(kind: PurchaseKind = 'subscription') {
       if (!result.granted) return;
 
       feedback.purchase();
+      // `tNow()` rather than `useT()`: a toast is a one-shot surface fired from an async
+      // continuation, so the snapshot at this instant is exactly what it should say.
+      const t = tNow();
       showToast({
         id: `entitlement:${kind}`,
-        title: kind === 'coins' ? 'Coins added' : 'Gold is yours',
-        body:
-          kind === 'coins'
-            ? 'They are in your balance now.'
-            : 'No daily limit, advanced filters, and the Gold frame.',
+        title: kind === 'coins' ? t.billing.coinsAdded : t.billing.goldYours,
+        body: kind === 'coins' ? t.billing.coinsAddedBody : t.billing.goldYoursBody,
         icon: kind === 'coins' ? Coins : Crown,
         tone: 'gold',
       });

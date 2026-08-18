@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { View } from 'react-native';
+import { useT } from '../i18n/useT';
 import { Button } from './Button';
 import { ErrorNotice } from './ErrorNotice';
 import { Screen } from './Screen';
@@ -48,11 +49,12 @@ export function EditScreen({
   saving = false,
   canSave = true,
   error,
-  saveLabel = 'Save',
+  saveLabel,
   scroll = true,
   footerNote,
 }: EditScreenProps) {
   const router = useRouter();
+  const t = useT();
 
   return (
     <Screen
@@ -67,9 +69,14 @@ export function EditScreen({
               also still renders below the content, where it always was. */}
           {!scroll && !!error && <ErrorNotice error={error} />}
           {footerNote}
-          <Button label={saveLabel} loading={saving} disabled={!canSave} onPress={onSave} />
           <Button
-            label="Cancel"
+            label={saveLabel ?? t.common.save}
+            loading={saving}
+            disabled={!canSave}
+            onPress={onSave}
+          />
+          <Button
+            label={t.common.cancel}
             variant="ghost"
             disabled={saving}
             onPress={() => router.back()}

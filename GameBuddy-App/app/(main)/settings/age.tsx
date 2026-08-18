@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { authApi } from '../../../src/api/auth';
 import { profileApi } from '../../../src/api/catalogue';
+import { useT } from '../../../src/i18n/useT';
 import { BirthDateField } from '../../../src/onboarding/BirthDateField';
 import { Text } from '../../../src/ui';
 import { EditScreen } from '../../../src/ui/EditScreen';
@@ -11,6 +12,7 @@ import { birthDateError, MIN_AGE, parseBirthDate, toIsoDate } from '../../../src
 
 export default function EditBirthDate() {
   const router = useRouter();
+  const t = useT();
   const queryClient = useQueryClient();
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
 
@@ -35,8 +37,8 @@ export default function EditBirthDate() {
 
   return (
     <EditScreen
-      title="Date of birth"
-      subtitle="Used to confirm you are old enough to be here. Other people see your age, never the date."
+      title={t.settings.age.title}
+      subtitle={t.settings.age.subtitle}
       onSave={() => {
         setTouched(true);
         if (problem) return;
@@ -54,15 +56,12 @@ export default function EditBirthDate() {
           if (parts.month !== undefined) setMonth(parts.month);
           if (parts.year !== undefined) setYear(parts.year);
         }}
-        error={touched ? problem : null}
-        hint={`You must be ${MIN_AGE} or over.`}
+        error={touched && problem ? problem(t) : null}
+        hint={t.onboarding.profile.ageHint(MIN_AGE)}
       />
 
       <View className="mt-4 rounded-card border border-line bg-raised p-4">
-        <Text variant="caption">
-          Changes to your date of birth are recorded. GameBuddy is for adults only, and a
-          date that puts you under {MIN_AGE} will be refused.
-        </Text>
+        <Text variant="caption">{t.settings.age.recordedNote(MIN_AGE)}</Text>
       </View>
     </EditScreen>
   );

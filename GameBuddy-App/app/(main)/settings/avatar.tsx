@@ -13,6 +13,8 @@ import {
   takePhoto,
   type PickOutcome,
 } from '../../../src/pickers/pickImage';
+import { useUpper } from '../../../src/i18n/case';
+import { useT } from '../../../src/i18n/useT';
 import { Avatar, Button, Card, ErrorNotice, Text } from '../../../src/ui';
 import { EditScreen } from '../../../src/ui/EditScreen';
 
@@ -29,6 +31,8 @@ import { EditScreen } from '../../../src/ui/EditScreen';
  */
 export default function EditAvatar() {
   const router = useRouter();
+  const t = useT();
+  const upper = useUpper();
   const queryClient = useQueryClient();
 
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
@@ -80,17 +84,17 @@ export default function EditAvatar() {
 
   return (
     <EditScreen
-      title="Your avatar"
-      subtitle="Upload a photo, or pick one of ours."
+      title={t.settings.avatarScreen.title}
+      subtitle={t.settings.avatarScreen.subtitle}
       onSave={() => save.mutate()}
       saving={save.isPending}
       canSave={!!avatarId}
       error={save.error}
-      saveLabel="Use this avatar"
+      saveLabel={t.settings.avatarScreen.saveLabel}
     >
       <View className="gap-7">
         <View className="gap-3">
-          <Text variant="overline">YOUR OWN PHOTO</Text>
+          <Text variant="overline">{upper(t.settings.avatarScreen.yourPhoto)}</Text>
 
           <View className="flex-row items-center gap-4">
             <Avatar
@@ -104,21 +108,21 @@ export default function EditAvatar() {
                   sheet. There are only three, each is one tap, and someone who keeps
                   their images in Files should not have to discover that. */}
               <Button
-                label="Take a photo"
+                label={t.settings.avatarScreen.takePhoto}
                 variant="secondary"
                 size="md"
                 disabled={upload.isPending}
                 onPress={() => upload.mutate(takePhoto)}
               />
               <Button
-                label="Choose from photos"
+                label={t.settings.avatarScreen.fromPhotos}
                 variant="secondary"
                 size="md"
                 disabled={upload.isPending}
                 onPress={() => upload.mutate(pickFromLibrary)}
               />
               <Button
-                label="Choose a file"
+                label={t.settings.avatarScreen.fromFiles}
                 variant="secondary"
                 size="md"
                 disabled={upload.isPending}
@@ -127,20 +131,17 @@ export default function EditAvatar() {
             </View>
           </View>
 
-          {upload.isPending && <Text variant="caption">Uploading and checking…</Text>}
+          {upload.isPending && <Text variant="caption">{t.settings.avatarScreen.uploading}</Text>}
 
           {refused && <PickRefusal outcome={refused} />}
           {!!upload.error && <ErrorNotice error={upload.error} />}
           {outcome && <UploadOutcome outcome={outcome} />}
 
-          <Text variant="caption">
-            Your photo is checked before anyone else can see it, and location data is
-            removed from it automatically.
-          </Text>
+          <Text variant="caption">{t.settings.avatarScreen.privacyNote}</Text>
         </View>
 
         <View className="gap-3">
-          <Text variant="overline">OR PICK ONE OF OURS</Text>
+          <Text variant="overline">{upper(t.settings.avatarScreen.orOurs)}</Text>
           <AvatarPicker selected={avatarId} onSelect={setAvatarId} size={72} />
         </View>
       </View>
@@ -150,12 +151,13 @@ export default function EditAvatar() {
 
 /** Why nothing was uploaded, when the reason is not an upload failure. */
 function PickRefusal({ outcome }: { outcome: PickOutcome }) {
+  const t = useT();
   if (outcome.kind === 'denied') {
     return (
       <Text variant="caption">
         {outcome.need === 'camera'
-          ? "GameBuddy cannot open the camera without permission. You can grant it in your phone's settings, choose an existing photo, or pick one of ours below."
-          : "GameBuddy cannot open your photos without permission. You can grant it in your phone's settings, take a photo instead, or pick one of ours below."}
+          ? t.settings.avatarScreen.cameraDenied
+          : t.settings.avatarScreen.photosDenied}
       </Text>
     );
   }
@@ -163,8 +165,10 @@ function PickRefusal({ outcome }: { outcome: PickOutcome }) {
   if (outcome.kind === 'tooLarge') {
     return (
       <Text variant="caption" className="text-danger">
-        That file is {(outcome.bytes / 1024 / 1024).toFixed(1)}MB and the limit is{' '}
-        {MAX_BYTES / 1024 / 1024}MB. Anything from your camera roll will be well under it.
+        {t.settings.avatarScreen.tooLarge(
+          (outcome.bytes / 1024 / 1024).toFixed(1),
+          MAX_BYTES / 1024 / 1024,
+        )}
       </Text>
     );
   }
@@ -179,11 +183,12 @@ function PickRefusal({ outcome }: { outcome: PickOutcome }) {
  * a lie — a delay and a decision are different things to be told.
  */
 function UploadOutcome({ outcome }: { outcome: AvatarUpload }) {
+  const t = useT();
   if (outcome.status === 'APPROVED') {
     return (
       <Card className="gap-1">
-        <Text variant="bodyStrong">That&apos;s your avatar now</Text>
-        <Text variant="caption">Everyone can see it.</Text>
+        <Text variant="bodyStrong">{t.settings.avatarScreen.approvedTitle}</Text>
+        <Text variant="caption">{t.settings.avatarScreen.approvedBody}</Text>
       </Card>
     );
   }
@@ -191,11 +196,8 @@ function UploadOutcome({ outcome }: { outcome: AvatarUpload }) {
   if (outcome.status === 'PENDING') {
     return (
       <Card className="gap-1">
-        <Text variant="bodyStrong">Waiting to be checked</Text>
-        <Text variant="caption">
-          Someone will look at it shortly. Until then you are the only one who can see it —
-          everyone else still sees your old avatar.
-        </Text>
+        <Text variant="bodyStrong">{t.settings.avatarScreen.pendingTitle}</Text>
+        <Text variant="caption">{t.settings.avatarScreen.pendingBody}</Text>
       </Card>
     );
   }
@@ -203,12 +205,9 @@ function UploadOutcome({ outcome }: { outcome: AvatarUpload }) {
   return (
     <Card className="gap-1">
       <Text variant="bodyStrong" className="text-danger">
-        That photo was not accepted
+        {t.settings.avatarScreen.rejectedTitle}
       </Text>
-      <Text variant="caption">
-        It looks like it breaks the rules on sexual content. Nobody else has seen it. Try
-        another photo, or pick one of ours.
-      </Text>
+      <Text variant="caption">{t.settings.avatarScreen.rejectedBody}</Text>
     </Card>
   );
 }

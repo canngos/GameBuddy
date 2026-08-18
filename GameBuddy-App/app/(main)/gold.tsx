@@ -10,6 +10,7 @@ import type { Cosmetic, CosmeticStore } from '../../src/api/types';
 import { trackFunnel } from '../../src/api/funnel';
 import { storeAvailable } from '../../src/billing/purchases';
 import { usePurchase } from '../../src/billing/usePurchase';
+import { useT } from '../../src/i18n/useT';
 import { useThemeColors } from '../../src/theme';
 import { GradientView } from '../../src/ui/Gradient';
 import { glow } from '../../src/ui/glow';
@@ -41,6 +42,7 @@ const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill
  */
 export default function Gold() {
   const router = useRouter();
+  const t = useT();
   const [selected, setSelected] = useState<GoldPlan>(GOLD_PLANS[1]);
 
   const subscription = useQuery({
@@ -68,7 +70,7 @@ export default function Gold() {
       scroll
       footer={
         isGold ? (
-          <Button label="Done" onPress={() => router.back()} />
+          <Button label={t.market.gold.done} onPress={() => router.back()} />
         ) : (
           <View className="gap-2">
             {/* Disabled rather than hidden when the build cannot purchase. A missing button
@@ -76,7 +78,9 @@ export default function Gold() {
                 and this state is normal for anyone running a build made before the store
                 was wired up. */}
             <Button
-              label={canBuy ? `Continue — ${selected.price}` : 'Purchases not available yet'}
+              label={
+                canBuy ? t.market.gold.continuePrice(selected.price) : t.market.gold.unavailable
+              }
               loading={buy.isPending}
               disabled={!canBuy}
               onPress={() => {
@@ -87,7 +91,7 @@ export default function Gold() {
                 buy.buy(selected.productId);
               }}
             />
-            <Button label="Not now" variant="ghost" onPress={() => router.back()} />
+            <Button label={t.market.gold.notNow} variant="ghost" onPress={() => router.back()} />
           </View>
         )
       }
@@ -111,7 +115,7 @@ export default function Gold() {
 
           <View className="gap-3 pt-8">
             <Text variant="label" className="text-muted">
-              Choose a plan
+              {t.market.gold.choosePlan}
             </Text>
             {GOLD_PLANS.map((plan) => (
               <PlanRow
@@ -134,17 +138,15 @@ export default function Gold() {
               calling it a failure is how somebody ends up paying twice. */}
           {buy.awaitingEntitlement && (
             <View className="mt-4 rounded-card bg-raised p-4">
-              <Text variant="bodyStrong">Your purchase is going through</Text>
+              <Text variant="bodyStrong">{t.market.gold.purchasePending}</Text>
               <Text variant="caption" className="mt-1">
-                It can take a moment to arrive. Gold will switch on by itself — there is no
-                need to buy again.
+                {t.market.gold.purchasePendingBody}
               </Text>
             </View>
           )}
 
           <Text variant="caption" className="pt-4">
-            Cancel any time from your store account. A subscription renews until you cancel
-            it.
+            {t.market.gold.cancelNote}
           </Text>
         </>
       )}
@@ -161,6 +163,7 @@ export default function Gold() {
  */
 function Hero({ isGold }: { isGold: boolean }) {
   const colors = useThemeColors();
+  const t = useT();
 
   return (
     <View className="mb-2 overflow-hidden rounded-card" style={glow('soft', colors.gold)}>
@@ -189,9 +192,7 @@ function Hero({ isGold }: { isGold: boolean }) {
               Gold
             </Text>
             <Text variant="caption" className="text-center">
-              {isGold
-                ? 'Thanks for backing GameBuddy.'
-                : 'The whole app, with nothing in the way.'}
+              {isGold ? t.market.gold.heroThanks : t.market.gold.heroPitch}
             </Text>
           </View>
         </View>
@@ -208,23 +209,30 @@ function Hero({ isGold }: { isGold: boolean }) {
  * list — a picture of the thing beats a sentence about it, and keeping both would have made
  * the same promise twice on one screen.
  */
-const BENEFITS: { icon: LucideIcon; title: string; body: string }[] = [
-  { icon: Eye, title: 'See who liked you', body: 'Every face, not just the number.' },
-  { icon: InfinityIcon, title: 'No daily limit', body: 'Swipe and like as much as you want.' },
+function Benefits() {
+  const t = useT();
+
+  // Built at render rather than as a module constant, so the copy follows the language.
   // Platform is deliberately not listed: the profile has no such field, so it is not
   // something we can filter by. Promising it on a paid product is the kind of claim
   // that earns a refund and a store complaint rather than a subscriber.
-  {
-    icon: SlidersHorizontal,
-    title: 'Advanced filters',
-    body: 'Narrow the deck by game, region, and who is online now.',
-  },
-];
+  const benefits: { icon: LucideIcon; title: string; body: string }[] = [
+    { icon: Eye, title: t.market.gold.benefitLikesTitle, body: t.market.gold.benefitLikesBody },
+    {
+      icon: InfinityIcon,
+      title: t.market.gold.benefitLimitTitle,
+      body: t.market.gold.benefitLimitBody,
+    },
+    {
+      icon: SlidersHorizontal,
+      title: t.market.gold.benefitFiltersTitle,
+      body: t.market.gold.benefitFiltersBody,
+    },
+  ];
 
-function Benefits() {
   return (
     <View className="gap-3 pt-6">
-      {BENEFITS.map(({ icon, title, body }) => (
+      {benefits.map(({ icon, title, body }) => (
         // A glyph rather than the bullet dot that was here. Four identical dots made four
         // different promises look like one list; an eye, an infinity and a slider say what
         // each one is before the words are read.
@@ -258,6 +266,7 @@ function Benefits() {
  * `app/(main)/market.tsx`.
  */
 function GoldCosmetics({ isGold }: { isGold: boolean }) {
+  const t = useT();
   const queryClient = useQueryClient();
 
   // Same key the Market uses, so react-query serves both from one request and an equip here
@@ -286,7 +295,7 @@ function GoldCosmetics({ isGold }: { isGold: boolean }) {
   return (
     <View className="gap-3 pt-8">
       <Text variant="label" className="text-muted">
-        {isGold ? 'Yours to wear' : 'Only for members'}
+        {isGold ? t.market.gold.yoursToWear : t.market.gold.membersOnly}
       </Text>
 
       {items.map((item) => (
@@ -315,6 +324,7 @@ function GoldCosmeticRow({
   busy: boolean;
   onEquip: () => void;
 }) {
+  const t = useT();
   const isBanner = item.kind === 'BANNER';
 
   return (
@@ -345,7 +355,7 @@ function GoldCosmeticRow({
           {item.name}
         </Text>
         <Text variant="caption" numberOfLines={1}>
-          {isBanner ? 'Banner' : 'Frame'}
+          {isBanner ? t.market.gold.banner : t.market.gold.frame}
         </Text>
       </View>
 
@@ -353,25 +363,25 @@ function GoldCosmeticRow({
         // No control at all for a non-member, and no padlock either: a lock implies there is
         // a way to open it from here, and the way is the button at the bottom of this screen.
         <Text variant="label" className="shrink-0 text-gold">
-          With Gold
+          {t.market.gold.withGold}
         </Text>
       ) : item.equipped ? (
         <Text variant="label" className="shrink-0 text-primary">
-          Worn
+          {t.market.gold.worn}
         </Text>
       ) : (
         <Pressable
           disabled={busy}
           onPress={onEquip}
           accessibilityRole="button"
-          accessibilityLabel={`Equip ${item.name}`}
+          accessibilityLabel={t.market.gold.equipA11y(item.name)}
           accessibilityState={{ disabled: busy }}
           // Same outlined pill the Market's Equip uses, so the two screens agree about what
           // an equip control looks like.
           className="shrink-0 rounded-full border-2 border-primary bg-transparent px-4 py-2 active:opacity-70"
         >
           <Text variant="label" className="text-primary">
-            Equip
+            {t.market.gold.equip}
           </Text>
         </Pressable>
       )}
@@ -401,13 +411,36 @@ function PlanRow({
   onPress: () => void;
 }) {
   const colors = useThemeColors();
+  const t = useT();
+
+  // GOLD_PLANS carries ids and prices; the words come from the dictionary, keyed by the
+  // product id, because that module is data shared with non-React code.
+  const copy: Record<GoldPlan['productId'], { label: string; period: string; note: string | null }> =
+    {
+      'gamebuddy.gold.weekly': {
+        label: t.market.gold.planWeekly,
+        period: t.market.gold.periodWeek,
+        note: null,
+      },
+      'gamebuddy.gold.monthly': {
+        label: t.market.gold.planMonthly,
+        period: t.market.gold.periodMonth,
+        note: t.market.gold.noteTrial,
+      },
+      'gamebuddy.gold.yearly': {
+        label: t.market.gold.planYearly,
+        period: t.market.gold.periodYear,
+        note: t.market.gold.noteYearly,
+      },
+    };
+  const { label, period, note } = copy[plan.productId];
 
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${plan.label}, ${plan.price}${plan.note ? `, ${plan.note}` : ''}`}
+      accessibilityLabel={`${label}, ${plan.price}${note ? `, ${note}` : ''}`}
       // Both branches carry the same class keys and only the values move — a class that
       // appears on one state and not the other stops NativeWind painting the subtree.
       // See `src/ui/hairline.ts`.
@@ -420,16 +453,14 @@ function PlanRow({
     >
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center gap-2">
-          <Text variant="bodyStrong">{plan.label}</Text>
-          {!!plan.note && (
+          <Text variant="bodyStrong">{label}</Text>
+          {!!note && (
             <View className="rounded-full bg-gold/20 px-2 py-0.5">
-              <Text className="font-semibold text-[11px] leading-[15px] text-gold">
-                {plan.note}
-              </Text>
+              <Text className="font-semibold text-[11px] leading-[15px] text-gold">{note}</Text>
             </View>
           )}
         </View>
-        <Text variant="caption">Billed every {plan.period}</Text>
+        <Text variant="caption">{t.market.gold.billedEvery(period)}</Text>
       </View>
 
       {/* The price as a numeral, tabular, so three stacked plans line up on the decimal
@@ -445,8 +476,9 @@ function PlanRow({
 }
 
 function ActiveMembership({ expiresAt }: { expiresAt: string | null }) {
+  const t = useT();
   const renews = expiresAt
-    ? new Date(expiresAt).toLocaleDateString(undefined, {
+    ? new Date(expiresAt).toLocaleDateString(t.locale, {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
@@ -456,15 +488,15 @@ function ActiveMembership({ expiresAt }: { expiresAt: string | null }) {
   return (
     <View className="pt-2">
       <Card>
-        <Text variant="heading">You are a member</Text>
+        <Text variant="heading">{t.market.gold.member}</Text>
         <Text variant="body" className="mt-1 text-muted">
-          {renews ? `Your membership runs until ${renews}.` : 'Your membership is active.'}
+          {renews ? t.market.gold.runsUntil(renews) : t.market.gold.active}
         </Text>
         {/* Points just below rather than at the Market, which is where these used to be
             equipped and no longer is. A stale instruction on a paid screen is worse than
             none: it sends a member somewhere their items are not. */}
         <Text variant="caption" className="mt-4">
-          The Gold frame and banner are yours — put them on below.
+          {t.market.gold.wearBelow}
         </Text>
       </Card>
     </View>

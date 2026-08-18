@@ -1,5 +1,26 @@
 import type { ErrorBoundaryProps } from 'expo-router';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { tNow } from '../i18n/useT';
+
+/**
+ * The screen's copy, in the app's language when the i18n module is healthy and in
+ * English when it is not. `tNow()` reaches into plain data through zustand's
+ * `getState()` — no provider, no hook — but this screen renders precisely when
+ * something already threw, so even that is allowed to fail.
+ */
+function boundaryCopy() {
+  try {
+    const t = tNow();
+    return { ...t.errorScreen, retry: t.common.retry };
+  } catch {
+    return {
+      title: 'GameBuddy hit a problem',
+      blurb: 'This is a bug, not something you did. The details below are what we need to fix it.',
+      copyHint: 'The text above can be selected and copied.',
+      retry: 'Try again',
+    };
+  }
+}
 
 /**
  * What the app shows when a render throws.
@@ -20,14 +41,15 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
  * it is what makes a bug report worth reading, and hiding it protects nobody.
  */
 export function AppErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const copy = boundaryCopy();
   return (
     <View style={{ flex: 1, backgroundColor: '#12121A', padding: 24, justifyContent: 'center' }}>
       <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '700', marginBottom: 8 }}>
-        GameBuddy hit a problem
+        {copy.title}
       </Text>
 
       <Text style={{ color: '#A0A0B0', fontSize: 15, lineHeight: 21, marginBottom: 20 }}>
-        This is a bug, not something you did. The details below are what we need to fix it.
+        {copy.blurb}
       </Text>
 
       <ScrollView
@@ -53,11 +75,11 @@ export function AppErrorBoundary({ error, retry }: ErrorBoundaryProps) {
           alignItems: 'center',
         }}
       >
-        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>Try again</Text>
+        <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>{copy.retry}</Text>
       </Pressable>
 
       <Text style={{ color: '#6A6A7A', fontSize: 12, marginTop: 14, textAlign: 'center' }}>
-        The text above can be selected and copied.
+        {copy.copyHint}
       </Text>
     </View>
   );

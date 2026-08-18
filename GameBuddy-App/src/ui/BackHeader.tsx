@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
+import { useT } from '../i18n/useT';
 import { Icon } from './Icon';
 import { Text } from './Text';
 
@@ -21,13 +22,14 @@ type BackHeaderProps = {
  */
 export function BackHeader({ title, subtitle, right }: BackHeaderProps) {
   const router = useRouter();
+  const t = useT();
 
   return (
     <View className="flex-row items-center gap-3 pb-4 pt-2">
       <Pressable
         onPress={() => router.back()}
         accessibilityRole="button"
-        accessibilityLabel="Back"
+        accessibilityLabel={t.common.back}
         hitSlop={12}
         className="h-10 w-10 items-center justify-center active:opacity-60"
       >

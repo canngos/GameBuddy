@@ -5,6 +5,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { lobbyApi, PAGE_SIZE } from '../../../src/api/lobby';
 import type { Lobby, LobbyTone } from '../../../src/api/types';
+import { useUpper } from '../../../src/i18n/case';
+import type { Dictionary } from '../../../src/i18n/dictionaries/en';
+import { useT } from '../../../src/i18n/useT';
 import { LobbyCard } from '../../../src/lobby/LobbyCard';
 import { TONES, ToneChip } from '../../../src/lobby/ToneChip';
 import { useThemeColors } from '../../../src/theme';
@@ -21,6 +24,8 @@ import { cn } from '../../../src/ui/cn';
 export default function LobbyHome() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
   const [tone, setTone] = useState<LobbyTone | null>(null);
   // Its own switch, not a fifth tone. "When it plays" and "what it plays like" are
   // different questions, and somebody wanting a competitive game *right now* should be
@@ -87,20 +92,20 @@ export default function LobbyHome() {
           <View className="gap-5 pb-2">
             <View className="flex-row items-end justify-between pt-8">
               <View className="gap-1">
-                <Text variant="overline">LOBBY</Text>
-                <Text variant="title">Find your team</Text>
+                <Text variant="overline">{upper(t.tabs.lobby)}</Text>
+                <Text variant="title">{t.lobby.list.title}</Text>
               </View>
             </View>
 
             <View className="gap-2">
               <Button
-                label="Open a lobby"
+                label={t.lobby.list.open}
                 disabled={ownsLive}
                 onPress={() => router.push('/lobby/create' as never)}
               />
               {ownsLive && (
                 <Text variant="caption" className="text-center">
-                  You have a lobby open. End or cancel it to start another.
+                  {t.lobby.list.ownsLive}
                 </Text>
               )}
             </View>
@@ -108,7 +113,7 @@ export default function LobbyHome() {
             {myLobbies.length > 0 && (
               <View className="gap-2">
                 <Text variant="overline">
-                  {myLobbies.length === 1 ? 'YOUR LOBBY' : 'YOUR LOBBIES'}
+                  {upper(myLobbies.length === 1 ? t.lobby.list.yourLobby : t.lobby.list.yourLobbies)}
                 </Text>
                 {myLobbies.map((lobby) => (
                   <LobbyCard key={lobby.id} lobby={lobby} />
@@ -117,7 +122,7 @@ export default function LobbyHome() {
             )}
 
             <View className="gap-2">
-              <Text variant="overline">OPEN LOBBIES</Text>
+              <Text variant="overline">{upper(t.lobby.list.openLobbies)}</Text>
               <View className="flex-row flex-wrap items-center gap-2">
                 {/* First, and set apart, because it filters a different thing: the tone
                     chips are one-of-four, this one is on or off alongside them. */}
@@ -126,14 +131,14 @@ export default function LobbyHome() {
                   onPress={() => setStartingSoon(!startingSoon)}
                 />
                 <View className="h-6 w-px bg-line" />
-                {TONES.map((t) => (
+                {TONES.map((value) => (
                   <ToneChip
-                    key={t.value}
-                    tone={t.value}
-                    active={tone === t.value}
+                    key={value}
+                    tone={value}
+                    active={tone === value}
                     // Tapping the active chip clears the filter — four chips and an
                     // implicit "all" beats a fifth chip saying so.
-                    onPress={() => setTone(tone === t.value ? null : t.value)}
+                    onPress={() => setTone(tone === value ? null : value)}
                   />
                 ))}
               </View>
@@ -148,13 +153,13 @@ export default function LobbyHome() {
           feed.isPending || feed.error ? null : (
             <EmptyState
               icon={Users}
-              title={emptyTitle(startingSoon, tone)}
+              title={emptyTitle(startingSoon, tone, t)}
               blurb={
                 startingSoon
-                  ? 'Nothing kicking off in the next 15 minutes. Turn off Now to see what is planned later.'
+                  ? t.lobby.list.emptySoonBlurb
                   : tone
-                    ? 'Nothing with that vibe at the moment. Try another filter, or open your own.'
-                    : 'Open one, set a time, and choose who joins you.'
+                    ? t.lobby.list.emptyToneBlurb
+                    : t.lobby.list.emptyBlurb
               }
             />
           )
@@ -164,10 +169,10 @@ export default function LobbyHome() {
   );
 }
 
-function emptyTitle(startingSoon: boolean, tone: LobbyTone | null): string {
-  if (startingSoon) return 'Nothing starting right now';
-  if (tone) return 'Nothing with that vibe';
-  return 'No open lobbies right now';
+function emptyTitle(startingSoon: boolean, tone: LobbyTone | null, t: Dictionary): string {
+  if (startingSoon) return t.lobby.list.emptySoonTitle;
+  if (tone) return t.lobby.list.emptyToneTitle;
+  return t.lobby.list.emptyTitle;
 }
 
 /**
@@ -178,12 +183,13 @@ function emptyTitle(startingSoon: boolean, tone: LobbyTone | null): string {
  * along with the rule separating it from the group.
  */
 function StartingSoonChip({ active, onPress }: { active: boolean; onPress: () => void }) {
+  const t = useT();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
-      accessibilityLabel="Starting within 15 minutes"
+      accessibilityLabel={t.lobby.list.soonA11y}
       className={cn(
         'flex-row items-center gap-1.5 rounded-full px-3.5 py-2',
         active ? 'bg-primary' : 'bg-raised',
@@ -191,7 +197,7 @@ function StartingSoonChip({ active, onPress }: { active: boolean; onPress: () =>
     >
       <Icon as={Clock} size={14} tone={active ? 'inverse' : 'content'} />
       <Text variant="label" className={active ? 'text-white' : 'text-content'}>
-        Now
+        {t.lobby.list.soon}
       </Text>
     </Pressable>
   );

@@ -1,7 +1,9 @@
-import { NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import { canRequestAds } from './consent';
+import { adsSdk } from './sdk';
 
 /**
- * Rewarded video, and the only file in the app that imports the AdMob SDK.
+ * Rewarded video.
  *
  * ## The coins are not granted here
  *
@@ -23,13 +25,12 @@ import { NativeModules, Platform } from 'react-native';
  * banned before it has earned anything. The real ids belong to release builds only, which
  * is why the swap is keyed to `__DEV__` rather than left to whoever is testing to remember.
  *
- * ## Why the SDK is loaded lazily
+ * ## Consent comes first
  *
- * Native code, exactly like `react-native-purchases`: present in the JS bundle as soon as
- * it is imported, but the native half only exists in a development build made after it was
- * installed. A top-level import would crash every older build at startup. Loading on first
- * use means an older build keeps working everywhere except the watch button, which reports
- * that it is unavailable instead of showing a white screen.
+ * The request below asks for a personalised advert, which in the EEA and the UK is only
+ * allowed once the user has said so. That conversation happens in `consent.ts` at startup,
+ * not here; this module only reads the verdict. If it is no, no advert is requested at all —
+ * asking anyway would be the violation, and Google would refuse to fill it regardless.
  */
 
 /** Google's published test rewarded unit. Serves a real ad that pays nobody. */
@@ -61,47 +62,18 @@ export function rewardedUnitId(): string {
  */
 export const REWARDED_AD_COINS = 20;
 
-type AdsModule = typeof import('react-native-google-mobile-ads');
-
-/** `undefined` = not tried yet, `null` = tried and the native module is not in this build. */
-let sdkCache: AdsModule | null | undefined;
 let initialised = false;
 
-function sdk(): AdsModule | null {
-  if (sdkCache !== undefined) return sdkCache;
-
-  // The native side is checked directly, for the same reason as in `purchases.ts`:
-  // requiring the package is not a test of anything, because it reads a NativeModules entry
-  // that is simply `undefined` in a build without the native half. A try/catch around the
-  // require would always succeed and the failure would surface later as an obscure crash
-  // rather than a disabled button with a reason beside it.
-  if (!NativeModules.RNGoogleMobileAdsModule) {
-    if (__DEV__) {
-      console.warn('[ads] RNGoogleMobileAds native module is missing — this build cannot show ads');
-    }
-    sdkCache = null;
-    return null;
-  }
-
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    sdkCache = require('react-native-google-mobile-ads') as AdsModule;
-  } catch {
-    sdkCache = null;
-  }
-  return sdkCache;
-}
-
-/** Whether this build can show an advert at all. Drives whether the card is offered. */
-export function adsAvailable(): boolean {
-  return sdk() !== null;
-}
+/** Re-exported so the Market can keep importing one module. See `sdk.ts`. */
+export { adsAvailable } from './sdk';
 
 export type RewardedOutcome =
   /** Watched to the end. AdMob's callback is on its way to our backend. */
   | 'earned'
   /** Closed early, or no ad was available. Nothing was earned and nothing is wrong. */
   | 'dismissed'
+  /** Consent for advertising was refused or never given. Recoverable, from Settings. */
+  | 'consentRequired'
   /** This build has no AdMob in it, or the SDK failed to start. */
   | 'unavailable';
 
@@ -113,8 +85,9 @@ export type RewardedOutcome =
  *     with nobody attached and the reward is dropped.
  */
 export async function showRewardedAd(userId: string): Promise<RewardedOutcome> {
-  const ads = sdk();
+  const ads = adsSdk();
   if (!ads) return 'unavailable';
+  if (!canRequestAds()) return 'consentRequired';
 
   try {
     if (!initialised) {

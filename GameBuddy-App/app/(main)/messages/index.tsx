@@ -6,6 +6,8 @@ import { chatApi } from '../../../src/api/chat';
 import { useChatSocketApi, useChatSocketStatus } from '../../../src/chat/ChatSocketProvider';
 import { matchApi } from '../../../src/api/match';
 import { socialApi } from '../../../src/api/social';
+import { useUpper } from '../../../src/i18n/case';
+import { useT } from '../../../src/i18n/useT';
 import { useThemeColors } from '../../../src/theme';
 import { Card, ErrorNotice, FramedAvatar, Screen, Text } from '../../../src/ui';
 
@@ -64,6 +66,7 @@ export default function Messages() {
   // the whole context would have it re-render on every presence frame in the app.
   const { onMessage } = useChatSocketApi();
   const { status: socketStatus } = useChatSocketStatus();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const inbox = useQuery({
@@ -202,10 +205,10 @@ export default function Messages() {
 
   const data = useMemo(
     () => [
-      ...section('friends', 'FRIENDS', friendRows, open.friends, 'Nobody yet. You can add a friend once you have matched with them.'),
-      ...section('matches', 'MATCHES', matchRows, open.matches, 'No matches yet. Swipe on the Home tab to find someone.'),
+      ...section('friends', t.messages.friends, friendRows, open.friends, t.messages.friendsEmpty),
+      ...section('matches', t.messages.matches, matchRows, open.matches, t.messages.matchesEmpty),
     ],
-    [friendRows, matchRows, open],
+    [friendRows, matchRows, open, t],
   );
 
   const router = useRouter();
@@ -316,12 +319,14 @@ function ListHeader({
   onRetry: () => void;
 }) {
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
 
   return (
     <View className="gap-2 pb-2">
       <View className="gap-1 pb-4 pt-8">
-        <Text variant="overline">MESSAGES</Text>
-        <Text variant="title">Your conversations</Text>
+        <Text variant="overline">{upper(t.messages.header)}</Text>
+        <Text variant="title">{t.messages.title}</Text>
       </View>
 
       {loading && <ActivityIndicator color={colors.primary} />}
@@ -345,6 +350,8 @@ const SectionHeader = memo(function SectionHeader({
   open: boolean;
   onToggle: (id: SectionId) => void;
 }) {
+  const t = useT();
+  const upper = useUpper();
   const onPress = useCallback(() => onToggle(id), [onToggle, id]);
 
   return (
@@ -352,11 +359,11 @@ const SectionHeader = memo(function SectionHeader({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ expanded: open }}
-      accessibilityLabel={`${title}, ${count}`}
+      accessibilityLabel={t.messages.sectionA11y(title, count)}
       className="flex-row items-center gap-2 pb-1 pt-4 active:opacity-70"
     >
       <Text variant="overline">
-        {title} · {count}
+        {upper(title)} · {count}
       </Text>
 
       {unread > 0 && (
@@ -387,6 +394,7 @@ const ConversationRow = memo(function ConversationRow({
   row: Row;
   onOpen: (userId: string, username: string) => void;
 }) {
+  const t = useT();
   const onPress = useCallback(() => onOpen(row.userId, row.username), [onOpen, row.userId, row.username]);
 
   return (
@@ -395,8 +403,8 @@ const ConversationRow = memo(function ConversationRow({
       accessibilityRole="button"
       accessibilityLabel={
         row.hasConversation
-          ? `Conversation with ${row.username}`
-          : `Start a conversation with ${row.username}`
+          ? t.messages.conversationWith(row.username)
+          : t.messages.startConversationWith(row.username)
       }
       className="active:opacity-70"
     >
@@ -411,7 +419,9 @@ const ConversationRow = memo(function ConversationRow({
         <View className="flex-1 gap-0.5">
           <Text variant="bodyStrong">{row.username}</Text>
           <Text variant="caption" numberOfLines={1}>
-            {row.hasConversation ? (row.lastMessage ?? 'No messages yet') : 'Say something first'}
+            {row.hasConversation
+              ? (row.lastMessage ?? t.messages.noMessagesYet)
+              : t.messages.sayFirst}
           </Text>
         </View>
 

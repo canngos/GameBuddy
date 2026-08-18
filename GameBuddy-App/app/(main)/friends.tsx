@@ -4,6 +4,8 @@ import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, View } from 'react-native';
 import { socialApi } from '../../src/api/social';
 import type { GamerSummary } from '../../src/api/types';
+import { useCountryName } from '../../src/i18n/countryNames';
+import { useT } from '../../src/i18n/useT';
 import { useThemeColors } from '../../src/theme';
 import { BackHeader, Button, Card, ErrorNotice, FramedAvatar, Screen, Text } from '../../src/ui';
 
@@ -23,6 +25,7 @@ import { BackHeader, Button, Card, ErrorNotice, FramedAvatar, Screen, Text } fro
 export default function Friends() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const query = useQuery({ queryKey: ['friends'], queryFn: socialApi.friends });
@@ -49,15 +52,11 @@ export default function Friends() {
   // Stable across renders so the memo on each row can actually bail out — see FriendRow.
   const confirmRemove = useCallback(
     (person: GamerSummary) =>
-      Alert.alert(
-        `Remove ${person.username}?`,
-        'They go back to being a match — you can still message each other, and either of you can send a new friend request.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(person.userId) },
-        ],
-      ),
-    [remove],
+      Alert.alert(t.profile.removeConfirmTitle(person.username), t.profile.removeConfirmBody, [
+        { text: t.common.cancel, style: 'cancel' },
+        { text: t.common.remove, style: 'destructive', onPress: () => remove.mutate(person.userId) },
+      ]),
+    [remove, t],
   );
 
   const openProfile = useCallback(
@@ -85,7 +84,10 @@ export default function Friends() {
 
   return (
     <Screen edges={['top']}>
-      <BackHeader title="Friends" subtitle={friends.length > 0 ? `${friends.length}` : undefined} />
+      <BackHeader
+        title={t.profile.friendsTitle}
+        subtitle={friends.length > 0 ? `${friends.length}` : undefined}
+      />
 
       {query.isPending && <ActivityIndicator color={colors.primary} className="mt-6" />}
 
@@ -102,10 +104,8 @@ export default function Friends() {
         ListEmptyComponent={
           query.isPending ? null : (
             <Card className="gap-1">
-              <Text variant="bodyStrong">No friends yet</Text>
-              <Text variant="caption">
-                You can add someone as a friend once you have matched with them.
-              </Text>
+              <Text variant="bodyStrong">{t.profile.noFriendsTitle}</Text>
+              <Text variant="caption">{t.profile.noFriendsBody}</Text>
             </Card>
           )
         }
@@ -143,14 +143,16 @@ const FriendRow = memo(function FriendRow({
   onOpen: (person: GamerSummary) => void;
   onRemove: (person: GamerSummary) => void;
 }) {
+  const t = useT();
+  const localize = useCountryName();
   const open = useCallback(() => onOpen(person), [onOpen, person]);
   const removeThis = useCallback(() => onRemove(person), [onRemove, person]);
 
   // Built once per row rather than per render: `filter(Boolean).join()` on every frame of
   // every row is small, and it was being paid on every keystroke elsewhere in the tree.
   const meta = useMemo(
-    () => [person.age, person.country].filter(Boolean).join(' · '),
-    [person.age, person.country],
+    () => [person.age, localize(person.country)].filter(Boolean).join(' · '),
+    [person.age, person.country, localize],
   );
 
   return (
@@ -162,7 +164,7 @@ const FriendRow = memo(function FriendRow({
       <Pressable
         onPress={open}
         accessibilityRole="button"
-        accessibilityLabel={`View ${person.username}'s profile`}
+        accessibilityLabel={t.messages.viewProfileA11y(person.username)}
         className="flex-1 flex-row items-center gap-3 active:opacity-70"
       >
         <FramedAvatar
@@ -182,7 +184,7 @@ const FriendRow = memo(function FriendRow({
           match — but it is not undoable in one tap either, and a solid button next
           to somebody's name reads as the point of the row. */}
       <Button
-        label="Remove"
+        label={t.common.remove}
         variant="ghost"
         size="md"
         className="px-3"

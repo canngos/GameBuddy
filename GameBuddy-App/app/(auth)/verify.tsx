@@ -82,7 +82,7 @@ export default function Verify() {
           // Strip anything that is not a digit: pasting from a mail client often
           // brings a trailing space or a stray character with it.
           onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
-          error={touched ? codeError(code) : null}
+          error={touched ? (codeError(code)?.(t) ?? null) : null}
           keyboardType="number-pad"
           textContentType="oneTimeCode"
           autoComplete="one-time-code"
@@ -105,7 +105,11 @@ export default function Verify() {
         <Button
           // A spent or expired code cannot be retried, so the resend button stops being
           // a secondary option and becomes the only way forward.
-          label={cooldown > 0 && !expired ? `Send a new code (${cooldown}s)` : 'Send a new code'}
+          label={
+            cooldown > 0 && !expired
+              ? t.auth.verify.resendCooldown(cooldown)
+              : t.auth.verify.resend
+          }
           variant={expired ? 'secondary' : 'ghost'}
           disabled={cooldown > 0 && !expired}
           loading={resend.isPending}

@@ -6,6 +6,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useT } from '../i18n/useT';
 import { brand } from '../theme';
 import type { MatchedGamer } from './celebration';
 import { Avatar } from '../ui/Avatar';
@@ -46,6 +47,7 @@ type MatchOverlayProps = {
  * `View` inside them.
  */
 export function MatchOverlay({ candidate, onDismiss, onMessage }: MatchOverlayProps) {
+  const t = useT();
   const visible = !!candidate;
   const progress = useSharedValue(0);
 
@@ -113,10 +115,10 @@ export function MatchOverlay({ candidate, onDismiss, onMessage }: MatchOverlayPr
                     reason. Pinned to the pink that was designed for a dark surface, the
                     same call `SwipeCard` makes for its stamps. */}
                 <Text variant="hero" className="text-center text-brand">
-                  It&apos;s a match!
+                  {t.deck.match.title}
                 </Text>
                 <Text className="text-center text-white/80">
-                  You and {candidate.username} both said yes.
+                  {t.deck.match.body(candidate.username)}
                 </Text>
               </View>
 
@@ -133,10 +135,10 @@ export function MatchOverlay({ candidate, onDismiss, onMessage }: MatchOverlayPr
               </View>
 
               <View className="w-full gap-3 pt-2">
-                <Button label="Send a message" onPress={() => onMessage(candidate)} />
+                <Button label={t.deck.match.message} onPress={() => onMessage(candidate)} />
                 {/* Secondary, not ghost: ghost's label is `text-muted`, which is dark
                     grey in light mode and would vanish against this overlay. */}
-                <Button label="Keep swiping" variant="secondary" onPress={onDismiss} />
+                <Button label={t.deck.match.keep} variant="secondary" onPress={onDismiss} />
               </View>
             </View>
           </Animated.View>

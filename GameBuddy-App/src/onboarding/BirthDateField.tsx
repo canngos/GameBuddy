@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { type TextInput, View } from 'react-native';
+import { useT } from '../i18n/useT';
 import { Text, TextField } from '../ui';
 
 type BirthDateFieldProps = {
@@ -24,6 +25,7 @@ type BirthDateFieldProps = {
  * dismissals.
  */
 export function BirthDateField({ day, month, year, onChange, error, hint }: BirthDateFieldProps) {
+  const t = useT();
   const monthRef = useRef<TextInput>(null);
   const yearRef = useRef<TextInput>(null);
 
@@ -32,13 +34,13 @@ export function BirthDateField({ day, month, year, onChange, error, hint }: Birt
   return (
     <View>
       <Text variant="label" className="mb-3 text-muted">
-        Date of birth
+        {t.settings.birthDate}
       </Text>
 
       <View className="flex-row gap-3">
         <View className="flex-1">
           <TextField
-            label="Day"
+            label={t.onboarding.birthDate.day}
             value={day}
             onChangeText={(text) => {
               const next = digitsOnly(text, 2);
@@ -54,7 +56,7 @@ export function BirthDateField({ day, month, year, onChange, error, hint }: Birt
         <View className="flex-1">
           <TextField
             ref={monthRef}
-            label="Month"
+            label={t.onboarding.birthDate.month}
             value={month}
             onChangeText={(text) => {
               const next = digitsOnly(text, 2);
@@ -70,7 +72,7 @@ export function BirthDateField({ day, month, year, onChange, error, hint }: Birt
         <View className="flex-[1.4]">
           <TextField
             ref={yearRef}
-            label="Year"
+            label={t.onboarding.birthDate.year}
             value={year}
             onChangeText={(text) => onChange({ year: digitsOnly(text, 4) })}
             keyboardType="number-pad"

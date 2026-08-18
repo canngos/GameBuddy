@@ -1,4 +1,5 @@
 import type { Game } from '../api/types';
+import type { Dictionary } from '../i18n/dictionaries/en';
 import type { PickerFilter, PickerItem } from './CataloguePicker';
 import { PLATFORMS } from '../profile/platforms';
 
@@ -13,9 +14,10 @@ import { PLATFORMS } from '../profile/platforms';
 /**
  * `OTHER` is not in {@link PLATFORMS}, deliberately — nobody is asked whether they play on
  * "Other" — but four catalogue games are tagged with it, so the filter has to offer it or
- * those games become unreachable by platform.
+ * those games become unreachable by platform. Its label is the one platform name that is
+ * a word rather than a brand, hence the lookup.
  */
-const OTHER_PLATFORM = { id: 'OTHER', label: 'Other' };
+const OTHER_PLATFORM_ID = 'OTHER';
 
 /** Genres come from the data rather than a list here, so a new one cannot go unoffered. */
 function genreOptions(games: Game[]): { id: string; label: string }[] {
@@ -33,9 +35,9 @@ function genreOptions(games: Game[]): { id: string; label: string }[] {
     .map(([category]) => ({ id: category, label: category }));
 }
 
-export function gameFilters(games: Game[]): PickerFilter[] {
+export function gameFilters(games: Game[], t: Dictionary): PickerFilter[] {
   const used = new Set(games.flatMap((game) => game.platforms ?? []));
-  const platforms = [...PLATFORMS, OTHER_PLATFORM]
+  const platforms = [...PLATFORMS, { id: OTHER_PLATFORM_ID, label: t.pickers.filterOther }]
     // Keeps PLATFORMS' own order, which is roughly by how many players each has, and drops
     // any the catalogue happens not to use so the row never offers an empty result.
     .filter((platform) => used.has(platform.id))
@@ -43,11 +45,11 @@ export function gameFilters(games: Game[]): PickerFilter[] {
 
   const filters: PickerFilter[] = [];
   if (platforms.length > 1) {
-    filters.push({ key: 'platform', label: 'Platform', options: platforms });
+    filters.push({ key: 'platform', label: t.pickers.filterPlatform, options: platforms });
   }
   const genres = genreOptions(games);
   if (genres.length > 1) {
-    filters.push({ key: 'genre', label: 'Genre', options: genres });
+    filters.push({ key: 'genre', label: t.pickers.filterGenre, options: genres });
   }
   return filters;
 }

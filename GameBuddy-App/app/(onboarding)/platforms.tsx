@@ -1,5 +1,6 @@
 import { Redirect, useRouter } from 'expo-router';
 import { View } from 'react-native';
+import { useT } from '../../src/i18n/useT';
 import { useDraft } from '../../src/onboarding/draft';
 import { SelectionCount } from '../../src/onboarding/SelectionCount';
 import { StepHeader } from '../../src/onboarding/StepHeader';
@@ -20,6 +21,7 @@ import { MIN_GAMES, parseBirthDate } from '../../src/validation';
  */
 export default function Platforms() {
   const router = useRouter();
+  const t = useT();
   const draft = useDraft();
 
   // Same guard as the keywords step: reachable directly after a fast refresh, when the
@@ -37,19 +39,19 @@ export default function Platforms() {
         <View className="gap-2">
           <SelectionCount picked={draft.platformIds.length} minimum={MIN_PLATFORMS} />
           <Button
-            label="Next"
+            label={t.common.next}
             disabled={draft.platformIds.length < MIN_PLATFORMS}
             onPress={() => router.push('/keywords')}
           />
-          <Button label="Back" variant="ghost" onPress={() => router.back()} />
+          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
       <StepHeader
         step={5}
         total={6}
-        title="What do you play on?"
-        subtitle="Pick everything you use. Other players filter by this, so more is better than fewer."
+        title={t.onboarding.platforms.title}
+        subtitle={t.onboarding.platforms.subtitle}
       />
 
       <PlatformPicker selected={draft.platformIds} onToggle={draft.togglePlatform} />

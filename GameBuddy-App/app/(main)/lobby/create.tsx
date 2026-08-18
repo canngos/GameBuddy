@@ -7,6 +7,8 @@ import { catalogueApi } from '../../../src/api/catalogue';
 import { ApiError, Code } from '../../../src/api/envelope';
 import { lobbyApi } from '../../../src/api/lobby';
 import type { Game, LobbyTone } from '../../../src/api/types';
+import { useUpper } from '../../../src/i18n/case';
+import { useT } from '../../../src/i18n/useT';
 import { localZone, startsFull } from '../../../src/lobby/startsAt';
 import { TONES, ToneChip } from '../../../src/lobby/ToneChip';
 import { useThemeColors } from '../../../src/theme';
@@ -34,10 +36,12 @@ import { cn } from '../../../src/ui/cn';
  * `BirthDateField` gives: it is a native dependency rendered differently on each
  * platform, and a spinner is a slow way to say 20:00.
  */
-const WHEN_PRESETS: { label: string; startsAt: () => Date }[] = [
-  { label: 'Now', startsAt: () => new Date() },
-  { label: 'In 1 hour', startsAt: () => hoursFromNow(1) },
-  { label: 'In 3 hours', startsAt: () => hoursFromNow(3) },
+// Keys, not labels: the words come from the dictionary at render time, because a
+// module-level label array is evaluated before anybody has chosen a language.
+const WHEN_PRESETS: { key: 'presetNow' | 'presetIn1h' | 'presetIn3h'; startsAt: () => Date }[] = [
+  { key: 'presetNow', startsAt: () => new Date() },
+  { key: 'presetIn1h', startsAt: () => hoursFromNow(1) },
+  { key: 'presetIn3h', startsAt: () => hoursFromNow(3) },
 ];
 
 /** The index that means "typed below" rather than a preset. */
@@ -96,6 +100,8 @@ const digits = (value: string, max: number) => value.replace(/\D/g, '').slice(0,
 export default function CreateLobby() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
   const queryClient = useQueryClient();
 
   const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
@@ -170,7 +176,7 @@ export default function CreateLobby() {
 
   return (
     <Screen edges={['top']}>
-      <BackHeader title="Open a lobby" />
+      <BackHeader title={t.lobby.create.title} />
 
       <ScrollView
         contentContainerClassName="gap-5 pb-8 pt-4"
@@ -179,30 +185,37 @@ export default function CreateLobby() {
       >
         {notGold && (
           <Card className="gap-2">
-            <Text variant="bodyStrong">Opening a lobby comes with Gold</Text>
-            <Text variant="caption">
-              Browsing lobbies and asking to join are always free.
-            </Text>
-            <Button label="Get Gold" size="md" onPress={() => router.push('/gold' as never)} />
+            <Text variant="bodyStrong">{t.lobby.create.goldTitle}</Text>
+            <Text variant="caption">{t.lobby.create.goldBlurb}</Text>
+            <Button
+              label={t.lobby.create.getGold}
+              size="md"
+              onPress={() => router.push('/gold' as never)}
+            />
           </Card>
         )}
 
         <View className="gap-2">
-          <Text variant="overline">GAME</Text>
+          <Text variant="overline">{upper(t.lobby.create.game)}</Text>
           {game ? (
             <Card className="flex-row items-center gap-3">
               <Avatar source={game.gameIcon} name={game.gameName} colorSeed={game.gameId} size={40} />
               <Text variant="bodyStrong" className="flex-1" numberOfLines={1}>
                 {game.gameName}
               </Text>
-              <Button label="Change" variant="ghost" size="md" onPress={() => setGame(null)} />
+              <Button
+                label={t.lobby.create.change}
+                variant="ghost"
+                size="md"
+                onPress={() => setGame(null)}
+              />
             </Card>
           ) : (
             <View className="gap-2">
               <TextField
                 value={gameSearch}
                 onChangeText={setGameSearch}
-                placeholder="Search for the game"
+                placeholder={t.lobby.create.searchGame}
                 autoCorrect={false}
                 autoCapitalize="none"
               />
@@ -230,43 +243,46 @@ export default function CreateLobby() {
         </View>
 
         <View className="gap-2">
-          <Text variant="overline">LOBBY</Text>
-          <TextField value={title} onChangeText={setTitle} placeholder="Title" maxLength={80} />
+          <Text variant="overline">{upper(t.tabs.lobby)}</Text>
+          <TextField
+            value={title}
+            onChangeText={setTitle}
+            placeholder={t.lobby.create.titlePlaceholder}
+            maxLength={80}
+          />
           <TextField
             value={description}
             onChangeText={setDescription}
-            placeholder="What's the plan? (optional)"
+            placeholder={t.lobby.create.descriptionPlaceholder}
             multiline
             maxLength={500}
           />
           <TextField
             value={requirements}
             onChangeText={setRequirements}
-            placeholder="Requirements — mic, rank, in-game chat (optional)"
+            placeholder={t.lobby.create.requirementsPlaceholder}
             multiline
             maxLength={300}
           />
-          <Text variant="caption">
-            Tell people what you're looking for. You approve every request yourself.
-          </Text>
+          <Text variant="caption">{t.lobby.create.approveHint}</Text>
         </View>
 
         <View className="gap-2">
-          <Text variant="overline">TONE</Text>
+          <Text variant="overline">{upper(t.lobby.create.tone)}</Text>
           <View className="flex-row flex-wrap gap-2">
-            {TONES.map((t) => (
+            {TONES.map((value) => (
               <ToneChip
-                key={t.value}
-                tone={t.value}
-                active={tone === t.value}
-                onPress={() => setTone(t.value)}
+                key={value}
+                tone={value}
+                active={tone === value}
+                onPress={() => setTone(value)}
               />
             ))}
           </View>
         </View>
 
         <View className="gap-2">
-          <Text variant="overline">PLAYERS (INCLUDING YOU)</Text>
+          <Text variant="overline">{upper(t.lobby.create.players)}</Text>
           <View className="flex-row gap-2">
             {SEATS.map((seats) => (
               <Pressable
@@ -291,11 +307,11 @@ export default function CreateLobby() {
         </View>
 
         <View className="gap-2">
-          <Text variant="overline">WHEN</Text>
+          <Text variant="overline">{upper(t.lobby.create.when)}</Text>
           <View className="flex-row flex-wrap gap-2">
             {WHEN_PRESETS.map((option, index) => (
               <Pressable
-                key={option.label}
+                key={option.key}
                 onPress={() => setWhen(index)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: when === index }}
@@ -305,7 +321,7 @@ export default function CreateLobby() {
                 )}
               >
                 <Text variant="label" className={when === index ? 'text-white' : 'text-content'}>
-                  {option.label}
+                  {t.lobby.create[option.key]}
                 </Text>
               </Pressable>
             ))}
@@ -322,7 +338,7 @@ export default function CreateLobby() {
                 variant="label"
                 className={when === CUSTOM_WHEN ? 'text-white' : 'text-content'}
               >
-                Pick a time
+                {t.lobby.create.pickATime}
               </Text>
             </Pressable>
           </View>
@@ -334,7 +350,7 @@ export default function CreateLobby() {
               <View className="flex-row gap-3">
                 <View className="flex-1">
                   <TextField
-                    label="Day"
+                    label={t.onboarding.birthDate.day}
                     value={typedDay}
                     onChangeText={(text) => {
                       const next = digits(text, 2);
@@ -349,7 +365,7 @@ export default function CreateLobby() {
                 <View className="flex-1">
                   <TextField
                     ref={monthRef}
-                    label="Month"
+                    label={t.onboarding.birthDate.month}
                     value={typedMonth}
                     onChangeText={(text) => {
                       const next = digits(text, 2);
@@ -364,7 +380,7 @@ export default function CreateLobby() {
                 <View className="flex-1">
                   <TextField
                     ref={hourRef}
-                    label="Hour"
+                    label={t.lobby.create.hour}
                     value={typedHour}
                     onChangeText={(text) => {
                       const next = digits(text, 2);
@@ -379,7 +395,7 @@ export default function CreateLobby() {
                 <View className="flex-1">
                   <TextField
                     ref={minuteRef}
-                    label="Minute"
+                    label={t.lobby.create.minute}
                     value={typedMinute}
                     onChangeText={(text) => setTypedMinute(digits(text, 2))}
                     keyboardType="number-pad"
@@ -391,20 +407,18 @@ export default function CreateLobby() {
 
               {typedTooFar ? (
                 <Text variant="caption" className="text-danger">
-                  Lobbies can be planned up to two weeks ahead.
+                  {t.lobby.create.tooFar}
                 </Text>
               ) : typedStart ? (
-                <Text variant="caption">Plays {startsFull(typedStart)}.</Text>
+                <Text variant="caption">{t.lobby.create.playsAt(startsFull(typedStart, t))}</Text>
               ) : (
-                <Text variant="caption">Use a 24-hour clock.</Text>
+                <Text variant="caption">{t.lobby.create.use24h}</Text>
               )}
             </View>
           )}
 
           <Text variant="caption">
-            {zone
-              ? `Set in your time zone (${zone}). Everyone sees it in theirs.`
-              : 'Everyone sees this time in their own time zone.'}
+            {zone ? t.lobby.create.zoneHint(zone) : t.lobby.create.zoneHintNoZone}
           </Text>
         </View>
 
@@ -414,7 +428,7 @@ export default function CreateLobby() {
           )}
 
         <Button
-          label="Open lobby"
+          label={t.lobby.create.submit}
           loading={create.isPending}
           disabled={!ready}
           onPress={() => create.mutate()}

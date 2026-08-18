@@ -1,6 +1,7 @@
 import { Heart, RotateCcw, X } from 'lucide-react-native';
 import type { ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { cn } from '../ui/cn';
 import { lift } from '../ui/elevation';
@@ -46,6 +47,7 @@ export function DeckActions({
   rewindCost = 0,
   boost,
 }: DeckActionsProps) {
+  const t = useT();
   return (
     <View className="flex-row items-center justify-center gap-6 py-5">
       {/* Left of Pass, and smaller than both. Undo is a recovery action, not a third
@@ -59,8 +61,8 @@ export function DeckActions({
       )}
 
       <CircleButton
-        label="Pass"
-        hint="Skip this gamer"
+        label={t.deck.actions.pass}
+        hint={t.deck.actions.passHint}
         onPress={() => {
           tapLight();
           onDecide('decline');
@@ -72,8 +74,8 @@ export function DeckActions({
       </CircleButton>
 
       <CircleButton
-        label="Match"
-        hint="Say yes to this gamer"
+        label={t.deck.actions.match}
+        hint={t.deck.actions.matchHint}
         // The one button in the app that gets `commit`. Saying yes is the decision that
         // costs an allowance and cannot be taken back without paying for a rewind, and a
         // pass is not — feedback of the same weight on both would flatten that difference.
@@ -117,6 +119,7 @@ function RewindButton({
   disabled: boolean;
   cost: number;
 }) {
+  const t = useT();
   return (
     <Pressable
       onPress={() => {
@@ -125,7 +128,7 @@ function RewindButton({
       }}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={cost > 0 ? `Undo last swipe, ${cost} coins` : 'Undo last swipe'}
+      accessibilityLabel={cost > 0 ? t.deck.actions.undoCost(cost) : t.deck.actions.undo}
       accessibilityState={{ disabled }}
       hitSlop={8}
       className={cn(

@@ -188,8 +188,20 @@ export async function forgetIdentity(): Promise<void> {
   configuredFor = null;
 }
 
+/**
+ * Why the store cannot be reached, as a code the UI can translate.
+ *
+ * The English `message` stays for logs and Crashlytics; `useErrorText` recognises the
+ * error by name and maps `reason` to the reader's language, so this module never has to
+ * import i18n.
+ */
+export type StoreUnavailableReason = 'unavailable' | 'notInBuild' | 'noKey' | 'productMissing';
+
 export class StoreUnavailableError extends Error {
-  constructor(message = 'Purchases are not available in this build yet.') {
+  constructor(
+    public readonly reason: StoreUnavailableReason = 'unavailable',
+    message = 'Purchases are not available in this build yet.',
+  ) {
     super(message);
     this.name = 'StoreUnavailableError';
   }
@@ -223,11 +235,12 @@ export async function purchase(productId: string): Promise<void> {
   const Purchases = sdk();
   if (!Purchases) {
     throw new StoreUnavailableError(
+      'notInBuild',
       'This build cannot make purchases. It was installed before in-app purchases were added.',
     );
   }
   if (!API_KEY) {
-    throw new StoreUnavailableError('No RevenueCat key is configured in this build.');
+    throw new StoreUnavailableError('noKey', 'No RevenueCat key is configured in this build.');
   }
 
   // The category has to be stated. `getProducts` defaults to SUBSCRIPTION, so asking for a
@@ -264,7 +277,7 @@ export async function purchase(productId: string): Promise<void> {
     // The id is not sold on this store. Ours to fix — the plan list and the store
     // disagree — so it is logged loudly rather than shown as a payment failure.
     if (__DEV__) console.error('[billing] store does not offer', productId);
-    throw new StoreUnavailableError('That plan is not available right now.');
+    throw new StoreUnavailableError('productMissing', 'That plan is not available right now.');
   }
 
   try {

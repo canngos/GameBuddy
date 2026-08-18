@@ -4,6 +4,8 @@ import { memo, useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { lobbyApi } from '../../../src/api/lobby';
 import type { LobbyDetail, LobbyMember, LobbyMessage } from '../../../src/api/types';
+import { useUpper } from '../../../src/i18n/case';
+import { useT } from '../../../src/i18n/useT';
 import { startsExact } from '../../../src/lobby/startsAt';
 import { ToneBadge } from '../../../src/lobby/ToneChip';
 import { useLobbyChat } from '../../../src/lobby/useLobbyChat';
@@ -35,6 +37,8 @@ export default function LobbyScreen() {
   const { lobbyId } = useLocalSearchParams<{ lobbyId: string }>();
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
   const queryClient = useQueryClient();
   const myId = useSession((s) => s.userId);
   const listRef = useRef<FlatList<LobbyMessage>>(null);
@@ -127,7 +131,7 @@ export default function LobbyScreen() {
   if (detail.isPending) {
     return (
       <Screen edges={['top']}>
-        <BackHeader title="Lobby" />
+        <BackHeader title={t.lobby.detail.fallbackTitle} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -138,9 +142,12 @@ export default function LobbyScreen() {
   if (detail.error || !detail.data || !lobby) {
     return (
       <Screen edges={['top']}>
-        <BackHeader title="Lobby" />
+        <BackHeader title={t.lobby.detail.fallbackTitle} />
         <View className="pt-4">
-          <ErrorNotice error={detail.error ?? new Error('This lobby is gone.')} onRetry={() => detail.refetch()} />
+          <ErrorNotice
+            error={detail.error ?? new Error(t.lobby.detail.gone)}
+            onRetry={() => detail.refetch()}
+          />
         </View>
       </Screen>
     );
@@ -197,17 +204,17 @@ export default function LobbyScreen() {
 
             {isOwner && detail.data.pendingRequests.length > 0 && lobby.status === 'OPEN' && (
               <View className="gap-2">
-                <Text variant="overline">WANTS TO JOIN</Text>
+                <Text variant="overline">{upper(t.lobby.detail.wantsToJoin)}</Text>
                 {detail.data.pendingRequests.map((request) => (
                   <MemberRow key={request.userId} member={request}>
                     <Button
-                      label="Accept"
+                      label={t.lobby.detail.accept}
                       size="md"
                       loading={answer.isPending}
                       onPress={() => answer.mutate({ userId: request.userId, accept: true })}
                     />
                     <Button
-                      label="Pass"
+                      label={t.lobby.detail.pass}
                       variant="ghost"
                       size="md"
                       loading={answer.isPending}
@@ -220,13 +227,13 @@ export default function LobbyScreen() {
 
             <View className="gap-2">
               <Text variant="overline">
-                TEAM · {lobby.playerCount}/{lobby.maxPlayers}
+                {upper(t.lobby.detail.team(lobby.playerCount, lobby.maxPlayers))}
               </Text>
               {detail.data.members.map((member) => (
                 <MemberRow key={member.userId} member={member}>
                   {isOwner && member.status !== 'OWNER' && chatOpen && (
                     <Button
-                      label="Remove"
+                      label={t.common.remove}
                       variant="ghost"
                       size="md"
                       loading={kick.isPending}
@@ -239,7 +246,7 @@ export default function LobbyScreen() {
 
             {inTeam && (
               <Text variant="overline">
-                {chatOpen ? 'LOBBY CHAT' : 'LOBBY CHAT · READ ONLY'}
+                {upper(chatOpen ? t.lobby.detail.chat : t.lobby.detail.chatReadOnly)}
               </Text>
             )}
             {inTeam && messages.error && (
@@ -250,9 +257,9 @@ export default function LobbyScreen() {
         ListEmptyComponent={
           inTeam && !messages.isPending && !messages.error ? (
             <View className="items-center gap-1 py-6">
-              <Text variant="bodyStrong">Nothing said yet</Text>
+              <Text variant="bodyStrong">{t.lobby.detail.emptyChatTitle}</Text>
               <Text variant="caption" className="text-center">
-                Sort out the details with your team here.
+                {t.lobby.detail.emptyChatBlurb}
               </Text>
             </View>
           ) : null
@@ -288,6 +295,7 @@ const Composer = memo(function Composer({
   sending: boolean;
   onSend: (text: string) => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState('');
   const empty = draft.trim().length === 0;
 
@@ -304,7 +312,7 @@ const Composer = memo(function Composer({
         <TextField
           value={draft}
           onChangeText={setDraft}
-          placeholder="Message the team"
+          placeholder={t.lobby.detail.composerPlaceholder}
           multiline
           maxLength={1000}
           onSubmitEditing={submit}
@@ -315,7 +323,7 @@ const Composer = memo(function Composer({
         onPress={submit}
         disabled={empty || sending}
         accessibilityRole="button"
-        accessibilityLabel="Send"
+        accessibilityLabel={t.common.send}
         className={cn(
           'h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80',
           (empty || sending) && 'opacity-40',
@@ -329,6 +337,8 @@ const Composer = memo(function Composer({
 
 function LobbyHeader({ detail }: { detail: LobbyDetail }) {
   const { lobby } = detail;
+  const t = useT();
+  const upper = useUpper();
   return (
     <Card className="gap-3">
       <View className="flex-row items-center gap-3">
@@ -339,9 +349,12 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
           size={44}
         />
         <View className="flex-1 gap-0.5">
-          <Text variant="bodyStrong">{lobby.gameName ?? 'Unknown game'}</Text>
+          <Text variant="bodyStrong">{lobby.gameName ?? t.lobby.card.unknownGame}</Text>
           <Text variant="caption">
-            Plays {startsExact(lobby.startsAt)} · by {lobby.ownerUsername ?? 'someone'}
+            {t.lobby.detail.playsBy(
+              startsExact(lobby.startsAt, t),
+              lobby.ownerUsername ?? t.lobby.card.unknownOwner,
+            )}
           </Text>
         </View>
         <ToneBadge tone={lobby.tone} />
@@ -350,7 +363,7 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
       {!!lobby.description && <Text variant="body">{lobby.description}</Text>}
       {!!lobby.requirements && (
         <View className="gap-0.5">
-          <Text variant="overline">REQUIREMENTS</Text>
+          <Text variant="overline">{upper(t.lobby.detail.requirements)}</Text>
           <Text variant="body">{lobby.requirements}</Text>
         </View>
       )}
@@ -358,10 +371,10 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
       {lobby.status !== 'OPEN' && (
         <View className="self-start rounded-full bg-raised px-2.5 py-0.5">
           <Text variant="label">
-            {lobby.status === 'LOCKED' && 'Team locked — not taking requests'}
-            {lobby.status === 'ENDED' && 'Played and closed'}
-            {lobby.status === 'CANCELLED' && 'Called off'}
-            {lobby.status === 'ARCHIVED' && 'Archived'}
+            {lobby.status === 'LOCKED' && t.lobby.detail.statusLocked}
+            {lobby.status === 'ENDED' && t.lobby.detail.statusEnded}
+            {lobby.status === 'CANCELLED' && t.lobby.detail.statusCancelled}
+            {lobby.status === 'ARCHIVED' && t.lobby.detail.statusArchived}
           </Text>
         </View>
       )}
@@ -390,16 +403,22 @@ function ActionRow({
 }) {
   const { lobby } = detail;
   const status = lobby.status;
+  const t = useT();
 
   if (lobby.myStatus === 'OWNER') {
     if (status === 'OPEN') {
       return (
         <View className="flex-row gap-2">
           <View className="flex-1">
-            <Button label="Lock team" loading={pending.lock} onPress={on.lock} />
+            <Button label={t.lobby.detail.lockTeam} loading={pending.lock} onPress={on.lock} />
           </View>
           <View className="flex-1">
-            <Button label="Cancel lobby" variant="danger" loading={pending.cancel} onPress={on.cancel} />
+            <Button
+              label={t.lobby.detail.cancelLobby}
+              variant="danger"
+              loading={pending.cancel}
+              onPress={on.cancel}
+            />
           </View>
         </View>
       );
@@ -408,10 +427,15 @@ function ActionRow({
       return (
         <View className="flex-row gap-2">
           <View className="flex-1">
-            <Button label="Unlock" variant="secondary" loading={pending.unlock} onPress={on.unlock} />
+            <Button
+              label={t.lobby.detail.unlock}
+              variant="secondary"
+              loading={pending.unlock}
+              onPress={on.unlock}
+            />
           </View>
           <View className="flex-1">
-            <Button label="End lobby" loading={pending.end} onPress={on.end} />
+            <Button label={t.lobby.detail.endLobby} loading={pending.end} onPress={on.end} />
           </View>
         </View>
       );
@@ -421,7 +445,14 @@ function ActionRow({
 
   if (lobby.myStatus === 'ACCEPTED') {
     if (status === 'OPEN' || status === 'LOCKED') {
-      return <Button label="Leave lobby" variant="ghost" loading={pending.leave} onPress={on.leave} />;
+      return (
+        <Button
+          label={t.lobby.detail.leaveLobby}
+          variant="ghost"
+          loading={pending.leave}
+          onPress={on.leave}
+        />
+      );
     }
     return null;
   }
@@ -429,37 +460,41 @@ function ActionRow({
   if (lobby.myStatus === 'PENDING') {
     return (
       <View className="gap-2">
-        <Text variant="caption">
-          Request sent. We'll notify you when the owner answers.
-        </Text>
-        <Button label="Withdraw request" variant="ghost" loading={pending.leave} onPress={on.leave} />
+        <Text variant="caption">{t.lobby.detail.requestSent}</Text>
+        <Button
+          label={t.lobby.detail.withdraw}
+          variant="ghost"
+          loading={pending.leave}
+          onPress={on.leave}
+        />
       </View>
     );
   }
 
   if (lobby.myStatus === 'REJECTED') {
-    return <Text variant="caption">The owner filled this one with someone else.</Text>;
+    return <Text variant="caption">{t.lobby.detail.rejected}</Text>;
   }
 
   // A stranger, or someone who left/was removed — both may ask (again).
   if (status === 'OPEN' && lobby.playerCount < lobby.maxPlayers) {
-    return <Button label="Ask to join" loading={pending.join} onPress={on.join} />;
+    return <Button label={t.lobby.detail.askToJoin} loading={pending.join} onPress={on.join} />;
   }
   if (status === 'OPEN') {
-    return <Text variant="caption">This lobby is full.</Text>;
+    return <Text variant="caption">{t.lobby.detail.full}</Text>;
   }
   return null;
 }
 
 function MemberRow({ member, children }: { member: LobbyMember; children?: React.ReactNode }) {
+  const t = useT();
   return (
     <Card className="flex-row items-center gap-3">
       <Avatar source={member.avatar} name={member.username ?? '?'} colorSeed={member.userId} size={36} />
       <View className="flex-1">
         <Text variant="bodyStrong" numberOfLines={1}>
-          {member.username ?? 'Unknown gamer'}
+          {member.username ?? t.lobby.detail.unknownGamer}
         </Text>
-        {member.status === 'OWNER' && <Text variant="caption">Lobby owner</Text>}
+        {member.status === 'OWNER' && <Text variant="caption">{t.lobby.detail.owner}</Text>}
       </View>
       {children}
     </Card>
@@ -473,9 +508,10 @@ const ChatLine = memo(function ChatLine({
   line: LobbyMessage;
   mine: boolean;
 }) {
+  const t = useT();
   return (
     <View className={cn('max-w-[85%] gap-0.5', mine ? 'self-end' : 'self-start')}>
-      {!mine && <Text variant="caption">{line.senderUsername ?? 'Unknown gamer'}</Text>}
+      {!mine && <Text variant="caption">{line.senderUsername ?? t.lobby.detail.unknownGamer}</Text>}
       <View className={cn('rounded-2xl px-3 py-2', mine ? 'bg-primary' : 'bg-raised')}>
         <Text variant="body" className={mine ? 'text-white' : 'text-content'}>
           {line.message}

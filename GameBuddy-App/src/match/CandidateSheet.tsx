@@ -8,6 +8,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { Candidate } from '../api/types';
 import { avatarGradient, avatarUri, initialsOf } from '../avatars';
+import { useCountryName } from '../i18n/countryNames';
+import { useT } from '../i18n/useT';
 import { Avatar } from '../ui/Avatar';
 import { FrameOverlay } from '../ui/FramedAvatar';
 import { GradientView } from '../ui/Gradient';
@@ -39,7 +41,9 @@ type CandidateSheetProps = {
  * full list cannot drift into looking like two different products.
  */
 export function CandidateSheet({ candidate, onDismiss }: CandidateSheetProps) {
+  const t = useT();
   const visible = !!candidate;
+  const localize = useCountryName();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -61,7 +65,7 @@ export function CandidateSheet({ candidate, onDismiss }: CandidateSheetProps) {
     <View style={[StyleSheet.absoluteFill, { zIndex: 45 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
-          <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel="Close" />
+          <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel={t.common.close} />
 
           <Animated.View style={sheetStyle}>
             <View className="max-h-[86%] overflow-hidden rounded-t-[28px] bg-surface pb-10 pt-3">
@@ -107,7 +111,7 @@ export function CandidateSheet({ candidate, onDismiss }: CandidateSheetProps) {
                       {candidate.gamerUsername}
                     </Text>
                     <Text className="font-medium text-[13px] leading-[18px] text-white/85">
-                      {[candidate.age, candidate.country].filter(Boolean).join(' · ')}
+                      {[candidate.age, localize(candidate.country)].filter(Boolean).join(' · ')}
                     </Text>
                   </View>
                 </View>
@@ -124,7 +128,7 @@ export function CandidateSheet({ candidate, onDismiss }: CandidateSheetProps) {
                 {!!candidate.platforms?.length && (
                   <PlatformRow platforms={candidate.platforms} />
                 )}
-                <KeywordRow title="Style" items={candidate.selectedKeywords ?? []} />
+                <KeywordRow title={t.deck.card.style} items={candidate.selectedKeywords ?? []} />
               </ScrollView>
 
               <View className="border-t border-line px-6 pt-4">

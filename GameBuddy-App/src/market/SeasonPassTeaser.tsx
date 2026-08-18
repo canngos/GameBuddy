@@ -1,5 +1,7 @@
 import { CalendarClock } from 'lucide-react-native';
 import { View } from 'react-native';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { Icon, Text } from '../ui';
 
 /**
@@ -21,22 +23,24 @@ import { Icon, Text } from '../ui';
  * be withdrawn should not need a store release to withdraw.
  */
 export function SeasonPassTeaser() {
+  const t = useT();
+  const upper = useUpper();
   return (
     <View
       accessible
       accessibilityRole="summary"
       accessibilityState={{ disabled: true }}
-      accessibilityLabel="Season Pass. Coming soon — new rewards every season."
+      accessibilityLabel={t.market.season.a11y}
       importantForAccessibility="yes"
       className="mb-5 overflow-hidden rounded-card border border-line bg-raised p-5"
     >
       <View className="flex-row items-center justify-between gap-4">
         <View className="flex-1 gap-1">
           <Text variant="overline" className="text-muted">
-            SEASON PASS
+            {upper(t.market.season.header)}
           </Text>
-          <Text variant="heading">Coming soon</Text>
-          <Text variant="caption">New rewards every season.</Text>
+          <Text variant="heading">{t.market.season.coming}</Text>
+          <Text variant="caption">{t.market.season.blurb}</Text>
         </View>
 
         {/* A quiet mark rather than an icon that suggests a destination. Muted on

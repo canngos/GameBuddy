@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { useT } from '../../src/i18n/useT';
 import { CountryPicker } from '../../src/onboarding/CountryPicker';
 import { useDraft } from '../../src/onboarding/draft';
 import { StepHeader } from '../../src/onboarding/StepHeader';
@@ -14,21 +15,26 @@ import { birthDateError, MIN_AGE } from '../../src/validation';
  * the backend accepts. Keeping them distinct is what stops the decline option from
  * rendering as pre-selected.
  */
-const GENDERS = [
-  { value: 'M', label: 'Man' },
-  { value: 'F', label: 'Woman' },
-  { value: 'O', label: 'Other' },
-  { value: '', label: 'Prefer not to say' },
-] as const;
+const GENDER_VALUES = ['M', 'F', 'O', ''] as const;
 
 export default function Profile() {
   const router = useRouter();
+  const t = useT();
   const draft = useDraft();
   const [touched, setTouched] = useState(false);
 
+  // Built here rather than as a module constant: a `const` array of labels is evaluated
+  // once at import time, long before anybody has chosen a language.
+  const genderLabels: Record<(typeof GENDER_VALUES)[number], string> = {
+    M: t.onboarding.profile.genderMan,
+    F: t.onboarding.profile.genderWoman,
+    O: t.onboarding.profile.genderOther,
+    '': t.onboarding.profile.genderNone,
+  };
+
   const problems = {
     birthDate: birthDateError(draft.birthDay, draft.birthMonth, draft.birthYear),
-    country: draft.country ? null : 'Choose your country',
+    country: draft.country ? null : t.onboarding.profile.countryRequired,
   };
   const valid = !problems.birthDate && !problems.country;
 
@@ -43,8 +49,8 @@ export default function Profile() {
       <StepHeader
         step={2}
         total={6}
-        title="About you"
-        subtitle="GameBuddy is for adults. We use your date of birth to confirm you are 18 or over — it is never shown to anyone."
+        title={t.onboarding.profile.title}
+        subtitle={t.onboarding.profile.subtitle}
       />
 
       <View className="gap-6">
@@ -59,8 +65,8 @@ export default function Profile() {
               ...(parts.year !== undefined && { birthYear: parts.year }),
             })
           }
-          error={touched ? problems.birthDate : null}
-          hint={`You must be ${MIN_AGE} or over.`}
+          error={touched && problems.birthDate ? problems.birthDate(t) : null}
+          hint={t.onboarding.profile.ageHint(MIN_AGE)}
         />
 
         <CountryPicker
@@ -71,15 +77,16 @@ export default function Profile() {
 
         <View>
           <Text variant="label" className="mb-3 text-muted">
-            Gender
+            {t.onboarding.profile.gender}
           </Text>
           <View className="flex-row flex-wrap gap-2">
-            {GENDERS.map((option) => {
-              const selected = draft.gender === option.value;
+            {GENDER_VALUES.map((value) => {
+              const selected = draft.gender === value;
+              const label = genderLabels[value];
               return (
                 <Pressable
-                  key={option.label}
-                  onPress={() => draft.set({ gender: option.value })}
+                  key={value || 'none'}
+                  onPress={() => draft.set({ gender: value })}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                   className={cn(
@@ -91,7 +98,7 @@ export default function Profile() {
                     variant={selected ? 'bodyStrong' : 'body'}
                     className={selected ? 'text-white' : 'text-content'}
                   >
-                    {option.label}
+                    {label}
                   </Text>
                 </Pressable>
               );
@@ -104,7 +111,7 @@ export default function Profile() {
       {/* No Back: the username step arrives here with `replace`, so this is the bottom
           of the stack and a back button would do nothing. */}
       <View className="mt-auto pt-10">
-        <Button label="Continue" onPress={next} />
+        <Button label={t.common.continue} onPress={next} />
       </View>
     </Screen>
   );

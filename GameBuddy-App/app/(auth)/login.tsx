@@ -60,7 +60,7 @@ export default function Login() {
           onChangeText={setIdentifier}
           textContentType="username"
           autoComplete="username"
-          placeholder="you@example.com"
+          placeholder={t.auth.emailPlaceholder}
         />
 
         <TextField

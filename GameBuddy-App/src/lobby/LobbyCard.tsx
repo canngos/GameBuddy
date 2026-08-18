@@ -2,16 +2,10 @@ import { useRouter } from 'expo-router';
 import { memo, useCallback, useMemo } from 'react';
 import { Pressable, View } from 'react-native';
 import type { Lobby } from '../api/types';
+import { useT } from '../i18n/useT';
 import { Avatar, Card, Text } from '../ui';
 import { startsLabel } from './startsAt';
 import { ToneBadge } from './ToneChip';
-
-/** What a non-OPEN lobby says about itself on a card. OPEN says the start time instead. */
-const STATUS_LABEL: Record<string, string> = {
-  LOCKED: 'Team locked',
-  ENDED: 'Played',
-  CANCELLED: 'Called off',
-};
 
 /**
  * One lobby, in the browse feed or the "mine" strip. The same card everywhere, because a
@@ -19,6 +13,7 @@ const STATUS_LABEL: Record<string, string> = {
  */
 export const LobbyCard = memo(function LobbyCard({ lobby }: { lobby: Lobby }) {
   const router = useRouter();
+  const t = useT();
   const seats = `${lobby.playerCount}/${lobby.maxPlayers}`;
   const full = lobby.playerCount >= lobby.maxPlayers;
 
@@ -29,13 +24,16 @@ export const LobbyCard = memo(function LobbyCard({ lobby }: { lobby: Lobby }) {
 
   // `startsLabel` builds a `Date` and reads `Date.now()`. It was doing that on every render
   // of every card in an infinite feed; the answer only changes when the timestamp does.
-  const when = useMemo(
-    () =>
-      lobby.status === 'OPEN'
-        ? `Plays ${startsLabel(lobby.startsAt)}`
-        : (STATUS_LABEL[lobby.status] ?? lobby.status),
-    [lobby.status, lobby.startsAt],
-  );
+  // What a non-OPEN lobby says about itself on a card; OPEN says the start time instead.
+  const when = useMemo(() => {
+    if (lobby.status === 'OPEN') return t.lobby.card.plays(startsLabel(lobby.startsAt, t));
+    const statusLabels: Record<string, string> = {
+      LOCKED: t.lobby.card.statusLocked,
+      ENDED: t.lobby.card.statusEnded,
+      CANCELLED: t.lobby.card.statusCancelled,
+    };
+    return statusLabels[lobby.status] ?? lobby.status;
+  }, [lobby.status, lobby.startsAt, t]);
 
   return (
     <Card className="gap-0 p-0">
@@ -56,7 +54,8 @@ export const LobbyCard = memo(function LobbyCard({ lobby }: { lobby: Lobby }) {
               {lobby.title}
             </Text>
             <Text variant="caption" numberOfLines={1}>
-              {lobby.gameName ?? 'Unknown game'} · by {lobby.ownerUsername ?? 'someone'}
+              {lobby.gameName ?? t.lobby.card.unknownGame} ·{' '}
+              {t.lobby.card.byOwner(lobby.ownerUsername ?? t.lobby.card.unknownOwner)}
             </Text>
           </View>
           {lobby.unreadCount > 0 && (
@@ -71,14 +70,16 @@ export const LobbyCard = memo(function LobbyCard({ lobby }: { lobby: Lobby }) {
         <View className="flex-row flex-wrap items-center gap-2">
           <ToneBadge tone={lobby.tone} />
           <View className="rounded-full bg-raised px-2.5 py-0.5">
-            <Text variant="label">{full ? `${seats} full` : `${seats} players`}</Text>
+            <Text variant="label">
+              {full ? t.lobby.card.seatsFull(seats) : t.lobby.card.seatsPlayers(seats)}
+            </Text>
           </View>
           <View className="rounded-full bg-raised px-2.5 py-0.5">
             <Text variant="label">{when}</Text>
           </View>
           {lobby.myStatus === 'PENDING' && (
             <View className="rounded-full bg-raised px-2.5 py-0.5">
-              <Text variant="label">Requested</Text>
+              <Text variant="label">{t.lobby.card.requested}</Text>
             </View>
           )}
         </View>

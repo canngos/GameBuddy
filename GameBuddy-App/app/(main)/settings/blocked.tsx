@@ -4,12 +4,15 @@ import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { socialApi } from '../../../src/api/social';
 import type { GamerSummary } from '../../../src/api/types';
+import { useCountryName } from '../../../src/i18n/countryNames';
+import { useT } from '../../../src/i18n/useT';
 import { useThemeColors } from '../../../src/theme';
 import { Avatar, Button, Card, ErrorNotice, Screen, Text } from '../../../src/ui';
 
 export default function BlockedUsers() {
   const router = useRouter();
   const colors = useThemeColors();
+  const t = useT();
   const queryClient = useQueryClient();
 
   const blocked = useQuery({ queryKey: ['blocked'], queryFn: socialApi.blocked });
@@ -47,10 +50,9 @@ export default function BlockedUsers() {
         ListHeaderComponent={
           <View className="gap-2 pb-4">
             <View className="gap-2 pb-2 pt-8">
-              <Text variant="title">Blocked</Text>
+              <Text variant="title">{t.settings.blocked}</Text>
               <Text variant="body" className="text-muted">
-                Blocking works both ways and covers everything: they are not shown to you, you
-                are not shown to them, and neither of you can message the other.
+                {t.settings.blockedScreen.body}
               </Text>
             </View>
 
@@ -63,17 +65,15 @@ export default function BlockedUsers() {
         ListEmptyComponent={
           blocked.isPending ? null : (
             <Card className="gap-1">
-              <Text variant="bodyStrong">Nobody is blocked</Text>
-              <Text variant="caption">
-                You can block someone from their profile if you need to.
-              </Text>
+              <Text variant="bodyStrong">{t.settings.blockedScreen.emptyTitle}</Text>
+              <Text variant="caption">{t.settings.blockedScreen.emptyBody}</Text>
             </Card>
           )
         }
         ListFooterComponent={
           <View className="gap-2 pt-6">
             {!!unblock.error && <ErrorNotice error={unblock.error} />}
-            <Button label="Back" variant="ghost" onPress={() => router.back()} />
+            <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
           </View>
         }
       />
@@ -90,10 +90,12 @@ const BlockedRow = memo(function BlockedRow({
   busy: boolean;
   onUnblock: (userId: string) => void;
 }) {
+  const t = useT();
+  const localize = useCountryName();
   const unblockThis = useCallback(() => onUnblock(person.userId), [onUnblock, person.userId]);
   const meta = useMemo(
-    () => [person.age, person.country].filter(Boolean).join(' · '),
-    [person.age, person.country],
+    () => [person.age, localize(person.country)].filter(Boolean).join(' · '),
+    [person.age, person.country, localize],
   );
 
   return (
@@ -104,7 +106,7 @@ const BlockedRow = memo(function BlockedRow({
         <Text variant="caption">{meta}</Text>
       </View>
       <Button
-        label="Unblock"
+        label={t.settings.blockedScreen.unblock}
         variant="secondary"
         size="md"
         className="px-4"

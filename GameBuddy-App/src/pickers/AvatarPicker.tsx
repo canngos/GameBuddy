@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, Pressable, View, type ViewStyle } from 'react-native';
 import { catalogueApi } from '../api/catalogue';
+import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { Avatar } from '../ui/Avatar';
 import { ErrorNotice } from '../ui/ErrorNotice';
@@ -85,13 +86,14 @@ const AvatarTile = memo(function AvatarTile({
   style: ViewStyle | undefined;
   onSelect: (avatarId: string) => void;
 }) {
+  const t = useT();
   const press = useCallback(() => onSelect(id), [onSelect, id]);
 
   return (
     <Pressable
       onPress={press}
       accessibilityRole="radio"
-      accessibilityLabel={`Avatar ${index + 1}`}
+      accessibilityLabel={t.pickers.avatarN(index + 1)}
       accessibilityState={{ selected }}
       style={style}
       className="active:opacity-70"

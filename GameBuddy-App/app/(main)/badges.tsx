@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { badgesApi } from '../../src/api/badges';
 import type { Badge, BadgeBoard, UserInfo } from '../../src/api/types';
+import { useT } from '../../src/i18n/useT';
 import { useThemeColors } from '../../src/theme';
 import { BackHeader, Button, Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
 
@@ -33,6 +34,7 @@ const ICON = grid.icon;
  */
 export default function Badges() {
   const colors = useThemeColors();
+  const t = useT();
   const queryClient = useQueryClient();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -129,7 +131,7 @@ export default function Badges() {
       return;
     }
     if (shown.length >= slots) {
-      setFailure(`You can show ${slots} badges. Take one off first.`);
+      setFailure(t.market.badges.showcaseFull(slots));
       return;
     }
     showcase.mutate([...shown, badge.code]);
@@ -145,8 +147,8 @@ export default function Badges() {
   return (
     <Screen edges={['top']}>
       <BackHeader
-        title="Badges"
-        subtitle="Finish missions, claim coins, show off three"
+        title={t.market.badges.title}
+        subtitle={t.market.badges.subtitle}
         right={
           board.data ? (
             <Text variant="label" className="text-muted">
@@ -211,13 +213,19 @@ const Tile = memo(function Tile({
   badge: Badge;
   onPress: (code: string) => void;
 }) {
+  const t = useT();
   const press = useCallback(() => onPress(badge.code), [onPress, badge.code]);
 
   return (
     <Pressable
       onPress={press}
       accessibilityRole="button"
-      accessibilityLabel={`${badge.title}. ${badge.earned ? 'Earned' : `${badge.progress} of ${badge.target}`}`}
+      accessibilityLabel={t.market.badges.tileA11y(
+        badge.title,
+        badge.earned
+          ? t.market.badges.earned
+          : t.market.badges.progressOf(badge.progress, badge.target),
+      )}
       style={TILE}
       className="mb-5 items-center active:opacity-70"
     >
@@ -247,7 +255,7 @@ const Tile = memo(function Tile({
           variant="caption"
           className={badge.collected ? 'text-center text-muted' : 'text-center text-gold'}
         >
-          {badge.collected ? 'Earned' : `+${badge.reward}`}
+          {badge.collected ? t.market.badges.earned : `+${badge.reward}`}
         </Text>
       ) : (
         <Text variant="caption" className="text-center text-muted">
@@ -280,6 +288,7 @@ function Detail({
   onCollect: () => void;
   onToggleShowcase: () => void;
 }) {
+  const t = useT();
   return (
     <Modal
       visible={!!badge}
@@ -313,7 +322,7 @@ function Detail({
 
             {badge.earned ? (
               <Text variant="label" className="text-primary">
-                Earned
+                {t.market.badges.earned}
               </Text>
             ) : (
               <Progress value={badge.progress} target={badge.target} />
@@ -322,20 +331,24 @@ function Detail({
             <View className="w-full gap-2 pt-2">
               {badge.earned && !badge.collected && (
                 <Button
-                  label={`Claim ${badge.reward} coins`}
+                  label={t.market.badges.claimCoins(badge.reward)}
                   onPress={onCollect}
                   loading={busy}
                 />
               )}
               {badge.earned && (
                 <Button
-                  label={badge.showcased ? 'Remove from profile' : 'Show on profile'}
+                  label={
+                    badge.showcased
+                      ? t.market.badges.removeFromProfile
+                      : t.market.badges.showOnProfile
+                  }
                   variant="secondary"
                   onPress={onToggleShowcase}
                   disabled={busy}
                 />
               )}
-              <Button label="Close" variant="ghost" onPress={onClose} />
+              <Button label={t.common.close} variant="ghost" onPress={onClose} />
             </View>
           </Pressable>
         </Pressable>
@@ -345,6 +358,7 @@ function Detail({
 }
 
 function Progress({ value, target }: { value: number; target: number }) {
+  const t = useT();
   // The server caps progress at the target, so this cannot exceed 100 — but clamping
   // here as well costs nothing and keeps a bad response from drawing outside its track.
   const percent = Math.min(100, Math.round((value / Math.max(1, target)) * 100));
@@ -354,9 +368,7 @@ function Progress({ value, target }: { value: number; target: number }) {
       <View className="h-2 w-full overflow-hidden rounded-full bg-raised">
         <View className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
       </View>
-      <Text variant="caption">
-        {value} of {target}
-      </Text>
+      <Text variant="caption">{t.market.badges.progressOf(value, target)}</Text>
     </View>
   );
 }
