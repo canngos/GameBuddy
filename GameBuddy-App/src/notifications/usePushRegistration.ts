@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
 import { authApi } from '../api/auth';
+import { ensureNotificationChannels } from './channel';
 import { hasBeenPrimed, permissionState } from './permission';
 import { isKnownKind } from './useNotificationRouting';
 
@@ -78,6 +79,11 @@ Notifications.setNotificationHandler({
 export async function registerDeviceToken(): Promise<void> {
   try {
     if ((await permissionState()) !== 'granted') return;
+
+    // Before the token, every time. The channel is what decides whether a notification
+    // appears over the screen or only in the shade, and an install that predates the
+    // channel — or one whose permission was granted from Android's settings — has none.
+    await ensureNotificationChannels();
 
     const token = await Notifications.getDevicePushTokenAsync();
     if (!token?.data) return;
