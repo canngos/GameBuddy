@@ -379,7 +379,16 @@ describe('a lobby can be boosted to the top of the list', () => {
     const browsed = await get(`${P.lobby}/browse?page=0&size=20`, { token: stranger.token });
     const ids = (browsed.data?.lobbies ?? []).map((l) => l.id);
     assert.ok(ids.includes(lobbyId), 'the boosted lobby is in the feed');
-    assert.equal(ids[0], lobbyId, 'and it is first');
+    assert.ok(ids.includes(soonerId), 'and so is the one it has to beat');
+
+    // Relative order, not position zero. This asserted `ids[0] === lobbyId` and failed the
+    // moment any other boosted lobby outlived a previous run — boosted rows are ordered
+    // among themselves by start time, so an older one legitimately sorts ahead. The
+    // property worth pinning is that boosting beats starting sooner.
+    assert.ok(
+      ids.indexOf(lobbyId) < ids.indexOf(soonerId),
+      'a boosted lobby must outrank one that starts sooner',
+    );
 
     const boostedRow = browsed.data.lobbies.find((l) => l.id === lobbyId);
     assert.equal(boostedRow.boosted, true, 'the card knows to draw the frame');

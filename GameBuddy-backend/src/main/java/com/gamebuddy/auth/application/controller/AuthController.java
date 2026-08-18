@@ -48,6 +48,24 @@ public class AuthController {
     }
 
     /**
+     * Step one of a forgotten-password reset: spend the mailed code for a short-lived ticket.
+     *
+     * <p>The code itself is requested through {@code /auth/sendCode} with
+     * {@code isRegister=false} — that endpoint is already throttled and already answers
+     * identically whether or not the address has an account, so there is nothing to add here.
+     */
+    @PostMapping("/reset/verify")
+    public ResponseEntity<ResetVerifyResponse> verifyResetCode(@Valid @RequestBody ResetVerifyRequest request) {
+        return ResponseEntity.ok(authService.verifyResetCode(request));
+    }
+
+    /** Step two: the ticket from step one, plus the password to set. */
+    @PostMapping("/reset/pwd")
+    public ResponseEntity<DefaultMessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
+    }
+
+    /**
      * Extends the caller's session, returning a token with a later expiry.
      *
      * <p>Header-based for the same reason {@code validateToken} is: the session's start

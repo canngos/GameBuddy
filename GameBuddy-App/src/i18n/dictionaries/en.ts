@@ -89,6 +89,7 @@ export const en = {
   auth: {
     stepOne: 'STEP 1',
     stepTwo: 'STEP 2',
+    stepThree: 'STEP 3',
     /** A format example, not copy — localized so the shape reads as "an address like mine". */
     emailPlaceholder: 'you@example.com',
 
@@ -100,6 +101,7 @@ export const en = {
       submit: 'Sign in',
       needsCode: 'We can email a new code to finish setting up this account.',
       emailCode: 'Email me a code',
+      forgot: 'Forgot password?',
     },
 
     register: {
@@ -131,6 +133,27 @@ export const en = {
       submit: 'Verify',
       resend: 'Send a new code',
       resendCooldown: (s: number) => `Send a new code (${s}s)`,
+    },
+
+    forgot: {
+      title: 'Reset your password',
+      subtitle: 'Give us the email you signed up with and we will send you a six-digit code.',
+      email: 'Email',
+      submit: 'Send the code',
+      /**
+       * Conditional on purpose, and the address is bold inside the sentence, hence the
+       * split. The server answers the same way for an address with no account, so saying
+       * "we sent you a code" here would undo that in the one place the user can read.
+       */
+      sentCodeBefore: 'If there is an account for it, a six-digit code is on its way to',
+      verifySubmit: 'Continue',
+      resetTitle: 'Choose a new password',
+      resetSubtitle: 'Anyone signed in with the old password will be signed out.',
+      resetSubmit: 'Set new password',
+      doneTitle: 'Sign in with your new password',
+      doneBody:
+        'Every session that used the old password has ended, on this device and any other.',
+      signIn: 'Sign in',
     },
   },
 

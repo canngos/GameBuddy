@@ -47,6 +47,7 @@ export const fr: Dictionary = {
   auth: {
     stepOne: 'ÉTAPE 1',
     stepTwo: 'ÉTAPE 2',
+    stepThree: 'ÉTAPE 3',
     emailPlaceholder: 'toi@exemple.com',
 
     login: {
@@ -57,6 +58,7 @@ export const fr: Dictionary = {
       submit: 'Se connecter',
       needsCode: 'Nous pouvons envoyer un nouveau code pour finaliser ce compte.',
       emailCode: 'Envoyez-moi un code',
+      forgot: 'Mot de passe oublié ?',
     },
 
     register: {
@@ -88,6 +90,23 @@ export const fr: Dictionary = {
       submit: 'Vérifier',
       resend: 'Envoyer un nouveau code',
       resendCooldown: (s: number) => `Envoyer un nouveau code (${s}s)`,
+    },
+
+    forgot: {
+      title: 'Réinitialise ton mot de passe',
+      subtitle:
+        "Indique l'e-mail utilisé à l'inscription et nous t'enverrons un code à six chiffres.",
+      email: 'E-mail',
+      submit: 'Envoyer le code',
+      sentCodeBefore: "Si un compte existe pour elle, un code à six chiffres part vers",
+      verifySubmit: 'Continuer',
+      resetTitle: 'Choisis un nouveau mot de passe',
+      resetSubtitle: "Toute personne connectée avec l'ancien sera déconnectée.",
+      resetSubmit: 'Enregistrer le mot de passe',
+      doneTitle: 'Connecte-toi avec ton nouveau mot de passe',
+      doneBody:
+        "Toutes les sessions qui utilisaient l'ancien mot de passe sont terminées, sur cet appareil comme sur les autres.",
+      signIn: 'Se connecter',
     },
   },
 

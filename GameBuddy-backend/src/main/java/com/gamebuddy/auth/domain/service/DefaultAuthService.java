@@ -54,6 +54,18 @@ public class DefaultAuthService implements AuthService {
     /** Wrong guesses tolerated per code before it is burned. */
     private static final int MAX_CODE_ATTEMPTS = 5;
 
+    /**
+     * How long a reset ticket lives, and why it is shorter than the code's fifteen minutes.
+     *
+     * <p>The code has to survive a trip to a mail client on another device. The ticket only
+     * has to survive typing a password on a screen the user is already looking at, so there
+     * is no reason to leave it lying around for longer.
+     */
+    private static final Duration TICKET_TTL = Duration.ofMinutes(10);
+
+    /** 256 bits. Enough that guessing a ticket is not a strategy worth rate-limiting for. */
+    private static final int TICKET_BYTES = 32;
+
     private static final int MIN_GAMES = 3;
     private static final int MIN_KEYWORDS = 5;
 
@@ -71,6 +83,7 @@ public class DefaultAuthService implements AuthService {
 
     private final GamerRepository gamerRepository;
     private final VerificationCodeRepository verificationCodeRepository;
+    private final PasswordResetTicketRepository passwordResetTicketRepository;
     private final GamesRepository gamesRepository;
     private final SessionRepository sessionRepository;
     private final KeywordsRepository keywordsRepository;
@@ -240,38 +253,7 @@ public class DefaultAuthService implements AuthService {
                 .findByEmail(email)
                 .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
 
-        VerificationCode verification = verificationCodeRepository
-                .findByEmailAndCodeAndIsValidTrue(email, code)
-                .orElseGet(() -> {
-                    // Charge the wrong guess against the live code so a brute-force run
-                    // burns its budget instead of guessing indefinitely.
-                    verificationCodeRepository
-                            .findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(email)
-                            .ifPresent(live -> {
-                                live.setAttempts(live.getAttempts() + 1);
-                                if (live.getAttempts() >= MAX_CODE_ATTEMPTS) {
-                                    live.setIsValid(false);
-                                }
-                                verificationCodeRepository.save(live);
-                            });
-                    throw new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND);
-                });
-
-        if (verification.isExpired()) {
-            verification.setIsValid(false);
-            verificationCodeRepository.save(verification);
-            throw new BusinessException(TransactionCode.VERIFICATION_CODE_EXPIRED);
-        }
-        if (verification.getAttempts() >= MAX_CODE_ATTEMPTS) {
-            verification.setIsValid(false);
-            verificationCodeRepository.save(verification);
-            throw new BusinessException(TransactionCode.TOO_MANY_ATTEMPTS);
-        }
-
-        // Burn this code and every other outstanding one for the address.
-        verification.setIsValid(false);
-        verificationCodeRepository.save(verification);
-        verificationCodeRepository.invalidateAllForEmail(email);
+        redeemCode(email, code, CodePurpose.REGISTRATION);
         rateLimiters.verify().reset(email);
 
         gamer.setIsVerified(true);
@@ -307,6 +289,141 @@ public class DefaultAuthService implements AuthService {
                 .findByEmail(email)
                 .ifPresent(g -> issueAndSendCode(email, Boolean.TRUE.equals(sendCodeRequest.getIsRegister())));
         return DefaultMessageResponse.of("If an account exists for that address, a verification code has been sent");
+    }
+
+    /**
+     * Step one of a reset: spend the emailed code, hand back a ticket for step two.
+     *
+     * <p>Deliberately not a session. {@code verifyCode} answers a correct code with an access
+     * token, which is right when the code proves "this address is mine" at signup and wrong
+     * here: the holder has not authenticated, they have only shown they can read the mailbox,
+     * and the one thing they should be able to do next is set a password. A ticket says
+     * exactly that and nothing more.
+     *
+     * <p>Every failure looks like a wrong code, including an address with no account, so this
+     * cannot be used to find out who has one.
+     */
+    @Override
+    @Transactional
+    public ResetVerifyResponse verifyResetCode(ResetVerifyRequest request) {
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+
+        if (!rateLimiters.resetPassword().tryAcquire(email)) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
+        }
+
+        gamerRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        redeemCode(email, request.getVerificationCode(), CodePurpose.PASSWORD_RESET);
+
+        // Any ticket from an abandoned earlier attempt stops being a way in.
+        passwordResetTicketRepository.burnAllForEmail(email);
+
+        byte[] raw = new byte[TICKET_BYTES];
+        RANDOM.nextBytes(raw);
+        String token = HexFormat.of().formatHex(raw);
+
+        Instant now = Instant.now();
+        PasswordResetTicket ticket = new PasswordResetTicket();
+        ticket.setEmail(email);
+        ticket.setTokenHash(hashToken(token));
+        ticket.setUsed(false);
+        ticket.setCreatedAt(now);
+        ticket.setExpiresAt(now.plus(TICKET_TTL));
+        passwordResetTicketRepository.save(ticket);
+
+        rateLimiters.resetPassword().reset(email);
+        log.info("Password reset code accepted for {}; ticket issued", email);
+
+        ResetVerifyResponse response = new ResetVerifyResponse();
+        ResetVerifyResponseBody body = new ResetVerifyResponseBody();
+        body.setResetToken(token);
+        response.setBody(new BaseBody<>(body));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
+    }
+
+    /**
+     * Step two: spend the ticket and set the new password.
+     *
+     * <p>Does what {@code changePwd} does once it is satisfied the request is genuine — encode,
+     * revoke, delete the sessions — because the two must not diverge on what "the password
+     * changed" means. What differs is only how the caller proved themselves: there, the
+     * current password; here, a ticket earned with a mailed code.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+
+        if (!rateLimiters.resetPassword().tryAcquire(email)) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
+        }
+
+        // A ticket that is missing, spent, expired or issued for a different address is one
+        // answer: start again. Distinguishing them would describe the state of somebody
+        // else's reset to whoever is guessing.
+        PasswordResetTicket ticket = passwordResetTicketRepository
+                .findByTokenHash(hashToken(request.getResetToken()))
+                .filter(t -> t.getEmail().equals(email))
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        if (ticket.isExpired()) {
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_EXPIRED);
+        }
+        if (Boolean.TRUE.equals(ticket.getUsed())) {
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND);
+        }
+
+        Gamer gamer = gamerRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        String newPassword = request.getPassword();
+        if (passwordEncoder.matches(newPassword, gamer.getPwd())) {
+            throw new BusinessException(TransactionCode.PASSWORD_SAME);
+        }
+        PasswordPolicy.validate(newPassword);
+
+        gamer.setPwd(passwordEncoder.encode(newPassword));
+        gamer.revokeIssuedTokens();
+        gamerRepository.save(gamer);
+        sessionRepository.deleteAllByEmail(email);
+
+        ticket.setUsed(true);
+        passwordResetTicketRepository.save(ticket);
+        passwordResetTicketRepository.burnAllForEmail(email);
+        verificationCodeRepository.invalidateAllForEmail(email);
+
+        log.info("Password reset for {}; all sessions invalidated", gamer.getUserId());
+
+        sendPasswordChangedNotice(email);
+
+        return DefaultMessageResponse.of("Password changed successfully. Please sign in.");
+    }
+
+    /**
+     * Tells the account its password changed — the one message a takeover victim receives.
+     *
+     * <p>Failure is swallowed, unlike every other mail in this class. Elsewhere a dead relay
+     * should roll the transaction back, because an account with no deliverable code is worse
+     * than no account. Here the password has already changed and the sessions are already
+     * gone; throwing would undo a reset the user completed successfully because we could not
+     * send them a courtesy note.
+     */
+    private void sendPasswordChangedNotice(String email) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(sender);
+        message.setTo(email);
+        message.setSubject(Constants.EMAIL_SUBJECT_PASSWORD_CHANGED);
+        message.setText(String.format(Constants.EMAIL_TEXT_PASSWORD_CHANGED, email));
+        try {
+            emailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Password-changed notice to {} could not be sent", email, e);
+        }
     }
 
     @Override
@@ -728,6 +845,59 @@ public class DefaultAuthService implements AuthService {
         return token;
     }
 
+    /**
+     * Spends a six-digit code, or refuses and charges the attempt.
+     *
+     * <p>Shared by registration and password reset so the two cannot drift apart on the
+     * rules that matter: expiry, the attempt cap, single use, and burning every sibling
+     * code on success.
+     *
+     * <p><b>The lookup is by address, not by code.</b> The code is bcrypt-hashed, so there is
+     * nothing to put in a WHERE clause — we take the live row for the address and compare
+     * against it. That is a happier shape than the one it replaces, which searched by code
+     * and then, on the miss, had to go looking for the row again just to charge the attempt.
+     *
+     * <p><b>A code issued for the other flow is treated exactly like a wrong guess</b> — same
+     * error, same attempt charged. Saying "that code is real but for something else" would
+     * tell an attacker which flow an address is in the middle of.
+     */
+    private VerificationCode redeemCode(String email, Integer code, CodePurpose purpose) {
+        VerificationCode live = verificationCodeRepository
+                .findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(email)
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        if (live.isExpired()) {
+            live.setIsValid(false);
+            verificationCodeRepository.save(live);
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_EXPIRED);
+        }
+        if (live.getAttempts() >= MAX_CODE_ATTEMPTS) {
+            live.setIsValid(false);
+            verificationCodeRepository.save(live);
+            throw new BusinessException(TransactionCode.TOO_MANY_ATTEMPTS);
+        }
+
+        boolean matches = live.getPurpose() == purpose
+                && code != null
+                && passwordEncoder.matches(String.valueOf(code), live.getCodeHash());
+        if (!matches) {
+            // Charge the wrong guess so a brute-force run burns its budget rather than
+            // walking the million values a six-digit code has.
+            live.setAttempts(live.getAttempts() + 1);
+            if (live.getAttempts() >= MAX_CODE_ATTEMPTS) {
+                live.setIsValid(false);
+            }
+            verificationCodeRepository.save(live);
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND);
+        }
+
+        // Burn this code and every other outstanding one for the address.
+        live.setIsValid(false);
+        verificationCodeRepository.save(live);
+        verificationCodeRepository.invalidateAllForEmail(email);
+        return live;
+    }
+
     /** Creates a fresh code, invalidates any predecessors, and mails it out. */
     private void issueAndSendCode(String email, boolean forRegistration) {
         verificationCodeRepository.invalidateAllForEmail(email);
@@ -736,7 +906,10 @@ public class DefaultAuthService implements AuthService {
         Instant now = Instant.now();
 
         VerificationCode verification = new VerificationCode();
-        verification.setCode(code);
+        // Hashed, never stored in the clear. See the comment on the entity for why bcrypt
+        // rather than the SHA-256 used for session tokens.
+        verification.setCodeHash(passwordEncoder.encode(String.valueOf(code)));
+        verification.setPurpose(forRegistration ? CodePurpose.REGISTRATION : CodePurpose.PASSWORD_RESET);
         verification.setEmail(email);
         verification.setIsValid(true);
         verification.setAttempts(0);

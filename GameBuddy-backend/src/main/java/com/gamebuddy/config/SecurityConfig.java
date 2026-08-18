@@ -49,6 +49,11 @@ public class SecurityConfig {
         "/auth/register",
         "/auth/sendCode",
         "/auth/verify",
+        // Both halves of a forgotten-password reset. Necessarily anonymous — somebody who
+        // cannot sign in is the only person who needs them. Each is throttled and each
+        // answers a bad code and an unknown address identically; see DefaultAuthService.
+        "/auth/reset/verify",
+        "/auth/reset/pwd",
         "/actuator/health/**",
         "/actuator/info",
         "/api-docs/**",
