@@ -108,17 +108,32 @@ public class PurchaseService {
         purchase.setPeriodType(verified.periodType());
         purchase.setEventType(verified.eventType());
 
+        Purchase saved;
         try {
-            // Flushed here so a unique violation surfaces now, where it is a replay, rather
-            // than escaping at commit time as a 500 that RevenueCat would retry.
-            purchases.saveAndFlush(purchase);
+            /*
+             * Flushed here so a unique violation surfaces now, where it is a replay, rather
+             * than escaping at commit time as a 500 that RevenueCat would retry.
+             *
+             * **The return value is the managed entity and `purchase` is not.** This row
+             * carries its own assigned UUID and the class has no `@Version` and does not
+             * implement `Persistable`, so Spring Data asks `isNew()`, sees a non-null id,
+             * and takes it for an update: `save` therefore goes through `merge`, which
+             * copies the state onto a *different* instance and leaves this one detached.
+             * Writing the entitlement expiry onto `purchase` below wrote it to an object
+             * nothing was going to persist, so every subscription in the ledger recorded a
+             * null expiry while the gamer's own row was granted correctly. Silent, and
+             * invisible until somebody asks the ledger when an entitlement should have
+             * ended — a refund or chargeback question, which is exactly when the record
+             * needs to be right.
+             */
+            saved = purchases.saveAndFlush(purchase);
         } catch (DataIntegrityViolationException e) {
             log.debug("Concurrent delivery of {} treated as a replay", verified.storeTransactionId());
             return false;
         }
 
         if (product.isSubscription()) {
-            purchase.setEntitlementExpiresAt(grantSubscription(gamer, product, verified.expiresAt()));
+            saved.setEntitlementExpiresAt(grantSubscription(gamer, product, verified.expiresAt()));
         } else {
             coins.earn(gamer, product.coins(), CoinReason.COIN_PACK);
         }
