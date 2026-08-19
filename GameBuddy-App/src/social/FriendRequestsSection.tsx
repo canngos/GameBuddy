@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect } from 'expo-router';
-import { Check, ChevronDown, ChevronUp, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp, UserX, X } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { socialApi } from '../api/social';
@@ -8,7 +8,7 @@ import type { GamerSummary } from '../api/types';
 import { useUpper } from '../i18n/case';
 import { useCountryName } from '../i18n/countryNames';
 import { useT } from '../i18n/useT';
-import { Avatar, Card, ErrorNotice, Icon, Text, cn } from '../ui';
+import { Avatar, Card, Icon, Text, cn, messageOf, showToast } from '../ui';
 
 /**
  * Incoming friend requests, each answerable in place.
@@ -51,11 +51,22 @@ export function FriendRequestsSection() {
    * owns; the other half was the push being collapsed away, fixed in `FCMService`.
    *
    * Focus is the right trigger because it is when somebody has come to look.
+   *
+   * **Focus alone was not enough.** A withdrawal is silent by design — the backend sends no
+   * push and no socket frame for it — so a request cancelled while this tab is already open
+   * stayed on screen until the gamer navigated away and came back, which is exactly what the
+   * next round of testing reported. Tapping Accept on that ghost row then failed with
+   * `FRIEND_NO_REQUEST`, which reads as a broken app rather than as a race.
+   *
+   * A poll is the honest fix for state that changes without telling us. It costs nothing
+   * when it matters least: react-query is wired to `focusManager` in `app/_layout.tsx`, so
+   * this stops entirely while the app is backgrounded, and the query is cheap and idempotent.
    */
   const query = useQuery({
     queryKey: ['friendRequests'],
     queryFn: socialApi.pendingRequests,
     staleTime: 0,
+    refetchInterval: 15_000,
   });
 
   const refetch = query.refetch;
@@ -75,6 +86,29 @@ export function FriendRequestsSection() {
       // is what the split is drawn from. Without this the row stays where it was until
       // the tab is next focused.
       void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    },
+
+    /*
+     * A failure here is nearly always a row that should not still be on screen — the
+     * request was withdrawn or answered elsewhere between the list loading and the tap.
+     * So the list is re-read on failure too. Previously only `onSuccess` invalidated,
+     * which meant the one event that *proved* the row was stale left it sitting there.
+     *
+     * Said with a toast rather than a banner. The banner was rendered from `answer.error`,
+     * which persists until the next mutation, so it outlived the row it described and was
+     * still showing underneath the *next* request to arrive — reported, and fair. A toast
+     * expires on its own after a few seconds and cannot contradict what is on screen later.
+     */
+    onError: (error) => {
+      void queryClient.invalidateQueries({ queryKey: ['friendRequests'] });
+      void queryClient.invalidateQueries({ queryKey: ['friends'] });
+      showToast({
+        id: 'friend-request-failed',
+        title: t.messages.requestGoneTitle,
+        body: messageOf(error) ?? t.errors.generic,
+        icon: UserX,
+        tone: 'muted',
+      });
     },
   });
 
@@ -124,7 +158,6 @@ export function FriendRequestsSection() {
         </View>
       )}
 
-      {answer.error && <ErrorNotice error={answer.error} />}
     </View>
   );
 }

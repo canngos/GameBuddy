@@ -368,6 +368,7 @@ export const en = {
       matchHint: 'Say yes to this gamer',
       superLike: 'Super Like',
       superLikeHint: 'Say yes and tell them straight away',
+      superLikeGetHint: 'Get more Super Likes',
       /** The count sits under the button, so the balance is visible before it is spent. */
       superLikeLeft: (n: number) => `${n} left`,
       superLikeNone: 'None left',
@@ -397,6 +398,13 @@ export const en = {
       likesLeft: 'Likes left',
       getGold: 'Get Gold — no daily limit',
       getSuperLikes: 'Get more Super Likes',
+            noCoinsTitle: 'Not enough coins',
+      noCoinsBody: 'A rewind costs coins. You can earn more in the Market.',
+      nothingToRewindTitle: 'Nothing to take back',
+      nothingToRewindBody: 'You have not swiped anyone yet — or that one turned into a match, which stands.',
+      somethingWrongTitle: 'That did not go through',
+      somethingWrongBody: 'Nothing was changed. Try again in a moment.',
+      getCoins: 'Get more coins',
       keepLooking: 'Keep looking',
     },
 
@@ -667,6 +675,7 @@ export const en = {
     acceptRequest: 'Accept friend request',
     sendRequest: 'Send a friend request',
     alreadyFriends: 'Already friends',
+    requestGoneTitle: 'That request is no longer there',
     reported: 'Reported. A moderator will look at it.',
     placeholder: 'Message',
     connecting: 'Connecting…',
@@ -695,7 +704,7 @@ export const en = {
     noShowcase: 'No badges on show yet — tap to pick some',
     games: 'Games',
     playsOn: 'Plays on',
-    keywords: 'Keywords',
+    keywords: 'Play style',
     friendRequestsShort: 'Friend requests',
     acceptRequestA11y: (name: string) => `Accept ${name}'s friend request`,
     declineRequestA11y: (name: string) => `Decline ${name}'s friend request`,
@@ -759,7 +768,7 @@ export const en = {
     games: 'Games',
     platforms: 'Platforms',
     platformsUnset: 'Not set — other players filter by this',
-    keywords: 'Keywords',
+    keywords: 'Play style',
     selected: (n: number) => `${n} selected`,
     themeSystem: 'System',
     themeSystemHint: 'Match your phone',
@@ -820,6 +829,10 @@ export const en = {
       fromPhotos: 'Choose from photos',
       fromFiles: 'Choose a file',
       uploading: 'Uploading and checking…',
+      cropTitle: 'Place your photo',
+      cropHint: 'Drag to move, pinch to zoom.',
+      cropConfirm: 'Use this photo',
+      cropFailed: 'That image could not be cropped. Try another one.',
       privacyNote:
         'Your photo is checked before anyone else can see it, and location data is removed from it automatically.',
       orOurs: 'Or pick one of ours',
@@ -1065,7 +1078,7 @@ export const en = {
     steps: {
       home: {
         title: 'Find someone to play with',
-        body: 'Swipe through gamers who play what you play. Right if you want to play together, left if not. When you both swipe right, you match.',
+        body: 'Swipe through gamers who play what you play. Right if you want to play together, left if not. When you both swipe right, you match. Swipe up to send a Super Like — they hear about it straight away.',
       },
       messages: {
         title: 'Talk to your matches',
@@ -1081,7 +1094,7 @@ export const en = {
       },
       profile: {
         title: 'Your profile, and everything else',
-        body: 'Your games, your keywords, your friends and your badges. Settings live behind the gear, including this tutorial if you want it again.',
+        body: 'Your games, your play style, your friends and your badges. Settings live behind the gear, including this tutorial if you want it again.',
       },
     },
     stepOf: (n: number, total: number) => `${n} of ${total}`,

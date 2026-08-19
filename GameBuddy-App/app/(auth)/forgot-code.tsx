@@ -1,13 +1,20 @@
-import { useMutation } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { ApiError, Code } from '../../src/api/envelope';
-import { useT } from '../../src/i18n/useT';
-import { usePasswordReset } from '../../src/session/passwordReset';
-import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { codeError } from '../../src/validation';
+import { useMutation } from "@tanstack/react-query";
+import { Redirect, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { ApiError, Code } from "../../src/api/envelope";
+import { useT } from "../../src/i18n/useT";
+import { usePasswordReset } from "../../src/session/passwordReset";
+import {
+  Button,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import { codeError } from "../../src/validation";
 
 /** How long before "Send a new code" becomes available. The server rate-limits too. */
 const RESEND_COOLDOWN_SECONDS = 45;
@@ -21,12 +28,13 @@ const RESEND_COOLDOWN_SECONDS = 45;
  * of the mailbox and nothing more. It hands back a ticket that only step three can spend.
  */
 export default function ForgotCode() {
+  const intro = useIntroPadding();
   const t = useT();
   const router = useRouter();
   const email = usePasswordReset((s) => s.email);
   const hold = usePasswordReset((s) => s.hold);
 
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
   const [touched, setTouched] = useState(false);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
 
@@ -40,7 +48,7 @@ export default function ForgotCode() {
     mutationFn: () => authApi.resetVerify(email, Number(code.trim())),
     onSuccess: (res) => {
       hold(res.resetToken);
-      router.push('/forgot-reset');
+      router.push("/forgot-reset");
     },
   });
 
@@ -50,7 +58,7 @@ export default function ForgotCode() {
       setCooldown(RESEND_COOLDOWN_SECONDS);
       // The old code was invalidated server-side, so leaving it in the field would
       // only invite the user to submit something that can no longer work.
-      setCode('');
+      setCode("");
       setTouched(false);
     },
   });
@@ -71,11 +79,11 @@ export default function ForgotCode() {
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
+      <View className={`gap-2 pb-8 ${intro.top}`}>
         <Text variant="overline">{t.auth.stepTwo}</Text>
         <Text variant="title">{t.auth.verify.title}</Text>
         <Text variant="body" className="text-muted">
-          {t.auth.forgot.sentCodeBefore}{' '}
+          {t.auth.forgot.sentCodeBefore}{" "}
           <Text variant="bodyStrong" className="text-content">
             {email}
           </Text>
@@ -89,7 +97,7 @@ export default function ForgotCode() {
           value={code}
           // Strip anything that is not a digit: pasting from a mail client often
           // brings a trailing space or a stray character with it.
-          onChangeText={(text) => setCode(text.replace(/\D/g, '').slice(0, 6))}
+          onChangeText={(text) => setCode(text.replace(/\D/g, "").slice(0, 6))}
           error={touched ? (codeError(code)?.(t) ?? null) : null}
           keyboardType="number-pad"
           textContentType="oneTimeCode"
@@ -108,8 +116,12 @@ export default function ForgotCode() {
         {resend.error && <ErrorNotice error={resend.error} />}
       </View>
 
-      <View className="mt-auto gap-2 pt-10">
-        <Button label={t.auth.forgot.verifySubmit} loading={verify.isPending} onPress={submit} />
+      <View className={`mt-auto gap-2 ${intro.footer}`}>
+        <Button
+          label={t.auth.forgot.verifySubmit}
+          loading={verify.isPending}
+          onPress={submit}
+        />
         <Button
           // A spent or expired code cannot be retried, so the resend button stops being
           // a secondary option and becomes the only way forward.
@@ -118,7 +130,7 @@ export default function ForgotCode() {
               ? t.auth.verify.resendCooldown(cooldown)
               : t.auth.verify.resend
           }
-          variant={expired ? 'secondary' : 'ghost'}
+          variant={expired ? "secondary" : "ghost"}
           disabled={cooldown > 0 && !expired}
           loading={resend.isPending}
           onPress={() => resend.mutate()}

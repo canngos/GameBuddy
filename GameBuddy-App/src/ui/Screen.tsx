@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { cn } from './cn';
+import { useScreenScale } from './useScreenScale';
 
 type ScreenProps = {
   children: ReactNode;
@@ -49,7 +50,23 @@ export function Screen({
   footer,
   scrollRef,
 }: ScreenProps) {
-  const gutter = padded ? 'px-6' : '';
+  const { pick } = useScreenScale();
+  /*
+   * The page gutter and the two paddings below, per tier.
+   *
+   * Numbers rather than classes: the value has to change with the device and a compiled class
+   * cannot. Every route inherits these, so this is the cheapest place in the app to give a
+   * small phone its screen back — 24dp of side gutter on a 360dp-wide device is 13% of the
+   * width spent on nothing.
+   *
+   * Safe here because no caller passes padding through `className` — unlike `Card`, where an
+   * inline style would silently beat the `p-0` that `LobbyCard` depends on. If a screen ever
+   * does need its own gutter, give it a prop rather than a class, or this will override it
+   * without a word.
+   */
+  const gutterPad = padded ? pick(16, 20, 24) : 0;
+  const scrollPad = pick(20, 26, 32);
+  const footerPad = { top: pick(8, 10, 12), bottom: pick(4, 6, 8) };
 
   return (
     <SafeAreaView className="flex-1 bg-canvas" edges={edges}>
@@ -69,21 +86,33 @@ export function Screen({
           <ScrollView
             ref={scrollRef}
             // grow, not flex: fill the screen when short, scroll when tall.
-            contentContainerClassName={cn('flex-grow pb-8', gutter, className)}
+            contentContainerClassName={cn('flex-grow', className)}
+            contentContainerStyle={{ paddingHorizontal: gutterPad, paddingBottom: scrollPad }}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
             {children}
           </ScrollView>
         ) : (
-          <View className={cn('flex-1', gutter, className)}>{children}</View>
+          <View className={cn('flex-1', className)} style={{ paddingHorizontal: gutterPad }}>
+            {children}
+          </View>
         )}
 
         {/* The hairline is what stops this reading as the end of the list. Without it the
             buttons look like the last two rows, and content scrolling underneath them
             looks like a rendering fault. */}
         {footer && (
-          <View className={cn('border-t border-line bg-canvas pb-2 pt-3', gutter)}>{footer}</View>
+          <View
+            className="border-t border-line bg-canvas"
+            style={{
+              paddingHorizontal: gutterPad,
+              paddingTop: footerPad.top,
+              paddingBottom: footerPad.bottom,
+            }}
+          >
+            {footer}
+          </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>

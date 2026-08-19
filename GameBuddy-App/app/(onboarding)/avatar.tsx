@@ -1,11 +1,11 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { useT } from '../../src/i18n/useT';
-import { useDraft } from '../../src/onboarding/draft';
-import { StepHeader } from '../../src/onboarding/StepHeader';
-import { AvatarPicker } from '../../src/pickers/AvatarPicker';
-import { Button, Screen, Text } from '../../src/ui';
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { View } from "react-native";
+import { useT } from "../../src/i18n/useT";
+import { useDraft } from "../../src/onboarding/draft";
+import { StepHeader } from "../../src/onboarding/StepHeader";
+import { AvatarPicker } from "../../src/pickers/AvatarPicker";
+import { BackButton, Button, Screen, Text, useScreenScale } from "../../src/ui";
 
 /**
  * Choosing a picture, on its own screen.
@@ -16,6 +16,7 @@ import { Button, Screen, Text } from '../../src/ui';
  * sees of an account, so it gets the room to be looked at.
  */
 export default function AvatarStep() {
+  const { pick } = useScreenScale();
   const router = useRouter();
   const t = useT();
   const draft = useDraft();
@@ -24,7 +25,7 @@ export default function AvatarStep() {
   function next() {
     setTouched(true);
     if (!draft.avatarId) return;
-    router.push('/games');
+    router.push("/games");
   }
 
   return (
@@ -33,10 +34,11 @@ export default function AvatarStep() {
       footer={
         <View className="gap-2">
           <Button label={t.common.continue} onPress={next} />
-          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
+      <BackButton />
+
       <StepHeader
         step={3}
         total={6}
@@ -48,7 +50,10 @@ export default function AvatarStep() {
         selected={draft.avatarId}
         onSelect={(avatarId) => draft.set({ avatarId })}
         // Three to a row on a phone, against the eight-per-row scatter this was before.
-        size={96}
+        // Three 96dp tiles plus their gaps overrun a 360dp screen's content width, so the
+        // tile gives way rather than the column count — two-per-row would change the shape
+        // of the step, not just its size.
+        size={pick(72, 84, 96)}
         columns={3}
       />
 

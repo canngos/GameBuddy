@@ -1,24 +1,32 @@
-import { useMutation } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { ApiError, Code } from '../../src/api/envelope';
-import { useSession } from '../../src/session/store';
-import { useT } from '../../src/i18n/useT';
-import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { codeError } from '../../src/validation';
+import { useMutation } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { ApiError, Code } from "../../src/api/envelope";
+import { useSession } from "../../src/session/store";
+import { useT } from "../../src/i18n/useT";
+import {
+  Button,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import { codeError } from "../../src/validation";
 
 /** How long before "Send a new code" becomes available. The server rate-limits too. */
 const RESEND_COOLDOWN_SECONDS = 45;
 
 export default function Verify() {
+  const intro = useIntroPadding();
   const t = useT();
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
   const adoptToken = useSession((s) => s.adoptToken);
 
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
   const [touched, setTouched] = useState(false);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
 
@@ -37,7 +45,7 @@ export default function Verify() {
       await adoptToken(session.accessToken, session.userId);
     },
     // The guards redirect from here to the right screen for the resolved status.
-    onSuccess: () => router.replace('/'),
+    onSuccess: () => router.replace("/"),
   });
 
   const resend = useMutation({
@@ -46,7 +54,7 @@ export default function Verify() {
       setCooldown(RESEND_COOLDOWN_SECONDS);
       // The old code was invalidated server-side, so leaving it in the field would
       // only invite the user to submit something that can no longer work.
-      setCode('');
+      setCode("");
       setTouched(false);
     },
   });
@@ -63,11 +71,11 @@ export default function Verify() {
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
+      <View className={`gap-2 pb-8 ${intro.top}`}>
         <Text variant="overline">{t.auth.stepTwo}</Text>
         <Text variant="title">{t.auth.verify.title}</Text>
         <Text variant="body" className="text-muted">
-          {t.auth.verify.sentCodeBefore}{' '}
+          {t.auth.verify.sentCodeBefore}{" "}
           <Text variant="bodyStrong" className="text-content">
             {email}
           </Text>
@@ -81,7 +89,7 @@ export default function Verify() {
           value={code}
           // Strip anything that is not a digit: pasting from a mail client often
           // brings a trailing space or a stray character with it.
-          onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
+          onChangeText={(t) => setCode(t.replace(/\D/g, "").slice(0, 6))}
           error={touched ? (codeError(code)?.(t) ?? null) : null}
           keyboardType="number-pad"
           textContentType="oneTimeCode"
@@ -100,8 +108,12 @@ export default function Verify() {
         {resend.error && <ErrorNotice error={resend.error} />}
       </View>
 
-      <View className="mt-auto gap-2 pt-10">
-        <Button label={t.auth.verify.submit} loading={verify.isPending} onPress={submit} />
+      <View className={`mt-auto gap-2 ${intro.footer}`}>
+        <Button
+          label={t.auth.verify.submit}
+          loading={verify.isPending}
+          onPress={submit}
+        />
         <Button
           // A spent or expired code cannot be retried, so the resend button stops being
           // a secondary option and becomes the only way forward.
@@ -110,7 +122,7 @@ export default function Verify() {
               ? t.auth.verify.resendCooldown(cooldown)
               : t.auth.verify.resend
           }
-          variant={expired ? 'secondary' : 'ghost'}
+          variant={expired ? "secondary" : "ghost"}
           disabled={cooldown > 0 && !expired}
           loading={resend.isPending}
           onPress={() => resend.mutate()}

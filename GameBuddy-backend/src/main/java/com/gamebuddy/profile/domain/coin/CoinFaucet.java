@@ -36,12 +36,17 @@ public final class CoinFaucet {
     /**
      * How long after a claim the next one becomes available.
      *
-     * <p>Twenty hours, not twenty-four, and this matters more than it looks. On a strict
-     * day boundary somebody who plays at 9pm and then at 8pm the next day has "missed a
-     * day" and loses a streak they were keeping perfectly well. Twenty hours lets the
-     * habit drift earlier without punishing it.
+     * <p>A full twenty-four hours, so "daily" means what everybody assumes it means. This
+     * was twenty for a real reason — on a strict day boundary somebody who plays at 9pm and
+     * then at 8pm the next day has "missed a day" and loses a streak they were keeping
+     * perfectly well — but a tester read the shorter window as a bug rather than as
+     * generosity, and a reward rule nobody can predict is worse than a slightly strict one.
+     *
+     * <p>{@link #STREAK_GRACE} is what now absorbs that drift: it stays at 48 hours, so
+     * claiming a few hours later each day costs nothing, and only a genuinely absent day
+     * resets the run.
      */
-    public static final Duration DAILY_COOLDOWN = Duration.ofHours(20);
+    public static final Duration DAILY_COOLDOWN = Duration.ofHours(24);
 
     /**
      * How long before a streak is considered broken.

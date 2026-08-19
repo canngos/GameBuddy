@@ -1,16 +1,22 @@
-import { ActivityIndicator, Pressable, type PressableProps, View } from 'react-native';
-import { useThemeColors } from '../theme';
-import { cn } from './cn';
-import { lift } from './elevation';
-import { GradientView } from './Gradient';
-import { glow } from './glow';
-import { tapLight } from './haptics';
-import { Text } from './Text';
+import {
+  ActivityIndicator,
+  Pressable,
+  type PressableProps,
+  View,
+} from "react-native";
+import { useThemeColors } from "../theme";
+import { cn } from "./cn";
+import { useScreenScale } from "./useScreenScale";
+import { lift } from "./elevation";
+import { GradientView } from "./Gradient";
+import { glow } from "./glow";
+import { tapLight } from "./haptics";
+import { Text } from "./Text";
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
-type Size = 'md' | 'lg';
+type Variant = "primary" | "secondary" | "ghost" | "danger";
+type Size = "md" | "lg";
 
-type ButtonProps = Omit<PressableProps, 'style' | 'children'> & {
+type ButtonProps = Omit<PressableProps, "style" | "children"> & {
   label: string;
   variant?: Variant;
   size?: Size;
@@ -27,10 +33,10 @@ type ButtonProps = Omit<PressableProps, 'style' | 'children'> & {
  * above the gradient table in `src/theme/gradients.ts` for why there are two.
  */
 const containers: Record<Variant, string> = {
-  primary: '',
-  secondary: 'border-2 border-primary',
-  ghost: '',
-  danger: 'border-2 border-danger',
+  primary: "",
+  secondary: "border-2 border-primary",
+  ghost: "",
+  danger: "border-2 border-danger",
 };
 
 /*
@@ -49,39 +55,50 @@ const containers: Record<Variant, string> = {
  * add a `hover:`/`active:`/`focus:` class to the inner node, this comes straight back.
  */
 const pressedStates: Record<Variant, string> = {
-  primary: 'active:opacity-90',
-  secondary: 'active:bg-primary/10',
-  ghost: 'active:bg-raised',
-  danger: 'active:bg-danger/10',
+  primary: "active:opacity-90",
+  secondary: "active:bg-primary/10",
+  ghost: "active:bg-raised",
+  danger: "active:bg-danger/10",
 };
 
 const labels: Record<Variant, string> = {
-  primary: 'text-white',
-  secondary: 'text-primary',
-  ghost: 'text-muted',
-  danger: 'text-danger',
+  primary: "text-white",
+  secondary: "text-primary",
+  ghost: "text-muted",
+  danger: "text-danger",
 };
 
-const sizes: Record<Size, string> = {
-  md: 'min-h-[44px] px-5',
-  lg: 'min-h-touch px-6',
+/**
+ * Per tier: tight, compact, roomy.
+ *
+ * **44dp is the floor and is not negotiable** — it is the platform minimum touch target, so the
+ * tight tier trims the padding and the slack above 44 rather than the target itself. `lg` gives
+ * up six points across the range; `md` only four, because it starts at the floor.
+ *
+ * Classes rather than styles, and the keys (`min-h-`, `px-`) are identical on every tier, so a
+ * caller's own `className` still merges over them through `cn`.
+ */
+const sizes: Record<Size, readonly [string, string, string]> = {
+  md: ["min-h-[44px] px-4", "min-h-[44px] px-4", "min-h-[44px] px-5"],
+  lg: ["min-h-[46px] px-5", "min-h-[49px] px-5", "min-h-touch px-6"],
 };
 
 export function Button({
   label,
-  variant = 'primary',
-  size = 'lg',
+  variant = "primary",
+  size = "lg",
   loading = false,
   disabled,
   className,
   onPress,
   ...rest
 }: ButtonProps) {
+  const { pick } = useScreenScale();
   const colors = useThemeColors();
   // A loading button is disabled too. Otherwise a double tap during a slow request
   // registers twice, and on registration that is two verification emails.
   const inert = disabled || loading;
-  const isPrimary = variant === 'primary';
+  const isPrimary = variant === "primary";
 
   return (
     <Pressable
@@ -95,7 +112,12 @@ export function Button({
         onPress?.(event);
       }}
       // `inert` last of the two so a disabled button cannot also dim on press.
-      className={cn('rounded-full', !inert && pressedStates[variant], inert && 'opacity-40', className)}
+      className={cn(
+        "rounded-full",
+        !inert && pressedStates[variant],
+        inert && "opacity-40",
+        className,
+      )}
       /*
        * Depth lives on this node and the gradient's clip lives on the one below, which is
        * not a stylistic choice: on Android `overflow: hidden` clips the node's own shadow
@@ -108,12 +130,12 @@ export function Button({
        * See `src/ui/hairline.ts`.
        */
       style={[
-        lift(isPrimary && !inert ? 'lg' : 'none', colors.primary),
-        glow(isPrimary && !inert ? 'soft' : 'none', colors.primary),
+        lift(isPrimary && !inert ? "lg" : "none", colors.primary),
+        glow(isPrimary && !inert ? "soft" : "none", colors.primary),
       ]}
       {...rest}
     >
-      <View className={cn('overflow-hidden rounded-full', containers[variant])}>
+      <View className={cn("overflow-hidden rounded-full", containers[variant])}>
         {isPrimary && (
           <GradientView
             name="action"
@@ -123,15 +145,28 @@ export function Button({
           />
         )}
 
-        <View className={cn('flex-row items-center justify-center', sizes[size])}>
+        <View
+          className={cn(
+            "flex-row items-center justify-center",
+            pick(...sizes[size]),
+          )}
+        >
           {/* The label stays mounted under the spinner so the button does not change
               width mid-request and shift everything below it. */}
-          <Text variant="button" className={cn(labels[variant], loading && 'opacity-0')}>
+          <Text
+            variant="button"
+            className={cn(labels[variant], loading && "opacity-0")}
+          >
             {label}
           </Text>
           {loading && (
-            <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
-              <ActivityIndicator color={isPrimary ? colors.onBrand : colors.primary} />
+            <View
+              className="absolute inset-0 items-center justify-center"
+              pointerEvents="none"
+            >
+              <ActivityIndicator
+                color={isPrimary ? colors.onBrand : colors.primary}
+              />
             </View>
           )}
         </View>

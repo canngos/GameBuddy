@@ -1,5 +1,5 @@
-import { Stack } from 'expo-router';
-import { RouteGuard } from '../../src/session/RouteGuard';
+import { Stack } from "expo-router";
+import { RouteGuard } from "../../src/session/RouteGuard";
 
 /**
  * The two server-side onboarding steps.
@@ -10,8 +10,10 @@ import { RouteGuard } from '../../src/session/RouteGuard';
  */
 export default function OnboardingLayout() {
   return (
-    <RouteGuard allow={(s) => s === 'needsUsername' || s === 'needsDetails'}>
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
+    <RouteGuard allow={(s) => s === "needsUsername" || s === "needsDetails"}>
+      <Stack
+        screenOptions={{ headerShown: false, animation: "slide_from_right" }}
+      />
     </RouteGuard>
   );
 }

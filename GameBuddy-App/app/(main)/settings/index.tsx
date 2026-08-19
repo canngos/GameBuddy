@@ -15,17 +15,7 @@ import { openPrivacy, openTerms } from '../../../src/legal';
 import { useTutorial } from '../../../src/tutorial/store';
 import { useSession } from '../../../src/session/store';
 import { useScheme } from '../../../src/theme';
-import {
-  Button,
-  Card,
-  ErrorNotice,
-  LinkRow,
-  RowGroup,
-  Screen,
-  SelectRow,
-  Text,
-  TextField,
-} from '../../../src/ui';
+import { BackButton, Button, Card, ErrorNotice, LinkRow, RowGroup, Screen, SelectRow, Text, TextField } from '../../../src/ui';
 
 /**
  * Everything that changes something, in one place.
@@ -72,6 +62,7 @@ export default function Settings() {
   return (
     <Screen scroll edges={['top', 'bottom']}>
       <View className="gap-1 pb-8 pt-8">
+        <BackButton className="-ml-2" />
         <Text variant="title">{t.settings.title}</Text>
       </View>
 
@@ -313,7 +304,6 @@ export default function Settings() {
       </View>
 
       <View className="mt-auto pt-10">
-        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
       </View>
     </Screen>
   );

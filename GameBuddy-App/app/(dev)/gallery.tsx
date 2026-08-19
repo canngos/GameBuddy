@@ -462,7 +462,7 @@ function Rows() {
       <RowGroup>
         <LinkRow label="Avatar" hint="Catalogue" position="first" onPress={() => {}} />
         <LinkRow label="Games" hint="3 selected" position="middle" onPress={() => {}} />
-        <LinkRow label="Keywords" hint="5 selected" position="last" onPress={() => {}} />
+        <LinkRow label="Play style" hint="5 selected" position="last" onPress={() => {}} />
       </RowGroup>
 
       <RowGroup>

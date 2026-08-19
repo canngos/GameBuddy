@@ -1,4 +1,5 @@
-import { Heart, RotateCcw, Star, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { HandFist, RotateCcw, Star, X } from 'lucide-react-native';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
@@ -9,6 +10,7 @@ import { glow } from '../ui/glow';
 import { commit, tapLight } from '../ui/haptics';
 import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
+import { useDeckLayout } from './deckLayout';
 import type { Decision } from './useDeck';
 
 type DeckActionsProps = {
@@ -19,7 +21,7 @@ type DeckActionsProps = {
   canRewind?: boolean;
   /** Coins a rewind costs here. Zero on Gold, and shown so the price is never a surprise. */
   rewindCost?: number;
-  /** Super Likes in hand. The button is not offered at zero — see below. */
+  /** Super Likes in hand. The button is shown either way; this decides what it does. */
   superLikes?: number;
 };
 
@@ -41,16 +43,30 @@ export function DeckActions({
 }: DeckActionsProps) {
   const t = useT();
   const colors = useThemeColors();
+  const router = useRouter();
+  const layout = useDeckLayout();
+  const hasSuperLikes = superLikes > 0;
   return (
-    <View className="flex-row items-center justify-center gap-6 py-5">
+    // Sized from the shared deck layout rather than fixed. These used to keep their full
+    // dimensions on every phone, so on a small screen the row took a third of the height and
+    // the card it belongs to looked like a thumbnail beneath it.
+    <View
+      className="flex-row items-center justify-center"
+      style={{ gap: layout.actionsGap, paddingVertical: layout.actionsPaddingY }}
+    >
       {/* Left of Pass, and smaller than both. Undo is a recovery action, not a third
           choice — sizing it like one would invite taps from people who meant to pass.
           Rendered as a spacer when there is nothing to undo, so Pass and Match do not
           jump sideways the moment the first swipe happens. */}
       {onRewind ? (
-        <RewindButton onPress={onRewind} disabled={disabled || !canRewind} cost={rewindCost} />
+        <RewindButton
+          onPress={onRewind}
+          disabled={disabled || !canRewind}
+          cost={rewindCost}
+          size={layout.rewindButton}
+        />
       ) : (
-        <View className="w-14" />
+        <View style={{ width: layout.rewindButton }} />
       )}
 
       <CircleButton
@@ -61,9 +77,10 @@ export function DeckActions({
           onDecide('decline');
         }}
         disabled={disabled}
+        size={layout.sideButton}
         className="border-line bg-surface"
       >
-        <Icon as={X} size={26} tone="muted" strokeWidth={2.5} />
+        <Icon as={X} size={layout.sideButton * 0.43} tone="muted" strokeWidth={2.5} />
       </CircleButton>
 
       <CircleButton
@@ -79,13 +96,21 @@ export function DeckActions({
         disabled={disabled}
         className="border-transparent"
         gradient
-        size={72}
+        size={layout.matchButton}
       >
-        {/* The pink survives here and only here — this is the like/match colour's one job.
-            Filled rather than outlined: white on the accent ramp measures 3.23:1, which
-            WCAG allows for a graphical element and not for a label. A heart is legal on it.
-            A word would not be. */}
-        <Icon as={Heart} size={30} tone="inverse" fill="#FFFFFF" strokeWidth={0} />
+        {/* A fist bump, not a heart.
+
+            The pink survives here and only here — this is the like/match colour's one job —
+            but the heart on it was borrowed from dating apps, and what this button actually
+            means is "let's play". A bump is what that looks like between two players.
+
+            Outlined rather than filled, which the heart could not be: a heart is a solid
+            shape and reads as a blob in outline, while a hand is legible precisely because
+            of its interior lines. The stroke is 2.5 so it holds its own at 30px on a
+            gradient. White on the accent ramp measures 3.23:1 — above the 3:1 WCAG asks of
+            a graphical element, though not of a label, which is why this is an icon and not
+            the word. */}
+        <Icon as={HandFist} size={layout.matchButton * 0.42} tone="inverse" strokeWidth={2.5} />
       </CircleButton>
 
       {/* Where the retired deck boost used to sit — the row read undo · pass · match ·
@@ -94,26 +119,45 @@ export function DeckActions({
           a thing you could buy and then never use. Sized between Pass and Match, because
           it is a stronger yes than a like and a rarer one than either.
 
-          Hidden entirely at zero rather than shown disabled. A greyed-out button on the
-          main screen is a permanent advertisement for something you do not have, and the
-          swipe still offers the same purchase prompt for anyone who wants one. */}
-      {superLikes > 0 ? (
-        <CircleButton
-          label={t.deck.actions.superLike}
-          hint={t.deck.actions.superLikeHint}
-          caption={t.deck.actions.superLikeLeft(superLikes)}
-          onPress={() => {
-            commit();
-            onDecide('super');
-          }}
-          disabled={disabled}
-          className="border-gold/60 bg-surface"
-        >
-          <Icon as={Star} size={26} tone="gold" fill={colors.gold} strokeWidth={0} />
-        </CircleButton>
-      ) : (
-        <View className="w-14" />
-      )}
+          **Always rendered, including at zero.** It used to be hidden when the balance was
+          empty, on the reasoning that a greyed-out button advertises something you do not
+          have. That was wrong in both directions: a new gamer never learned the feature
+          existed, and a tester who *had* bought Super Likes reported the button missing —
+          because the balance arrives on a separate query and any hiccup fetching it looks
+          identical to owning none. A control that vanishes cannot be debugged by the person
+          holding the phone. At zero it says so and offers the fix, which is one tap. */}
+      <CircleButton
+        label={t.deck.actions.superLike}
+        hint={hasSuperLikes ? t.deck.actions.superLikeHint : t.deck.actions.superLikeGetHint}
+        caption={
+          hasSuperLikes ? t.deck.actions.superLikeLeft(superLikes) : t.deck.actions.superLikeNone
+        }
+        onPress={() => {
+          if (!hasSuperLikes) {
+            // Not a decision, so no commit haptic — this navigates rather than spending.
+            tapLight();
+            router.push('/market');
+            return;
+          }
+          commit();
+          onDecide('super');
+        }}
+        // Never disabled by an empty balance, only by the deck being frozen. Going to buy
+        // one is a legitimate action at zero.
+        disabled={disabled}
+        size={layout.sideButton}
+        className={hasSuperLikes ? 'border-gold/60 bg-surface' : 'border-line bg-surface'}
+      >
+        <Icon
+          as={Star}
+          size={layout.sideButton * 0.43}
+          tone={hasSuperLikes ? 'gold' : 'muted'}
+          // Outlined at zero and filled when you have one, so the state reads at a glance
+          // without a second colour.
+          fill={hasSuperLikes ? colors.gold : 'none'}
+          strokeWidth={hasSuperLikes ? 0 : 2}
+        />
+      </CircleButton>
     </View>
   );
 }
@@ -130,10 +174,12 @@ function RewindButton({
   onPress,
   disabled,
   cost,
+  size,
 }: {
   onPress: () => void;
   disabled: boolean;
   cost: number;
+  size: number;
 }) {
   const t = useT();
   return (
@@ -147,12 +193,13 @@ function RewindButton({
       accessibilityLabel={cost > 0 ? t.deck.actions.undoCost(cost) : t.deck.actions.undo}
       accessibilityState={{ disabled }}
       hitSlop={8}
+      style={{ width: size, height: size, borderRadius: size / 2 }}
       className={cn(
-        'h-14 w-14 items-center justify-center rounded-full border border-line bg-surface',
+        'items-center justify-center border border-line bg-surface',
         disabled ? 'opacity-40' : 'active:opacity-70',
       )}
     >
-      <Icon as={RotateCcw} size={20} tone="muted" />
+      <Icon as={RotateCcw} size={size * 0.36} tone="muted" />
       {cost > 0 && (
         <Text className="font-semibold text-[10px] leading-[12px] text-muted">{cost}</Text>
       )}

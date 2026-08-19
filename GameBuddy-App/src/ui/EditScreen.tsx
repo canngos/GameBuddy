@@ -1,11 +1,12 @@
-import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { View } from 'react-native';
-import { useT } from '../i18n/useT';
-import { Button } from './Button';
-import { ErrorNotice } from './ErrorNotice';
-import { Screen } from './Screen';
-import { Text } from './Text';
+import { useIntroPadding } from "./spacing";
+import { useRouter } from "expo-router";
+import type { ReactNode } from "react";
+import { View } from "react-native";
+import { useT } from "../i18n/useT";
+import { Button } from "./Button";
+import { ErrorNotice } from "./ErrorNotice";
+import { Screen } from "./Screen";
+import { Text } from "./Text";
 
 type EditScreenProps = {
   title: string;
@@ -59,7 +60,7 @@ export function EditScreen({
   return (
     <Screen
       scroll={scroll}
-      edges={['top', 'bottom']}
+      edges={["top", "bottom"]}
       // Pinned rather than scrolled past. The games and keywords screens use this and
       // their lists are a hundred rows long; Save at the end of the content meant
       // scrolling the whole catalogue to reach it and back up to keep choosing.
@@ -104,9 +105,16 @@ export function EditScreen({
  * The title block, exported so a `scroll={false}` screen can hand it to whatever child
  * owns the scrolling — otherwise the title would simply not be drawn.
  */
-export function EditTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+export function EditTitle({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  const intro = useIntroPadding();
   return (
-    <View className="gap-2 pb-6 pt-8">
+    <View className={`gap-2 pb-6 ${intro.heading}`}>
       <Text variant="title">{title}</Text>
       {subtitle && (
         <Text variant="body" className="text-muted">

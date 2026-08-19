@@ -1,16 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { View } from 'react-native';
-import { catalogueApi } from '../../src/api/catalogue';
-import { useT } from '../../src/i18n/useT';
-import { useDraft } from '../../src/onboarding/draft';
-import { SelectionCount } from '../../src/onboarding/SelectionCount';
-import { StepHeader } from '../../src/onboarding/StepHeader';
-import { CataloguePicker } from '../../src/pickers/CataloguePicker';
-import { gameFilters, toGameItem } from '../../src/pickers/gameFilters';
-import { Button, Screen } from '../../src/ui';
-import { MIN_GAMES } from '../../src/validation';
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useMemo } from "react";
+import { View } from "react-native";
+import { catalogueApi } from "../../src/api/catalogue";
+import { useT } from "../../src/i18n/useT";
+import { useDraft } from "../../src/onboarding/draft";
+import { SelectionCount } from "../../src/onboarding/SelectionCount";
+import { StepHeader } from "../../src/onboarding/StepHeader";
+import { CataloguePicker } from "../../src/pickers/CataloguePicker";
+import { gameFilters, toGameItem } from "../../src/pickers/gameFilters";
+import { BackButton, Button, Screen } from "../../src/ui";
+import { MIN_GAMES } from "../../src/validation";
 
 export default function Games() {
   const router = useRouter();
@@ -21,10 +21,13 @@ export default function Games() {
   const gameIds = useDraft((s) => s.gameIds);
   const toggleGame = useDraft((s) => s.toggleGame);
 
-  const games = useQuery({ queryKey: ['games'], queryFn: catalogueApi.games });
+  const games = useQuery({ queryKey: ["games"], queryFn: catalogueApi.games });
 
   const items = useMemo(() => (games.data ?? []).map(toGameItem), [games.data]);
-  const filters = useMemo(() => gameFilters(games.data ?? [], t), [games.data, t]);
+  const filters = useMemo(
+    () => gameFilters(games.data ?? [], t),
+    [games.data, t],
+  );
 
   return (
     // Not `scroll`: the picker is a FlatList and owns the scrolling, so the step header
@@ -36,12 +39,13 @@ export default function Games() {
           <Button
             label={t.common.continue}
             disabled={gameIds.length < MIN_GAMES}
-            onPress={() => router.push('/platforms')}
+            onPress={() => router.push("/platforms")}
           />
-          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
+      <BackButton />
+
       <CataloguePicker
         header={
           <StepHeader

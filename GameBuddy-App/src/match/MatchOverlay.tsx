@@ -1,21 +1,23 @@
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from "react";
+import { StyleSheet, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
-} from 'react-native-reanimated';
-import { useT } from '../i18n/useT';
-import { brand } from '../theme';
-import type { MatchedGamer } from './celebration';
-import { Avatar } from '../ui/Avatar';
-import { Burst } from '../ui/Burst';
-import { Button } from '../ui/Button';
-import { GradientView } from '../ui/Gradient';
-import { glow } from '../ui/glow';
-import { celebrate } from '../ui/feedback';
-import { Text } from '../ui/Text';
+} from "react-native-reanimated";
+import { useT } from "../i18n/useT";
+import { brand } from "../theme";
+import type { MatchedGamer } from "./celebration";
+import { FistBump } from "./FistBump";
+import { Avatar } from "../ui/Avatar";
+import { Burst } from "../ui/Burst";
+import { Button } from "../ui/Button";
+import { GradientView } from "../ui/Gradient";
+import { glow } from "../ui/glow";
+import { celebrate } from "../ui/feedback";
+import { Text } from "../ui/Text";
+import { useScreenScale } from "../ui/useScreenScale";
 
 type MatchOverlayProps = {
   /** `MatchedGamer`, not `Candidate` — this is raised from a push as well as from the deck. */
@@ -46,18 +48,50 @@ type MatchOverlayProps = {
  * So animated wrappers carry `style` only, and every visual class sits on a plain
  * `View` inside them.
  */
-export function MatchOverlay({ candidate, onDismiss, onMessage }: MatchOverlayProps) {
+export function MatchOverlay({
+  candidate,
+  onDismiss,
+  onMessage,
+}: MatchOverlayProps) {
+  /*
+   * The celebration is the tallest thing in the app and it cannot scroll — it is a moment,
+   * not a page — so on a small phone it has to fit by being smaller.
+   *
+   * `FistBump` draws into a box three times its `size` wide and 1.4x tall, so it is the
+   * expensive one: 64 costs 192x90, and the avatar, hero headline and two buttons all
+   * have to fit beneath it. The fist gives up the most, the portrait next, and the gaps
+   * absorb the rest.
+   */
+  const { pick } = useScreenScale();
+  const fist = pick(44, 54, 64);
+  const portrait = pick(88, 104, 120);
+  const gap = pick("gap-4", "gap-5", "gap-6");
+
   const t = useT();
   const visible = !!candidate;
   const progress = useSharedValue(0);
+
+  /**
+   * Whether the two fists have met yet.
+   *
+   * The burst and the buzz both wait for this. They used to fire on mount, which put the
+   * light and the thump a third of a second *before* the thing they were reacting to.
+   */
+  const [bumped, setBumped] = useState(false);
+
+  const onImpact = useCallback(() => {
+    setBumped(true);
+    // The one `celebrate` in the deck. A match is the rarest good thing that happens here
+    // and the only moment that earns a heavier buzz than a swipe — landed on the contact.
+    celebrate();
+  }, []);
 
   useEffect(() => {
     progress.value = visible
       ? withSpring(1, { damping: 14, stiffness: 160 })
       : withTiming(0, { duration: 120 });
-    // The one `celebrate` in the deck. A match is the rarest good thing that happens here
-    // and the only moment that earns a heavier buzz than a swipe.
-    if (visible) celebrate();
+    // Re-armed when the overlay is dismissed, so a second match plays the whole thing again.
+    if (!visible) setBumped(false);
   }, [visible, progress]);
 
   const backdropStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
@@ -101,10 +135,14 @@ export function MatchOverlay({ candidate, onDismiss, onMessage }: MatchOverlayPr
             token that flips with the theme would repaint the particles for a surface that
             did not change.
           */}
-          <Burst play={0} color={brand.DEFAULT} radius={200} />
+          {bumped && <Burst play={0} color={brand.DEFAULT} radius={200} />}
 
           <Animated.View style={contentStyle}>
-            <View className="w-full items-center gap-6">
+            <View className={`w-full items-center ${gap}`}>
+              {/* Above the headline, because it is the sentence's verb: the bump happens,
+                  then you read what it meant and see who it was with. */}
+              <FistBump size={fist} onImpact={onImpact} />
+
               <View className="items-center gap-1">
                 {/* `hero` — the largest type in the system, used here and essentially
                     nowhere else. This is the screen people screenshot. */}
@@ -125,20 +163,30 @@ export function MatchOverlay({ candidate, onDismiss, onMessage }: MatchOverlayPr
               {/* Lit rather than flat: the glow is on a wrapper because `Avatar` clips its
                   own contents, and on Android `overflow: hidden` clips the node's own
                   shadow. Same split as `Button`. */}
-              <View className="rounded-full" style={glow('strong', brand.DEFAULT)}>
+              <View
+                className="rounded-full"
+                style={glow("strong", brand.DEFAULT)}
+              >
                 <Avatar
                   source={candidate.avatar}
                   name={candidate.username}
                   colorSeed={candidate.userId}
-                  size={120}
+                  size={portrait}
                 />
               </View>
 
               <View className="w-full gap-3 pt-2">
-                <Button label={t.deck.match.message} onPress={() => onMessage(candidate)} />
+                <Button
+                  label={t.deck.match.message}
+                  onPress={() => onMessage(candidate)}
+                />
                 {/* Secondary, not ghost: ghost's label is `text-muted`, which is dark
                     grey in light mode and would vanish against this overlay. */}
-                <Button label={t.deck.match.keep} variant="secondary" onPress={onDismiss} />
+                <Button
+                  label={t.deck.match.keep}
+                  variant="secondary"
+                  onPress={onDismiss}
+                />
               </View>
             </View>
           </Animated.View>

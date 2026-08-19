@@ -1,28 +1,40 @@
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { ApiError, Code } from '../../src/api/envelope';
-import { useSession } from '../../src/session/store';
-import { useT } from '../../src/i18n/useT';
-import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { normalisePassword } from '../../src/validation';
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { ApiError, Code } from "../../src/api/envelope";
+import { useSession } from "../../src/session/store";
+import { useT } from "../../src/i18n/useT";
+import {
+  BackButton,
+  Button,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import { normalisePassword } from "../../src/validation";
 
 export default function Login() {
+  const intro = useIntroPadding();
   const t = useT();
   const router = useRouter();
   const signIn = useSession((s) => s.signIn);
 
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
 
   const login = useMutation({
     mutationFn: async () => {
-      const session = await authApi.login(identifier.trim(), normalisePassword(password));
+      const session = await authApi.login(
+        identifier.trim(),
+        normalisePassword(password),
+      );
       await signIn(session.accessToken, session.userId);
     },
-    onSuccess: () => router.replace('/home'),
+    onSuccess: () => router.replace("/home"),
   });
 
   /**
@@ -40,7 +52,10 @@ export default function Login() {
   const sendCode = useMutation({
     mutationFn: () => authApi.sendCode(identifier.trim()),
     onSuccess: () =>
-      router.replace({ pathname: '/verify', params: { email: identifier.trim() } }),
+      router.replace({
+        pathname: "/verify",
+        params: { email: identifier.trim() },
+      }),
   });
 
   const canSubmit =
@@ -48,7 +63,9 @@ export default function Login() {
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
+      <BackButton />
+
+      <View className={`gap-2 pb-8 ${intro.top}`}>
         <Text variant="title">{t.auth.login.title}</Text>
         <Text variant="body" className="text-muted">
           {t.auth.login.subtitle}
@@ -81,7 +98,7 @@ export default function Login() {
         <Text
           variant="bodyStrong"
           className="-mt-2 self-end text-primary"
-          onPress={() => router.push('/forgot')}
+          onPress={() => router.push("/forgot")}
         >
           {t.auth.login.forgot}
         </Text>
@@ -110,14 +127,13 @@ export default function Login() {
         )}
       </View>
 
-      <View className="mt-auto gap-2 pt-10">
+      <View className={`mt-auto gap-2 ${intro.footer}`}>
         <Button
           label={t.auth.login.submit}
           loading={login.isPending}
           disabled={!canSubmit}
           onPress={() => login.mutate()}
         />
-        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
       </View>
     </Screen>
   );

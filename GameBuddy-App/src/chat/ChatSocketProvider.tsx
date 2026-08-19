@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 import { useSession } from '../session/store';
 import {
   createChatSocket,
@@ -178,6 +179,33 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
       setPresence({});
       setTyping({});
     };
+  }, [token]);
+
+  /**
+   * Rebuild the socket every time the app comes back to the foreground.
+   *
+   * Android freezes JS timers while the app is away, so the keepalive that proves this
+   * connection is alive stops firing and the server drops the session after about half a
+   * minute — correctly announcing this gamer as offline. Coming back, the socket is
+   * frequently half-open: no close event was ever delivered, so stompjs still believes it
+   * is connected and never reconnects, and the gamer stays offline to everyone until the
+   * app is force-quit. That was the report — locking the phone showed offline, unlocking
+   * never came back.
+   *
+   * Unconditional on purpose. Asking `client.connected` first is asking the one thing that
+   * is wrong in exactly the case this exists to fix. A redundant reconnect costs a CONNECT
+   * frame; a skipped one costs presence for the rest of the session.
+   *
+   * Separate from the effect above so it does not tear the socket down whenever the token
+   * object changes, and it reads `socket.current` rather than closing over an instance.
+   */
+  useEffect(() => {
+    if (!token) return;
+
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void socket.current?.reconnect();
+    });
+    return () => subscription.remove();
   }, [token]);
 
   // Empty deps, and correctly so: all three close over refs, never over state. This object

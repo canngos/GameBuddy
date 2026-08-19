@@ -1,9 +1,10 @@
-import { useMemo, type ReactNode } from 'react';
-import { View } from 'react-native';
-import { useIsDark } from '../theme';
-import { cn } from './cn';
-import { lift } from './elevation';
-import { useHairline } from './hairline';
+import { useMemo, type ReactNode } from "react";
+import { View } from "react-native";
+import { useIsDark } from "../theme";
+import { cn } from "./cn";
+import { useScreenScale } from "./useScreenScale";
+import { lift } from "./elevation";
+import { useHairline } from "./hairline";
 
 type CardProps = {
   children: ReactNode;
@@ -34,10 +35,29 @@ export function Card({ children, className }: CardProps) {
   // No `memo()` on the component itself — `children` is a fresh element on every parent
   // render, so it could never bail out until the row above it is memoised too. That comes
   // with the list work.
-  const style = useMemo(() => [lift(isDark ? 'none' : 'sm'), hairline], [isDark, hairline]);
+  const { pick } = useScreenScale();
+  /*
+   * A class, not a style, and that is not a free choice.
+   *
+   * Callers override this padding through `className` — `LobbyCard` passes `p-0` for a card
+   * that is all artwork, `FriendRequestsSection` passes `px-4 py-3` for a compact row — and
+   * `cn` is what lets the caller win. An inline style would beat every one of those silently,
+   * which is the worst way for it to break: the card still renders, just wrong.
+   *
+   * The class *key* is `p-` on every tier, only its value moves, which is what UI_NOTE §4.2
+   * requires.
+   */
+  const padding = pick("p-3.5", "p-4", "p-5");
+  const style = useMemo(
+    () => [lift(isDark ? "none" : "sm"), hairline],
+    [isDark, hairline],
+  );
 
   return (
-    <View className={cn('rounded-card bg-surface p-5', className)} style={style}>
+    <View
+      className={cn("rounded-card bg-surface", padding, className)}
+      style={style}
+    >
       {children}
     </View>
   );

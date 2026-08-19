@@ -21,9 +21,18 @@ import { useHairline } from '../../src/ui/hairline';
 import { Screen } from '../../src/ui';
 import { TabIcon, type TabIconName } from '../../src/ui/TabIcon';
 import { ToastHost } from '../../src/ui/ToastHost';
+import { useScreenScale } from '../../src/ui/useScreenScale';
 
-/** The floating bar's own height. Its distance off the bottom is computed per-platform. */
-const TAB_BAR_HEIGHT = 64;
+/**
+ * The floating bar's own height, per tier. Its distance off the bottom is computed
+ * per-platform below.
+ *
+ * A fixed 64 was a tenth of a tall phone and a sixth of a short one — the single biggest piece
+ * of chrome that did not scale, and it is subtracted from nine screens rather than one. The
+ * tier comes from `useScreenScale` so the bar can never disagree with the deck about how small
+ * the screen is.
+ */
+const TAB_BAR_HEIGHT = { tight: 52, compact: 58, roomy: 64 };
 
 /**
  * The app proper. Reachable only once onboarding has actually been completed.
@@ -42,6 +51,14 @@ export default function MainLayout() {
   const t = useT();
   const insets = useSafeAreaInsets();
   const hairline = useHairline();
+  const { pick } = useScreenScale();
+
+  const barHeight = pick(TAB_BAR_HEIGHT.tight, TAB_BAR_HEIGHT.compact, TAB_BAR_HEIGHT.roomy);
+  const barPadding = pick(4, 6, 8);
+  const iconSize = pick(20, 22, 24);
+  // 9 is the floor. The note below records a label truncating at 11, and a tab that cannot
+  // show its own word is worse than a slightly smaller one.
+  const labelSize = pick(9, 10, 10);
 
   /*
    * The floating bar's geometry, in one place, because two numbers have to agree: how far
@@ -49,7 +66,7 @@ export default function MainLayout() {
    * second from the first is the only way they cannot drift.
    */
   const barInset = (Platform.OS === 'android' ? insets.bottom : insets.bottom * 0.5) + 10;
-  const tabBarSpace = barInset + TAB_BAR_HEIGHT;
+  const tabBarSpace = barInset + barHeight;
 
   // Here rather than at the root: this layout mounts only once a gamer is signed in and
   // onboarded, which is exactly when there is an account to attach a device token to.
@@ -199,12 +216,12 @@ export default function MainLayout() {
              */
             marginHorizontal: 12,
             marginBottom: barInset,
-            height: TAB_BAR_HEIGHT,
+            height: barHeight,
             borderRadius: 24,
             backgroundColor: colors.elevated,
             borderTopWidth: 0,
-            paddingTop: 8,
-            paddingBottom: 8,
+            paddingTop: barPadding,
+            paddingBottom: barPadding,
             // Depth without a class — `shadow-*` is forbidden here, see src/ui/elevation.ts.
             ...lift('lg'),
             ...hairline,
@@ -213,14 +230,14 @@ export default function MainLayout() {
           // 10, not 11: the floating bar is inset from both edges, and at 11 "Community"
           // truncated to "Communi…". A tab label that cannot show its own word is worse
           // than a slightly smaller one.
-          tabBarLabelStyle: { fontFamily: 'Poppins_500Medium', fontSize: 10 },
+          tabBarLabelStyle: { fontFamily: 'Poppins_500Medium', fontSize: labelSize },
         }}
       >
-        <Tabs.Screen name="home" options={tab(t.tabs.home, 'deck')} />
-        <Tabs.Screen name="lobby" options={tab(t.tabs.lobby, 'lobby')} />
-        <Tabs.Screen name="messages" options={tab(t.tabs.messages, 'messages')} />
-        <Tabs.Screen name="market" options={tab(t.tabs.market, 'market')} />
-        <Tabs.Screen name="profile" options={tab(t.tabs.profile, 'profile')} />
+        <Tabs.Screen name="home" options={tab(t.tabs.home, 'deck', iconSize)} />
+        <Tabs.Screen name="lobby" options={tab(t.tabs.lobby, 'lobby', iconSize)} />
+        <Tabs.Screen name="messages" options={tab(t.tabs.messages, 'messages', iconSize)} />
+        <Tabs.Screen name="market" options={tab(t.tabs.market, 'market', iconSize)} />
+        <Tabs.Screen name="profile" options={tab(t.tabs.profile, 'profile', iconSize)} />
 
 
         {/* Reachable from Profile, but not a tab of its own. One entry, not two: the
@@ -304,11 +321,13 @@ export default function MainLayout() {
   );
 }
 
-function tab(title: string, icon: TabIconName) {
+function tab(title: string, icon: TabIconName, size: number) {
   return {
     title,
     // `focused`, not `color`. TabIcon owns what an active tab looks like — see the header
     // comment there for why taking the navigator's tint was the wrong seam.
-    tabBarIcon: ({ focused }: { focused: boolean }) => <TabIcon name={icon} focused={focused} />,
+    tabBarIcon: ({ focused }: { focused: boolean }) => (
+      <TabIcon name={icon} focused={focused} size={size} />
+    ),
   };
 }

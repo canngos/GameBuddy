@@ -1,23 +1,40 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { Crown, Eye, Infinity as InfinityIcon, SlidersHorizontal, type LucideIcon } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { billingApi, GOLD_PLANS, type GoldPlan } from '../../src/api/billing';
-import { cosmeticsApi } from '../../src/api/cosmetics';
-import type { Cosmetic, CosmeticStore } from '../../src/api/types';
-import { trackFunnel } from '../../src/api/funnel';
-import { storeAvailable } from '../../src/billing/purchases';
-import { usePurchase } from '../../src/billing/usePurchase';
-import { useT } from '../../src/i18n/useT';
-import { useThemeColors } from '../../src/theme';
-import { GradientView } from '../../src/ui/Gradient';
-import { glow } from '../../src/ui/glow';
-import { BackHeader, Button, Card, ErrorNotice, Icon, Screen, Text } from '../../src/ui';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import {
+  Crown,
+  Eye,
+  Infinity as InfinityIcon,
+  SlidersHorizontal,
+  type LucideIcon,
+} from "lucide-react-native";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { billingApi, GOLD_PLANS, type GoldPlan } from "../../src/api/billing";
+import { cosmeticsApi } from "../../src/api/cosmetics";
+import type { Cosmetic, CosmeticStore } from "../../src/api/types";
+import { trackFunnel } from "../../src/api/funnel";
+import { storeAvailable } from "../../src/billing/purchases";
+import { usePurchase } from "../../src/billing/usePurchase";
+import { useT } from "../../src/i18n/useT";
+import { useThemeColors } from "../../src/theme";
+import { GradientView } from "../../src/ui/Gradient";
+import { glow } from "../../src/ui/glow";
+import {
+  BackHeader,
+  Button,
+  Card,
+  ErrorNotice,
+  Icon,
+  Screen,
+  Text,
+  useScreenScale,
+} from "../../src/ui";
 
 /** The image fills its already-sized box. A constant, so it is not a new prop per row. */
-const FILL = StyleSheet.create({ fill: { width: '100%', height: '100%' } }).fill;
+const FILL = StyleSheet.create({
+  fill: { width: "100%", height: "100%" },
+}).fill;
 
 /**
  * The Gold pitch and plan picker.
@@ -46,11 +63,11 @@ export default function Gold() {
   const [selected, setSelected] = useState<GoldPlan>(GOLD_PLANS[1]);
 
   const subscription = useQuery({
-    queryKey: ['subscription'],
+    queryKey: ["subscription"],
     queryFn: billingApi.subscription,
   });
 
-  const isGold = subscription.data?.tier === 'GOLD';
+  const isGold = subscription.data?.tier === "GOLD";
 
   // Opens the store sheet, then waits for the webhook to land before calling it done.
   const buy = usePurchase();
@@ -62,7 +79,7 @@ export default function Gold() {
   // render, and not gated on tier: a member reopening the paywall is a view too, and
   // filtering it out here would hide the fact that they keep landing on it.
   useEffect(() => {
-    trackFunnel('PAYWALL_VIEWED');
+    trackFunnel("PAYWALL_VIEWED");
   }, []);
 
   return (
@@ -79,7 +96,9 @@ export default function Gold() {
                 was wired up. */}
             <Button
               label={
-                canBuy ? t.market.gold.continuePrice(selected.price) : t.market.gold.unavailable
+                canBuy
+                  ? t.market.gold.continuePrice(selected.price)
+                  : t.market.gold.unavailable
               }
               loading={buy.isPending}
               disabled={!canBuy}
@@ -87,11 +106,15 @@ export default function Gold() {
                 // Before the sheet opens, so an abandoned purchase still counts as intent.
                 // The gap between this and a granted subscription is the store's own
                 // drop-off, which is worth seeing apart from ours.
-                trackFunnel('CHECKOUT_STARTED');
+                trackFunnel("CHECKOUT_STARTED");
                 buy.buy(selected.productId);
               }}
             />
-            <Button label={t.market.gold.notNow} variant="ghost" onPress={() => router.back()} />
+            <Button
+              label={t.market.gold.notNow}
+              variant="ghost"
+              onPress={() => router.back()}
+            />
           </View>
         )
       }
@@ -110,7 +133,7 @@ export default function Gold() {
           <Benefits />
 
           {/* Directly under the claims, because it is the only one of them that can be
-              *shown* rather than described. */}
+           *shown* rather than described. */}
           <GoldCosmetics isGold={false} />
 
           <View className="gap-3 pt-8">
@@ -162,11 +185,15 @@ export default function Gold() {
  * top of the same system rather than a screen designed on its own.
  */
 function Hero({ isGold }: { isGold: boolean }) {
+  const { pick } = useScreenScale();
   const colors = useThemeColors();
   const t = useT();
 
   return (
-    <View className="mb-2 overflow-hidden rounded-card" style={glow('soft', colors.gold)}>
+    <View
+      className="mb-2 overflow-hidden rounded-card"
+      style={glow("soft", colors.gold)}
+    >
       <View className="overflow-hidden rounded-card border border-line bg-surface">
         <GradientView
           name="gold"
@@ -175,10 +202,20 @@ function Hero({ isGold }: { isGold: boolean }) {
           pointerEvents="none"
         />
 
-        <View className="items-center gap-3 px-6 py-8">
-          <View className="rounded-full" style={glow('strong', colors.gold)}>
-            <View className="h-16 w-16 items-center justify-center rounded-full bg-gold/15">
-              <Icon as={Crown} size={30} tone="gold" fill={colors.gold} strokeWidth={1.5} />
+        <View
+          className={`items-center gap-3 px-6 ${pick("py-4", "py-6", "py-8")}`}
+        >
+          <View className="rounded-full" style={glow("strong", colors.gold)}>
+            <View
+              className={`${pick("h-12 w-12", "h-14 w-14", "h-16 w-16")} items-center justify-center rounded-full bg-gold/15`}
+            >
+              <Icon
+                as={Crown}
+                size={pick(24, 27, 30)}
+                tone="gold"
+                fill={colors.gold}
+                strokeWidth={1.5}
+              />
             </View>
           </View>
 
@@ -217,7 +254,11 @@ function Benefits() {
   // something we can filter by. Promising it on a paid product is the kind of claim
   // that earns a refund and a store complaint rather than a subscriber.
   const benefits: { icon: LucideIcon; title: string; body: string }[] = [
-    { icon: Eye, title: t.market.gold.benefitLikesTitle, body: t.market.gold.benefitLikesBody },
+    {
+      icon: Eye,
+      title: t.market.gold.benefitLikesTitle,
+      body: t.market.gold.benefitLikesBody,
+    },
     {
       icon: InfinityIcon,
       title: t.market.gold.benefitLimitTitle,
@@ -236,7 +277,10 @@ function Benefits() {
         // A glyph rather than the bullet dot that was here. Four identical dots made four
         // different promises look like one list; an eye, an infinity and a slider say what
         // each one is before the words are read.
-        <View key={title} className="flex-row items-center gap-3 rounded-card bg-raised p-4">
+        <View
+          key={title}
+          className="flex-row items-center gap-3 rounded-card bg-raised p-4"
+        >
           <View className="h-10 w-10 items-center justify-center rounded-full bg-gold/15">
             <Icon as={icon} size={18} tone="gold" />
           </View>
@@ -271,11 +315,15 @@ function GoldCosmetics({ isGold }: { isGold: boolean }) {
 
   // Same key the Market uses, so react-query serves both from one request and an equip here
   // is already applied when that screen is next opened.
-  const store = useQuery({ queryKey: ['cosmetics'], queryFn: cosmeticsApi.store });
+  const store = useQuery({
+    queryKey: ["cosmetics"],
+    queryFn: cosmeticsApi.store,
+  });
 
-  const items = [...(store.data?.frames ?? []), ...(store.data?.banners ?? [])].filter(
-    (item) => item.membershipOnly,
-  );
+  const items = [
+    ...(store.data?.frames ?? []),
+    ...(store.data?.banners ?? []),
+  ].filter((item) => item.membershipOnly);
 
   const equip = useMutation({
     mutationFn: cosmeticsApi.equip,
@@ -283,8 +331,8 @@ function GoldCosmetics({ isGold }: { isGold: boolean }) {
       // Written through rather than refetched, for the reason the Market gives: the response
       // is the whole refreshed store, and refetching leaves a window where the item is worn
       // but still offers an Equip button.
-      queryClient.setQueryData(['cosmetics'], next);
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
+      queryClient.setQueryData(["cosmetics"], next);
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
     },
   });
 
@@ -325,7 +373,7 @@ function GoldCosmeticRow({
   onEquip: () => void;
 }) {
   const t = useT();
-  const isBanner = item.kind === 'BANNER';
+  const isBanner = item.kind === "BANNER";
 
   return (
     <View className="flex-row items-center gap-4 rounded-card border border-line bg-raised p-4">
@@ -334,14 +382,14 @@ function GoldCosmeticRow({
       <View
         className={
           isBanner
-            ? 'h-16 w-24 overflow-hidden rounded-xl bg-surface'
-            : 'h-16 w-16 items-center justify-center rounded-full bg-surface'
+            ? "h-16 w-24 overflow-hidden rounded-xl bg-surface"
+            : "h-16 w-16 items-center justify-center rounded-full bg-surface"
         }
       >
         <Image
           source={{ uri: item.image }}
           style={FILL}
-          contentFit={isBanner ? 'cover' : 'contain'}
+          contentFit={isBanner ? "cover" : "contain"}
           autoplay
           transition={150}
           // See `market.tsx`.
@@ -415,24 +463,26 @@ function PlanRow({
 
   // GOLD_PLANS carries ids and prices; the words come from the dictionary, keyed by the
   // product id, because that module is data shared with non-React code.
-  const copy: Record<GoldPlan['productId'], { label: string; period: string; note: string | null }> =
-    {
-      'gamebuddy.gold.weekly': {
-        label: t.market.gold.planWeekly,
-        period: t.market.gold.periodWeek,
-        note: null,
-      },
-      'gamebuddy.gold.monthly': {
-        label: t.market.gold.planMonthly,
-        period: t.market.gold.periodMonth,
-        note: t.market.gold.noteTrial,
-      },
-      'gamebuddy.gold.yearly': {
-        label: t.market.gold.planYearly,
-        period: t.market.gold.periodYear,
-        note: t.market.gold.noteYearly,
-      },
-    };
+  const copy: Record<
+    GoldPlan["productId"],
+    { label: string; period: string; note: string | null }
+  > = {
+    "gamebuddy.gold.weekly": {
+      label: t.market.gold.planWeekly,
+      period: t.market.gold.periodWeek,
+      note: null,
+    },
+    "gamebuddy.gold.monthly": {
+      label: t.market.gold.planMonthly,
+      period: t.market.gold.periodMonth,
+      note: t.market.gold.noteTrial,
+    },
+    "gamebuddy.gold.yearly": {
+      label: t.market.gold.planYearly,
+      period: t.market.gold.periodYear,
+      note: t.market.gold.noteYearly,
+    },
+  };
   const { label, period, note } = copy[plan.productId];
 
   return (
@@ -440,23 +490,25 @@ function PlanRow({
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${label}, ${plan.price}${note ? `, ${note}` : ''}`}
+      accessibilityLabel={`${label}, ${plan.price}${note ? `, ${note}` : ""}`}
       // Both branches carry the same class keys and only the values move — a class that
       // appears on one state and not the other stops NativeWind painting the subtree.
       // See `src/ui/hairline.ts`.
       className={
         selected
-          ? 'flex-row items-center gap-3 rounded-card border-2 border-gold bg-gold/10 p-4 active:opacity-80'
-          : 'flex-row items-center gap-3 rounded-card border-2 border-line bg-surface p-4 active:opacity-80'
+          ? "flex-row items-center gap-3 rounded-card border-2 border-gold bg-gold/10 p-4 active:opacity-80"
+          : "flex-row items-center gap-3 rounded-card border-2 border-line bg-surface p-4 active:opacity-80"
       }
-      style={glow(selected ? 'soft' : 'none', colors.gold)}
+      style={glow(selected ? "soft" : "none", colors.gold)}
     >
       <View className="flex-1 gap-0.5">
         <View className="flex-row items-center gap-2">
           <Text variant="bodyStrong">{label}</Text>
           {!!note && (
             <View className="rounded-full bg-gold/20 px-2 py-0.5">
-              <Text className="font-semibold text-[11px] leading-[15px] text-gold">{note}</Text>
+              <Text className="font-semibold text-[11px] leading-[15px] text-gold">
+                {note}
+              </Text>
             </View>
           )}
         </View>
@@ -467,7 +519,11 @@ function PlanRow({
           instead of drifting by a digit. */}
       <Text
         variant="numeral"
-        className={selected ? 'text-[18px] leading-[24px] text-gold' : 'text-[18px] leading-[24px] text-content'}
+        className={
+          selected
+            ? "text-[18px] leading-[24px] text-gold"
+            : "text-[18px] leading-[24px] text-content"
+        }
       >
         {plan.price}
       </Text>
@@ -479,9 +535,9 @@ function ActiveMembership({ expiresAt }: { expiresAt: string | null }) {
   const t = useT();
   const renews = expiresAt
     ? new Date(expiresAt).toLocaleDateString(t.locale, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
+        day: "numeric",
+        month: "long",
+        year: "numeric",
       })
     : null;
 

@@ -1,17 +1,16 @@
-import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
 /**
- * The three ways to get a picture off a phone.
+ * The two ways to get a picture off a phone.
  *
- * People do not think of these as one thing. A photo you already took is in the gallery;
- * a photo you are about to take needs the camera; and an image that arrived over chat, or
- * was drawn on a desktop and synced, is in Files and often not in the gallery at all.
- * Offering only the gallery quietly excludes the third case, which for an app about
- * gaming identities is exactly where the good avatars are.
+ * People do not think of these as one thing: a photo you already took is in the gallery, and
+ * a photo you are about to take needs the camera. Both return the same shape so the caller
+ * has one code path and one set of states to render.
  *
- * All three return the same shape so the caller has one code path and one set of states
- * to render.
+ * There was a third — the system document picker, for images sitting in Files and never
+ * added to the gallery. It crashed the app in production, and it is removed rather than
+ * repaired: the import is gone too, so this bundle never loads that native module at all,
+ * which is what makes the fix reachable over the air instead of needing a new build.
  */
 
 /** What the server will accept, and roughly what its multipart limit allows. */
@@ -25,16 +24,19 @@ export type PickOutcome =
   | { kind: 'tooLarge'; bytes: number };
 
 /**
- * Crop-to-square, offered by the two pickers that support it.
+ * No `allowsEditing`, deliberately.
  *
- * The server centre-crops whatever arrives, so this is not what makes the avatar square —
- * it is what lets the gamer decide *which* square, rather than having a portrait photo
- * silently lose whichever half it loses.
+ * That flag opened Android's own square editor, and {@link AvatarCropper} now does the job
+ * properly — a circle, at the size it is worn, with the gamer's frame drawn on top. Leaving
+ * both in would mean cropping twice: once in a square the OS drew, then again in ours, with
+ * the second crop confined to whatever the first one kept.
+ *
+ * Turning it off also makes the three sources consistent for the first time. The document
+ * picker never had an editor, so a file arrived whole and the server centre-cropped it;
+ * now every path lands in the same place.
  */
 const EDIT: ImagePicker.ImagePickerOptions = {
   mediaTypes: 'images',
-  allowsEditing: true,
-  aspect: [1, 1],
   // The server re-encodes to 512px square regardless, so a 12MP original is bytes over a
   // mobile connection that are discarded on arrival.
   quality: 0.8,
@@ -52,39 +54,6 @@ export async function takePhoto(): Promise<PickOutcome> {
   if (!permission.granted) return { kind: 'denied', need: 'camera' };
 
   return fromImagePicker(await ImagePicker.launchCameraAsync(EDIT));
-}
-
-/**
- * The file system, for images that never reached the gallery.
- *
- * No crop step: the document picker has no editing UI, so these arrive whole and the
- * server's centre-crop decides. That is a real difference from the other two and the
- * reason the button says "file" rather than "photo".
- *
- * `copyToCacheDirectory` is left on. Without it the URI can be a content:// handle that
- * is only valid while the picker is open, and the upload then fails on a file that was
- * there a second ago.
- */
-export async function pickFromFiles(): Promise<PickOutcome> {
-  const result = await DocumentPicker.getDocumentAsync({
-    type: ['image/*'],
-    copyToCacheDirectory: true,
-    multiple: false,
-  });
-  if (result.canceled) return { kind: 'cancelled' };
-
-  const asset = result.assets[0];
-  if (!asset) return { kind: 'cancelled' };
-
-  // Checked here because this is the one source that can hand over an arbitrary file.
-  // The server refuses anything over its multipart limit, but it does so after the whole
-  // body has crossed the network — which on a phone is the user watching a progress bar
-  // fill up in order to be told no.
-  if (asset.size != null && asset.size > MAX_BYTES) {
-    return { kind: 'tooLarge', bytes: asset.size };
-  }
-
-  return { kind: 'picked', uri: asset.uri, mimeType: asset.mimeType };
 }
 
 function fromImagePicker(result: ImagePicker.ImagePickerResult): PickOutcome {

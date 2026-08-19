@@ -396,12 +396,29 @@ function ClaimRow({
   );
 }
 
-/** "in 3h", "in 12m", or "soon" — enough to know whether to wait. */
+/**
+ * "in 3h", "in 12m", or "soon" — enough to know whether to wait.
+ *
+ * **Rounded up, not down.** Flooring is the obvious choice and it is wrong for a countdown:
+ * the instant somebody claims a daily worth 24 hours, the remainder is 23h 59m and change,
+ * and `Math.floor` renders that as "in 23h". The number can therefore never once equal the
+ * cooldown it is counting down, and a tester reasonably reported the reward window as an
+ * hour shorter than it is. Ceiling says "in 24h" for that first minute and is honest
+ * everywhere else too: a countdown answers "how long until I can", and being told an hour
+ * that has not fully elapsed is the answer that does not send somebody back early.
+ */
 function relative(iso: string | null, t: Dictionary): string {
   if (!iso) return t.market.earn.soon;
   const seconds = Math.max(0, Math.floor((new Date(iso).getTime() - Date.now()) / 1000));
   if (seconds < 60) return t.market.earn.inAMoment;
-  if (seconds < 3600) return t.market.earn.inMinutes(Math.floor(seconds / 60));
-  if (seconds < 86400) return t.market.earn.inHours(Math.floor(seconds / 3600));
-  return t.market.earn.inDays(Math.floor(seconds / 86400));
+  if (seconds < 3600) return t.market.earn.inMinutes(Math.round(seconds / 60));
+
+  // The unit is chosen from the *rounded* hours, not from the raw seconds, and that is the
+  // whole subtlety. Picking the unit first and rounding second means a 24-hour cooldown
+  // lands either side of the day boundary depending on a fraction of a second of clock
+  // skew: a hair under renders "24h", a hair over renders "2d", because ceiling 1.0001
+  // days is 2. Rounding first makes both cases say the same thing.
+  const hours = Math.round(seconds / 3600);
+  if (hours <= 24) return t.market.earn.inHours(hours);
+  return t.market.earn.inDays(Math.round(seconds / 86400));
 }

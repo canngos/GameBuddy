@@ -1,13 +1,13 @@
-import { Redirect, useRouter } from 'expo-router';
-import { View } from 'react-native';
-import { useT } from '../../src/i18n/useT';
-import { useDraft } from '../../src/onboarding/draft';
-import { SelectionCount } from '../../src/onboarding/SelectionCount';
-import { StepHeader } from '../../src/onboarding/StepHeader';
-import { PlatformPicker } from '../../src/profile/PlatformPicker';
-import { MIN_PLATFORMS } from '../../src/profile/platforms';
-import { Button, Screen } from '../../src/ui';
-import { MIN_GAMES, parseBirthDate } from '../../src/validation';
+import { Redirect, useRouter } from "expo-router";
+import { View } from "react-native";
+import { useT } from "../../src/i18n/useT";
+import { useDraft } from "../../src/onboarding/draft";
+import { SelectionCount } from "../../src/onboarding/SelectionCount";
+import { StepHeader } from "../../src/onboarding/StepHeader";
+import { PlatformPicker } from "../../src/profile/PlatformPicker";
+import { MIN_PLATFORMS } from "../../src/profile/platforms";
+import { BackButton, Button, Screen } from "../../src/ui";
+import { MIN_GAMES, parseBirthDate } from "../../src/validation";
 
 /**
  * What you play on.
@@ -37,16 +37,20 @@ export default function Platforms() {
       scroll
       footer={
         <View className="gap-2">
-          <SelectionCount picked={draft.platformIds.length} minimum={MIN_PLATFORMS} />
+          <SelectionCount
+            picked={draft.platformIds.length}
+            minimum={MIN_PLATFORMS}
+          />
           <Button
             label={t.common.next}
             disabled={draft.platformIds.length < MIN_PLATFORMS}
-            onPress={() => router.push('/keywords')}
+            onPress={() => router.push("/keywords")}
           />
-          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
+      <BackButton />
+
       <StepHeader
         step={5}
         total={6}
@@ -54,7 +58,10 @@ export default function Platforms() {
         subtitle={t.onboarding.platforms.subtitle}
       />
 
-      <PlatformPicker selected={draft.platformIds} onToggle={draft.togglePlatform} />
+      <PlatformPicker
+        selected={draft.platformIds}
+        onToggle={draft.togglePlatform}
+      />
     </Screen>
   );
 }

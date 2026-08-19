@@ -1,13 +1,13 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
-import { useT } from '../../src/i18n/useT';
-import { CountryPicker } from '../../src/onboarding/CountryPicker';
-import { useDraft } from '../../src/onboarding/draft';
-import { StepHeader } from '../../src/onboarding/StepHeader';
-import { BirthDateField } from '../../src/onboarding/BirthDateField';
-import { Button, cn, Screen, Text } from '../../src/ui';
-import { birthDateError, MIN_AGE } from '../../src/validation';
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Pressable, View } from "react-native";
+import { useT } from "../../src/i18n/useT";
+import { CountryPicker } from "../../src/onboarding/CountryPicker";
+import { useDraft } from "../../src/onboarding/draft";
+import { StepHeader } from "../../src/onboarding/StepHeader";
+import { BirthDateField } from "../../src/onboarding/BirthDateField";
+import { Button, Screen, Text, cn, useIntroPadding } from "../../src/ui";
+import { birthDateError, MIN_AGE } from "../../src/validation";
 
 /**
  * The backend stores gender as a single character and does not constrain it further.
@@ -15,9 +15,10 @@ import { birthDateError, MIN_AGE } from '../../src/validation';
  * the backend accepts. Keeping them distinct is what stops the decline option from
  * rendering as pre-selected.
  */
-const GENDER_VALUES = ['M', 'F', 'O', ''] as const;
+const GENDER_VALUES = ["M", "F", "O", ""] as const;
 
 export default function Profile() {
+  const intro = useIntroPadding();
   const router = useRouter();
   const t = useT();
   const draft = useDraft();
@@ -29,11 +30,15 @@ export default function Profile() {
     M: t.onboarding.profile.genderMan,
     F: t.onboarding.profile.genderWoman,
     O: t.onboarding.profile.genderOther,
-    '': t.onboarding.profile.genderNone,
+    "": t.onboarding.profile.genderNone,
   };
 
   const problems = {
-    birthDate: birthDateError(draft.birthDay, draft.birthMonth, draft.birthYear),
+    birthDate: birthDateError(
+      draft.birthDay,
+      draft.birthMonth,
+      draft.birthYear,
+    ),
     country: draft.country ? null : t.onboarding.profile.countryRequired,
   };
   const valid = !problems.birthDate && !problems.country;
@@ -41,7 +46,7 @@ export default function Profile() {
   function next() {
     setTouched(true);
     if (!valid) return;
-    router.push('/avatar');
+    router.push("/avatar");
   }
 
   return (
@@ -85,18 +90,20 @@ export default function Profile() {
               const label = genderLabels[value];
               return (
                 <Pressable
-                  key={value || 'none'}
+                  key={value || "none"}
                   onPress={() => draft.set({ gender: value })}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                   className={cn(
-                    'rounded-full border-2 px-4 py-2.5 active:opacity-80',
-                    selected ? 'border-primary bg-primary' : 'border-line bg-raised',
+                    "rounded-full border-2 px-4 py-2.5 active:opacity-80",
+                    selected
+                      ? "border-primary bg-primary"
+                      : "border-line bg-raised",
                   )}
                 >
                   <Text
-                    variant={selected ? 'bodyStrong' : 'body'}
-                    className={selected ? 'text-white' : 'text-content'}
+                    variant={selected ? "bodyStrong" : "body"}
+                    className={selected ? "text-white" : "text-content"}
                   >
                     {label}
                   </Text>
@@ -105,12 +112,11 @@ export default function Profile() {
             })}
           </View>
         </View>
-
       </View>
 
       {/* No Back: the username step arrives here with `replace`, so this is the bottom
           of the stack and a back button would do nothing. */}
-      <View className="mt-auto pt-10">
+      <View className={`mt-auto ${intro.footer}`}>
         <Button label={t.common.continue} onPress={next} />
       </View>
     </Screen>

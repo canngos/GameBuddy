@@ -20,6 +20,7 @@ import com.gamebuddy.shared.event.ProfileChangedEvent;
 import com.gamebuddy.shared.mail.EmailContent;
 import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.moderation.TextModerationService;
+import com.gamebuddy.shared.storage.ObjectStorage;
 import com.gamebuddy.shared.repository.*;
 import java.time.Clock;
 import java.time.Duration;
@@ -87,6 +88,9 @@ class DefaultAuthServiceTest {
 
     @Mock
     private ApplicationEventPublisher events;
+
+    @Mock
+    private ObjectStorage objectStorage;
 
     /**
      * Real limiters with the production budgets. JUnit builds a fresh test instance per
@@ -1311,6 +1315,48 @@ class DefaultAuthServiceTest {
         // avatar was refused unless bought, and accepted once it was. Nothing in the
         // catalogue is for sale any more, so there is no entitlement left to test: every
         // stock avatar is selectable, which is what the case below asserts.
+
+        @Test
+        @DisplayName("picking one of ours removes the uploaded photo instead of being hidden behind it")
+        void testChangeAvatar_whenUploadExists_ClearsItAndDeletesTheObject() {
+            Avatars free = avatar();
+            gamer.setAvatarKey("avatars/someone/photo.jpg");
+            gamer.setAvatarStatus(AvatarStatus.APPROVED);
+            gamer.setAvatarScore(0.1);
+            gamer.setAvatarUploadedAt(Instant.parse("2026-08-01T00:00:00Z"));
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            when(avatarsRepository.findById(free.getId())).thenReturn(Optional.of(free));
+
+            authService.changeAvatar(gamer, avatarRequest(free.getId()));
+
+            // The point of the whole change: AvatarUrls prefers avatarKey, so a catalogue
+            // choice that leaves it set is invisible everywhere the avatar is drawn.
+            assertEquals(free.getId(), gamer.getAvatar());
+            assertNull(gamer.getAvatarKey());
+            assertNull(gamer.getAvatarStatus());
+            assertNull(gamer.getAvatarScore());
+            assertNull(gamer.getAvatarUploadedAt());
+
+            // An approved image lives in MEDIA; anything else never left UPLOADS.
+            verify(objectStorage).delete(ObjectStorage.Bucket.MEDIA, "avatars/someone/photo.jpg");
+        }
+
+        @Test
+        @DisplayName("an upload still awaiting review is deleted from the bucket it is actually in")
+        void testChangeAvatar_whenPendingUploadExists_DeletesFromUploads() {
+            Avatars free = avatar();
+            gamer.setAvatarKey("avatars/someone/pending.jpg");
+            gamer.setAvatarStatus(AvatarStatus.PENDING);
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            when(avatarsRepository.findById(free.getId())).thenReturn(Optional.of(free));
+
+            authService.changeAvatar(gamer, avatarRequest(free.getId()));
+
+            // Clearing the status also takes the account out of the moderation queue,
+            // which is keyed on it — there is nothing left to decide about.
+            assertNull(gamer.getAvatarStatus());
+            verify(objectStorage).delete(ObjectStorage.Bucket.UPLOADS, "avatars/someone/pending.jpg");
+        }
 
         @Test
         void testChangeAvatar_whenCatalogueAvatarProvided_ReturnSuccess() {

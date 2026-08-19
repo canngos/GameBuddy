@@ -20,7 +20,13 @@ export type Block =
   | { kind: 'swipe-limit'; message: string }
   | { kind: 'subscription'; message: string }
   /** No Super Likes left. The way out is the Market, not waiting. */
-  | { kind: 'no-super-likes'; message: string };
+  | { kind: 'no-super-likes'; message: string }
+  /** A rewind was refused for want of coins. The Market is the way out. */
+  | { kind: 'no-coins'; message: string }
+  /** Nothing has been swiped yet, or the swipe became a match. Nothing to offer. */
+  | { kind: 'nothing-to-rewind'; message: string }
+  /** Anything else the deck could not do. Said once, in the same place as the rest. */
+  | { kind: 'deck-error'; message: string };
 
 /**
  * The swipe deck's state machine.
@@ -124,8 +130,18 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
           return;
         }
       }
-      // Anything else — network, 500, rate limiting — is surfaced by `decide.error`
-      // on the screen. The card is already back, so it can simply be swiped again.
+      /*
+       * Everything else lands in the same sheet rather than a banner on the deck.
+       *
+       * These used to render as an `ErrorNotice` stacked under the card, and two at once
+       * — a refused rewind and a refused swipe — pushed the controls around and stayed
+       * there. A deck is a full-screen, one-thing-at-a-time surface; an error on it is a
+       * modal answer to something you just did, not a status line.
+       */
+      setBlock({
+        kind: 'deck-error',
+        message: error instanceof ApiError ? error.message : '',
+      });
     },
   });
 
@@ -158,6 +174,25 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
    */
   const rewind = useMutation({
     mutationFn: matchApi.rewind,
+
+    /*
+     * Refusals here are ordinary and expected — no swipe yet, not enough coins, or the
+     * swipe turned into a match — so each gets the sheet with the one action that helps.
+     * Coins are buyable; the other two are simply facts, and the sheet just says so.
+     */
+    onError: (error) => {
+      if (error instanceof ApiError) {
+        if (error.is(Code.COIN_NOT_ENOUGH)) {
+          setBlock({ kind: 'no-coins', message: error.message });
+          return;
+        }
+        if (error.is(Code.NOTHING_TO_REWIND) || error.is(Code.REWIND_MATCHED)) {
+          setBlock({ kind: 'nothing-to-rewind', message: error.message });
+          return;
+        }
+      }
+      setBlock({ kind: 'deck-error', message: error instanceof ApiError ? error.message : '' });
+    },
     onSuccess: (result) => {
       queryClient.setQueryData<Candidate[]>(['recommendations', filters], (page) => {
         const current = page ?? [];
@@ -199,8 +234,6 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     isLoading: feed.isPending,
     error: filtersRefused ? null : feed.error,
     filtersRefused,
-    /** Only failures that were not turned into a `block`. */
-    decisionError: block ? null : decide.error,
     allowance: allowance.data ?? null,
     block,
     dismissBlock,
@@ -218,7 +251,5 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     canRewind: cursor > 0 && !rewind.isPending,
     rewind: rewind.mutate,
     rewinding: rewind.isPending,
-    rewindError: rewind.error,
-    clearRewindError: rewind.reset,
   };
 }
