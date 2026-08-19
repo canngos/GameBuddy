@@ -533,11 +533,32 @@ function PlanRow({
 
 function ActiveMembership({ expiresAt }: { expiresAt: string | null }) {
   const t = useT();
-  const renews = expiresAt
-    ? new Date(expiresAt).toLocaleDateString(t.locale, {
+
+  /*
+   * The clock time as well, once the end is close.
+   *
+   * A date on its own answers "how long have I got" for all but the last day of a
+   * membership, and on that last day it stops being an answer at all: a subscription that
+   * ends in ten minutes and one that ends at midnight both read as today's date, which
+   * looks like the date is simply wrong. It is at its worst on a store test purchase,
+   * where Google compresses a week into five minutes and the card confidently reports a
+   * membership running until a date that has already arrived.
+   *
+   * Two days is the threshold because that is where "until the 26th" starts being vaguer
+   * than the reader needs. Above it the time is noise; below it, it is the whole question.
+   */
+  const expiry = expiresAt ? new Date(expiresAt) : null;
+  const withinTwoDays =
+    expiry != null && expiry.getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000;
+
+  const renews = expiry
+    ? expiry.toLocaleString(t.locale, {
         day: "numeric",
         month: "long",
         year: "numeric",
+        // Only these two are conditional. Naming any component at all means the locale
+        // shows exactly what is listed, so the wide case stays the date it always was.
+        ...(withinTwoDays ? { hour: "2-digit", minute: "2-digit" } : {}),
       })
     : null;
 

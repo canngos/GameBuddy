@@ -95,6 +95,36 @@ class PurchaseServiceTest {
         }
 
         @Test
+        @DisplayName("the ledger keeps the entitlement expiry, on the entity JPA actually persists")
+        void recordsEntitlementExpiryOnTheManagedEntity() {
+            Instant storeExpiry = NOW.plus(Duration.ofDays(30));
+
+            /*
+             * The stub has to hand back a *different* instance, because that is what the
+             * real repository does here and it is the whole point of the test.
+             *
+             * A Purchase carries an assigned UUID and is neither versioned nor
+             * Persistable, so Spring Data reads the non-null id as "already exists" and
+             * routes save through merge — which copies the state onto a managed instance
+             * and leaves the caller's object detached. The default stub in setUp returns
+             * the argument, which quietly makes the detached object and the managed one
+             * the same thing and lets a write to the wrong one look correct.
+             */
+            Purchase managed = new Purchase();
+            when(purchases.saveAndFlush(any())).thenAnswer(i -> {
+                Purchase detached = i.getArgument(0);
+                managed.setId(detached.getId());
+                managed.setUserId(detached.getUserId());
+                managed.setProductId(detached.getProductId());
+                return managed;
+            });
+
+            assertTrue(service.grant(purchase(Product.GOLD_MONTHLY, storeExpiry)));
+
+            assertEquals(storeExpiry, managed.getEntitlementExpiresAt());
+        }
+
+        @Test
         @DisplayName("the transaction is recorded before the entitlement is handed over")
         void recordsBeforeGranting() {
             // The unique constraint is the idempotency mechanism, so it has to be taken
