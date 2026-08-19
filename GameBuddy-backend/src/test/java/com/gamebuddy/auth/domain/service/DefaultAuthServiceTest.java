@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.auth.config.AuthRateLimitConfig;
 import com.gamebuddy.auth.infrastructure.entity.*;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.request.*;
@@ -12,7 +13,6 @@ import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
-import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
@@ -20,8 +20,8 @@ import com.gamebuddy.shared.event.ProfileChangedEvent;
 import com.gamebuddy.shared.mail.EmailContent;
 import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.moderation.TextModerationService;
-import com.gamebuddy.shared.storage.ObjectStorage;
 import com.gamebuddy.shared.repository.*;
+import com.gamebuddy.shared.storage.ObjectStorage;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,6 +44,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.MailSendException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
@@ -93,15 +94,14 @@ class DefaultAuthServiceTest {
     private ObjectStorage objectStorage;
 
     /**
-     * Real limiters with the production budgets. JUnit builds a fresh test instance per
-     * method, so every test starts with empty windows.
+     * The production bean, built from the real configuration rather than re-declared here.
+     * A hand-copied set of budgets drifts from the ones that actually ship the moment
+     * somebody tunes them, and then these tests pass while proving nothing about
+     * production. JUnit builds a fresh test instance per method, so every test still
+     * starts with empty windows.
      */
     @Spy
-    private AuthRateLimiters rateLimiters = new AuthRateLimiters(
-            new RateLimiter(10, Duration.ofMinutes(15)),
-            new RateLimiter(3, Duration.ofMinutes(15)),
-            new RateLimiter(10, Duration.ofMinutes(15)),
-            new RateLimiter(10, Duration.ofMinutes(15)));
+    private AuthRateLimiters rateLimiters = new AuthRateLimitConfig().authRateLimiters();
 
     /**
      * The real filter, not a mock. It is a pure function over a word list, so stubbing it
@@ -267,18 +267,85 @@ class DefaultAuthServiceTest {
             verify(sessionRepository).deleteAllByEmail(EMAIL);
         }
 
+        /** What a failed attempt answers with while there is still budget left. */
+        private static final int WRONG_PASSWORD = 108;
+
+        private static final int RATE_LIMITED = 146;
+
+        /**
+         * A run of retries that must never be throttled.
+         *
+         * <p>Set one below the shipping budget on purpose. The point is not that fourteen
+         * is a magic number of fumbles — it is that tightening the limiter back toward the
+         * setting that locked a tester out breaks this test instead of a real sign-in.
+         */
+        private static final int HONEST_RETRIES = 14;
+
+        private int loginAndGetCode(String password) {
+            var request = request(EMAIL, password);
+            return assertThrows(BusinessException.class, () -> authService.login(request))
+                    .getTransactionCode()
+                    .getId();
+        }
+
+        /** Rejects everything except the one password the fixture's account really has. */
+        private void acceptOnlyTheRealPassword() {
+            when(authenticationManager.authenticate(any())).thenAnswer(invocation -> {
+                if (!GOOD_PASSWORD.equals(
+                        ((UsernamePasswordAuthenticationToken) invocation.getArgument(0)).getCredentials())) {
+                    throw new BadCredentialsException("bad");
+                }
+                return invocation.getArgument(0);
+            });
+        }
+
         @Test
-        @DisplayName("repeated failures are throttled")
+        @DisplayName("a run of honest retries is not throttled")
+        void testLogin_whenPasswordMistypedSeveralTimes_StillAnswersWrongPassword() {
+            // A production tester was locked out by mistyping a password roughly five
+            // times in a row with quick taps. That is somebody trying to remember their
+            // password, not an attack, and it has to keep answering "wrong password" for
+            // as long as anyone would plausibly keep trying.
+            when(gamerRepository.findByEmail(anyString())).thenReturn(Optional.empty());
+
+            for (int attempt = 1; attempt <= HONEST_RETRIES; attempt++) {
+                assertEquals(WRONG_PASSWORD, loginAndGetCode("guess"), "attempt " + attempt + " was throttled");
+            }
+        }
+
+        @Test
+        @DisplayName("repeated failures are throttled eventually")
         void testLogin_whenAttemptsExceeded_ReturnRateLimited() {
             when(gamerRepository.findByEmail(anyString())).thenReturn(Optional.empty());
 
-            for (int i = 0; i < 10; i++) {
-                var request = request(EMAIL, "guess");
-                assertThrows(BusinessException.class, () -> authService.login(request));
+            // Deliberately not asserting the exact budget — that number is a tuning
+            // decision owned by AuthRateLimitConfig, and pinning it here just means two
+            // places to edit. What must hold is that the door does close at all, and the
+            // test above already fixes the point before which it may not.
+            int attempts = 0;
+            while (loginAndGetCode("guess") == WRONG_PASSWORD) {
+                assertTrue(++attempts < 100, "login was never throttled");
             }
-            var request = request(EMAIL, "guess");
-            BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(request));
-            assertEquals(146, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("signing in successfully clears the failure budget")
+        void testLogin_whenEventuallySuccessful_ResetsThrottle() {
+            when(gamerRepository.findByEmail(anyString())).thenReturn(Optional.of(gamer));
+            acceptOnlyTheRealPassword();
+
+            for (int attempt = 1; attempt <= HONEST_RETRIES; attempt++) {
+                loginAndGetCode("guess");
+            }
+            assertEquals(
+                    "100",
+                    authService.login(request(EMAIL, GOOD_PASSWORD)).getStatus().getCode());
+
+            // Without the reset the attempts above would still be counted, and somebody who
+            // fumbled their way in would be one stumble from a lockout for the rest of the
+            // window.
+            assertEquals(WRONG_PASSWORD, loginAndGetCode("guess"));
+            assertNotEquals(RATE_LIMITED, loginAndGetCode("guess"));
         }
     }
 
@@ -514,18 +581,24 @@ class DefaultAuthServiceTest {
         }
 
         @Test
+        @DisplayName("guessing codes is throttled eventually, whatever the budget is set to")
         void testVerifyCode_whenTooManyRequests_ReturnRateLimited() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
             when(verificationCodeRepository.findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(EMAIL))
                     .thenReturn(Optional.empty());
 
-            for (int i = 0; i < 10; i++) {
+            // Deliberately not counting to the budget. That number belongs to
+            // AuthRateLimitConfig, and RateLimitBudgetsTest fixes the floor below which it
+            // may not fall; this only has to prove the door closes at all.
+            int guesses = 0;
+            int code;
+            do {
                 var request = request(100001);
-                assertThrows(BusinessException.class, () -> authService.verifyCode(request));
-            }
-            var request = request(123456);
-            BusinessException ex = assertThrows(BusinessException.class, () -> authService.verifyCode(request));
-            assertEquals(146, ex.getTransactionCode().getId());
+                code = assertThrows(BusinessException.class, () -> authService.verifyCode(request))
+                        .getTransactionCode()
+                        .getId();
+                assertTrue(++guesses < 200, "code guessing was never throttled");
+            } while (code != 146);
         }
 
         @Test
@@ -905,13 +978,20 @@ class DefaultAuthServiceTest {
         void testSendVerificationEmail_whenSpammed_ReturnRateLimited() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
 
-            for (int i = 0; i < 3; i++) {
-                authService.sendVerificationEmail(request(true));
+            // Budget-agnostic for the same reason as the code-guessing test above: the
+            // number lives in AuthRateLimitConfig, and its floor is asserted in
+            // RateLimitBudgetsTest. What must hold here is that the endpoint stops.
+            int sent = 0;
+            while (true) {
+                var request = request(true);
+                try {
+                    authService.sendVerificationEmail(request);
+                } catch (BusinessException capped) {
+                    assertEquals(146, capped.getTransactionCode().getId());
+                    break;
+                }
+                assertTrue(++sent < 200, "code emails were never capped");
             }
-            var request = request(true);
-            BusinessException ex =
-                    assertThrows(BusinessException.class, () -> authService.sendVerificationEmail(request));
-            assertEquals(146, ex.getTransactionCode().getId());
         }
     }
 

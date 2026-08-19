@@ -255,7 +255,53 @@ crontab -e   # 30 3 * * *  /home/gamebuddy/backup.sh >> /home/gamebuddy/backup.l
 is a hypothesis. Also enable Hetzner's automatic snapshots (20% of the server price, ~€0.80/mo)
 — they cover the whole disk, not just the database.
 
-## 8. After real users arrive
+## 8. Tuning a rate limit without a rebuild
+
+Every abuse control is configurable, because the first set of numbers was wrong in a way
+that only production could show: testers were refused while swiping the deck at an
+ordinary pace and while trying to remember their own password. If it happens again, the
+fix should take a minute, not a release.
+
+Set the variable in `.env` and restart the one container:
+
+```bash
+# e.g. testers are hitting the swipe limiter again
+echo 'MATCH_DECISION_PERMITS=200' >> .env
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d backend
+```
+
+Each limit has a `_PERMITS` and a `_WINDOW`:
+
+| Limit | Variables | Default |
+|---|---|---|
+| Swiping the deck | `MATCH_DECISION_{PERMITS,WINDOW}` | 120 / 1m |
+| Opening a lobby | `LOBBY_CREATE_{PERMITS,WINDOW}` | 20 / 1d |
+| Asking to join a lobby | `LOBBY_JOIN_{PERMITS,WINDOW}` | 40 / 1h |
+| Lobby chat | `LOBBY_MESSAGE_{PERMITS,WINDOW}` | 60 / 1m |
+| Failed sign-ins | `AUTH_LOGIN_{PERMITS,WINDOW}` | 15 / 5m |
+| Verification-code guesses | `AUTH_VERIFY_{PERMITS,WINDOW}` | 20 / 15m |
+| Code emails | `AUTH_SEND_CODE_{PERMITS,WINDOW}` | 6 / 15m |
+| Password reset | `AUTH_RESET_PASSWORD_{PERMITS,WINDOW}` | 20 / 15m |
+
+Windows accept `30s`, `5m`, `1h`, `1d`. Leaving a variable out — or setting it empty, which
+is what Compose does with an unset variable — keeps the default; it is not an error.
+
+Three things worth knowing before you turn a dial:
+
+- **The counters live in the JVM, so a restart clears every window.** That is the fastest
+  way to unblock somebody who is locked out right now, and it works without changing
+  anything: `up -d backend`.
+- **Raising a limit is safe; lowering one is a decision about whom to turn away.** None of
+  these is what actually bounds abuse — the daily swipe allowance, the one-live-lobby rule,
+  the five-guess cap that invalidates a verification code, and password hashing each do
+  that in their own place. `RateLimitBudgetsTest` fails the build if a limit is set below
+  what a real person does.
+- **`AUTH_SEND_CODE_PERMITS` is the one to leave alone.** Every permit sends a real email,
+  and the person flooded is not the person asking for it.
+
+---
+
+## 9. After real users arrive
 
 The seeded `@bot.gamebuddy.invalid` accounts are fixtures, not users. A fake profile a real
 person can swipe on and message is what matching apps get investigated for, so remove them

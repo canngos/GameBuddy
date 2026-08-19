@@ -143,6 +143,71 @@ gamebuddy:
     read-timeout: 30s
     api-key: ${INTERNAL_API_KEY}
 
+  rate-limit:
+    # Abuse controls, tunable without a rebuild.
+    #
+    # Every one of these is a fixed window keyed by the account (or, on the auth
+    # endpoints, by the address being used), and every one of them is set ABOVE what a
+    # person can do rather than above what a person ought to need to do. That distinction
+    # is the whole lesson of this block: the original numbers were half these, chosen by
+    # reasoning about careful use, and production testers were refused while swiping at an
+    # ordinary pace and while trying to remember their own password. A limit that catches
+    # real users is not a stricter limit, it is a broken feature — the script it is aimed
+    # at is orders of magnitude past any of these either way.
+    #
+    # None of these is what actually bounds abuse, which is why they can be generous. The
+    # daily swipe allowance, the one-live-lobby-per-owner rule, the five-guess cap that
+    # invalidates a verification code, and password hashing each do that job in their own
+    # place.
+    #
+    # The values repeated here are the same defaults declared in the Java that reads them,
+    # so a deployment with none of these set still gets exactly what was tested;
+    # RateLimitBudgetsTest fails if the two ever disagree. Raising one is always safe.
+    # Lowering one is a decision about which real users to turn away.
+    match:
+      # Swiping the deck. Two a second sustained for a minute — past what a thumb does
+      # flat out. Was 30/1m, which a normal session spent in about fifteen seconds.
+      decision:
+        permits: ${MATCH_DECISION_PERMITS:120}
+        window: ${MATCH_DECISION_WINDOW:1m}
+
+    lobby:
+      # Opening a lobby. The binding limit is one live lobby per owner, enforced
+      # separately; this only stops a create-cancel loop.
+      create:
+        permits: ${LOBBY_CREATE_PERMITS:20}
+        window: ${LOBBY_CREATE_WINDOW:1d}
+      # Asking to join. Requests are how you find out whether a team has room, and most
+      # are never answered, so a browsing evening spends a lot of them.
+      join:
+        permits: ${LOBBY_JOIN_PERMITS:40}
+        window: ${LOBBY_JOIN_WINDOW:1h}
+      # Lobby chat. A squad settling on a time talks in bursts of very short messages.
+      message:
+        permits: ${LOBBY_MESSAGE_PERMITS:60}
+        window: ${LOBBY_MESSAGE_WINDOW:1m}
+
+    auth:
+      # Failed sign-ins, per account. Cleared immediately by a successful login. The short
+      # window is deliberate: being wrong about somebody should cost them minutes.
+      login:
+        permits: ${AUTH_LOGIN_PERMITS:15}
+        window: ${AUTH_LOGIN_WINDOW:5m}
+      # Guesses at a mailed code. Not the control that holds the 900k code space shut —
+      # MAX_CODE_ATTEMPTS invalidates the code itself after five wrong guesses.
+      verify:
+        permits: ${AUTH_VERIFY_PERMITS:20}
+        window: ${AUTH_VERIFY_WINDOW:15m}
+      # Code emails. The one budget here worth keeping tight, because each permit spends
+      # somebody else's inbox and the person flooded is not the person asking.
+      send-code:
+        permits: ${AUTH_SEND_CODE_PERMITS:6}
+        window: ${AUTH_SEND_CODE_WINDOW:15m}
+      # Both password-reset steps share this, so one completed reset costs two permits.
+      reset-password:
+        permits: ${AUTH_RESET_PASSWORD_PERMITS:20}
+        window: ${AUTH_RESET_PASSWORD_WINDOW:15m}
+
   predict:
     # The only remaining out-of-process dependency: the Python model is a different
     # runtime. Everything that used to be an HTTP call between services is a method call.
