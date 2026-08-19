@@ -560,8 +560,43 @@ public class DefaultAuthService implements AuthService {
         Gamer gamer = reload(principal);
         Avatars avatar = requireSelectableAvatar(avatarRequest.getAvatarId());
 
+        /*
+         * The upload has to be cleared, not merely overtaken.
+         *
+         * {@link AvatarUrls} prefers {@code avatarKey} over this column whenever one is
+         * set, so writing the catalogue id on its own changed the row and nothing anybody
+         * could see: the picker showed the new avatar selected while every screen in the
+         * app went on drawing the uploaded photograph. Picking one of ours is a
+         * replacement, and the only way to say so is to remove the thing it replaces.
+         *
+         * The score and the timestamp go with it. They describe an image that is no longer
+         * anyone's avatar, and leaving a PENDING status behind would keep the account
+         * sitting in the moderation queue waiting on a decision about a photo that has
+         * already been withdrawn.
+         */
+        String previousKey = gamer.getAvatarKey();
+        AvatarStatus previousStatus = gamer.getAvatarStatus();
+
         gamer.setAvatar(avatar.getId());
+        gamer.setAvatarKey(null);
+        gamer.setAvatarStatus(null);
+        gamer.setAvatarScore(null);
+        gamer.setAvatarUploadedAt(null);
         gamerRepository.save(gamer);
+
+        // Same call, same reasoning, as deleteAccount: an image the application can no
+        // longer reach must not stay in a public bucket where anyone holding the URL
+        // still can. Inside the transaction for the same trade — a commit that fails
+        // here costs a photograph its owner has already chosen to replace, which is much
+        // the cheaper of the two mistakes.
+        if (previousKey != null) {
+            objectStorage.delete(
+                    previousStatus == AvatarStatus.APPROVED
+                            ? ObjectStorage.Bucket.MEDIA
+                            : ObjectStorage.Bucket.UPLOADS,
+                    previousKey);
+        }
+
         return DefaultMessageResponse.of("Avatar changed successfully");
     }
 

@@ -187,7 +187,44 @@ These cost real time this session. Each one fails **silently**.
    not match the source, reload from the dev menu before debugging anything else — a good
    half hour went into "diagnosing" stale code.
 
-9. **A colour class that does not exist fails silently, and only in one theme.** The filter
+9. **A class name that is *new to the codebase* is not compiled until Metro's cache is
+   cleared, and until then it does nothing.** Distinct from 8 — the JS updates fine, so the
+   source and the behaviour appear to agree. It is the generated Tailwind CSS that is stale,
+   and NativeWind drops any class it has no rule for without a word.
+
+   This bit hard while making the app responsive. Swapping a class *value* per screen size
+   (`pick('p-3.5', 'p-4', 'p-5')`) is the supported way to scale — see 1 — but `p-3.5`,
+   `-mx-4` and `min-h-[46px]` had never appeared in the app before, so they compiled to
+   nothing. `Card` rendered with **no padding at all** on small phones, and `ProfileBanner`'s
+   negative margins stopped cancelling it, so the banner sat inset inside its own card. Every
+   tier whose classes happened to already exist looked perfect, which is what made it look
+   like a logic bug in the tier selection.
+
+   The tell: grep the served bundle for the compiled rule, not the source string —
+   `curl -s "http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true" | grep -o '"p-[0-9.]*"' | sort -u`
+   lists what actually exists. Anything missing needs `npx expo start --clear`. A clean CI or
+   EAS build generates the CSS from scratch, so this is a dev-loop trap only — which is worse,
+   because it means the device in front of you disagrees with the build testers will get.
+
+10. **`onLoad`'s reported image size is the *decoded* size, not the file's.** Android
+    downsamples a large picture when it decodes it, so `expo-image`'s
+    `event.source.width/height` came back as 683x1365 for a 900x1800 photo — while
+    `expo-image-manipulator` crops in the file's own full-resolution pixels.
+
+    The avatar cropper computed its rectangle in the preview's pixel space and handed it
+    straight to the manipulator, so a 683px square was cut out of a 900px-wide image: every
+    crop returned zoomed in by the downsample factor and off-centre, and by a *different*
+    amount per image depending on how hard Android decided to shrink it. Nothing errors —
+    the preview is right, the output is a valid square, and each looks plausible alone. It
+    is only wrong when you compare them.
+
+    Any measurement taken from a decoded bitmap and applied to a file must cross that gap
+    explicitly. The cropper now computes the rect as **fractions** of the image and
+    multiplies them by dimensions it gets from the manipulator itself
+    (`ImageManipulator.manipulate(uri).renderAsync()` returns an `ImageRef` carrying the
+    true `width`/`height`) — the one number guaranteed to be in the same space as the crop.
+
+11. **A colour class that does not exist fails silently, and only in one theme.** The filter
    sheet spent its whole life with `text-ink` on the game and toggle labels. There is no
    bare `ink` colour — `tailwind.config.js` defines `ink-500/700/900` and nothing else — so
    Tailwind emitted nothing, NativeWind dropped the class, and the labels fell through to

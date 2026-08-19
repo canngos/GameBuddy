@@ -10,6 +10,7 @@ import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenScaleProvider } from '../src/ui/useScreenScale';
 import { gatherAdConsent } from '../src/ads/consent';
 import { identifyForCrashReports } from '../src/diagnostics/crashReporting';
 import { installGlobalErrorHandler } from '../src/errors';
@@ -185,18 +186,23 @@ function Shell() {
           inferring it from window size, so it is unaffected by edge-to-edge. */}
       <KeyboardProvider>
         <SafeAreaProvider>
-          <QueryClientProvider client={queryClient}>
-            <StatusBar style={isDark ? 'light' : 'dark'} />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                // A colour value, not a class: this styles the navigator's own container,
-                // which sits outside the React tree NativeWind processes. Without it the
-                // white default flashes between screens in dark mode.
-                contentStyle: { backgroundColor: colors.canvas },
-              }}
-            />
-          </QueryClientProvider>
+          {/* Above everything that draws. The tier is read by `Text`, by the tab bar and by
+              every screen that sizes itself, so it has to be resolved before any of them
+              mount — and resolved once, not per component. See `useScreenScale`. */}
+          <ScreenScaleProvider>
+            <QueryClientProvider client={queryClient}>
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  // A colour value, not a class: this styles the navigator's own container,
+                  // which sits outside the React tree NativeWind processes. Without it the
+                  // white default flashes between screens in dark mode.
+                  contentStyle: { backgroundColor: colors.canvas },
+                }}
+              />
+            </QueryClientProvider>
+          </ScreenScaleProvider>
         </SafeAreaProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>

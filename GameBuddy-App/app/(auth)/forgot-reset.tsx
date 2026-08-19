@@ -1,12 +1,20 @@
-import { useMutation } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { useT } from '../../src/i18n/useT';
-import { usePasswordReset } from '../../src/session/passwordReset';
-import { Button, Card, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { normalisePassword, passwordError } from '../../src/validation';
+import { useMutation } from "@tanstack/react-query";
+import { Redirect, useRouter } from "expo-router";
+import { useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { useT } from "../../src/i18n/useT";
+import { usePasswordReset } from "../../src/session/passwordReset";
+import {
+  Button,
+  Card,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import { normalisePassword, passwordError } from "../../src/validation";
 
 /**
  * Step three of three: the new password.
@@ -18,17 +26,19 @@ import { normalisePassword, passwordError } from '../../src/validation';
  * chosen.
  */
 export default function ForgotReset() {
+  const intro = useIntroPadding();
   const t = useT();
   const router = useRouter();
   const email = usePasswordReset((s) => s.email);
   const ticket = usePasswordReset((s) => s.ticket);
   const clear = usePasswordReset((s) => s.clear);
 
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [touched, setTouched] = useState(false);
 
   const save = useMutation({
-    mutationFn: () => authApi.resetPassword(email, ticket, normalisePassword(password)),
+    mutationFn: () =>
+      authApi.resetPassword(email, ticket, normalisePassword(password)),
   });
 
   function submit() {
@@ -40,7 +50,7 @@ export default function ForgotReset() {
   if (save.isSuccess) {
     return (
       <Screen scroll>
-        <View className="gap-2 pb-6 pt-12">
+        <View className={`gap-2 pb-6 ${intro.top}`}>
           <Text variant="title">{t.settings.passwordScreen.changedTitle}</Text>
         </View>
 
@@ -49,7 +59,7 @@ export default function ForgotReset() {
           <Text variant="caption">{t.auth.forgot.doneBody}</Text>
         </Card>
 
-        <View className="mt-auto pt-10">
+        <View className={`mt-auto ${intro.footer}`}>
           <Button
             label={t.auth.forgot.signIn}
             onPress={() => {
@@ -61,7 +71,7 @@ export default function ForgotReset() {
               clear();
               // replace, not push: the three screens behind this one are all spent — a
               // used ticket, a burnt code — and the back gesture must not return to them.
-              router.replace('/login');
+              router.replace("/login");
             }}
           />
         </View>
@@ -75,13 +85,14 @@ export default function ForgotReset() {
   // Only while nothing has been attempted: once a reset is in flight the ticket may be
   // spent and cleared under us, and navigating away from a request whose result decides
   // what the user sees next is never right.
-  if (!ticket && save.isIdle) return <Redirect href={email ? '/forgot-code' : '/forgot'} />;
+  if (!ticket && save.isIdle)
+    return <Redirect href={email ? "/forgot-code" : "/forgot"} />;
 
   const problem = touched ? passwordError(password) : null;
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
+      <View className={`gap-2 pb-8 ${intro.top}`}>
         <Text variant="overline">{t.auth.stepThree}</Text>
         <Text variant="title">{t.auth.forgot.resetTitle}</Text>
         <Text variant="body" className="text-muted">
@@ -106,8 +117,12 @@ export default function ForgotReset() {
         {save.error && <ErrorNotice error={save.error} />}
       </View>
 
-      <View className="mt-auto pt-10">
-        <Button label={t.auth.forgot.resetSubmit} loading={save.isPending} onPress={submit} />
+      <View className={`mt-auto ${intro.footer}`}>
+        <Button
+          label={t.auth.forgot.resetSubmit}
+          loading={save.isPending}
+          onPress={submit}
+        />
       </View>
     </Screen>
   );

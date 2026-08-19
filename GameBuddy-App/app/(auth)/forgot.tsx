@@ -1,12 +1,20 @@
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { useT } from '../../src/i18n/useT';
-import { usePasswordReset } from '../../src/session/passwordReset';
-import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { emailError } from '../../src/validation';
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { useT } from "../../src/i18n/useT";
+import { usePasswordReset } from "../../src/session/passwordReset";
+import {
+  BackButton,
+  Button,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import { emailError } from "../../src/validation";
 
 /**
  * Step one of three: which address to send the code to.
@@ -18,18 +26,19 @@ import { emailError } from '../../src/validation';
  * that away again in the one place the user can see it.
  */
 export default function Forgot() {
+  const intro = useIntroPadding();
   const t = useT();
   const router = useRouter();
   const begin = usePasswordReset((s) => s.begin);
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [touched, setTouched] = useState(false);
 
   const send = useMutation({
     mutationFn: () => authApi.sendCode(email.trim(), false),
     onSuccess: () => {
       begin(email.trim());
-      router.push('/forgot-code');
+      router.push("/forgot-code");
     },
   });
 
@@ -41,7 +50,9 @@ export default function Forgot() {
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
+      <BackButton />
+
+      <View className={`gap-2 pb-8 ${intro.top}`}>
         <Text variant="overline">{t.auth.stepOne}</Text>
         <Text variant="title">{t.auth.forgot.title}</Text>
         <Text variant="body" className="text-muted">
@@ -67,9 +78,12 @@ export default function Forgot() {
         {send.error && <ErrorNotice error={send.error} />}
       </View>
 
-      <View className="mt-auto gap-2 pt-10">
-        <Button label={t.auth.forgot.submit} loading={send.isPending} onPress={submit} />
-        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
+      <View className={`mt-auto gap-2 ${intro.footer}`}>
+        <Button
+          label={t.auth.forgot.submit}
+          loading={send.isPending}
+          onPress={submit}
+        />
       </View>
     </Screen>
   );

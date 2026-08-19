@@ -57,17 +57,21 @@ class CoinFaucetTest {
             Instant justClaimed = NOW.minus(Duration.ofHours(1));
             assertFalse(CoinFaucet.dailyAvailable(justClaimed, NOW));
 
-            assertFalse(CoinFaucet.dailyAvailable(NOW.minus(Duration.ofHours(19)), NOW));
-            assertTrue(CoinFaucet.dailyAvailable(NOW.minus(Duration.ofHours(20)), NOW));
+            assertFalse(CoinFaucet.dailyAvailable(NOW.minus(Duration.ofHours(23)), NOW));
+            assertTrue(CoinFaucet.dailyAvailable(NOW.minus(Duration.ofHours(24)), NOW));
         }
 
         @Test
-        @DisplayName("the cooldown is 20 hours so an earlier session tomorrow still counts")
-        void cooldownLetsTheHabitDriftEarlier() {
+        @DisplayName("coming back earlier the next day is refused, but the streak survives it")
+        void anEarlierSessionTomorrowWaitsButKeepsTheStreak() {
             // Somebody who played at 9pm and comes back at 8pm the next day: 23 hours.
-            // On a strict 24-hour rule they would be turned away for being an hour early.
+            // The cooldown is a full day now, so they are an hour early and are turned away.
             Instant lastNight = NOW.minus(Duration.ofHours(23));
-            assertTrue(CoinFaucet.dailyAvailable(lastNight, NOW));
+            assertFalse(CoinFaucet.dailyAvailable(lastNight, NOW));
+
+            // What protects them is the 48-hour grace, not the cooldown: whenever they do
+            // claim next, the run continues rather than restarting at one.
+            assertEquals(6, CoinFaucet.streakAfterClaim(5, lastNight, NOW));
         }
 
         @Test

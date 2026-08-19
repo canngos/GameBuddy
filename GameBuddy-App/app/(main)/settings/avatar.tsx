@@ -8,7 +8,6 @@ import type { AvatarUpload } from '../../../src/api/types';
 import { AvatarPicker } from '../../../src/pickers/AvatarPicker';
 import {
   MAX_BYTES,
-  pickFromFiles,
   pickFromLibrary,
   takePhoto,
   type PickOutcome,
@@ -16,6 +15,7 @@ import {
 import { useUpper } from '../../../src/i18n/case';
 import { useT } from '../../../src/i18n/useT';
 import { Avatar, Button, Card, ErrorNotice, Text } from '../../../src/ui';
+import { AvatarCropper } from '../../../src/pickers/AvatarCropper';
 import { EditScreen } from '../../../src/ui/EditScreen';
 
 /**
@@ -53,7 +53,16 @@ export default function EditAvatar() {
    * and three copies of the upload-and-report path would be three places for the outcome
    * handling to drift apart.
    */
-  const upload = useMutation({
+  /**
+   * Picking and uploading are now two steps with the cropper between them.
+   *
+   * The picker no longer crops — see `pickImage.ts` — so what comes back is the whole
+   * image, and it is held here until somebody has placed it inside the circle. Only the
+   * cropped 512px square is ever uploaded.
+   */
+  const [pending, setPending] = useState<string | null>(null);
+
+  const choose = useMutation({
     mutationFn: async (pick: () => Promise<PickOutcome>) => {
       setRefused(null);
       setOutcome(null);
@@ -65,9 +74,18 @@ export default function EditAvatar() {
         if (picked.kind !== 'cancelled') setRefused(picked);
         return null;
       }
-      return profileApi.uploadAvatar(picked.uri, picked.mimeType);
+      setPending(picked.uri);
+      return null;
+    },
+  });
+
+  const upload = useMutation({
+    mutationFn: async (croppedUri: string) => {
+      // Always a JPEG: the cropper saves one, whatever went in.
+      return profileApi.uploadAvatar(croppedUri, 'image/jpeg');
     },
     onSuccess: (result) => {
+      setPending(null);
       if (!result) return;
       setOutcome(result);
       void queryClient.invalidateQueries({ queryKey: ['me'] });
@@ -81,6 +99,8 @@ export default function EditAvatar() {
       router.back();
     },
   });
+
+  const busy = choose.isPending || upload.isPending;
 
   return (
     <EditScreen
@@ -104,29 +124,24 @@ export default function EditAvatar() {
               size={72}
             />
             <View className="flex-1 gap-2">
-              {/* Three sources, all on screen rather than hidden behind one button and a
-                  sheet. There are only three, each is one tap, and someone who keeps
-                  their images in Files should not have to discover that. */}
+              {/* Both sources on screen rather than behind one button and a sheet — there
+                  are only two and each is one tap. A third, "Choose a file", opened the
+                  system document picker and crashed the app outright in production; it is
+                  gone rather than fixed, because everything reachable through it is
+                  reachable through the gallery. */}
               <Button
                 label={t.settings.avatarScreen.takePhoto}
                 variant="secondary"
                 size="md"
-                disabled={upload.isPending}
-                onPress={() => upload.mutate(takePhoto)}
+                disabled={busy}
+                onPress={() => choose.mutate(takePhoto)}
               />
               <Button
                 label={t.settings.avatarScreen.fromPhotos}
                 variant="secondary"
                 size="md"
-                disabled={upload.isPending}
-                onPress={() => upload.mutate(pickFromLibrary)}
-              />
-              <Button
-                label={t.settings.avatarScreen.fromFiles}
-                variant="secondary"
-                size="md"
-                disabled={upload.isPending}
-                onPress={() => upload.mutate(pickFromFiles)}
+                disabled={busy}
+                onPress={() => choose.mutate(pickFromLibrary)}
               />
             </View>
           </View>
@@ -145,6 +160,18 @@ export default function EditAvatar() {
           <AvatarPicker selected={avatarId} onSelect={setAvatarId} size={72} />
         </View>
       </View>
+
+      {/* Last child of the screen, so it covers it. Only mounted once something has been
+          picked; unmounting on cancel throws the untouched original away. */}
+      {pending && (
+        <AvatarCropper
+          uri={pending}
+          frame={me.data?.frame}
+          busy={upload.isPending}
+          onCancel={() => setPending(null)}
+          onDone={(croppedUri) => upload.mutate(croppedUri)}
+        />
+      )}
     </EditScreen>
   );
 }

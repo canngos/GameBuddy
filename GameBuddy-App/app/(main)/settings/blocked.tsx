@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import { memo, useCallback, useMemo } from 'react';
 import { ActivityIndicator, FlatList, View } from 'react-native';
 import { socialApi } from '../../../src/api/social';
@@ -7,10 +6,9 @@ import type { GamerSummary } from '../../../src/api/types';
 import { useCountryName } from '../../../src/i18n/countryNames';
 import { useT } from '../../../src/i18n/useT';
 import { useThemeColors } from '../../../src/theme';
-import { Avatar, Button, Card, ErrorNotice, Screen, Text } from '../../../src/ui';
+import { Avatar, BackButton, Button, Card, ErrorNotice, Screen, Text } from '../../../src/ui';
 
 export default function BlockedUsers() {
-  const router = useRouter();
   const colors = useThemeColors();
   const t = useT();
   const queryClient = useQueryClient();
@@ -40,6 +38,8 @@ export default function BlockedUsers() {
 
   return (
     <Screen edges={['top', 'bottom']}>
+      <BackButton />
+
       <FlatList
         className="flex-1"
         data={people}
@@ -73,8 +73,7 @@ export default function BlockedUsers() {
         ListFooterComponent={
           <View className="gap-2 pt-6">
             {!!unblock.error && <ErrorNotice error={unblock.error} />}
-            <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
-          </View>
+              </View>
         }
       />
     </Screen>

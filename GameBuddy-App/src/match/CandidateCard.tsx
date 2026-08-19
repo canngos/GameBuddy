@@ -1,8 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { ChevronUp } from 'lucide-react-native';
 import { useMemo } from 'react';
-import { PixelRatio, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { avatarGradient, avatarUri, initialsOf } from '../avatars';
 import { profileApi } from '../api/catalogue';
 import type { Candidate } from '../api/types';
@@ -12,10 +11,12 @@ import { useCountryName } from '../i18n/countryNames';
 import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
 import { platformIdOf } from '../profile/platforms';
+import { useDeckLayout } from './deckLayout';
 import { Avatar } from '../ui/Avatar';
 import { FrameOverlay } from '../ui/FramedAvatar';
 import { cn } from '../ui/cn';
 import { lift } from '../ui/elevation';
+import { GamePills } from '../ui/GamePills';
 import { GradientView } from '../ui/Gradient';
 import { useHairline } from '../ui/hairline';
 import { Icon } from '../ui/Icon';
@@ -37,31 +38,11 @@ type CandidateCardProps = {
  * scroll vertically inside a deck whose whole interaction is dragging horizontally. A card
  * in a swipe deck has one job, which is to be readable in the second before a decision.
  */
-const MAX_GAMES = 3;
-const MAX_KEYWORDS = 3;
 
 /**
- * Below this many dp of screen height, the portrait is drawn smaller.
- *
- * **The card cannot shrink itself, so something has to decide for it.** The identity block
- * is `flex-1` and the detail block below is sized to its content — see the note on the
- * layout — which is right, but React Native defaults `flexShrink` to 0 (unlike the web), so
- * the detail block never gives anything back and the identity block absorbs the entire
- * shortfall on its own. Its contents are fixed: a 128dp portrait, 80dp of padding, a name,
- * a subtitle and a row of platform glyphs come to roughly 286dp whatever the screen is. On
- * a 360×760dp phone the block is handed around 266dp of it. Because the block is centred
- * *and* clips, the missing 20dp comes off the top and bottom equally — which is exactly the
- * report: avatars cut off along the top on a 5.8" phone, and nothing wrong on a tablet.
- *
- * 800 rather than 760 so the smallest common phones are not sized to the millimetre; the
- * compact portrait saves about 64dp, which is enough headroom to survive a long username
- * or a game name that wraps.
- *
- * Divided by the font scale, so somebody running large text gets the compact layout on a
- * phone that would otherwise be comfortable. Their text is bigger everywhere on this card,
- * which is the same shortfall arriving by a different route.
+ * How many pills survive on the card at the roomiest size. Everything past this is behind
+ * the tap. The per-tier values live in {@link useDeckLayout}.
  */
-const COMPACT_HEIGHT = 800;
 
 /**
  * One gamer, as a card. This is the app's front door.
@@ -88,9 +69,8 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
   const hairline = useHairline();
   const localize = useCountryName();
 
-  const { height } = useWindowDimensions();
-  const compact = height / PixelRatio.getFontScale() < COMPACT_HEIGHT;
-  const portrait = compact ? 96 : 128;
+  const layout = useDeckLayout();
+  const { compact, tight, portrait, maxGames, maxKeywords } = layout;
 
   const games = candidate.favoriteGames ?? [];
   const keywords = candidate.selectedKeywords ?? [];
@@ -114,7 +94,28 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
         the *portrait* absorb whatever is left over inverts that: the block that can safely
         change height is the one that does.
       */}
-      <View className="flex-1 justify-center overflow-hidden">
+      {/*
+        `flexBasis: 'auto'` is the load-bearing part, and `flex-1` alone was not enough.
+
+        Tailwind's `flex-1` is `flexGrow: 1; flexShrink: 1; flexBasis: 0%`, and a basis of
+        zero means this block's *natural* size is nothing — it only ever receives whatever
+        is left over. Adding `flexShrink: 0` on top of that protected nothing, because the
+        block was never shrinking below its basis; it simply had no basis to begin with. So
+        on a short screen, where the detail block below already consumed the whole card, the
+        leftover was zero and the face disappeared entirely.
+
+        Basing it on its own content instead means the portrait, the name and the glyphs are
+        the floor. It still grows into spare room on a tall screen, and the detail block —
+        the only part that can lose a chip row without losing meaning — is what gives way.
+      */}
+      <View
+        className="justify-center overflow-hidden"
+        // Grows into spare room only where there is some. On a short screen every spare dp
+        // belongs to the detail block, which is the half that had been squeezed to nothing;
+        // letting the portrait area take it as well would protect the face by deleting
+        // everything the card is supposed to say about the person.
+        style={{ flexGrow: compact ? 0 : 1, flexShrink: 0, flexBasis: 'auto' }}
+      >
         <GradientView
           colors={avatarGradient(candidate.userId)}
           direction="diagonal"
@@ -136,7 +137,10 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
             The vertical padding shrinks with the portrait: two thirds of what is saved here
             is padding, and cutting only the picture would leave a small avatar swimming in
             the space the big one needed. */}
-        <View className="items-center justify-center px-6" style={{ paddingVertical: compact ? 24 : 40 }}>
+        <View
+          className="items-center justify-center px-6"
+          style={{ paddingVertical: layout.portraitPadding }}
+        >
           {/* The frame goes over whichever portrait we drew — a photo, or the oversized
               monogram below. Someone who paid for a ring should see it whether or not
               they have uploaded a picture yet. */}
@@ -152,7 +156,7 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
                   className="font-bold text-white"
                   // Scaled with the circle it sits in, so the monogram keeps the same
                   // proportions rather than rattling around inside a smaller ring.
-                  style={{ fontSize: compact ? 34 : 44, lineHeight: compact ? 40 : 52 }}
+                  style={layout.monogram}
                 >
                   {initialsOf(candidate.gamerUsername)}
                 </Text>
@@ -165,7 +169,7 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
             variant="title"
             numberOfLines={1}
             className="text-center text-white"
-            style={{ marginTop: compact ? 8 : 16 }}
+            style={{ marginTop: layout.nameGap }}
           >
             {candidate.gamerUsername}
           </Text>
@@ -186,22 +190,30 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
 
       {/* No `flex-1`: this is exactly as tall as what is in it, which is what stops it
           being clipped. Everything past the caps is behind the tap. */}
-      <View className="gap-4 p-5 pt-4">
+      {/* Padding and gap come down with the rest on a very short screen: this block holds
+          two labelled rows, and the space between them is the cheapest thing in the card to
+          spend when the alternative is losing one of the rows. */}
+      <View
+        className={cn(tight ? 'gap-2 p-3 pt-2' : 'gap-4 p-5 pt-4')}
+        style={{ flexShrink: 1 }}
+      >
         <GameRow
-          games={ordered.slice(0, MAX_GAMES)}
-          hidden={ordered.length - MAX_GAMES}
+          games={ordered.slice(0, maxGames)}
+          hidden={ordered.length - maxGames}
           shared={shared}
         />
 
         <KeywordRow
           title={t.deck.card.style}
-          items={keywords.slice(0, MAX_KEYWORDS)}
-          hidden={keywords.length - MAX_KEYWORDS}
+          items={keywords.slice(0, maxKeywords)}
+          hidden={keywords.length - maxKeywords}
         />
 
         {/* Not on the card behind. It is inert and dimmed, and inviting a tap on something
             that cannot be tapped is worse than saying nothing. */}
-        {!muted && (
+        {/* Dropped on a short screen. It is a hint about a gesture, not information about
+            the person, so it is the first thing worth losing when the face needs the room. */}
+        {!muted && !compact && (
           <View className="flex-row items-center justify-center gap-1.5">
             <Text variant="caption">{t.deck.card.tapForProfile}</Text>
             <Icon as={ChevronUp} size={14} tone="muted" />
@@ -283,42 +295,7 @@ export function GameRow({
           </Text>
         )}
       </View>
-      <View className="flex-row flex-wrap gap-2">
-        {games.map((game) => (
-          <View
-            key={game.gameName}
-            className="max-w-full flex-row items-center gap-2 overflow-hidden rounded-full border border-primary/30 bg-primary/12 py-1 pl-1 pr-3"
-          >
-            {game.gameIcon ? (
-              <Image
-                source={{ uri: game.gameIcon }}
-                // `style`, not the `h-6 w-6 rounded-full` this used to carry: expo-image
-                // is not registered with NativeWind, so a className on it resolves to
-                // nothing at all and the cover would render at zero size. Same trap as
-                // UI_NOTE §4.9 — it fails silently either way.
-                style={styles.gameIcon}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={game.gameIcon}
-                transition={0}
-              />
-            ) : (
-              // The game's initial, on the same footprint the cover would occupy — so a
-              // catalogue with art and one without produce the same layout rather than
-              // the pills changing shape when the backfill runs.
-              <View className="h-6 w-6 items-center justify-center rounded-full bg-primary/25">
-                <Text className="font-semibold text-[11px] leading-[14px] text-primary">
-                  {game.gameName.slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
-            )}
-            <Text variant="caption" numberOfLines={1} className="shrink text-primary">
-              {game.gameName}
-            </Text>
-          </View>
-        ))}
-        {hidden > 0 && <MorePill count={hidden} />}
-      </View>
+      <GamePills games={games} trailing={hidden > 0 ? <MorePill count={hidden} /> : null} />
     </View>
   );
 }
@@ -423,13 +400,3 @@ function MorePill({ count }: { count: number }) {
     </View>
   );
 }
-
-/**
- * The game-cover chip on the deck card.
- *
- * A style rather than a class because this goes on an `expo-image`, which NativeWind does
- * not register — see the comment at the call site.
- */
-const styles = StyleSheet.create({
-  gameIcon: { width: 24, height: 24, borderRadius: 12 },
-});

@@ -1,19 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Redirect, useRouter } from 'expo-router';
-import { useMemo } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { catalogueApi } from '../../src/api/catalogue';
-import { keywordDetail } from '../../src/i18n/keywords';
-import { useT } from '../../src/i18n/useT';
-import { useDraft } from '../../src/onboarding/draft';
-import { SelectionCount } from '../../src/onboarding/SelectionCount';
-import { StepHeader } from '../../src/onboarding/StepHeader';
-import { CataloguePicker } from '../../src/pickers/CataloguePicker';
-import { MIN_PLATFORMS } from '../../src/profile/platforms';
-import { useSession } from '../../src/session/store';
-import { Button, ErrorNotice, Screen } from '../../src/ui';
-import { MIN_GAMES, MIN_KEYWORDS, parseBirthDate, toIsoDate } from '../../src/validation';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Redirect, useRouter } from "expo-router";
+import { useMemo } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { catalogueApi } from "../../src/api/catalogue";
+import { keywordDetail } from "../../src/i18n/keywords";
+import { useT } from "../../src/i18n/useT";
+import { useDraft } from "../../src/onboarding/draft";
+import { SelectionCount } from "../../src/onboarding/SelectionCount";
+import { StepHeader } from "../../src/onboarding/StepHeader";
+import { CataloguePicker } from "../../src/pickers/CataloguePicker";
+import { MIN_PLATFORMS } from "../../src/profile/platforms";
+import { useSession } from "../../src/session/store";
+import { BackButton, Button, ErrorNotice, Screen } from "../../src/ui";
+import {
+  MIN_GAMES,
+  MIN_KEYWORDS,
+  parseBirthDate,
+  toIsoDate,
+} from "../../src/validation";
 
 export default function Keywords() {
   const router = useRouter();
@@ -22,7 +27,10 @@ export default function Keywords() {
   const draft = useDraft();
   const detailsCompleted = useSession((s) => s.detailsCompleted);
 
-  const keywords = useQuery({ queryKey: ['keywords'], queryFn: catalogueApi.keywords });
+  const keywords = useQuery({
+    queryKey: ["keywords"],
+    queryFn: catalogueApi.keywords,
+  });
 
   const items = useMemo(
     () =>
@@ -40,12 +48,14 @@ export default function Keywords() {
         // The server derives the age from this and refuses anything under 18. Sending a
         // date rather than a number is the point: an age is an assertion, a date is a fact
         // the server can check.
-        birthDate: toIsoDate(parseBirthDate(draft.birthDay, draft.birthMonth, draft.birthYear)!),
+        birthDate: toIsoDate(
+          parseBirthDate(draft.birthDay, draft.birthMonth, draft.birthYear)!,
+        ),
         country: draft.country,
         avatar: draft.avatarId!,
         // null means the question was never answered; the backend wants a string, and
         // an empty one is what "prefer not to say" already sends.
-        gender: draft.gender ?? '',
+        gender: draft.gender ?? "",
         favoriteGames: draft.gameIds,
         platforms: draft.platformIds,
         keywords: draft.keywordIds,
@@ -55,8 +65,8 @@ export default function Keywords() {
       draft.reset();
       // The profile the app is about to read is the one just written; anything cached
       // from before onboarding describes an empty account.
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-      router.replace('/home');
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
+      router.replace("/home");
     },
   });
 
@@ -79,17 +89,21 @@ export default function Keywords() {
           {/* Next to the button that failed, rather than below a forty-eight-row list
               where it needed a scroll to reach. */}
           {!!submit.error && <ErrorNotice error={submit.error} />}
-          <SelectionCount picked={draft.keywordIds.length} minimum={MIN_KEYWORDS} />
+          <SelectionCount
+            picked={draft.keywordIds.length}
+            minimum={MIN_KEYWORDS}
+          />
           <Button
             label={t.common.finish}
             disabled={draft.keywordIds.length < MIN_KEYWORDS}
             loading={submit.isPending}
             onPress={() => submit.mutate()}
           />
-          <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
         </View>
       }
     >
+      <BackButton />
+
       <CataloguePicker
         header={
           <StepHeader

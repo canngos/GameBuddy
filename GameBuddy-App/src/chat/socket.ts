@@ -261,6 +261,35 @@ export function createChatSocket(token: string, listeners: Listeners) {
     },
 
     /**
+     * Tears the connection down and builds it again, whatever it currently believes.
+     *
+     * **For coming back from the background, where "connected" cannot be trusted.** The
+     * client has no liveness detection of its own — `heartbeatIncoming` is 0 because React
+     * Native mangles the newline frames stompjs listens for, so the only thing proving the
+     * link is alive is our own keepalive, and Android freezes JS timers while the app is
+     * away. The server therefore reaps the session after ~34s of silence and tells everybody
+     * this gamer went offline.
+     *
+     * On the way back, the socket is very often *half-open*: the phone's TCP connection is
+     * dead but no close event was ever delivered, so `client.connected` is still true,
+     * stompjs's only reconnect trigger (`onWebSocketClose`) never fires, and the gamer stays
+     * offline to everyone until the app is killed. That is the bug this exists for.
+     *
+     * Deactivating first is what makes it unconditional: it also rescues a client that
+     * `onStompError` shut down, which leaves `active === false` and is otherwise
+     * unrecoverable for the life of the process. Reconnecting a socket that happened to be
+     * healthy costs one CONNECT frame; not reconnecting a dead one costs the feature.
+     */
+    async reconnect() {
+      stopKeepalive();
+      listeners.onStatus('connecting');
+      // Awaited so activate() cannot race the teardown and leave two sockets, which is
+      // exactly how the server ends up counting a session that no longer exists.
+      await client.deactivate();
+      client.activate();
+    },
+
+    /**
      * Tells one person that we are typing to them.
      *
      * **Dropped silently when the socket is down**, and that is the whole point of not

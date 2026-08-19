@@ -7,36 +7,45 @@
  * gives that for free when the same component is mounted at two routes, and takes it
  * away the moment one route is pushed from the other tab.
  */
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Check, Clock, MoreVertical, UserCheck, UserPlus } from 'lucide-react-native';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
-import { profileApi } from '../api/catalogue';
-import { matchApi } from '../api/match';
-import { moderationApi } from '../api/moderation';
-import { socialApi } from '../api/social';
-import { useCountryName } from '../i18n/countryNames';
-import { useT } from '../i18n/useT';
-import { useCelebration } from '../match/celebration';
-import { useThemeColors } from '../theme';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  Check,
+  Clock,
+  MoreVertical,
+  UserCheck,
+  UserPlus,
+} from "lucide-react-native";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { profileApi } from "../api/catalogue";
+import { matchApi } from "../api/match";
+import { moderationApi } from "../api/moderation";
+import { socialApi } from "../api/social";
+import { useCountryName } from "../i18n/countryNames";
+import { useT } from "../i18n/useT";
+import { useCelebration } from "../match/celebration";
+import { useThemeColors } from "../theme";
 import {
   ActionSheet,
   BackHeader,
   Button,
   Card,
+  cn,
+  ConfirmDialog,
+  type ConfirmRequest,
   ErrorNotice,
   FramedAvatar,
+  GamePills,
   Icon,
+  type PillGame,
   ProfileBanner,
   ReportSheet,
   Screen,
   Text,
-  ConfirmDialog,
-  cn,
-  type ConfirmRequest,
-} from '../ui';
+  useProfileHeaderLayout,
+} from "../ui";
 
 /**
  * Somebody else's profile.
@@ -57,12 +66,13 @@ type GamerProfileScreenProps = {
    * gamer looking at a profile with a dead screen underneath. The route back depends on
    * which door they came through.
    */
-  afterBlock: '/messages' | '/friends';
+  afterBlock: "/messages" | "/friends";
 };
 
 export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
   const router = useRouter();
   const colors = useThemeColors();
+  const header = useProfileHeaderLayout();
   const t = useT();
   const localize = useCountryName();
   const queryClient = useQueryClient();
@@ -78,13 +88,13 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   const gamer = useQuery({
-    queryKey: ['gamer', userId],
+    queryKey: ["gamer", userId],
     queryFn: () => profileApi.byId(userId),
   });
 
-  const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
+  const me = useQuery({ queryKey: ["me"], queryFn: profileApi.me });
   const friends = useQuery({
-    queryKey: ['friends'],
+    queryKey: ["friends"],
     queryFn: socialApi.friends,
   });
 
@@ -96,30 +106,52 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
    * how the screen knows this person already liked you, which is what makes matching a
    * single tap rather than a trip back to the deck to find them again.
    */
-  const matches = useQuery({ queryKey: ['matches'], queryFn: matchApi.matches });
-  const admirers = useQuery({ queryKey: ['admirers'], queryFn: matchApi.likedYou });
-  const incoming = useQuery({ queryKey: ['friendRequests'], queryFn: socialApi.pendingRequests });
-  const outgoing = useQuery({ queryKey: ['sentRequests'], queryFn: socialApi.sentRequests });
+  const matches = useQuery({
+    queryKey: ["matches"],
+    queryFn: matchApi.matches,
+  });
+  const admirers = useQuery({
+    queryKey: ["admirers"],
+    queryFn: matchApi.likedYou,
+  });
+  const incoming = useQuery({
+    queryKey: ["friendRequests"],
+    queryFn: socialApi.pendingRequests,
+  });
+  const outgoing = useQuery({
+    queryKey: ["sentRequests"],
+    queryFn: socialApi.sentRequests,
+  });
 
   const isSelf = me.data?.userId === userId;
-  const isFriend = (friends.data ?? []).some((friend) => friend.userId === userId);
-  const isMatched = (matches.data ?? []).some((match) => match.userId === userId);
-  const likedYou = (admirers.data?.likedYou ?? []).some((c) => c.userId === userId);
-  const theyAsked = (incoming.data ?? []).some((person) => person.userId === userId);
-  const youAsked = (outgoing.data ?? []).some((person) => person.userId === userId);
+  const isFriend = (friends.data ?? []).some(
+    (friend) => friend.userId === userId,
+  );
+  const isMatched = (matches.data ?? []).some(
+    (match) => match.userId === userId,
+  );
+  const likedYou = (admirers.data?.likedYou ?? []).some(
+    (c) => c.userId === userId,
+  );
+  const theyAsked = (incoming.data ?? []).some(
+    (person) => person.userId === userId,
+  );
+  const youAsked = (outgoing.data ?? []).some(
+    (person) => person.userId === userId,
+  );
 
   /** Everything that changes who this person is to you touches the same three lists. */
   const refreshRelationship = () => {
-    void queryClient.invalidateQueries({ queryKey: ['friends'] });
-    void queryClient.invalidateQueries({ queryKey: ['inbox'] });
-    void queryClient.invalidateQueries({ queryKey: ['matches'] });
+    void queryClient.invalidateQueries({ queryKey: ["friends"] });
+    void queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    void queryClient.invalidateQueries({ queryKey: ["matches"] });
   };
 
   /** The friend-request lists, which the three request actions all move between. */
   const refreshRequests = () => {
     refreshRelationship();
-    void queryClient.invalidateQueries({ queryKey: ['friendRequests'] });
-    void queryClient.invalidateQueries({ queryKey: ['sentRequests'] });
+    void queryClient.invalidateQueries({ queryKey: ["friendRequests"] });
+    void queryClient.invalidateQueries({ queryKey: ["sentRequests"] });
   };
 
   const remove = useMutation({
@@ -146,8 +178,8 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
   const match = useMutation({
     mutationFn: () => matchApi.accept(userId),
     onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ['admirers'] });
-      void queryClient.invalidateQueries({ queryKey: ['allowance'] });
+      void queryClient.invalidateQueries({ queryKey: ["admirers"] });
+      void queryClient.invalidateQueries({ queryKey: ["allowance"] });
       refreshRelationship();
       if (result.matched && gamer.data) {
         useCelebration.getState().celebrate({
@@ -183,7 +215,7 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
     onSuccess: () => {
       setConfirm(null);
       refreshRelationship();
-      void queryClient.invalidateQueries({ queryKey: ['blocked'] });
+      void queryClient.invalidateQueries({ queryKey: ["blocked"] });
       // Straight out of the screen. Blocking is mutual and total — the conversation
       // behind this is now closed in both directions, so leaving the gamer looking at
       // their profile with a dead chat underneath would be a worse answer than leaving.
@@ -260,21 +292,21 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
   };
 
   const friendState: FriendState = isFriend
-    ? 'friends'
+    ? "friends"
     : youAsked
-      ? 'sent'
+      ? "sent"
       : theyAsked
-        ? 'asked'
+        ? "asked"
         : isMatched
-          ? 'none'
-          : 'locked';
+          ? "none"
+          : "locked";
 
   return (
     // Not `Screen scroll`: the report sheet positions itself absolutely over the whole
     // screen, and inside a ScrollView's content view "the whole screen" means the whole
     // scrollable content instead — the sheet would scroll away with the page. The list
     // scrolls in its own ScrollView and the sheet is a sibling of it.
-    <Screen edges={['top']} padded={false}>
+    <Screen edges={["top"]} padded={false}>
       <ScrollView
         contentContainerClassName="grow px-6 pb-8"
         showsVerticalScrollIndicator={false}
@@ -300,27 +332,31 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
         />
 
         {gamer.isPending && <ActivityIndicator color={colors.primary} />}
-        {gamer.error && <ErrorNotice error={gamer.error} onRetry={() => gamer.refetch()} />}
+        {gamer.error && (
+          <ErrorNotice error={gamer.error} onRetry={() => gamer.refetch()} />
+        )}
 
         {gamer.data && (
           <View className="gap-6">
-            <Card className="gap-5">
+            <Card className={header.cardGap}>
               <ProfileBanner source={gamer.data.banner} />
 
-              <View className="-mt-9 flex-row items-end gap-4">
+              <View className={`${header.overlap} flex-row items-end gap-4`}>
                 <FramedAvatar
                   frame={gamer.data.frame}
                   source={gamer.data.avatar}
                   name={gamer.data.username}
                   colorSeed={gamer.data.userId}
-                  size={72}
+                  size={header.avatar}
                 />
                 <View className="min-w-0 flex-1 gap-0.5 pb-1">
                   <Text variant="heading" numberOfLines={1}>
                     {gamer.data.username}
                   </Text>
                   <Text variant="caption">
-                    {[gamer.data.age, localize(gamer.data.country)].filter(Boolean).join(' · ')}
+                    {[gamer.data.age, localize(gamer.data.country)]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </Text>
                 </View>
 
@@ -344,7 +380,11 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
               {(gamer.data.badges ?? []).length > 0 && (
                 <View className="flex-row items-start gap-3">
                   {gamer.data.badges.map((badge) => (
-                    <View key={badge.code} className="items-center gap-1" style={{ width: 80 }}>
+                    <View
+                      key={badge.code}
+                      className="items-center gap-1"
+                      style={{ width: 80 }}
+                    >
                       <Image
                         source={{ uri: badge.icon }}
                         style={{ width: 48, height: 48 }}
@@ -353,7 +393,11 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                         cachePolicy="memory-disk"
                         recyclingKey={badge.code}
                       />
-                      <Text variant="caption" numberOfLines={2} className="text-center">
+                      <Text
+                        variant="caption"
+                        numberOfLines={2}
+                        className="text-center"
+                      >
                         {badge.title}
                       </Text>
                     </View>
@@ -363,14 +407,13 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
 
               <View className="h-px bg-line" />
 
-              <Tags
-                title={t.profile.games}
-                items={gamer.data.games.map((game) => game.gameName)}
-                accent
-              />
+              {/* The same pills as the deck — see the note on `GamePills`. */}
+              <GameSection title={t.profile.games} games={gamer.data.games} />
               <Tags
                 title={t.profile.keywords}
-                items={gamer.data.keywords.map((keyword) => keyword.keywordName)}
+                items={gamer.data.keywords.map(
+                  (keyword) => keyword.keywordName,
+                )}
               />
             </Card>
 
@@ -385,8 +428,12 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                 {report.error && <ErrorNotice error={report.error} />}
                 {match.error && <ErrorNotice error={match.error} />}
                 {sendRequest.error && <ErrorNotice error={sendRequest.error} />}
-                {acceptRequest.error && <ErrorNotice error={acceptRequest.error} />}
-                {withdrawRequest.error && <ErrorNotice error={withdrawRequest.error} />}
+                {acceptRequest.error && (
+                  <ErrorNotice error={acceptRequest.error} />
+                )}
+                {withdrawRequest.error && (
+                  <ErrorNotice error={withdrawRequest.error} />
+                )}
                 {reported && (
                   <Card>
                     <Text variant="caption">{t.profile.reported}</Text>
@@ -399,7 +446,11 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                 {likedYou && !isMatched && (
                   <View className="gap-1">
                     <Button
-                      label={match.isPending ? t.profile.matching : t.profile.matchBack}
+                      label={
+                        match.isPending
+                          ? t.profile.matching
+                          : t.profile.matchBack
+                      }
                       loading={match.isPending}
                       disabled={busy}
                       onPress={() => match.mutate()}
@@ -446,7 +497,9 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
       {confirm && (
         <ConfirmDialog
           request={confirm}
-          busy={remove.isPending || block.isPending || withdrawRequest.isPending}
+          busy={
+            remove.isPending || block.isPending || withdrawRequest.isPending
+          }
           onCancel={() => setConfirm(null)}
         />
       )}
@@ -463,7 +516,7 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
 }
 
 /** Where the friendship stands, which is the only thing the icon has to say. */
-type FriendState = 'locked' | 'none' | 'sent' | 'asked' | 'friends';
+type FriendState = "locked" | "none" | "sent" | "asked" | "friends";
 
 /**
  * The friendship, as one tappable glyph beside the name.
@@ -489,14 +542,44 @@ function FriendIcon({
   const colors = useThemeColors();
 
   const spec = {
-    locked: { icon: UserPlus, tone: 'muted', filled: false, label: t.profile.addFriendCaption },
-    none: { icon: UserPlus, tone: 'inverse', filled: true, label: t.profile.addFriend },
-    sent: { icon: Clock, tone: 'muted', filled: false, label: t.profile.withdrawRequest },
-    asked: { icon: Check, tone: 'inverse', filled: true, label: t.profile.acceptRequest },
-    friends: { icon: UserCheck, tone: 'primary', filled: false, label: t.profile.removeFriend },
-  }[state] as { icon: typeof UserPlus; tone: 'muted' | 'inverse' | 'primary'; filled: boolean; label: string };
+    locked: {
+      icon: UserPlus,
+      tone: "muted",
+      filled: false,
+      label: t.profile.addFriendCaption,
+    },
+    none: {
+      icon: UserPlus,
+      tone: "inverse",
+      filled: true,
+      label: t.profile.addFriend,
+    },
+    sent: {
+      icon: Clock,
+      tone: "muted",
+      filled: false,
+      label: t.profile.withdrawRequest,
+    },
+    asked: {
+      icon: Check,
+      tone: "inverse",
+      filled: true,
+      label: t.profile.acceptRequest,
+    },
+    friends: {
+      icon: UserCheck,
+      tone: "primary",
+      filled: false,
+      label: t.profile.removeFriend,
+    },
+  }[state] as {
+    icon: typeof UserPlus;
+    tone: "muted" | "inverse" | "primary";
+    filled: boolean;
+    label: string;
+  };
 
-  const inert = state === 'locked' || busy;
+  const inert = state === "locked" || busy;
 
   return (
     <Pressable
@@ -507,17 +590,39 @@ function FriendIcon({
       accessibilityState={{ disabled: inert }}
       hitSlop={8}
       className={cn(
-        'h-11 w-11 shrink-0 items-center justify-center rounded-full border',
-        spec.filled ? 'border-transparent bg-primary' : 'border-line bg-transparent',
-        inert ? 'opacity-40' : 'active:opacity-70',
+        "h-11 w-11 shrink-0 items-center justify-center rounded-full border",
+        spec.filled
+          ? "border-transparent bg-primary"
+          : "border-line bg-transparent",
+        inert ? "opacity-40" : "active:opacity-70",
       )}
     >
       {busy ? (
-        <ActivityIndicator color={spec.filled ? colors.onBrand : colors.primary} />
+        <ActivityIndicator
+          color={spec.filled ? colors.onBrand : colors.primary}
+        />
       ) : (
         <Icon as={spec.icon} size={20} tone={spec.tone} strokeWidth={2.5} />
       )}
     </Pressable>
+  );
+}
+
+/** Games with their cover art, headed like the tag sections beside it. */
+function GameSection({ title, games }: { title: string; games: PillGame[] }) {
+  return (
+    <View className="gap-2">
+      <Text variant="label" className="text-muted">
+        {title}
+      </Text>
+      {games.length === 0 ? (
+        <Text variant="body" className="text-muted">
+          —
+        </Text>
+      ) : (
+        <GamePills games={games} />
+      )}
+    </View>
   );
 }
 
@@ -547,11 +652,14 @@ function Tags({
               key={item}
               className={
                 accent
-                  ? 'rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5'
-                  : 'rounded-full bg-raised px-3 py-1.5'
+                  ? "rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5"
+                  : "rounded-full bg-raised px-3 py-1.5"
               }
             >
-              <Text variant="caption" className={accent ? 'text-primary' : 'text-content'}>
+              <Text
+                variant="caption"
+                className={accent ? "text-primary" : "text-content"}
+              >
                 {item}
               </Text>
             </View>

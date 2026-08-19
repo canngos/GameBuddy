@@ -10,7 +10,17 @@ import { useConversation } from '../../../src/chat/useConversation';
 import type { Dictionary } from '../../../src/i18n/dictionaries/en';
 import { useT } from '../../../src/i18n/useT';
 import { useThemeColors } from '../../../src/theme';
-import { Avatar, cn, ErrorNotice, Screen, Text, TextField } from '../../../src/ui';
+import {
+  ActionSheet,
+  Avatar,
+  cn,
+  ConfirmDialog,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  type ConfirmRequest,
+} from '../../../src/ui';
 
 export default function Chat() {
   const router = useRouter();
@@ -43,6 +53,10 @@ export default function Chat() {
 
   const chat = useConversation(friendId);
   const [draft, setDraft] = useState('');
+  // Both belong to the header's friend control, but they are owned here: an ActionSheet
+  // only covers the screen when it is the last child of one.
+  const [friendMenuOpen, setFriendMenuOpen] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   const report = useMutation({
     mutationFn: (messageId: string) => chatApi.report(messageId),
@@ -110,7 +124,7 @@ export default function Chat() {
           </View>
         </Pressable>
 
-        <FriendAction userId={friendId} />
+        <FriendAction userId={friendId} onOpenMenu={() => setFriendMenuOpen(true)} />
       </View>
 
       {chat.isLoading && (
@@ -147,10 +161,11 @@ export default function Chat() {
           keyExtractor={keyExtractor}
           contentContainerClassName="gap-2 p-4"
           ListEmptyComponent={
-            // Inverted lists draw their children upside down, this one included. The flip
-            // is undone here rather than by leaving the empty state outside the list,
-            // which would mean laying it out twice.
-            <View className="items-center gap-1 py-10" style={{ transform: [{ scaleY: -1 }] }}>
+            // No counter-flip here. VirtualizedList already un-inverts this cell for us,
+            // and its own transform is `scale: -1` on Android rather than `scaleY: -1` —
+            // composing ours on top replaced theirs and left the text mirrored
+            // horizontally on exactly the platform we ship.
+            <View className="items-center gap-1 py-10">
               <Text variant="bodyStrong">{t.messages.noMessagesYet}</Text>
               <Text variant="caption" className="text-center">
                 {t.messages.emptyBlurb}
@@ -213,7 +228,104 @@ export default function Chat() {
           <View className="h-3 w-3 rotate-45 border-r-2 border-t-2 border-white" />
         </Pressable>
       </View>
+
+      {/* Last children of the Screen, so they cover it. The friend control in the header
+          only asks for them; owning them there would put a full-screen overlay inside a
+          40dp row. */}
+      {friendMenuOpen && (
+        <FriendMenu
+          userId={friendId}
+          username={username ?? t.messages.thisGamer}
+          onClose={() => setFriendMenuOpen(false)}
+          onConfirm={setConfirm}
+        />
+      )}
+
+      {confirm && (
+        <ConfirmDialog request={confirm} busy={false} onCancel={() => setConfirm(null)} />
+      )}
     </Screen>
+  );
+}
+
+/**
+ * What you can do about somebody you are already friends with.
+ *
+ * The same three actions as their profile screen, offered without making anybody go and
+ * find it. Removing and blocking both ask first — they are quiet, one-tap actions with
+ * consequences the other person sees, and `ConfirmDialog` exists for exactly that.
+ * Reporting does not, because `ReportSheet` on the profile is its own second step.
+ */
+function FriendMenu({
+  userId,
+  username,
+  onClose,
+  onConfirm,
+}: {
+  userId: string;
+  username: string;
+  onClose: () => void;
+  onConfirm: (request: ConfirmRequest) => void;
+}) {
+  const t = useT();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const refresh = () => {
+    void queryClient.invalidateQueries({ queryKey: ['friends'] });
+    void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+  };
+
+  const remove = useMutation({
+    mutationFn: () => socialApi.remove(userId),
+    onSuccess: refresh,
+  });
+
+  // Blocking ends the conversation, so there is nothing left to stay on. The profile
+  // screen does the same thing for the same reason.
+  const block = useMutation({
+    mutationFn: () => socialApi.block(userId),
+    onSuccess: () => {
+      refresh();
+      void queryClient.invalidateQueries({ queryKey: ['blocked'] });
+      router.replace('/messages');
+    },
+  });
+
+  return (
+    <ActionSheet
+      onCancel={onClose}
+      actions={[
+        {
+          label: t.profile.removeFriend,
+          destructive: true,
+          onPress: () => {
+            onClose();
+            onConfirm({
+              title: t.profile.removeConfirmTitle(username),
+              body: t.profile.removeConfirmBody,
+              confirmLabel: t.common.remove,
+              destructive: true,
+              onConfirm: () => remove.mutate(),
+            });
+          },
+        },
+        {
+          label: t.profile.block,
+          destructive: true,
+          onPress: () => {
+            onClose();
+            onConfirm({
+              title: t.profile.blockConfirmTitle(username),
+              body: t.profile.blockConfirmBody,
+              confirmLabel: t.profile.block,
+              destructive: true,
+              onConfirm: () => block.mutate(),
+            });
+          },
+        },
+      ]}
+    />
   );
 }
 
@@ -233,7 +345,7 @@ export default function Chat() {
  * not usually cost a request. Renders nothing at all until they have loaded, because a
  * plus that turns into a tick a moment later invites the tap it then ignores.
  */
-function FriendAction({ userId }: { userId: string }) {
+function FriendAction({ userId, onOpenMenu }: { userId: string; onOpenMenu: () => void }) {
   const colors = useThemeColors();
   const t = useT();
   const queryClient = useQueryClient();
@@ -295,14 +407,30 @@ function FriendAction({ userId }: { userId: string }) {
   const youAsked = (outgoing.data ?? []).some((f) => f.userId === userId);
   const busy = send.isPending || accept.isPending || withdraw.isPending;
 
+  /*
+   * Being friends is a state you can act on, not a badge.
+   *
+   * This used to render a bare `View`: no press handler, not even a Pressable, so the
+   * control that had offered "add friend" a moment earlier became inert the instant it
+   * succeeded. A tester reported tapping it and getting nothing, which is the right
+   * complaint — the icon still looks like the button it used to be.
+   *
+   * The actions themselves live on the profile screen already; this opens the same set
+   * without making somebody navigate to find them. Reported through `onOpenMenu` rather
+   * than owning the sheet here, because an `ActionSheet` must be the last child of a
+   * `Screen` to cover it — see the note in `src/ui/ActionSheet.tsx`.
+   */
   if (isFriend) {
     return (
-      <View
-        className="h-10 w-10 items-center justify-center"
-        accessibilityLabel={t.messages.alreadyFriends}
+      <Pressable
+        onPress={onOpenMenu}
+        accessibilityRole="button"
+        accessibilityLabel={t.profile.moreActionsA11y}
+        hitSlop={8}
+        className="h-10 w-10 items-center justify-center active:opacity-60"
       >
         <PersonIcon color={colors.primary} badge="check" background={colors.canvas} />
-      </View>
+      </Pressable>
     );
   }
 

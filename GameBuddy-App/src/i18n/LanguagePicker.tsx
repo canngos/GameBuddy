@@ -1,11 +1,11 @@
-import { Check } from 'lucide-react-native';
-import { Modal, Pressable, View } from 'react-native';
-import { Icon, Text } from '../ui';
-import { cn } from '../ui/cn';
-import { Flag } from './Flag';
-import { LANG_NAMES, LANGS, type Lang } from './languages';
-import { useLangStore } from './store';
-import { useT } from './useT';
+import { Check } from "lucide-react-native";
+import { Modal, Pressable, ScrollView, View } from "react-native";
+import { Icon, Text } from "../ui";
+import { cn } from "../ui/cn";
+import { Flag } from "./Flag";
+import { LANG_NAMES, LANGS, type Lang } from "./languages";
+import { useLangStore } from "./store";
+import { useT } from "./useT";
 
 /**
  * The language chooser: seven flags, each with the language's own name under it.
@@ -16,7 +16,13 @@ import { useT } from './useT';
  * and a language is not: Swedish is spoken in Finland, German in Austria, Spanish
  * mostly outside Spain. The flag finds the row, the word confirms it.
  */
-export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function LanguagePicker({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
   const lang = useLangStore((s) => s.lang);
   const setLang = useLangStore((s) => s.setLang);
   const t = useT();
@@ -27,7 +33,12 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       {/* Tapping the scrim closes it. A picker with no visible way out is a trap on a
           screen somebody may have opened by accident in a language they cannot read. */}
       <Pressable
@@ -37,10 +48,18 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
         className="flex-1 justify-end bg-black/50"
       >
         {/* Stops a tap inside the sheet from closing it. */}
-        <Pressable onPress={() => {}} className="rounded-t-[28px] bg-elevated p-6 pb-10">
-          <View className="mb-5 h-1 w-10 self-center rounded-full bg-line" />
+        {/* Capped and scrollable: seven tiles wrap to three rows, and at a large system
+            text size the labels push that to four with nowhere to go. */}
+        <Pressable
+          onPress={() => {}}
+          className="max-h-[86%] rounded-t-[28px] bg-elevated"
+        >
+          <View className="mb-5 mt-6 h-1 w-10 self-center rounded-full bg-line" />
 
-          <View className="flex-row flex-wrap justify-center gap-4">
+          <ScrollView
+            contentContainerClassName="flex-row flex-wrap justify-center gap-4 px-6 pb-10"
+            showsVerticalScrollIndicator={false}
+          >
             {LANGS.map((code) => {
               const selected = code === lang;
               return (
@@ -54,10 +73,10 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
                 >
                   <View
                     className={cn(
-                      'rounded-full p-1',
+                      "rounded-full p-1",
                       // The ring is the selection, drawn outside the flag so it never
                       // covers the artwork it is marking.
-                      selected ? 'bg-primary' : 'bg-transparent',
+                      selected ? "bg-primary" : "bg-transparent",
                     )}
                   >
                     <Flag lang={code} size={52} />
@@ -68,7 +87,7 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
                     <Text
                       variant="label"
                       numberOfLines={1}
-                      className={selected ? 'text-primary' : 'text-content'}
+                      className={selected ? "text-primary" : "text-content"}
                     >
                       {LANG_NAMES[code]}
                     </Text>
@@ -76,7 +95,7 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -90,7 +109,13 @@ export function LanguagePicker({ visible, onClose }: { visible: boolean; onClose
  * says both. On the welcome screen it is the only control above the fold, which is
  * deliberate — somebody who cannot read the pitch underneath needs to find this first.
  */
-export function LanguageButton({ onPress, size = 32 }: { onPress: () => void; size?: number }) {
+export function LanguageButton({
+  onPress,
+  size = 32,
+}: {
+  onPress: () => void;
+  size?: number;
+}) {
   const lang = useLangStore((s) => s.lang);
   const t = useT();
 

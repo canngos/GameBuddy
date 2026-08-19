@@ -1,19 +1,33 @@
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { ApiError, Code } from '../../src/api/envelope';
-import { openPrivacy, openTerms } from '../../src/legal';
-import { useT } from '../../src/i18n/useT';
-import { Button, Checkbox, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
-import { emailError, normalisePassword, passwordError } from '../../src/validation';
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { ApiError, Code } from "../../src/api/envelope";
+import { openPrivacy, openTerms } from "../../src/legal";
+import { useT } from "../../src/i18n/useT";
+import {
+  BackButton,
+  Button,
+  Checkbox,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import {
+  emailError,
+  normalisePassword,
+  passwordError,
+} from "../../src/validation";
 
 export default function Register() {
+  const intro = useIntroPadding();
   const t = useT();
   const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [touched, setTouched] = useState(false);
 
@@ -24,11 +38,12 @@ export default function Register() {
   const consentProblem = touched && !accepted;
 
   const register = useMutation({
-    mutationFn: () => authApi.register(email.trim(), normalisePassword(password), accepted),
+    mutationFn: () =>
+      authApi.register(email.trim(), normalisePassword(password), accepted),
     onSuccess: () => {
       // Replace, not push: the account now exists and the code has been sent, so
       // coming back here to submit the same address again can only cause confusion.
-      router.replace({ pathname: '/verify', params: { email: email.trim() } });
+      router.replace({ pathname: "/verify", params: { email: email.trim() } });
     },
   });
 
@@ -45,7 +60,9 @@ export default function Register() {
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
+      <BackButton />
+
+      <View className={`gap-2 pb-8 ${intro.top}`}>
         <Text variant="overline">{t.auth.stepOne}</Text>
         <Text variant="title">{t.auth.register.title}</Text>
         <Text variant="body" className="text-muted">
@@ -93,7 +110,7 @@ export default function Register() {
                     key={index}
                     variant="bodyStrong"
                     className="text-primary"
-                    onPress={segment.link === 'terms' ? openTerms : openPrivacy}
+                    onPress={segment.link === "terms" ? openTerms : openPrivacy}
                   >
                     {segment.text}
                   </Text>
@@ -115,7 +132,9 @@ export default function Register() {
           )}
         </View>
 
-        {register.error && !emailTaken && <ErrorNotice error={register.error} />}
+        {register.error && !emailTaken && (
+          <ErrorNotice error={register.error} />
+        )}
 
         {emailTaken && (
           <View className="gap-3 rounded-card border border-danger/40 bg-danger/10 p-4">
@@ -126,15 +145,18 @@ export default function Register() {
               label={t.auth.register.signInInstead}
               variant="secondary"
               size="md"
-              onPress={() => router.replace('/login')}
+              onPress={() => router.replace("/login")}
             />
           </View>
         )}
       </View>
 
-      <View className="mt-auto gap-2 pt-10">
-        <Button label={t.common.continue} loading={register.isPending} onPress={submit} />
-        <Button label={t.common.back} variant="ghost" onPress={() => router.back()} />
+      <View className={`mt-auto gap-2 ${intro.footer}`}>
+        <Button
+          label={t.common.continue}
+          loading={register.isPending}
+          onPress={submit}
+        />
       </View>
     </Screen>
   );

@@ -56,6 +56,10 @@ export const Code = {
   ACCEPT_LIMIT_REACHED: '158',
   SUBSCRIPTION_REQUIRED: '159',
   SWIPE_LIMIT_REACHED: '163',
+  /** Nothing swiped this session, so there is nothing to take back. */
+  NOTHING_TO_REWIND: '171',
+  /** The swipe being rewound turned into a match, which is not ours to undo. */
+  REWIND_MATCHED: '172',
   LOBBY_NOT_FOUND: '178',
   LOBBY_FULL: '179',
   /** The lobby is locked, ended or cancelled — refresh and show it as it is now. */

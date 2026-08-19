@@ -1,10 +1,10 @@
-import { useRouter } from 'expo-router';
-import { Gamepad2, MessagesSquare, Users } from 'lucide-react-native';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { LanguageButton, LanguagePicker } from '../../src/i18n/LanguagePicker';
-import { useT } from '../../src/i18n/useT';
-import { Button, Icon, Screen, Text } from '../../src/ui';
+import { useRouter } from "expo-router";
+import { Gamepad2, MessagesSquare, Users } from "lucide-react-native";
+import { useState } from "react";
+import { View } from "react-native";
+import { LanguageButton, LanguagePicker } from "../../src/i18n/LanguagePicker";
+import { useT } from "../../src/i18n/useT";
+import { Button, Icon, Screen, Text, useScreenScale } from "../../src/ui";
 
 /**
  * Three claims, each tied to something the product actually does — the recommender,
@@ -19,6 +19,7 @@ import { Button, Icon, Screen, Text } from '../../src/ui';
 const PITCH_ICONS = [Gamepad2, Users, MessagesSquare];
 
 export default function Welcome() {
+  const { pick } = useScreenScale();
   const router = useRouter();
   const t = useT();
   const [picking, setPicking] = useState(false);
@@ -26,9 +27,21 @@ export default function Welcome() {
   // Paired here rather than in the dictionary: an icon is not copy, and a translator
   // opening the Finnish file should not meet a Lucide import.
   const pitch = [
-    { icon: PITCH_ICONS[0], title: t.welcome.matchedTitle, body: t.welcome.matchedBody },
-    { icon: PITCH_ICONS[1], title: t.welcome.lobbyTitle, body: t.welcome.lobbyBody },
-    { icon: PITCH_ICONS[2], title: t.welcome.chatTitle, body: t.welcome.chatBody },
+    {
+      icon: PITCH_ICONS[0],
+      title: t.welcome.matchedTitle,
+      body: t.welcome.matchedBody,
+    },
+    {
+      icon: PITCH_ICONS[1],
+      title: t.welcome.lobbyTitle,
+      body: t.welcome.lobbyBody,
+    },
+    {
+      icon: PITCH_ICONS[2],
+      title: t.welcome.chatTitle,
+      body: t.welcome.chatBody,
+    },
   ];
 
   return (
@@ -42,7 +55,9 @@ export default function Welcome() {
 
       <LanguagePicker visible={picking} onClose={() => setPicking(false)} />
 
-      <View className="flex-1 justify-center gap-10 py-12">
+      <View
+        className={`flex-1 justify-center ${pick("gap-6", "gap-8", "gap-10")} ${pick("py-6", "py-9", "py-12")}`}
+      >
         <View className="gap-3">
           {/* Two weights on one line: the brand reads as a mark rather than a heading.
               This keeps `brand` — the wordmark is the one use of the pink that is identity
@@ -81,11 +96,14 @@ export default function Welcome() {
       </View>
 
       <View className="gap-3">
-        <Button label={t.welcome.createAccount} onPress={() => router.push('/register')} />
+        <Button
+          label={t.welcome.createAccount}
+          onPress={() => router.push("/register")}
+        />
         <Button
           label={t.welcome.haveAccount}
           variant="secondary"
-          onPress={() => router.push('/login')}
+          onPress={() => router.push("/login")}
         />
       </View>
     </Screen>

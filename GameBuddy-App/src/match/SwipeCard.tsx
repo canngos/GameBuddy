@@ -12,6 +12,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 import type { Candidate } from '../api/types';
 import { useT } from '../i18n/useT';
 import { useThemeColors } from '../theme';
+import { GradientView } from '../ui/Gradient';
 import { glow } from '../ui/glow';
 import { commit as commitHaptic, tapLight } from '../ui/haptics';
 import { Text } from '../ui/Text';
@@ -171,19 +172,48 @@ export function SwipeCard({
 
   const gesture = Gesture.Race(pan, tap);
 
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      {
-        rotate: `${interpolate(
-          translateX.value,
-          [-width, 0, width],
-          [-MAX_TILT, 0, MAX_TILT],
-          Extrapolation.CLAMP,
-        )}deg`,
-      },
-    ],
+  /*
+   * The card itself grows very slightly on the way up, which is most of why a Super Like
+   * reads as a bigger act than a like. A stamp in a corner asks somebody to look away from
+   * the thing they are dragging; scale is felt without being looked at.
+   *
+   * Deliberately small — 4% — because this is a 300dp card and anything more reads as a
+   * bug rather than as emphasis.
+   */
+  const cardStyle = useAnimatedStyle(() => {
+    const lifting = isSuper(translateX.value, translateY.value)
+      ? interpolate(-translateY.value, [0, superCommitDistance], [0, 1], Extrapolation.CLAMP)
+      : 0;
+
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { translateY: translateY.value },
+        {
+          rotate: `${interpolate(
+            translateX.value,
+            [-width, 0, width],
+            [-MAX_TILT, 0, MAX_TILT],
+            Extrapolation.CLAMP,
+          )}deg`,
+        },
+        { scale: 1 + lifting * 0.04 },
+      ],
+    };
+  });
+
+  /*
+   * The gold that washes over the card as it is lifted.
+   *
+   * This is the answer to the tester's complaint that a "SUPER" tag was not exciting: while
+   * you drag upward the whole card turns gold and lights up, so the state change is wherever
+   * you happen to be looking. Opacity only — the glow underneath is a static style on a
+   * plain child, because a node Reanimated drives must not also carry `glow()`.
+   */
+  const superWashStyle = useAnimatedStyle(() => ({
+    opacity: isSuper(translateX.value, translateY.value)
+      ? interpolate(-translateY.value, [0, superCommitDistance], [0, 1], Extrapolation.CLAMP)
+      : 0,
   }));
 
   /*
@@ -251,6 +281,25 @@ export function SwipeCard({
     <GestureDetector gesture={gesture}>
       <Animated.View style={[StyleSheet.absoluteFill, cardStyle]}>
         <CandidateCard candidate={candidate} />
+
+        {/* Over the card and under the stamps. `pointerEvents` off so it never competes
+            with the tap that opens the profile. */}
+        <Animated.View
+          style={[StyleSheet.absoluteFill, superWashStyle]}
+          pointerEvents="none"
+        >
+          <View
+            className="flex-1 rounded-card border-2 border-gold"
+            style={glow('strong', colors.gold)}
+          >
+            <GradientView
+              colors={['rgba(255,196,0,0.30)', 'rgba(255,138,0,0.12)']}
+              direction="vertical"
+              className="absolute inset-0 rounded-card"
+              pointerEvents="none"
+            />
+          </View>
+        </Animated.View>
 
         {/* Fixed colours rather than theme tokens: these sit on the card's own colour
             block and must not follow `text-content` into black.

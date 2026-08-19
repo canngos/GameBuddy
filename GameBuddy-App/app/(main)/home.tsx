@@ -18,6 +18,7 @@ import { NO_FILTERS, activeCount, type FeedFilters } from '../../src/match/filte
 import { useUpper } from '../../src/i18n/case';
 import { useT } from '../../src/i18n/useT';
 import { useCelebration } from '../../src/match/celebration';
+import { useDeckLayout } from '../../src/match/deckLayout';
 import { useDeck } from '../../src/match/useDeck';
 import { useThemeColors } from '../../src/theme';
 import { useTutorial } from '../../src/tutorial/store';
@@ -31,6 +32,7 @@ export default function Deck() {
   const [filters, setFilters] = useState<FeedFilters>(NO_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const deck = useDeck(filters);
+  const deckLayout = useDeckLayout();
 
   /*
    * Hand the match to the app-wide celebration.
@@ -96,9 +98,22 @@ export default function Deck() {
     // browser, obvious on a device.
     <Screen edges={['top']} padded={false}>
       <View className="flex-row items-center justify-between gap-4 px-6 pb-2 pt-2">
+        {/* Both capped at one line.
+
+            The heading is two words in English and four in some languages, and this row
+            gives it whatever the three controls beside it do not want. On a narrow screen
+            — a small phone, or any phone with the display size turned up — that was about
+            a third of the width, so "Who's playing" wrapped onto four lines and the header
+            alone took a quarter of the screen. The deck below is the screen; the header is
+            a label for it, and a label that grows by wrapping is one that takes room from
+            the thing it is labelling. */}
         <View className="flex-1">
-          <Text variant="overline">{upper(t.deck.header.discover)}</Text>
-          <Text variant="heading">{t.deck.header.title}</Text>
+          <Text variant="overline" numberOfLines={1}>
+            {upper(t.deck.header.discover)}
+          </Text>
+          <Text variant="heading" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            {t.deck.header.title}
+          </Text>
         </View>
 
         {/* Settings used to live here. It moved to Profile once that tab existed —
@@ -114,7 +129,8 @@ export default function Deck() {
         </View>
       </View>
 
-      <View className="flex-1 px-6 py-3">
+      {/* The gutter around the card scales with everything else — see `useDeckLayout`. */}
+      <View className="flex-1 px-6" style={{ paddingVertical: deckLayout.cardGutter }}>
         {deck.isLoading && (
           <View className="flex-1 items-center justify-center gap-3">
             <ActivityIndicator color={colors.primary} />
@@ -147,10 +163,22 @@ export default function Deck() {
 
         {deck.current && (
           <View className="flex-1">
-            {/* The next card sits underneath, inset and dimmed, so the deck reads as a
-                stack with somewhere to go rather than a single card that vanishes. */}
+            {/* The next card sits underneath, smaller and dimmed, so the deck reads as a
+                stack with somewhere to go rather than a single card that vanishes.
+
+                **Scaled, not inset.** It used to be positioned `top-4 bottom-2`, which made
+                it a genuinely shorter card — 24dp shorter — and so it laid its contents out
+                in less room than the card in front. On a small phone that was the difference
+                between the Style tags fitting and being clipped off the bottom, so swiping
+                revealed a card with no tags on it and putting it in front put them back. A
+                transform changes what is drawn, never the box it was measured in, so the
+                card behind now lays out exactly as it will when it is the card in front. */}
             {deck.upcoming && (
-              <View className="absolute inset-x-3 bottom-2 top-4" pointerEvents="none">
+              <View
+                className="absolute inset-0"
+                pointerEvents="none"
+                style={{ transform: [{ scale: 0.95 }] }}
+              >
                 <CandidateCard candidate={deck.upcoming} muted />
               </View>
             )}
@@ -169,17 +197,10 @@ export default function Deck() {
         )}
       </View>
 
-      {deck.decisionError && (
-        <View className="px-6 pb-2">
-          <ErrorNotice error={deck.decisionError} />
-        </View>
-      )}
-
-      {deck.rewindError && (
-        <View className="px-6 pb-2">
-          <ErrorNotice error={deck.rewindError} onRetry={deck.clearRewindError} />
-        </View>
-      )}
+      {/* Nothing is reported inline here any more. A refused swipe and a refused rewind
+          could both be on screen at once, stacked under the card, shifting the controls
+          down and staying until something else replaced them. Every deck failure now
+          arrives as the same sheet the limits use — see `LimitSheet`. */}
 
       {deck.current && (
         <DeckActions

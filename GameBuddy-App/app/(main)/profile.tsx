@@ -1,43 +1,53 @@
-import { useQuery } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { Crown, Settings, Shirt } from 'lucide-react-native';
-import { ActivityIndicator, Pressable, View } from 'react-native';
-import { billingApi } from '../../src/api/billing';
-import { profileApi } from '../../src/api/catalogue';
-import { socialApi } from '../../src/api/social';
-import { useUpper } from '../../src/i18n/case';
-import { useCountryName } from '../../src/i18n/countryNames';
-import { useT } from '../../src/i18n/useT';
-import { useThemeColors } from '../../src/theme';
+import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { useRouter } from "expo-router";
+import { Crown, Settings, Shirt } from "lucide-react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import { billingApi } from "../../src/api/billing";
+import { profileApi } from "../../src/api/catalogue";
+import { socialApi } from "../../src/api/social";
+import { useUpper } from "../../src/i18n/case";
+import { useCountryName } from "../../src/i18n/countryNames";
+import { useT } from "../../src/i18n/useT";
+import { useThemeColors } from "../../src/theme";
 import {
   Card,
   ErrorNotice,
   FramedAvatar,
+  GamePills,
   Icon,
+  type PillGame,
   ProfileBanner,
   Screen,
   Text,
-} from '../../src/ui';
+  useProfileHeaderLayout,
+} from "../../src/ui";
 
 export default function Profile() {
   const router = useRouter();
   const colors = useThemeColors();
+  const header = useProfileHeaderLayout();
   const t = useT();
   const upper = useUpper();
   const localize = useCountryName();
 
-  const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
-  const friends = useQuery({ queryKey: ['friends'], queryFn: socialApi.friends });
+  const me = useQuery({ queryKey: ["me"], queryFn: profileApi.me });
+  const friends = useQuery({
+    queryKey: ["friends"],
+    queryFn: socialApi.friends,
+  });
 
   // Same key the Market, the deck and the paywall use, so react-query serves all of them
   // from one request rather than this adding a fourth call on a screen that already makes
   // three.
-  const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
-  const isGold = subscription.data?.tier === 'GOLD';
+  const subscription = useQuery({
+    queryKey: ["subscription"],
+    queryFn: billingApi.subscription,
+  });
+  const isGold = subscription.data?.tier === "GOLD";
 
   return (
-    <Screen scroll edges={['top']}>
+    <Screen scroll edges={["top"]}>
       <View className="flex-row items-center justify-between pb-6 pt-8">
         <View>
           <Text variant="overline">{upper(t.profile.header)}</Text>
@@ -48,7 +58,7 @@ export default function Profile() {
               wardrobe is visited whenever something new is bought; settings are visited
               roughly once. */}
           <Pressable
-            onPress={() => router.push('/inventory')}
+            onPress={() => router.push("/inventory")}
             accessibilityRole="button"
             accessibilityLabel={t.profile.inventoryA11y}
             className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
@@ -57,7 +67,7 @@ export default function Profile() {
           </Pressable>
 
           <Pressable
-            onPress={() => router.push('/settings')}
+            onPress={() => router.push("/settings")}
             accessibilityRole="button"
             accessibilityLabel={t.profile.settingsA11y}
             className="h-11 w-11 items-center justify-center rounded-full bg-raised active:opacity-70"
@@ -70,23 +80,25 @@ export default function Profile() {
       </View>
 
       {me.isPending && <ActivityIndicator color={colors.primary} />}
-      {me.error && <ErrorNotice error={me.error} onRetry={() => me.refetch()} />}
+      {me.error && (
+        <ErrorNotice error={me.error} onRetry={() => me.refetch()} />
+      )}
 
       <View className="gap-6">
         {me.data && (
-          <Card className="gap-5">
+          <Card className={header.cardGap}>
             <ProfileBanner source={me.data.banner} />
 
             {/* Pulled up over the banner's lower edge, which is the arrangement every
                 profile header uses: it ties the two together instead of stacking a
                 picture on top of an unrelated strip of art. */}
-            <View className="-mt-9 flex-row items-end gap-4">
+            <View className={`${header.overlap} flex-row items-end gap-4`}>
               <FramedAvatar
                 frame={me.data.frame}
                 source={me.data.avatar}
                 name={me.data.username}
                 colorSeed={me.data.userId}
-                size={72}
+                size={header.avatar}
               />
               <View className="flex-1 gap-0.5 pb-1">
                 {/* The name shrinks and truncates so the tag beside it is never pushed off
@@ -100,7 +112,9 @@ export default function Profile() {
                   {isGold && <GoldTag />}
                 </View>
                 <Text variant="caption">
-                  {[me.data.age, localize(me.data.country)].filter(Boolean).join(' · ')}
+                  {[me.data.age, localize(me.data.country)]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </Text>
               </View>
             </View>
@@ -114,25 +128,33 @@ export default function Profile() {
               <Stat
                 label={t.profile.friends}
                 value={friends.data?.length ?? 0}
-                onPress={() => router.push('/friends')}
+                onPress={() => router.push("/friends")}
               />
               <Stat label={t.profile.coins} value={me.data.coin ?? 0} />
               <Stat
                 label={t.profile.badges}
                 value={me.data.badgeCount ?? 0}
-                onPress={() => router.push('/badges')}
+                onPress={() => router.push("/badges")}
               />
             </View>
 
-            <Showcase badges={me.data.badges ?? []} onPress={() => router.push('/badges')} />
+            <Showcase
+              badges={me.data.badges ?? []}
+              onPress={() => router.push("/badges")}
+            />
 
             <View className="h-px bg-line" />
 
-            <Tags title={t.profile.games} items={me.data.games.map((g) => g.gameName)} accent />
+            {/* The same pills as the deck, cover art and all — `games` has carried
+                `gameIcon` all along and this used to render only the name. */}
+            <GameSection title={t.profile.games} games={me.data.games} />
             {/* Directly under games, because it is the second half of the same question:
                 what you play, and what you play it on. */}
             <Tags title={t.profile.playsOn} items={me.data.platforms ?? []} />
-            <Tags title={t.profile.keywords} items={me.data.keywords.map((k) => k.keywordName)} />
+            <Tags
+              title={t.profile.keywords}
+              items={me.data.keywords.map((k) => k.keywordName)}
+            />
           </Card>
         )}
 
@@ -169,8 +191,16 @@ function GoldTag() {
       accessibilityRole="text"
       accessibilityLabel={t.profile.goldMemberA11y}
     >
-      <Icon as={Crown} size={12} tone="gold" fill={colors.gold} strokeWidth={2} />
-      <Text className="font-semibold text-[11px] leading-[15px] text-gold">Gold</Text>
+      <Icon
+        as={Crown}
+        size={12}
+        tone="gold"
+        fill={colors.gold}
+        strokeWidth={2}
+      />
+      <Text className="font-semibold text-[11px] leading-[15px] text-gold">
+        Gold
+      </Text>
     </View>
   );
 }
@@ -188,17 +218,19 @@ function Stat({
     <Pressable
       onPress={onPress}
       disabled={!onPress}
-      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityRole={onPress ? "button" : undefined}
       // Both branches carry the same class keys; only the values move. A class present
       // on one and absent on the other stops NativeWind painting the subtree — see
       // `src/ui/hairline.ts`.
       className={
         onPress
-          ? 'flex-1 items-center gap-0.5 rounded-card bg-raised py-3 active:opacity-70'
-          : 'flex-1 items-center gap-0.5 rounded-card bg-raised py-3 active:opacity-100'
+          ? "flex-1 items-center gap-0.5 rounded-card bg-raised py-3 active:opacity-70"
+          : "flex-1 items-center gap-0.5 rounded-card bg-raised py-3 active:opacity-100"
       }
     >
-      <Text className="font-bold text-[20px] leading-[26px] text-primary">{value}</Text>
+      <Text className="font-bold text-[20px] leading-[26px] text-primary">
+        {value}
+      </Text>
       <Text variant="caption">{label}</Text>
     </Pressable>
   );
@@ -233,7 +265,11 @@ function Showcase({
           // Wide enough for two lines of the longest title in the set. At one line
           // every name but the shortest ended in an ellipsis, which is a worse way to
           // spend the space than simply wrapping.
-          <View key={badge.code} className="items-center gap-1" style={{ width: 80 }}>
+          <View
+            key={badge.code}
+            className="items-center gap-1"
+            style={{ width: 80 }}
+          >
             <Image
               source={{ uri: badge.icon }}
               style={{ width: 48, height: 48 }}
@@ -249,6 +285,30 @@ function Showcase({
         ))
       )}
     </Pressable>
+  );
+}
+
+/**
+ * Games, drawn exactly as the deck draws them.
+ *
+ * Its own wrapper rather than a flag on `Tags`, because a game is not a tag: it has art, and
+ * `GamePills` is what knows how to place it. The heading matches the tag sections beside it
+ * so the card still reads as one list of facts about a person.
+ */
+function GameSection({ title, games }: { title: string; games: PillGame[] }) {
+  return (
+    <View className="gap-2">
+      <Text variant="label" className="text-muted">
+        {title}
+      </Text>
+      {games.length === 0 ? (
+        <Text variant="body" className="text-muted">
+          —
+        </Text>
+      ) : (
+        <GamePills games={games} />
+      )}
+    </View>
   );
 }
 
@@ -277,11 +337,14 @@ function Tags({
               key={item}
               className={
                 accent
-                  ? 'rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5'
-                  : 'rounded-full bg-raised px-3 py-1.5'
+                  ? "rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5"
+                  : "rounded-full bg-raised px-3 py-1.5"
               }
             >
-              <Text variant="caption" className={accent ? 'text-primary' : 'text-content'}>
+              <Text
+                variant="caption"
+                className={accent ? "text-primary" : "text-content"}
+              >
                 {item}
               </Text>
             </View>
@@ -291,4 +354,3 @@ function Tags({
     </View>
   );
 }
-
