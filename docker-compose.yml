@@ -236,6 +236,33 @@ services:
       LOCAL_MEDIA_DIR: /app/.media
       LOCAL_MEDIA_URL: ${LOCAL_MEDIA_URL:-http://10.0.2.2:8080/media}
 
+      # Rate limits. Every one is optional and every one is forwarded bare on purpose:
+      # Compose resolves an unset variable to the empty string, and the application treats
+      # an empty rate-limit value as "not configured" and keeps the default it shipped
+      # with. So the normal state of this block is that none of them are in .env and none
+      # of them do anything — the same arrangement as R2_ACCESS_KEY_ID above.
+      #
+      # Declared here rather than in the prod overlay because compose MERGES environment
+      # maps, so one definition serves both environments. The defaults and the reasoning
+      # behind each number are in application.yml under `gamebuddy.rate-limit`; DEPLOY.md
+      # section 8 has the table and the procedure for changing one on the server.
+      MATCH_DECISION_PERMITS: ${MATCH_DECISION_PERMITS:-}
+      MATCH_DECISION_WINDOW: ${MATCH_DECISION_WINDOW:-}
+      LOBBY_CREATE_PERMITS: ${LOBBY_CREATE_PERMITS:-}
+      LOBBY_CREATE_WINDOW: ${LOBBY_CREATE_WINDOW:-}
+      LOBBY_JOIN_PERMITS: ${LOBBY_JOIN_PERMITS:-}
+      LOBBY_JOIN_WINDOW: ${LOBBY_JOIN_WINDOW:-}
+      LOBBY_MESSAGE_PERMITS: ${LOBBY_MESSAGE_PERMITS:-}
+      LOBBY_MESSAGE_WINDOW: ${LOBBY_MESSAGE_WINDOW:-}
+      AUTH_LOGIN_PERMITS: ${AUTH_LOGIN_PERMITS:-}
+      AUTH_LOGIN_WINDOW: ${AUTH_LOGIN_WINDOW:-}
+      AUTH_VERIFY_PERMITS: ${AUTH_VERIFY_PERMITS:-}
+      AUTH_VERIFY_WINDOW: ${AUTH_VERIFY_WINDOW:-}
+      AUTH_SEND_CODE_PERMITS: ${AUTH_SEND_CODE_PERMITS:-}
+      AUTH_SEND_CODE_WINDOW: ${AUTH_SEND_CODE_WINDOW:-}
+      AUTH_RESET_PASSWORD_PERMITS: ${AUTH_RESET_PASSWORD_PERMITS:-}
+      AUTH_RESET_PASSWORD_WINDOW: ${AUTH_RESET_PASSWORD_WINDOW:-}
+
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env}
 

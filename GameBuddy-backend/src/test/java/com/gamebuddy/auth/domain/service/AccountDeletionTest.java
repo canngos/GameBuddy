@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.auth.config.AuthRateLimitConfig;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.request.DeleteAccountRequest;
 import com.gamebuddy.auth.interfaces.request.FcmTokenRequest;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.exception.BusinessException;
-import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.shared.entity.AvatarStatus;
 import com.gamebuddy.shared.entity.Cosmetic;
@@ -21,7 +21,6 @@ import com.gamebuddy.shared.event.AccountDeletedEvent;
 import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
-import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -89,12 +88,9 @@ class AccountDeletionTest {
     @Mock
     private ObjectStorage objectStorage;
 
+    /** The production bean rather than a copy of its numbers; see DefaultAuthServiceTest. */
     @Spy
-    private AuthRateLimiters rateLimiters = new AuthRateLimiters(
-            new RateLimiter(10, Duration.ofMinutes(15)),
-            new RateLimiter(3, Duration.ofMinutes(15)),
-            new RateLimiter(10, Duration.ofMinutes(15)),
-            new RateLimiter(10, Duration.ofMinutes(15)));
+    private AuthRateLimiters rateLimiters = new AuthRateLimitConfig().authRateLimiters();
 
     private Gamer gamer;
 
