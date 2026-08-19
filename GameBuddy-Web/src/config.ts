@@ -10,7 +10,7 @@ export const SITE = {
   url: 'https://findgamebuddy.com',
   name: 'GameBuddy',
   /** Used as the `<title>` suffix and in the JSON-LD. */
-  tagline: 'Find people who actually play what you play',
+  tagline: 'Find people who actually want to play games with you',
 } as const;
 
 /**
