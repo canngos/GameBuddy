@@ -240,7 +240,7 @@ export default function Deck() {
                   // a P20 Lite on Android 9. The card behind does not move while the front
                   // one is dragged, so there is no per-frame resampling to pay for.
                   blurMethod="dimezisBlurView"
-                  intensity={40}
+                  intensity={20}
                   tint="default"
                   style={StyleSheet.absoluteFill}
                   pointerEvents="none"

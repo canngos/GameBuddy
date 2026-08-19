@@ -31,7 +31,7 @@ export const fr: Dictionary = {
     comingSoon: 'Bientôt sur',
     releaseNote: 'GameBuddy est en phase finale avant la sortie. Android arrive en premier.',
     deckAlt: "Le deck GameBuddy, montrant le profil d'un joueur et les jeux auxquels il joue",
-    chatAlt: 'Une conversation GameBuddy entre deux joueurs qui ont matché',
+    chatAlt: 'La liste des conversations GameBuddy, avec un nouveau match en attente',
   },
 
   features: {
