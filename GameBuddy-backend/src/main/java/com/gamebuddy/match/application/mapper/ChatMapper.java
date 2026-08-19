@@ -30,7 +30,14 @@ public interface ChatMapper {
 
     List<GamesDto> toGameDtos(Collection<Games> games);
 
-    /** Avatar, games and keywords need lookups or flattening; the service fills them in. */
+    /**
+     * Avatar, games and keywords need lookups or flattening; the service fills them in.
+     *
+     * <p>{@code superLike} is not a property of a gamer at all — it describes one gamer's
+     * like of another — so there is nothing on the source to map. Only the "who liked you"
+     * list sets it; everywhere else it stays false.
+     */
+    @Mapping(target = "superLike", ignore = true)
     @Mapping(target = "avatar", ignore = true)
     @Mapping(target = "favoriteGames", ignore = true)
     @Mapping(target = "frame", ignore = true)

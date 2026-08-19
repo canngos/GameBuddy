@@ -92,7 +92,7 @@ export type UserInfo = {
    * account has no age, games or keywords, so the onboarding check would otherwise
    * strand it on "finish your profile" forever.
    */
-  role?: 'USER' | 'ADMIN';
+  role?: "USER" | "ADMIN";
   games: Game[];
   keywords: Keyword[];
   /**
@@ -132,6 +132,14 @@ export type Candidate = {
   selectedKeywords: string[];
   /** Labels, not enum names. Empty for accounts that pre-date the field. */
   platforms: string[];
+  /**
+   * Whether this person's like was a super like.
+   *
+   * Only ever true in the "who liked you" list — everywhere else this describes somebody
+   * who has not necessarily liked you at all, and the server leaves it false. Optional
+   * because a client on an older build talks to a server that never sends it.
+   */
+  superLike?: boolean;
 };
 
 /** Today's swipe budget. One budget with a sub-cap, not two. */
@@ -283,17 +291,19 @@ export type ProfileDetails = {
   keywords: string[];
 };
 
-export type LobbyTone = 'COMPETITIVE' | 'CHILL' | 'CASUAL' | 'LEARNING';
+export type LobbyTone = "COMPETITIVE" | "CHILL" | "CASUAL" | "LEARNING";
 
 /**
  * OPEN takes requests; LOCKED is "team found, stop asking" and starts no timer; ENDED and
  * CANCELLED keep the chat readable (read-only); ARCHIVED never reaches the client — the
  * backend answers 404 for it.
  */
-export type LobbyStatus = 'OPEN' | 'LOCKED' | 'ENDED' | 'CANCELLED' | 'ARCHIVED';
+export type LobbyStatus =
+  "OPEN" | "LOCKED" | "ENDED" | "CANCELLED" | "ARCHIVED";
 
 /** REJECTED is final for that lobby; LEFT and KICKED may request again. */
-export type LobbyMemberStatus = 'OWNER' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'LEFT' | 'KICKED';
+export type LobbyMemberStatus =
+  "OWNER" | "PENDING" | "ACCEPTED" | "REJECTED" | "LEFT" | "KICKED";
 
 /** One lobby: the card in the browse feed and the header of the detail screen. */
 export type Lobby = {
@@ -355,10 +365,6 @@ export type LobbyDetail = {
   pendingRequests: LobbyMember[];
 };
 
-
-
-
-
 /**
  * The result of uploading an avatar.
  *
@@ -368,7 +374,7 @@ export type LobbyDetail = {
  * owner can look at what they uploaded while being told it is under review.
  */
 export type AvatarUpload = {
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  status: "APPROVED" | "PENDING" | "REJECTED";
   url: string;
 };
 
@@ -381,7 +387,7 @@ export type AvatarUpload = {
  */
 export type Cosmetic = {
   id: string;
-  kind: 'FRAME' | 'BANNER';
+  kind: "FRAME" | "BANNER";
   name: string;
   image: string;
   animated: boolean;

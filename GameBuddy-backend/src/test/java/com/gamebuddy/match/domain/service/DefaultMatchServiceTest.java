@@ -15,6 +15,8 @@ import com.gamebuddy.match.domain.client.PredictClient;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent;
 import com.gamebuddy.match.infrastructure.entity.*;
 import com.gamebuddy.match.infrastructure.repository.*;
+import com.gamebuddy.match.infrastructure.entity.SuperLike;
+import com.gamebuddy.match.infrastructure.repository.SuperLikeRepository;
 import com.gamebuddy.match.infrastructure.repository.UnlockedAdmirerRepository;
 import com.gamebuddy.match.interfaces.dto.GamerDto;
 import com.gamebuddy.match.interfaces.request.ColdStartRequest;
@@ -86,6 +88,13 @@ class DefaultMatchServiceTest {
 
     @Mock
     private DeclinedMatchRepository declinedMatches;
+
+    /**
+     * Which likes were super likes. Empty by default: an ordinary accept must not touch it,
+     * and the "who liked you" list must not mark anybody without a row here.
+     */
+    @Mock
+    private SuperLikeRepository superLikes;
 
     /**
      * Admirers bought one at a time. Mocked and empty by default, which is the truthful
@@ -187,6 +196,12 @@ class DefaultMatchServiceTest {
     private GamerRequest request(Gamer target) {
         GamerRequest r = new GamerRequest();
         r.setUserId(target.getUserId());
+        return r;
+    }
+
+    private GamerRequest superLikeRequest(Gamer target) {
+        GamerRequest r = request(target);
+        r.setSuperLike(true);
         return r;
     }
 
@@ -951,6 +966,27 @@ class DefaultMatchServiceTest {
         }
 
         @Test
+        @DisplayName("a super like is recorded, so the liked-you list can still tell later")
+        void testAcceptGamer_whenSuperLike_RecordsIt() {
+            gamer.setSuperLikes(1);
+
+            matchService.acceptGamer(gamer, superLikeRequest(candidate));
+
+            ArgumentCaptor<SuperLike> saved = ArgumentCaptor.forClass(SuperLike.class);
+            verify(superLikes).save(saved.capture());
+            assertEquals(gamer.getUserId(), saved.getValue().getUserId());
+            assertEquals(candidate.getUserId(), saved.getValue().getTargetId());
+        }
+
+        @Test
+        @DisplayName("an ordinary like records nothing — the star is for super likes only")
+        void testAcceptGamer_whenOrdinaryLike_RecordsNoSuperLike() {
+            matchService.acceptGamer(gamer, request(candidate));
+
+            verify(superLikes, never()).save(any());
+        }
+
+        @Test
         @DisplayName("accepting someone previously declined clears the decline")
         void testAcceptGamer_whenPreviouslyDeclined_ClearsTheDecline() {
             hasDeclined(gamer, candidate.getUserId());
@@ -1301,6 +1337,32 @@ class DefaultMatchServiceTest {
             assertFalse(body.isLocked());
             assertEquals(1, body.getLikedYou().size());
             assertEquals("candidate", body.getLikedYou().get(0).getGamerUsername());
+        }
+
+        @Test
+        @DisplayName("an admirer who super liked is flagged, and an ordinary one is not")
+        void testGetWhoLikedYou_whenSuperLiked_FlagsThatAdmirer() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+            when(gamerRepository.findPendingAdmirers(gamer.getUserId())).thenReturn(List.of(candidate));
+            when(superLikes.findSendersAmong(eq(gamer.getUserId()), anyCollection()))
+                    .thenReturn(List.of(candidate.getUserId()));
+
+            var body = matchService.getWhoLikedYou(gamer).getBody().getData();
+
+            assertTrue(body.getLikedYou().get(0).isSuperLike());
+        }
+
+        @Test
+        @DisplayName("with no super likes recorded, nobody is flagged")
+        void testGetWhoLikedYou_whenNoSuperLikes_FlagsNobody() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+            when(gamerRepository.findPendingAdmirers(gamer.getUserId())).thenReturn(List.of(candidate));
+
+            var body = matchService.getWhoLikedYou(gamer).getBody().getData();
+
+            assertFalse(body.getLikedYou().get(0).isSuperLike());
         }
 
         @Test

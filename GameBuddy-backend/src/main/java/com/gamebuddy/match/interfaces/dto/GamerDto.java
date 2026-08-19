@@ -37,4 +37,15 @@ public class GamerDto {
      * than showing "Plays on: —", because an absent answer is not information.
      */
     private List<String> platforms;
+
+    /**
+     * Whether this gamer's like was a super like.
+     *
+     * <p>Only ever true on the "who liked you" list, which is the one place the question
+     * means anything: everywhere else this DTO describes somebody who has not necessarily
+     * liked you at all, and the field is left false rather than being made nullable to say
+     * "not applicable". A boolean that is false in the deck costs a word on the wire and
+     * spares every caller a null check.
+     */
+    private boolean superLike;
 }

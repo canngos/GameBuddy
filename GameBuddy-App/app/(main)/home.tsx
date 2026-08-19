@@ -1,30 +1,44 @@
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { Gamepad2, SlidersHorizontal } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
-import { AdmirersBadge } from './admirers';
-import { billingApi } from '../../src/api/billing';
-import { UpgradePromptSheet } from '../../src/billing/UpgradePromptSheet';
-import { REWIND_COST_COINS } from '../../src/match/prices';
-import type { Candidate } from '../../src/api/types';
-import { CandidateCard } from '../../src/match/CandidateCard';
-import { CandidateSheet } from '../../src/match/CandidateSheet';
-import { DeckActions } from '../../src/match/DeckActions';
-import { FilterSheet } from '../../src/match/FilterSheet';
-import { LimitSheet } from '../../src/match/LimitSheet';
-import { SwipeCard } from '../../src/match/SwipeCard';
-import { NO_FILTERS, activeCount, type FeedFilters } from '../../src/match/filters';
-import { useUpper } from '../../src/i18n/case';
-import { useT } from '../../src/i18n/useT';
-import { useCelebration } from '../../src/match/celebration';
-import { useDeckLayout } from '../../src/match/deckLayout';
-import { useDeck } from '../../src/match/useDeck';
-import { useThemeColors } from '../../src/theme';
-import { useTutorial } from '../../src/tutorial/store';
-import { Button, EmptyState, ErrorNotice, Icon, Screen, Text } from '../../src/ui';
+import { useQuery } from "@tanstack/react-query";
+import { BlurTargetView, BlurView } from "expo-blur";
+import { useRouter } from "expo-router";
+import { Gamepad2, SlidersHorizontal } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { AdmirersBadge } from "./admirers";
+import { billingApi } from "../../src/api/billing";
+import { UpgradePromptSheet } from "../../src/billing/UpgradePromptSheet";
+import { REWIND_COST_COINS } from "../../src/match/prices";
+import type { Candidate } from "../../src/api/types";
+import { CandidateCard } from "../../src/match/CandidateCard";
+import { CandidateSheet } from "../../src/match/CandidateSheet";
+import { DeckActions } from "../../src/match/DeckActions";
+import { FilterSheet } from "../../src/match/FilterSheet";
+import { LimitSheet } from "../../src/match/LimitSheet";
+import { SwipeCard } from "../../src/match/SwipeCard";
+import {
+  NO_FILTERS,
+  activeCount,
+  type FeedFilters,
+} from "../../src/match/filters";
+import { useUpper } from "../../src/i18n/case";
+import { useT } from "../../src/i18n/useT";
+import { useCelebration } from "../../src/match/celebration";
+import { useDeckLayout } from "../../src/match/deckLayout";
+import { useDeck } from "../../src/match/useDeck";
+import { useThemeColors } from "../../src/theme";
+import { useTutorial } from "../../src/tutorial/store";
+import {
+  Button,
+  EmptyState,
+  ErrorNotice,
+  Icon,
+  Screen,
+  Text,
+} from "../../src/ui";
 
 export default function Deck() {
+  // Android's BlurView samples a specific view rather than the window; this is it.
+  const upcomingBlurTarget = useRef<View>(null);
   const colors = useThemeColors();
   const router = useRouter();
   const t = useT();
@@ -62,7 +76,10 @@ export default function Deck() {
 
   // Shared cache with the paywall, so buying Gold there unlocks the controls here without
   // a reload. Only ever advisory — see FilterSheet on why the server is the authority.
-  const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
+  const subscription = useQuery({
+    queryKey: ["subscription"],
+    queryFn: billingApi.subscription,
+  });
   const unlocked = subscription.data?.canUseAdvancedFilters ?? false;
 
   /**
@@ -90,13 +107,15 @@ export default function Deck() {
   // one app open; not deferring costs the only showing there is.
   const tutorialStep = useTutorial((s) => s.step);
   const promptDue =
-    (subscription.data?.upgradePromptDue ?? false) && !frozen && tutorialStep === null;
+    (subscription.data?.upgradePromptDue ?? false) &&
+    !frozen &&
+    tutorialStep === null;
 
   return (
     // Top only: the tab bar owns the bottom inset now. It briefly did not, and the
     // Pass/Match labels sat underneath Android's navigation bar — invisible in a
     // browser, obvious on a device.
-    <Screen edges={['top']} padded={false}>
+    <Screen edges={["top"]} padded={false}>
       <View className="flex-row items-center justify-between gap-4 px-6 pb-2 pt-2">
         {/* Both capped at one line.
 
@@ -111,7 +130,12 @@ export default function Deck() {
           <Text variant="overline" numberOfLines={1}>
             {upper(t.deck.header.discover)}
           </Text>
-          <Text variant="heading" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+          <Text
+            variant="heading"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
             {t.deck.header.title}
           </Text>
         </View>
@@ -123,14 +147,20 @@ export default function Deck() {
             left, and how many people are waiting for you. The second is the reason to
             come back, so it sits closest to the thumb. */}
         <View className="flex-row items-center gap-4">
-          <FilterButton count={activeCount(filters)} onPress={() => setFiltersOpen(true)} />
+          <FilterButton
+            count={activeCount(filters)}
+            onPress={() => setFiltersOpen(true)}
+          />
           <AdmirersBadge />
           <Allowance deck={deck} />
         </View>
       </View>
 
       {/* The gutter around the card scales with everything else — see `useDeckLayout`. */}
-      <View className="flex-1 px-6" style={{ paddingVertical: deckLayout.cardGutter }}>
+      <View
+        className="flex-1 px-6"
+        style={{ paddingVertical: deckLayout.cardGutter }}
+      >
         {deck.isLoading && (
           <View className="flex-1 items-center justify-center gap-3">
             <ActivityIndicator color={colors.primary} />
@@ -140,26 +170,32 @@ export default function Deck() {
 
         {deck.error && (
           <View className="flex-1 justify-center">
-            <ErrorNotice error={deck.error} onRetry={() => void deck.refetchFeed()} />
+            <ErrorNotice
+              error={deck.error}
+              onRetry={() => void deck.refetchFeed()}
+            />
           </View>
         )}
 
         {deck.filtersRefused && (
           <View className="flex-1 justify-center">
             <FiltersLocked
-              onUpgrade={() => router.push('/gold')}
+              onUpgrade={() => router.push("/gold")}
               onClear={() => setFilters(NO_FILTERS)}
             />
           </View>
         )}
 
-        {!deck.isLoading && !deck.error && !deck.filtersRefused && deck.exhausted && (
-          <Exhausted
-            onReload={deck.reload}
-            filtered={activeCount(filters) > 0}
-            onClearFilters={() => setFilters(NO_FILTERS)}
-          />
-        )}
+        {!deck.isLoading &&
+          !deck.error &&
+          !deck.filtersRefused &&
+          deck.exhausted && (
+            <Exhausted
+              onReload={deck.reload}
+              filtered={activeCount(filters) > 0}
+              onClearFilters={() => setFilters(NO_FILTERS)}
+            />
+          )}
 
         {deck.current && (
           <View className="flex-1">
@@ -175,11 +211,40 @@ export default function Deck() {
                 card behind now lays out exactly as it will when it is the card in front. */}
             {deck.upcoming && (
               <View
-                className="absolute inset-0"
+                className="absolute inset-0 overflow-hidden rounded-card"
                 pointerEvents="none"
                 style={{ transform: [{ scale: 0.95 }] }}
               >
-                <CandidateCard candidate={deck.upcoming} muted />
+                {/*
+                  Two views, not one, because a `BlurView` blurs what is *behind* it rather
+                  than what is inside it. Wrapping the card in one would have blurred the
+                  screen behind the deck and left the card itself perfectly sharp — which
+                  looks like the blur simply did not work.
+
+                  On Android it also needs to be told what to sample: `blurTarget` takes a
+                  ref to the `BlurTargetView` below, and without `blurMethod` the default is
+                  `'none'`, which draws a flat translucent rectangle. Both of those fail
+                  quietly — you get *a* view, just not a blurred one.
+                */}
+                <BlurTargetView
+                  ref={upcomingBlurTarget}
+                  style={StyleSheet.absoluteFill}
+                >
+                  <CandidateCard candidate={deck.upcoming} muted />
+                </BlurTargetView>
+
+                <BlurView
+                  blurTarget={upcomingBlurTarget}
+                  // `dimezisBlurView` rather than the SDK-31+ variant: that one falls back
+                  // to no blur at all below Android 12, and the phone this was asked for is
+                  // a P20 Lite on Android 9. The card behind does not move while the front
+                  // one is dragged, so there is no per-frame resampling to pay for.
+                  blurMethod="dimezisBlurView"
+                  intensity={40}
+                  tint="default"
+                  style={StyleSheet.absoluteFill}
+                  pointerEvents="none"
+                />
               </View>
             )}
 
@@ -224,7 +289,10 @@ export default function Deck() {
 
       {/* Below the limit sheet and the match overlay in z-order, because this one is opened
           on purpose and those two arrive on their own. */}
-      <CandidateSheet candidate={profileOf} onDismiss={() => setProfileOf(null)} />
+      <CandidateSheet
+        candidate={profileOf}
+        onDismiss={() => setProfileOf(null)}
+      />
 
       <LimitSheet
         block={deck.block}
@@ -236,7 +304,6 @@ export default function Deck() {
           overlay or a limit sheet is a response to something the gamer just did, and
           landing a pitch on top of either would talk over it. */}
       <UpgradePromptSheet due={promptDue} />
-
     </Screen>
   );
 }
@@ -264,28 +331,42 @@ function Allowance({ deck }: { deck: ReturnType<typeof useDeck> }) {
  * unfiltered one, and without a visible badge an empty deck reads as "nobody uses this
  * app" rather than "you asked for Valorant players in Finland who are online".
  */
-function FilterButton({ count, onPress }: { count: number; onPress: () => void }) {
+function FilterButton({
+  count,
+  onPress,
+}: {
+  count: number;
+  onPress: () => void;
+}) {
   const t = useT();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={
-        count > 0 ? t.deck.header.filtersOnA11y(count) : t.deck.header.filtersA11y
+        count > 0
+          ? t.deck.header.filtersOnA11y(count)
+          : t.deck.header.filtersA11y
       }
       hitSlop={8}
       className={[
-        'h-9 flex-row items-center gap-1.5 rounded-full border px-3',
-        count > 0 ? 'border-primary bg-primary/10' : 'border-line bg-raised',
-      ].join(' ')}>
+        "h-9 flex-row items-center gap-1.5 rounded-full border px-3",
+        count > 0 ? "border-primary bg-primary/10" : "border-line bg-raised",
+      ].join(" ")}
+    >
       {/* Was the literal character ⚙︎, which renders at whatever weight the platform
           font feels like and cannot take the active colour. */}
-      <Icon as={SlidersHorizontal} size={15} tone={count > 0 ? 'primary' : 'muted'} />
+      <Icon
+        as={SlidersHorizontal}
+        size={15}
+        tone={count > 0 ? "primary" : "muted"}
+      />
       <Text
         className={[
-          'font-semibold text-[13px] leading-[17px]',
-          count > 0 ? 'text-primary' : 'text-muted',
-        ].join(' ')}>
+          "font-semibold text-[13px] leading-[17px]",
+          count > 0 ? "text-primary" : "text-muted",
+        ].join(" ")}
+      >
         {count > 0 ? String(count) : t.deck.header.filter}
       </Text>
     </Pressable>
@@ -300,7 +381,13 @@ function FilterButton({ count, onPress }: { count: number; onPress: () => void }
  * ordinary deck back without paying — otherwise an expiry silently bricks the main screen
  * of the app.
  */
-function FiltersLocked({ onUpgrade, onClear }: { onUpgrade: () => void; onClear: () => void }) {
+function FiltersLocked({
+  onUpgrade,
+  onClear,
+}: {
+  onUpgrade: () => void;
+  onClear: () => void;
+}) {
   const t = useT();
   return (
     <EmptyState
@@ -311,7 +398,11 @@ function FiltersLocked({ onUpgrade, onClear }: { onUpgrade: () => void; onClear:
       accent
     >
       <Button label={t.deck.locked.getGold} onPress={onUpgrade} />
-      <Button label={t.deck.locked.showEveryone} variant="ghost" onPress={onClear} />
+      <Button
+        label={t.deck.locked.showEveryone}
+        variant="ghost"
+        onPress={onClear}
+      />
     </EmptyState>
   );
 }
@@ -330,13 +421,26 @@ function Exhausted({
     <View className="flex-1 justify-center">
       <EmptyState
         icon={Gamepad2}
-        title={filtered ? t.deck.exhausted.filteredTitle : t.deck.exhausted.title}
-        blurb={filtered ? t.deck.exhausted.filteredBlurb : t.deck.exhausted.blurb}
+        title={
+          filtered ? t.deck.exhausted.filteredTitle : t.deck.exhausted.title
+        }
+        blurb={
+          filtered ? t.deck.exhausted.filteredBlurb : t.deck.exhausted.blurb
+        }
       >
         {/* Offered before "look again", because refetching the same narrow filters is the
             one thing that will not produce anybody new. */}
-        {filtered && <Button label={t.deck.filters.clearFilters} onPress={onClearFilters} />}
-        <Button label={t.deck.exhausted.lookAgain} variant="secondary" onPress={onReload} />
+        {filtered && (
+          <Button
+            label={t.deck.filters.clearFilters}
+            onPress={onClearFilters}
+          />
+        )}
+        <Button
+          label={t.deck.exhausted.lookAgain}
+          variant="secondary"
+          onPress={onReload}
+        />
       </EmptyState>
     </View>
   );
