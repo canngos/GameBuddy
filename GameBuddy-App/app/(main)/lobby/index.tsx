@@ -1,18 +1,26 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { Clock, Users } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
-import { lobbyApi, PAGE_SIZE } from '../../../src/api/lobby';
-import type { Lobby, LobbyTone } from '../../../src/api/types';
-import { useUpper } from '../../../src/i18n/case';
-import type { Dictionary } from '../../../src/i18n/dictionaries/en';
-import { useT } from '../../../src/i18n/useT';
-import { LobbyCard } from '../../../src/lobby/LobbyCard';
-import { TONES, ToneChip } from '../../../src/lobby/ToneChip';
-import { useThemeColors } from '../../../src/theme';
-import { Button, EmptyState, ErrorNotice, Icon, Screen, Text } from '../../../src/ui';
-import { cn } from '../../../src/ui/cn';
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { Clock, Users } from "lucide-react-native";
+import { useCallback, useMemo, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
+import { LIVE_QUERY } from "../../../src/lobby/live";
+import { lobbyApi, PAGE_SIZE } from "../../../src/api/lobby";
+import type { Lobby, LobbyTone } from "../../../src/api/types";
+import { useUpper } from "../../../src/i18n/case";
+import type { Dictionary } from "../../../src/i18n/dictionaries/en";
+import { useT } from "../../../src/i18n/useT";
+import { LobbyCard } from "../../../src/lobby/LobbyCard";
+import { TONES, ToneChip } from "../../../src/lobby/ToneChip";
+import { useThemeColors } from "../../../src/theme";
+import {
+  Button,
+  EmptyState,
+  ErrorNotice,
+  Icon,
+  Screen,
+  Text,
+} from "../../../src/ui";
+import { cn } from "../../../src/ui/cn";
 
 /**
  * The lobby tab: what I am in, then what is open.
@@ -32,15 +40,21 @@ export default function LobbyHome() {
   // able to ask both at once.
   const [startingSoon, setStartingSoon] = useState(false);
 
-  const mine = useQuery({ queryKey: ['my-lobbies'], queryFn: lobbyApi.mine });
+  const mine = useQuery({
+    queryKey: ["my-lobbies"],
+    queryFn: lobbyApi.mine,
+    ...LIVE_QUERY,
+  });
 
   const feed = useInfiniteQuery({
-    queryKey: ['lobbies', tone, startingSoon],
+    ...LIVE_QUERY,
+    queryKey: ["lobbies", tone, startingSoon],
     queryFn: ({ pageParam }) =>
       lobbyApi.browse(pageParam, undefined, tone ?? undefined, startingSoon),
     initialPageParam: 0,
     // No total in the response; a short page is the end-of-list signal.
-    getNextPageParam: (last, all) => (last.length < PAGE_SIZE ? undefined : all.length),
+    getNextPageParam: (last, all) =>
+      last.length < PAGE_SIZE ? undefined : all.length,
   });
 
   const myLobbies = mine.data ?? [];
@@ -55,14 +69,18 @@ export default function LobbyHome() {
    */
   const open = useMemo(() => {
     const mineIds = new Set(myLobbies.map((lobby) => lobby.id));
-    return (feed.data?.pages.flat() ?? []).filter((lobby) => !mineIds.has(lobby.id));
+    return (feed.data?.pages.flat() ?? []).filter(
+      (lobby) => !mineIds.has(lobby.id),
+    );
   }, [feed.data?.pages, myLobbies]);
 
   // One live lobby per owner is the rule the backend enforces (LOBBY_LIMIT_REACHED).
   // Knowing it here too means the button can say so before somebody fills in a form
   // that was always going to be refused.
   const ownsLive = myLobbies.some(
-    (lobby) => lobby.myStatus === 'OWNER' && (lobby.status === 'OPEN' || lobby.status === 'LOCKED'),
+    (lobby) =>
+      lobby.myStatus === "OWNER" &&
+      (lobby.status === "OPEN" || lobby.status === "LOCKED"),
   );
 
   const keyExtractor = useCallback((lobby: Lobby) => lobby.id, []);
@@ -72,7 +90,7 @@ export default function LobbyHome() {
   );
 
   return (
-    <Screen edges={['top']} padded={false}>
+    <Screen edges={["top"]} padded={false}>
       <FlatList
         data={open}
         keyExtractor={keyExtractor}
@@ -80,7 +98,8 @@ export default function LobbyHome() {
         showsVerticalScrollIndicator={false}
         onEndReachedThreshold={0.5}
         onEndReached={() => {
-          if (feed.hasNextPage && !feed.isFetchingNextPage) void feed.fetchNextPage();
+          if (feed.hasNextPage && !feed.isFetchingNextPage)
+            void feed.fetchNextPage();
         }}
         refreshing={feed.isRefetching && !feed.isFetchingNextPage}
         onRefresh={() => {
@@ -101,7 +120,7 @@ export default function LobbyHome() {
               <Button
                 label={t.lobby.list.open}
                 disabled={ownsLive}
-                onPress={() => router.push('/lobby/create' as never)}
+                onPress={() => router.push("/lobby/create" as never)}
               />
               {ownsLive && (
                 <Text variant="caption" className="text-center">
@@ -113,7 +132,11 @@ export default function LobbyHome() {
             {myLobbies.length > 0 && (
               <View className="gap-2">
                 <Text variant="overline">
-                  {upper(myLobbies.length === 1 ? t.lobby.list.yourLobby : t.lobby.list.yourLobbies)}
+                  {upper(
+                    myLobbies.length === 1
+                      ? t.lobby.list.yourLobby
+                      : t.lobby.list.yourLobbies,
+                  )}
                 </Text>
                 {myLobbies.map((lobby) => (
                   <LobbyCard key={lobby.id} lobby={lobby} />
@@ -144,9 +167,15 @@ export default function LobbyHome() {
               </View>
             </View>
 
-            {feed.isPending && <ActivityIndicator color={colors.primary} className="mt-4" />}
-            {feed.error && <ErrorNotice error={feed.error} onRetry={() => feed.refetch()} />}
-            {mine.error && <ErrorNotice error={mine.error} onRetry={() => mine.refetch()} />}
+            {feed.isPending && (
+              <ActivityIndicator color={colors.primary} className="mt-4" />
+            )}
+            {feed.error && (
+              <ErrorNotice error={feed.error} onRetry={() => feed.refetch()} />
+            )}
+            {mine.error && (
+              <ErrorNotice error={mine.error} onRetry={() => mine.refetch()} />
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -169,7 +198,11 @@ export default function LobbyHome() {
   );
 }
 
-function emptyTitle(startingSoon: boolean, tone: LobbyTone | null, t: Dictionary): string {
+function emptyTitle(
+  startingSoon: boolean,
+  tone: LobbyTone | null,
+  t: Dictionary,
+): string {
   if (startingSoon) return t.lobby.list.emptySoonTitle;
   if (tone) return t.lobby.list.emptyToneTitle;
   return t.lobby.list.emptyTitle;
@@ -182,7 +215,13 @@ function emptyTitle(startingSoon: boolean, tone: LobbyTone | null, t: Dictionary
  * kind*, and the two combine. The clock glyph is what tells them apart at a glance,
  * along with the rule separating it from the group.
  */
-function StartingSoonChip({ active, onPress }: { active: boolean; onPress: () => void }) {
+function StartingSoonChip({
+  active,
+  onPress,
+}: {
+  active: boolean;
+  onPress: () => void;
+}) {
   const t = useT();
   return (
     <Pressable
@@ -191,12 +230,12 @@ function StartingSoonChip({ active, onPress }: { active: boolean; onPress: () =>
       accessibilityState={{ selected: active }}
       accessibilityLabel={t.lobby.list.soonA11y}
       className={cn(
-        'flex-row items-center gap-1.5 rounded-full px-3.5 py-2',
-        active ? 'bg-primary' : 'bg-raised',
+        "flex-row items-center gap-1.5 rounded-full px-3.5 py-2",
+        active ? "bg-primary" : "bg-raised",
       )}
     >
-      <Icon as={Clock} size={14} tone={active ? 'inverse' : 'content'} />
-      <Text variant="label" className={active ? 'text-white' : 'text-content'}>
+      <Icon as={Clock} size={14} tone={active ? "inverse" : "content"} />
+      <Text variant="label" className={active ? "text-white" : "text-content"}>
         {t.lobby.list.soon}
       </Text>
     </Pressable>

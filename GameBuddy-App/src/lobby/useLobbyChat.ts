@@ -1,7 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
-import type { LobbyMessage } from '../api/types';
-import { useChatSocketApi, useChatSocketStatus } from '../chat/ChatSocketProvider';
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import type { LobbyMessage } from "../api/types";
+import {
+  useChatSocketApi,
+  useChatSocketStatus,
+} from "../chat/ChatSocketProvider";
 
 /**
  * Feeds one lobby screen from the shared socket.
@@ -33,20 +36,43 @@ export function useLobbyChat(lobbyId: string | undefined) {
     return onLobby((event) => {
       if (event.lobbyId !== lobbyId) return;
 
-      if (event.type === 'MESSAGE' && event.message) {
+      if (event.type === "MESSAGE" && event.message) {
         const line = event.message as LobbyMessage;
-        queryClient.setQueryData<LobbyMessage[]>(['lobby-messages', lobbyId], (current) => {
-          if (!current) return current;
-          if (current.some((m) => m.id === line.id)) return current;
-          return [...current, line];
-        });
+
+        /*
+         * A frame that arrives before the history has loaded is a fetch, not a discard.
+         *
+         * `setQueryData` used to return `current` untouched when there was nothing cached,
+         * which quietly threw the line away — and the window is not theoretical: the
+         * screen mounts, the socket is already connected, and the first messages request
+         * is still in flight. The line was gone until something else refetched.
+         *
+         * Invalidating instead means the in-flight or next fetch brings it along with
+         * whatever else we have not seen. Appending is still the fast path when we do hold
+         * the history.
+         */
+        const cached = queryClient.getQueryData<LobbyMessage[]>([
+          "lobby-messages",
+          lobbyId,
+        ]);
+        if (!cached) {
+          void queryClient.invalidateQueries({
+            queryKey: ["lobby-messages", lobbyId],
+          });
+          return;
+        }
+        if (cached.some((m) => m.id === line.id)) return;
+        queryClient.setQueryData<LobbyMessage[]>(
+          ["lobby-messages", lobbyId],
+          [...cached, line],
+        );
         return;
       }
 
-      // MEMBER and STATE: refetch what changed. `my-lobbies` too — a kick or a cancel
-      // changes what the tab's own list should show.
-      void queryClient.invalidateQueries({ queryKey: ['lobby', lobbyId] });
-      void queryClient.invalidateQueries({ queryKey: ['my-lobbies'] });
+      // MEMBER and STATE: refetch what changed. `my-lobbies` too — a kick, a cancel, or
+      // being accepted changes what the tab's own list should show.
+      void queryClient.invalidateQueries({ queryKey: ["lobby", lobbyId] });
+      void queryClient.invalidateQueries({ queryKey: ["my-lobbies"] });
     });
   }, [lobbyId, onLobby, queryClient]);
 

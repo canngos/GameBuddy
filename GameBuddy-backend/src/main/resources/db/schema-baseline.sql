@@ -197,6 +197,17 @@ CREATE TABLE gamebuddy.declined_matches (
 
 
 --
+-- Name: super_likes; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.super_likes (
+    user_id character varying(255) NOT NULL,
+    target_id character varying(255) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL
+);
+
+
+--
 -- Name: friends; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -882,6 +893,14 @@ ALTER TABLE ONLY gamebuddy.declined_matches
 
 
 --
+-- Name: super_likes super_likes_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.super_likes
+    ADD CONSTRAINT super_likes_pkey PRIMARY KEY (user_id, target_id);
+
+
+--
 -- Name: friends friends_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1175,6 +1194,13 @@ CREATE INDEX idx_cosmetic_kind ON gamebuddy.cosmetic USING btree (kind, sort_ord
 --
 
 CREATE INDEX idx_declined_user_time ON gamebuddy.declined_matches USING btree (user_id, declined_at);
+
+
+--
+-- Name: idx_super_like_target; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_super_like_target ON gamebuddy.super_likes USING btree (target_id);
 
 
 --

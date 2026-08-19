@@ -1,16 +1,21 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { memo, useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
-import { LOBBY_BOOST_COST_COINS, lobbyApi } from '../../../src/api/lobby';
-import type { LobbyDetail, LobbyMember, LobbyMessage } from '../../../src/api/types';
-import { useUpper } from '../../../src/i18n/case';
-import { useT } from '../../../src/i18n/useT';
-import { startsExact } from '../../../src/lobby/startsAt';
-import { ToneBadge } from '../../../src/lobby/ToneChip';
-import { useLobbyChat } from '../../../src/lobby/useLobbyChat';
-import { useSession } from '../../../src/session/store';
-import { useThemeColors } from '../../../src/theme';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
+import { LOBBY_BOOST_COST_COINS, lobbyApi } from "../../../src/api/lobby";
+import type {
+  LobbyDetail,
+  LobbyMember,
+  LobbyMessage,
+} from "../../../src/api/types";
+import { useUpper } from "../../../src/i18n/case";
+import { useT } from "../../../src/i18n/useT";
+import { startsExact } from "../../../src/lobby/startsAt";
+import { ToneBadge } from "../../../src/lobby/ToneChip";
+import { LIVE_QUERY } from "../../../src/lobby/live";
+import { useLobbyChat } from "../../../src/lobby/useLobbyChat";
+import { useSession } from "../../../src/session/store";
+import { useThemeColors } from "../../../src/theme";
 import {
   Avatar,
   BackHeader,
@@ -20,8 +25,8 @@ import {
   Screen,
   Text,
   TextField,
-} from '../../../src/ui';
-import { cn } from '../../../src/ui/cn';
+} from "../../../src/ui";
+import { cn } from "../../../src/ui/cn";
 
 /**
  * One lobby: header, roster, the owner's pending inbox, and the chat.
@@ -44,38 +49,86 @@ export default function LobbyScreen() {
   const listRef = useRef<FlatList<LobbyMessage>>(null);
 
   const detail = useQuery({
-    queryKey: ['lobby', lobbyId],
+    queryKey: ["lobby", lobbyId],
     queryFn: () => lobbyApi.get(lobbyId!),
     enabled: !!lobbyId,
+    ...LIVE_QUERY,
   });
 
   const lobby = detail.data?.lobby;
-  const isOwner = lobby?.myStatus === 'OWNER';
-  const inTeam = lobby?.myStatus === 'OWNER' || lobby?.myStatus === 'ACCEPTED';
-  const chatOpen = lobby?.status === 'OPEN' || lobby?.status === 'LOCKED';
+  const isOwner = lobby?.myStatus === "OWNER";
+  const inTeam = lobby?.myStatus === "OWNER" || lobby?.myStatus === "ACCEPTED";
+  const chatOpen = lobby?.status === "OPEN" || lobby?.status === "LOCKED";
 
   const messages = useQuery({
-    queryKey: ['lobby-messages', lobbyId],
+    queryKey: ["lobby-messages", lobbyId],
     queryFn: () => lobbyApi.messages(lobbyId!),
     // The backend answers LOBBY_NOT_MEMBER to anyone else; not asking beats asking to
     // be refused. ENDED/CANCELLED stay readable, so this keys on membership alone.
     enabled: !!lobbyId && inTeam,
+    ...LIVE_QUERY,
   });
 
-  useLobbyChat(inTeam ? lobbyId : undefined);
+  /*
+   * Subscribed whether or not we are on the team yet, which is the whole point.
+   *
+   * This used to be `inTeam ? lobbyId : undefined`, so somebody whose request was still
+   * pending registered no handler at all — and being accepted is precisely the event they
+   * are waiting for. The backend does send it to them (`accept` saves the ACCEPTED row
+   * before it fans out, so the new member is in the team by then); there was simply
+   * nothing listening, and the screen went on offering "withdraw request" until the app
+   * was restarted.
+   *
+   * Nothing leaks by subscribing early: the handler drops frames for other lobbies, and
+   * the backend only sends MESSAGE frames to members, so a pending requester receives
+   * lifecycle events and nothing else.
+   */
+  useLobbyChat(lobbyId);
+
+  /*
+   * Reading is what clears the badge, but only on the server.
+   *
+   * `GET /lobby/{id}/messages` moves this member's `lastReadAt` watermark, and the count
+   * the tab draws comes from a different query — `my-lobbies`. Nothing connected the two,
+   * so the purple bubble kept whatever number it was last told, and with the lobby list
+   * cached it survived leaving the screen and coming back. Refetching the list once the
+   * messages have landed is what makes "I have read these" visible where it is shown.
+   */
+  useEffect(() => {
+    if (!messages.isSuccess) return;
+    void queryClient.invalidateQueries({ queryKey: ["my-lobbies"] });
+  }, [messages.isSuccess, messages.dataUpdatedAt, queryClient]);
 
   const invalidate = () => {
-    void queryClient.invalidateQueries({ queryKey: ['lobby', lobbyId] });
-    void queryClient.invalidateQueries({ queryKey: ['my-lobbies'] });
-    void queryClient.invalidateQueries({ queryKey: ['lobbies'] });
+    void queryClient.invalidateQueries({ queryKey: ["lobby", lobbyId] });
+    void queryClient.invalidateQueries({ queryKey: ["my-lobbies"] });
+    void queryClient.invalidateQueries({ queryKey: ["lobbies"] });
   };
 
-  const join = useMutation({ mutationFn: () => lobbyApi.join(lobbyId!), onSuccess: invalidate });
-  const leave = useMutation({ mutationFn: () => lobbyApi.leave(lobbyId!), onSuccess: invalidate });
-  const lock = useMutation({ mutationFn: () => lobbyApi.lock(lobbyId!), onSuccess: invalidate });
-  const unlock = useMutation({ mutationFn: () => lobbyApi.unlock(lobbyId!), onSuccess: invalidate });
-  const end = useMutation({ mutationFn: () => lobbyApi.end(lobbyId!), onSuccess: invalidate });
-  const cancel = useMutation({ mutationFn: () => lobbyApi.cancel(lobbyId!), onSuccess: invalidate });
+  const join = useMutation({
+    mutationFn: () => lobbyApi.join(lobbyId!),
+    onSuccess: invalidate,
+  });
+  const leave = useMutation({
+    mutationFn: () => lobbyApi.leave(lobbyId!),
+    onSuccess: invalidate,
+  });
+  const lock = useMutation({
+    mutationFn: () => lobbyApi.lock(lobbyId!),
+    onSuccess: invalidate,
+  });
+  const unlock = useMutation({
+    mutationFn: () => lobbyApi.unlock(lobbyId!),
+    onSuccess: invalidate,
+  });
+  const end = useMutation({
+    mutationFn: () => lobbyApi.end(lobbyId!),
+    onSuccess: invalidate,
+  });
+  const cancel = useMutation({
+    mutationFn: () => lobbyApi.cancel(lobbyId!),
+    onSuccess: invalidate,
+  });
 
   const boost = useMutation({
     mutationFn: () => lobbyApi.boost(lobbyId!),
@@ -83,17 +136,19 @@ export default function LobbyScreen() {
       // The response is the whole refreshed lobby, so the frame and the button both change
       // without a second request. The coin balance moved as well, which the Market header
       // and the profile both show.
-      queryClient.setQueryData(['lobby', lobbyId], fresh);
-      void queryClient.invalidateQueries({ queryKey: ['my-lobbies'] });
-      void queryClient.invalidateQueries({ queryKey: ['lobbies'] });
-      void queryClient.invalidateQueries({ queryKey: ['me'] });
-      void queryClient.invalidateQueries({ queryKey: ['cosmetics'] });
+      queryClient.setQueryData(["lobby", lobbyId], fresh);
+      void queryClient.invalidateQueries({ queryKey: ["my-lobbies"] });
+      void queryClient.invalidateQueries({ queryKey: ["lobbies"] });
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
+      void queryClient.invalidateQueries({ queryKey: ["cosmetics"] });
     },
   });
 
   const answer = useMutation({
     mutationFn: ({ userId, accept }: { userId: string; accept: boolean }) =>
-      accept ? lobbyApi.accept(lobbyId!, userId) : lobbyApi.reject(lobbyId!, userId),
+      accept
+        ? lobbyApi.accept(lobbyId!, userId)
+        : lobbyApi.reject(lobbyId!, userId),
     onSuccess: invalidate,
   });
 
@@ -107,11 +162,14 @@ export default function LobbyScreen() {
     onSuccess: (line) => {
       // The screened text, as everyone else will see it. Appended by id so the socket
       // replaying it on a reconnect cannot double it.
-      queryClient.setQueryData<LobbyMessage[]>(['lobby-messages', lobbyId], (current) => {
-        if (!current) return [line];
-        if (current.some((m) => m.id === line.id)) return current;
-        return [...current, line];
-      });
+      queryClient.setQueryData<LobbyMessage[]>(
+        ["lobby-messages", lobbyId],
+        (current) => {
+          if (!current) return [line];
+          if (current.some((m) => m.id === line.id)) return current;
+          return [...current, line];
+        },
+      );
     },
   });
 
@@ -144,7 +202,7 @@ export default function LobbyScreen() {
 
   if (detail.isPending) {
     return (
-      <Screen edges={['top']}>
+      <Screen edges={["top"]}>
         <BackHeader title={t.lobby.detail.fallbackTitle} />
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.primary} />
@@ -155,7 +213,7 @@ export default function LobbyScreen() {
 
   if (detail.error || !detail.data || !lobby) {
     return (
-      <Screen edges={['top']}>
+      <Screen edges={["top"]}>
         <BackHeader title={t.lobby.detail.fallbackTitle} />
         <View className="pt-4">
           <ErrorNotice
@@ -168,13 +226,24 @@ export default function LobbyScreen() {
   }
 
   const firstError =
-    join.error ?? leave.error ?? lock.error ?? unlock.error ?? end.error ?? cancel.error ??
-    boost.error ?? answer.error ?? kick.error ?? null;
+    join.error ??
+    leave.error ??
+    lock.error ??
+    unlock.error ??
+    end.error ??
+    cancel.error ??
+    boost.error ??
+    answer.error ??
+    kick.error ??
+    null;
 
   return (
-    <Screen edges={['top']} padded={false}>
+    <Screen edges={["top"]} padded={false}>
       <View className="px-6">
-        <BackHeader title={lobby.title} subtitle={lobby.gameName ?? undefined} />
+        <BackHeader
+          title={lobby.title}
+          subtitle={lobby.gameName ?? undefined}
+        />
       </View>
 
       <FlatList
@@ -208,7 +277,7 @@ export default function LobbyScreen() {
                   leave.mutate();
                   // Leaving is also how a pending request is withdrawn; either way this
                   // screen is no longer somewhere the viewer belongs.
-                  if (lobby.myStatus === 'ACCEPTED') router.back();
+                  if (lobby.myStatus === "ACCEPTED") router.back();
                 },
                 lock: () => lock.mutate(),
                 unlock: () => unlock.mutate(),
@@ -218,36 +287,52 @@ export default function LobbyScreen() {
               }}
             />
 
-            {isOwner && detail.data.pendingRequests.length > 0 && lobby.status === 'OPEN' && (
-              <View className="gap-2">
-                <Text variant="overline">{upper(t.lobby.detail.wantsToJoin)}</Text>
-                {detail.data.pendingRequests.map((request) => (
-                  <MemberRow key={request.userId} member={request}>
-                    <Button
-                      label={t.lobby.detail.accept}
-                      size="md"
-                      loading={answer.isPending}
-                      onPress={() => answer.mutate({ userId: request.userId, accept: true })}
-                    />
-                    <Button
-                      label={t.lobby.detail.pass}
-                      variant="ghost"
-                      size="md"
-                      loading={answer.isPending}
-                      onPress={() => answer.mutate({ userId: request.userId, accept: false })}
-                    />
-                  </MemberRow>
-                ))}
-              </View>
-            )}
+            {isOwner &&
+              detail.data.pendingRequests.length > 0 &&
+              lobby.status === "OPEN" && (
+                <View className="gap-2">
+                  <Text variant="overline">
+                    {upper(t.lobby.detail.wantsToJoin)}
+                  </Text>
+                  {detail.data.pendingRequests.map((request) => (
+                    <MemberRow key={request.userId} member={request}>
+                      <Button
+                        label={t.lobby.detail.accept}
+                        size="md"
+                        loading={answer.isPending}
+                        onPress={() =>
+                          answer.mutate({
+                            userId: request.userId,
+                            accept: true,
+                          })
+                        }
+                      />
+                      <Button
+                        label={t.lobby.detail.pass}
+                        variant="ghost"
+                        size="md"
+                        loading={answer.isPending}
+                        onPress={() =>
+                          answer.mutate({
+                            userId: request.userId,
+                            accept: false,
+                          })
+                        }
+                      />
+                    </MemberRow>
+                  ))}
+                </View>
+              )}
 
             <View className="gap-2">
               <Text variant="overline">
-                {upper(t.lobby.detail.team(lobby.playerCount, lobby.maxPlayers))}
+                {upper(
+                  t.lobby.detail.team(lobby.playerCount, lobby.maxPlayers),
+                )}
               </Text>
               {detail.data.members.map((member) => (
                 <MemberRow key={member.userId} member={member}>
-                  {isOwner && member.status !== 'OWNER' && chatOpen && (
+                  {isOwner && member.status !== "OWNER" && chatOpen && (
                     <Button
                       label={t.common.remove}
                       variant="ghost"
@@ -262,11 +347,16 @@ export default function LobbyScreen() {
 
             {inTeam && (
               <Text variant="overline">
-                {upper(chatOpen ? t.lobby.detail.chat : t.lobby.detail.chatReadOnly)}
+                {upper(
+                  chatOpen ? t.lobby.detail.chat : t.lobby.detail.chatReadOnly,
+                )}
               </Text>
             )}
             {inTeam && messages.error && (
-              <ErrorNotice error={messages.error} onRetry={() => messages.refetch()} />
+              <ErrorNotice
+                error={messages.error}
+                onRetry={() => messages.refetch()}
+              />
             )}
           </View>
         }
@@ -288,7 +378,9 @@ export default function LobbyScreen() {
         </View>
       )}
 
-      {inTeam && chatOpen && <Composer sending={send.isPending} onSend={submit} />}
+      {inTeam && chatOpen && (
+        <Composer sending={send.isPending} onSend={submit} />
+      )}
     </Screen>
   );
 }
@@ -312,13 +404,13 @@ const Composer = memo(function Composer({
   onSend: (text: string) => void;
 }) {
   const t = useT();
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState("");
   const empty = draft.trim().length === 0;
 
   const submit = useCallback(() => {
     const text = draft.trim();
     if (!text || sending) return;
-    setDraft('');
+    setDraft("");
     onSend(text);
   }, [draft, sending, onSend]);
 
@@ -341,8 +433,8 @@ const Composer = memo(function Composer({
         accessibilityRole="button"
         accessibilityLabel={t.common.send}
         className={cn(
-          'h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80',
-          (empty || sending) && 'opacity-40',
+          "h-touch w-touch items-center justify-center rounded-full bg-primary active:opacity-80",
+          (empty || sending) && "opacity-40",
         )}
       >
         <View className="h-3 w-3 rotate-45 border-r-2 border-t-2 border-white" />
@@ -360,12 +452,14 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
       <View className="flex-row items-center gap-3">
         <Avatar
           source={lobby.gameIcon}
-          name={lobby.gameName ?? '?'}
+          name={lobby.gameName ?? "?"}
           colorSeed={lobby.gameId}
           size={44}
         />
         <View className="flex-1 gap-0.5">
-          <Text variant="bodyStrong">{lobby.gameName ?? t.lobby.card.unknownGame}</Text>
+          <Text variant="bodyStrong">
+            {lobby.gameName ?? t.lobby.card.unknownGame}
+          </Text>
           <Text variant="caption">
             {t.lobby.detail.playsBy(
               startsExact(lobby.startsAt, t),
@@ -384,13 +478,13 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
         </View>
       )}
 
-      {lobby.status !== 'OPEN' && (
+      {lobby.status !== "OPEN" && (
         <View className="self-start rounded-full bg-raised px-2.5 py-0.5">
           <Text variant="label">
-            {lobby.status === 'LOCKED' && t.lobby.detail.statusLocked}
-            {lobby.status === 'ENDED' && t.lobby.detail.statusEnded}
-            {lobby.status === 'CANCELLED' && t.lobby.detail.statusCancelled}
-            {lobby.status === 'ARCHIVED' && t.lobby.detail.statusArchived}
+            {lobby.status === "LOCKED" && t.lobby.detail.statusLocked}
+            {lobby.status === "ENDED" && t.lobby.detail.statusEnded}
+            {lobby.status === "CANCELLED" && t.lobby.detail.statusCancelled}
+            {lobby.status === "ARCHIVED" && t.lobby.detail.statusArchived}
           </Text>
         </View>
       )}
@@ -399,7 +493,7 @@ function LobbyHeader({ detail }: { detail: LobbyDetail }) {
 }
 
 type ActionHandlers = Record<
-  'join' | 'leave' | 'lock' | 'unlock' | 'end' | 'cancel' | 'boost',
+  "join" | "leave" | "lock" | "unlock" | "end" | "cancel" | "boost",
   () => void
 >;
 type ActionPending = Record<keyof ActionHandlers, boolean>;
@@ -424,13 +518,17 @@ function ActionRow({
   const status = lobby.status;
   const t = useT();
 
-  if (lobby.myStatus === 'OWNER') {
-    if (status === 'OPEN') {
+  if (lobby.myStatus === "OWNER") {
+    if (status === "OPEN") {
       return (
         <View className="gap-2">
           <View className="flex-row gap-2">
             <View className="flex-1">
-              <Button label={t.lobby.detail.lockTeam} loading={pending.lock} onPress={on.lock} />
+              <Button
+                label={t.lobby.detail.lockTeam}
+                loading={pending.lock}
+                onPress={on.lock}
+              />
             </View>
             <View className="flex-1">
               <Button
@@ -465,7 +563,7 @@ function ActionRow({
         </View>
       );
     }
-    if (status === 'LOCKED') {
+    if (status === "LOCKED") {
       return (
         <View className="flex-row gap-2">
           <View className="flex-1">
@@ -477,7 +575,11 @@ function ActionRow({
             />
           </View>
           <View className="flex-1">
-            <Button label={t.lobby.detail.endLobby} loading={pending.end} onPress={on.end} />
+            <Button
+              label={t.lobby.detail.endLobby}
+              loading={pending.end}
+              onPress={on.end}
+            />
           </View>
         </View>
       );
@@ -485,8 +587,8 @@ function ActionRow({
     return null;
   }
 
-  if (lobby.myStatus === 'ACCEPTED') {
-    if (status === 'OPEN' || status === 'LOCKED') {
+  if (lobby.myStatus === "ACCEPTED") {
+    if (status === "OPEN" || status === "LOCKED") {
       return (
         <Button
           label={t.lobby.detail.leaveLobby}
@@ -499,7 +601,7 @@ function ActionRow({
     return null;
   }
 
-  if (lobby.myStatus === 'PENDING') {
+  if (lobby.myStatus === "PENDING") {
     return (
       <View className="gap-2">
         <Text variant="caption">{t.lobby.detail.requestSent}</Text>
@@ -513,30 +615,49 @@ function ActionRow({
     );
   }
 
-  if (lobby.myStatus === 'REJECTED') {
+  if (lobby.myStatus === "REJECTED") {
     return <Text variant="caption">{t.lobby.detail.rejected}</Text>;
   }
 
   // A stranger, or someone who left/was removed — both may ask (again).
-  if (status === 'OPEN' && lobby.playerCount < lobby.maxPlayers) {
-    return <Button label={t.lobby.detail.askToJoin} loading={pending.join} onPress={on.join} />;
+  if (status === "OPEN" && lobby.playerCount < lobby.maxPlayers) {
+    return (
+      <Button
+        label={t.lobby.detail.askToJoin}
+        loading={pending.join}
+        onPress={on.join}
+      />
+    );
   }
-  if (status === 'OPEN') {
+  if (status === "OPEN") {
     return <Text variant="caption">{t.lobby.detail.full}</Text>;
   }
   return null;
 }
 
-function MemberRow({ member, children }: { member: LobbyMember; children?: React.ReactNode }) {
+function MemberRow({
+  member,
+  children,
+}: {
+  member: LobbyMember;
+  children?: React.ReactNode;
+}) {
   const t = useT();
   return (
     <Card className="flex-row items-center gap-3">
-      <Avatar source={member.avatar} name={member.username ?? '?'} colorSeed={member.userId} size={36} />
+      <Avatar
+        source={member.avatar}
+        name={member.username ?? "?"}
+        colorSeed={member.userId}
+        size={36}
+      />
       <View className="flex-1">
         <Text variant="bodyStrong" numberOfLines={1}>
           {member.username ?? t.lobby.detail.unknownGamer}
         </Text>
-        {member.status === 'OWNER' && <Text variant="caption">{t.lobby.detail.owner}</Text>}
+        {member.status === "OWNER" && (
+          <Text variant="caption">{t.lobby.detail.owner}</Text>
+        )}
       </View>
       {children}
     </Card>
@@ -552,10 +673,21 @@ const ChatLine = memo(function ChatLine({
 }) {
   const t = useT();
   return (
-    <View className={cn('max-w-[85%] gap-0.5', mine ? 'self-end' : 'self-start')}>
-      {!mine && <Text variant="caption">{line.senderUsername ?? t.lobby.detail.unknownGamer}</Text>}
-      <View className={cn('rounded-2xl px-3 py-2', mine ? 'bg-primary' : 'bg-raised')}>
-        <Text variant="body" className={mine ? 'text-white' : 'text-content'}>
+    <View
+      className={cn("max-w-[85%] gap-0.5", mine ? "self-end" : "self-start")}
+    >
+      {!mine && (
+        <Text variant="caption">
+          {line.senderUsername ?? t.lobby.detail.unknownGamer}
+        </Text>
+      )}
+      <View
+        className={cn(
+          "rounded-2xl px-3 py-2",
+          mine ? "bg-primary" : "bg-raised",
+        )}
+      >
+        <Text variant="body" className={mine ? "text-white" : "text-content"}>
           {line.message}
         </Text>
       </View>

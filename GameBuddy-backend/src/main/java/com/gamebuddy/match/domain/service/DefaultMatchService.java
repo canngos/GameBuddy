@@ -17,6 +17,8 @@ import com.gamebuddy.match.domain.event.RecommendationServedEvent.ServedCandidat
 import com.gamebuddy.match.infrastructure.entity.*;
 import com.gamebuddy.match.infrastructure.entity.UnlockedAdmirer;
 import com.gamebuddy.match.infrastructure.repository.DeclinedMatchRepository;
+import com.gamebuddy.match.infrastructure.entity.SuperLike;
+import com.gamebuddy.match.infrastructure.repository.SuperLikeRepository;
 import com.gamebuddy.match.infrastructure.repository.UnlockedAdmirerRepository;
 import com.gamebuddy.match.interfaces.dto.AcceptResponseBody;
 import com.gamebuddy.match.interfaces.dto.ConsumableResponseBody;
@@ -97,6 +99,7 @@ public class DefaultMatchService implements MatchService {
 
     private final DeclinedMatchRepository declinedMatches;
     private final UnlockedAdmirerRepository unlockedAdmirers;
+    private final SuperLikeRepository superLikes;
     private final CoinLedger coins;
     private final Clock clock;
 
@@ -414,6 +417,15 @@ public class DefaultMatchService implements MatchService {
         declinedMatches.clear(gamer.getUserId(), target.getUserId());
         rememberDecision(gamer, target, true);
 
+        // Kept, because nothing else does. The balance has already been spent and the push
+        // has already been queued, and both are moments — after them a super like used to be
+        // indistinguishable from any other like, including on the one screen that exists to
+        // show who likes you. `save` rather than an insert guard: the primary key is the
+        // pair, so re-liking somebody after a rewind overwrites rather than collides.
+        if (superLike) {
+            superLikes.save(new SuperLike(gamer.getUserId(), target.getUserId(), clock.instant()));
+        }
+
         boolean mutual = target.getApprovedMatches().contains(gamer);
 
         // Only when it is not already a match. Two notifications a second apart, the first
@@ -483,15 +495,17 @@ public class DefaultMatchService implements MatchService {
         body.setLocked(!unlocked);
 
         if (unlocked) {
-            body.setLikedYou(toDtos(admirers));
+            body.setLikedYou(markSuperLikes(gamer, toDtos(admirers)));
         } else {
             // Without Gold, only the ones already paid for by name. The list still reports
             // the full count above, so the screen shows "three more" rather than pretending
             // the bought one is all there is.
             Set<String> bought = new HashSet<>(unlockedAdmirers.findAdmirerIds(gamer.getUserId()));
-            body.setLikedYou(toDtos(admirers.stream()
-                    .filter(other -> bought.contains(other.getUserId()))
-                    .toList()));
+            body.setLikedYou(markSuperLikes(
+                    gamer,
+                    toDtos(admirers.stream()
+                            .filter(other -> bought.contains(other.getUserId()))
+                            .toList())));
         }
 
         LikedYouResponse response = new LikedYouResponse();
@@ -595,6 +609,9 @@ public class DefaultMatchService implements MatchService {
 
         if (wasAccept) {
             gamer.getApprovedMatches().remove(target);
+            // Whether or not this one was a super like — `clear` is a no-op when it was
+            // not, and asking first would cost a query to save nothing.
+            superLikes.clear(gamer.getUserId(), targetId);
         } else {
             declinedMatches.clear(gamer.getUserId(), targetId);
         }
@@ -979,6 +996,25 @@ public class DefaultMatchService implements MatchService {
     }
 
     /** Maps gamers to DTOs, resolving every avatar in one query rather than per row. */
+    /**
+     * Flags the admirers whose like was a super like.
+     *
+     * <p>One query for the whole page, scoped to the ids already on it — the alternative,
+     * asking per row, turns a list of thirty into thirty round trips for a boolean.
+     *
+     * <p>Applied after the list has been narrowed rather than before, so a gamer without
+     * Gold does not have the flag computed for admirers they are not allowed to see.
+     */
+    private List<GamerDto> markSuperLikes(Gamer gamer, List<GamerDto> dtos) {
+        if (dtos.isEmpty()) {
+            return dtos;
+        }
+        Set<String> senders = new HashSet<>(superLikes.findSendersAmong(
+                gamer.getUserId(), dtos.stream().map(GamerDto::getUserId).toList()));
+        dtos.forEach(dto -> dto.setSuperLike(senders.contains(dto.getUserId())));
+        return dtos;
+    }
+
     private List<GamerDto> toDtos(List<Gamer> gamers) {
         Map<String, String> avatars = avatarUrls.visibleTo(gamers);
 
