@@ -31,7 +31,7 @@ export const es: Dictionary = {
     comingSoon: 'Muy pronto en',
     releaseNote: 'GameBuddy está en la recta final antes del lanzamiento. Android va primero.',
     deckAlt: 'El mazo de GameBuddy, con el perfil de un jugador y los juegos a los que juega',
-    chatAlt: 'Una conversación de GameBuddy entre dos jugadores emparejados',
+    chatAlt: 'La lista de conversaciones de GameBuddy, con un nuevo match esperando',
   },
 
   features: {

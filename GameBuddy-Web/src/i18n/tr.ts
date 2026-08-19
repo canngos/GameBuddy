@@ -31,7 +31,7 @@ export const tr: Dictionary = {
     comingSoon: 'Çok yakında',
     releaseNote: 'GameBuddy çıkış öncesi son aşamada. Önce Android geliyor.',
     deckAlt: 'GameBuddy destesi: bir oyuncunun profili ve oynadığı oyunlar',
-    chatAlt: 'Eşleşmiş iki oyuncu arasındaki GameBuddy sohbeti',
+    chatAlt: 'Yeni bir eşleşmenin beklediği GameBuddy sohbet listesi',
   },
 
   features: {

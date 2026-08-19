@@ -35,7 +35,7 @@ export const en = {
     comingSoon: 'Coming soon to',
     releaseNote: 'GameBuddy is in the final stages before release. Android comes first.',
     deckAlt: "The GameBuddy deck, showing a gamer's profile with the games they play",
-    chatAlt: 'A GameBuddy conversation between two matched players',
+    chatAlt: 'The GameBuddy conversations list, with a new match waiting',
   },
 
   features: {

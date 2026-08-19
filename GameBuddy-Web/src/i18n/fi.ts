@@ -34,7 +34,7 @@ export const fi: Dictionary = {
     comingSoon: 'Tulossa pian',
     releaseNote: 'GameBuddy on viimeistelyvaiheessa. Android tulee ensin.',
     deckAlt: 'GameBuddyn korttipino, jossa näkyy pelaajan profiili ja hänen pelinsä',
-    chatAlt: 'GameBuddy-keskustelu kahden yhteensopivan pelaajan välillä',
+    chatAlt: 'GameBuddyn keskustelulista, jossa uusi matchi odottaa',
   },
 
   features: {

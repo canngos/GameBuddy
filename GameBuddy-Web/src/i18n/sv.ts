@@ -31,7 +31,7 @@ export const sv: Dictionary = {
     comingSoon: 'Kommer snart till',
     releaseNote: 'GameBuddy är i slutfasen före lansering. Android kommer först.',
     deckAlt: 'GameBuddys kortlek som visar en spelares profil och vilka spel hen spelar',
-    chatAlt: 'En GameBuddy-konversation mellan två matchade spelare',
+    chatAlt: 'GameBuddys konversationslista, med en ny match som väntar',
   },
 
   features: {
