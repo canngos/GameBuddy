@@ -103,6 +103,7 @@ export const fr: Dictionary = {
     legalNav: 'Mentions légales et aide',
     privacy: 'Confidentialité',
     terms: "Conditions d'utilisation",
+    childSafety: 'Protection des mineurs',
     deleteAccount: 'Supprimer ton compte',
     support: 'Aide',
     help: 'Aide',

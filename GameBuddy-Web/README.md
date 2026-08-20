@@ -20,8 +20,8 @@ Performance 99 · Accessibility 100 · Best Practices 100 · SEO 100
 LCP 1.7s · CLS 0.017 · TBT 0ms · no failing audits
 ```
 
-**23 pages**: three marketing pages (landing, `/support`, `/delete-account`) in seven
-languages, plus `/terms` and `/privacy` in English.
+**24 pages**: three marketing pages (landing, `/support`, `/delete-account`) in seven
+languages, plus `/terms`, `/privacy` and `/child-safety` in English.
 
 About the JavaScript: the first version shipped none at all. The theme toggle, the language
 menu and the scroll reveal need a little, and it comes to about 2 kB across three tiny

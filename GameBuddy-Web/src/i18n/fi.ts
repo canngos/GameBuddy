@@ -106,6 +106,7 @@ export const fi: Dictionary = {
     legalNav: 'Ehdot ja tuki',
     privacy: 'Tietosuoja',
     terms: 'Käyttöehdot',
+    childSafety: 'Lasten turvallisuus',
     deleteAccount: 'Poista tilisi',
     support: 'Tuki',
     help: 'Apua',

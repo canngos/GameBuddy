@@ -103,6 +103,7 @@ export const sv: Dictionary = {
     legalNav: 'Juridik och support',
     privacy: 'Integritet',
     terms: 'Villkor',
+    childSafety: 'Barnsäkerhet',
     deleteAccount: 'Radera ditt konto',
     support: 'Support',
     help: 'Hjälp',
