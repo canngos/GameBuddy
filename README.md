@@ -351,11 +351,18 @@ that removes accounts is not something to run on autopilot. Production must star
 | Image filtering | `ImageModerationService` and the NSFW classifier — see [Avatar review](#avatar-review) |
 | An age gate at registration | Date of birth at onboarding, plus a 18-or-over confirmation the account holder has to tick |
 | A privacy policy URL, in the app and on the listing | `documentation/legal/PRIVACY.md`; linked from Settings → About via `EXPO_PUBLIC_PRIVACY_URL` |
+| Published child safety standards, for the Play CSAE declaration | `documentation/legal/CHILD_SAFETY.md`, served at `findgamebuddy.com/child-safety`. The declaration also wants a contact: `contact@findgamebuddy.com`, named in section 7 |
+| A Data safety declaration that matches the privacy policy | `store-listing/PLAY_DATA_SAFETY.md` — every answer, and which SDK drives it. `GameBuddy-App/scripts/check-sdk-inventory.js` fails `npm run check` when a dependency appears that it does not account for |
 
-Both documents carry placeholder operator details in their final section and need a lawyer
-before submission. The URLs must serve them before the first store review — until the site
-exists, the links in the app resolve to nothing, which is a launch blocker rather than a
-bug.
+All three documents are served from `GameBuddy-Web`, which renders the files in
+`documentation/legal/` rather than copies of them — so the app, the website and the version
+recorded against an account cannot drift apart. `GameBuddy-Web/scripts/check-legal.mjs` refuses
+to build while any of them still contains a placeholder, which is what made the operator details
+a blocker rather than a footnote.
+
+They have not been through a lawyer. That is a decision, not an oversight — the operator is one
+person and the documents describe what the code actually does — but it is worth knowing before
+the first store review.
 
 ### Why the text filter treats chat and posts differently
 

@@ -65,7 +65,8 @@
     "web": "expo start --web",
     "start:go": "expo start --go",
     "check:contrast": "node scripts/check-contrast.js",
-    "check": "tsc --noEmit && node scripts/check-contrast.js",
+    "check:sdks": "node scripts/check-sdk-inventory.js",
+    "check": "tsc --noEmit && node scripts/check-contrast.js && node scripts/check-sdk-inventory.js",
     "eas-build-pre-install": "node scripts/eas-enable-crashlytics.js"
   },
   "private": true,

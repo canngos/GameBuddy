@@ -256,8 +256,14 @@ services:
 
       # Rotation, so the log cannot fill the disk. 200 MB total is roughly a week at this
       # traffic with the access log at WARN.
+      #
+      # LOG_MAX_HISTORY is a number of *days* to Logback, which makes it retention rather
+      # than housekeeping: these logs carry IP addresses, and PRIVACY.md section 9 tells
+      # account holders they are kept for seven days. It was 10. The other two are size
+      # ceilings and can stay where they are — a cap that trims sooner than seven days is
+      # not a broken promise, one that keeps things for ten is.
       LOG_MAX_FILE_SIZE: ${LOG_MAX_FILE_SIZE:-20MB}
-      LOG_MAX_HISTORY: ${LOG_MAX_HISTORY:-10}
+      LOG_MAX_HISTORY: ${LOG_MAX_HISTORY:-7}
       LOG_TOTAL_SIZE_CAP: ${LOG_TOTAL_SIZE_CAP:-200MB}
 
       # A container gets UTC, and "midnight" then silently becomes mid-evening for your

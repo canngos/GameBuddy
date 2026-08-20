@@ -57,10 +57,23 @@
 		-Server
 	}
 
+	# The access log records a client IP against every request, which makes it personal
+	# data with a published retention: PRIVACY.md section 9 says seven days.
+	#
+	# `roll_size` and `roll_keep` are a disk-space ceiling, not retention — 30 MB of access
+	# log is months at closed-testing volume, so on their own they keep IP addresses far
+	# longer than the policy allows. `roll_keep_for` expires files that have already rolled
+	# (its default is 90 days, which is the number this replaces).
+	#
+	# It cannot expire the file still being written to, and at this traffic that is the only
+	# file there is — nothing rolls until 10 MB, so without something else the first week of
+	# testing would still be here in the spring. That gap is what
+	# `deploy/enforce-log-retention.sh` closes, nightly, from cron.
 	log {
 		output file /data/access.log {
 			roll_size 10MB
 			roll_keep 3
+			roll_keep_for 168h
 		}
 		format json
 	}
