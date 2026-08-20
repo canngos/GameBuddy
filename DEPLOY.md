@@ -204,6 +204,22 @@ Six containers: `caddy`, `backend`, `postgres`, `redis`, `model`, `model-retrain
 Elasticsearch, Kibana and Filebeat are behind a `logs` profile and will not start — that is
 deliberate, they need 2.9 GB and do not fit.
 
+**A changed `deploy/Caddyfile` needs `--force-recreate`, and this is silent when you forget.**
+The Caddyfile is bind-mounted as a *file*, not a directory, so the container holds the inode it
+was started with. `git pull` does not edit that file in place — it writes a new one and renames
+it over the top, which is a new inode — so the container goes on serving the old configuration
+while the file on disk shows the change. `up -d` will not notice, because nothing in the service
+definition changed:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate caddy
+docker compose -f docker-compose.yml -f docker-compose.prod.yml exec caddy cat /etc/caddy/Caddyfile
+```
+
+The second line is the check that matters — read the config out of the container, not off the
+disk. Certificates live in the `caddy-data` volume and survive the recreate, so this costs a
+couple of seconds of downtime and no ACME traffic.
+
 ## 6. Verify
 
 ```bash
@@ -239,16 +255,48 @@ backup that outlives that is a copy of somebody who asked to be deleted, so all 
 below are load-bearing — the script is no longer optional to install, and the lifecycle rule is
 not an optimisation.
 
-**1. Install the script.** It is `deploy/backup.sh` in the repository now, rather than a
-snippet to paste — it prunes both the local dumps and the remote ones, and the comments explain
-why both prunes exist.
+**1. Install the script — done, 2026-08-20.** It is `deploy/backup.sh` in the repository now,
+rather than a snippet to paste — it prunes both the local dumps and the remote ones, and the
+comments explain why both prunes exist.
 
 ```bash
 mkdir -p ~/backups
 cp ~/gamebuddy/deploy/backup.sh ~/backup.sh && chmod +x ~/backup.sh
+crontab -l   # 30 3 * * * /home/gamebuddy/backup.sh >> /home/gamebuddy/backup.log 2>&1
 ```
 
-**2. Install the log retention pass.** Caddy's access log and Docker's console capture both
+**The `rclone` remote, and the two things that make it fail.** It is configured as the
+`gamebuddy` user — cron runs as that user, and a remote defined under `root` is invisible to it.
+The token is `gamebuddy-backup` in Cloudflare → R2 → **Manage API Tokens**: Object **Read &
+Write**, scoped to `gamebuddy-backups` only, so a leak of this key cannot reach a single user
+photograph.
+
+```bash
+rclone config create r2 s3 provider=Cloudflare region=auto \
+  access_key_id=YOUR_KEY secret_access_key=YOUR_SECRET \
+  endpoint=https://72df662faf2999bda0fc9585339b9e5f.eu.r2.cloudflarestorage.com
+rclone config update r2 no_check_bucket true
+```
+
+**`no_check_bucket = true` is not optional, and its absence looks exactly like a permissions
+problem.** Before copying, rclone checks the bucket exists — a bucket-level operation that a
+token scoped to *objects* is not allowed to perform. R2 answers `403 AccessDenied`, rclone
+reports it against the *file* being copied, and the obvious conclusion — wrong token — is
+wrong. The token was correct for an hour of debugging before this line fixed it in one attempt.
+Reading works throughout, which is the tell: `rclone lsf` succeeding while `rclone copy` returns
+403 means the credentials are fine and the pre-flight check is the problem.
+
+The endpoint is the `.eu.` one because the bucket is EU-jurisdiction; the account-default
+endpoint will not find it.
+
+**Expect one `501 NotImplemented` per run, followed by a success.** Ubuntu packages rclone
+v1.60.1-DEV (2022), whose S3 client sends something R2 does not implement on the first PUT; the
+retry falls back and succeeds, and the script exits 0. So `backup.log` shows an ERROR line every
+night on a run that worked. `disable_checksum` does not help — it is the client version. Cure it
+by installing current rclone from rclone.org rather than from apt, if the noise is worth a
+manual install on the box.
+
+**2. Install the log retention pass — done, 2026-08-20.** Caddy's access log and Docker's console capture both
 rotate by *size*, and at this traffic neither reaches its 10 MB threshold for months — so the
 IP addresses inside them would outlive the seven days the policy promises by a wide margin.
 `deploy/enforce-log-retention.sh` reads the age from the oldest entry in each file, rather than
@@ -289,20 +337,35 @@ rclone lsl r2:gamebuddy-backups/    # nothing older than seven days should survi
 **4. Restore-test it once**, now, while nothing is at stake. A backup you have never restored
 is a hypothesis.
 
-**Disk-level backups are a second copy of everything, including deleted accounts.** Hetzner's
-automatic backups (20% of the server price, ~€0.80/mo) cover the whole disk and rotate through
-seven slots, which matches what the policy says. Manual snapshots do not rotate at all — they
-live until somebody deletes them, and one taken today is still holding an account that asked to
-be erased next year. Check which of the two you have, and write the answer here so the next
-person does not have to ask:
+**Disk-level backups are a second copy of everything, including deleted accounts.** Checked
+2026-08-20 in the Hetzner console (project 15695043, server `gamebuddy-prod`, id 162337286):
+
+- **Automatic backups: not enabled.**
+- **Snapshots: none.**
+
+So there is no disk-level copy of anybody, and the nightly `pg_dump` is the only backup that
+exists. That is what makes section 9 of the privacy policy true as written — the seven days it
+promises is the seven days that is actually enforced, with nothing outliving it in a disk image
+somebody forgot about.
+
+It also means the recovery story is *rebuild the box from this document, restore the dump*. That
+works — it is why this document exists — but it is slower than restoring an image, and it is the
+trade being made.
+
+**If you enable Hetzner's automatic backups** (20% of the server price, ~€1/mo), the policy stays
+honest: they rotate through seven slots taken daily, which is the same seven days. Note it in
+section 9 anyway, because a disk image is a copy of more than the database. **Manual snapshots
+are the thing to avoid** — they never rotate, and one taken today still holds an account that
+asked to be erased next year. If you ever take one for a risky migration, delete it afterwards.
+
+Re-check with the console, or from a machine with an API token:
 
 ```bash
-hcloud server describe gamebuddy     # Backups: enabled?
-hcloud image list --type snapshot    # manual snapshots, kept until deleted by hand
+curl -s -H "Authorization: Bearer $HCLOUD_TOKEN" \
+  'https://api.hetzner.cloud/v1/servers/162337286' | grep -o '"backup_window":[^,]*'
+curl -s -H "Authorization: Bearer $HCLOUD_TOKEN" \
+  'https://api.hetzner.cloud/v1/images?type=snapshot' | grep -o '"description":"[^"]*"'
 ```
-
-If manual snapshots exist, either delete the stale ones on the same seven-day rhythm or amend
-section 9 of the privacy policy to say how long they are kept. Do not leave it unstated.
 
 ## 8. Tuning a rate limit without a rebuild
 
