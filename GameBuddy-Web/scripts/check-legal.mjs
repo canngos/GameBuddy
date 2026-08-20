@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const legal = join(here, '..', '..', 'documentation', 'legal');
 
-const DOCUMENTS = ['TERMS.md', 'PRIVACY.md'];
+const DOCUMENTS = ['TERMS.md', 'PRIVACY.md', 'CHILD_SAFETY.md'];
 
 /**
  * What must never reach production.
@@ -75,7 +75,7 @@ if (problems.length) {
   console.error('\n[legal] These documents are not publishable:\n');
   for (const problem of problems) console.error(`  ✖ ${problem}`);
   console.error(
-    '\nThey are served at /terms and /privacy, and both stores check them.\n' +
+    '\nThey are served at /terms, /privacy and /child-safety, and both stores check them.\n' +
       'Fix documentation/legal/ and build again.\n',
   );
   process.exit(1);

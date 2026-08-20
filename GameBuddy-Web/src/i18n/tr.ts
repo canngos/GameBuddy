@@ -103,6 +103,7 @@ export const tr: Dictionary = {
     legalNav: 'Hukuk ve destek',
     privacy: 'Gizlilik',
     terms: 'Kullanım koşulları',
+    childSafety: 'Çocuk güvenliği',
     deleteAccount: 'Hesabını sil',
     support: 'Destek',
     help: 'Yardım',

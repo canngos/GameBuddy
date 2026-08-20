@@ -107,6 +107,7 @@ export const en = {
     legalNav: 'Legal and support',
     privacy: 'Privacy',
     terms: 'Terms',
+    childSafety: 'Child safety',
     deleteAccount: 'Delete your account',
     support: 'Support',
     help: 'Help',

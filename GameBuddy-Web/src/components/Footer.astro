@@ -6,7 +6,11 @@
  * without installing anything. Putting them here means every page in every language
  * satisfies that, rather than only the landing page.
  *
- * The two legal links point at the English pages from every locale — those documents are not
+ * The child safety standards are here for a second reason: Google Play requires them to be
+ * published outside the app, and a page nobody can navigate to is a page that reads as a form
+ * being satisfied rather than a policy being kept.
+ *
+ * The three legal links point at the English pages from every locale — those documents are not
  * translated, and the pages themselves say so.
  */
 import { CONTACT, OPERATOR, SITE } from '../config';
@@ -23,6 +27,7 @@ const year = new Date().getFullYear();
 const legal = [
   { href: '/privacy', label: t(lang, 'footer.privacy') },
   { href: '/terms', label: t(lang, 'footer.terms') },
+  { href: '/child-safety', label: t(lang, 'footer.childSafety') },
   { href: localeUrl(lang, 'delete-account'), label: t(lang, 'footer.deleteAccount') },
   { href: localeUrl(lang, 'support'), label: t(lang, 'footer.support') },
 ];

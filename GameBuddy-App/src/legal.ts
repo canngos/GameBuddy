@@ -25,7 +25,7 @@ export const TERMS_URL = process.env.EXPO_PUBLIC_TERMS_URL ?? 'https://findgameb
 export const PRIVACY_URL =
   process.env.EXPO_PUBLIC_PRIVACY_URL ?? 'https://findgamebuddy.com/privacy';
 
-export const TERMS_VERSION = '2026-08-07';
+export const TERMS_VERSION = '2026-08-20';
 
 export function openTerms() {
   return Linking.openURL(TERMS_URL);

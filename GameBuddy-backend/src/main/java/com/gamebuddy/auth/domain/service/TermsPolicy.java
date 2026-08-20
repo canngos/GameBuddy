@@ -24,7 +24,7 @@ import com.gamebuddy.common.exception.BusinessException;
 public final class TermsPolicy {
 
     /** Bump when the wording changes in a way an account holder would care about. */
-    public static final String CURRENT_VERSION = "2026-08-07";
+    public static final String CURRENT_VERSION = "2026-08-20";
 
     private TermsPolicy() {}
 
