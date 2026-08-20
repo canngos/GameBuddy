@@ -233,27 +233,76 @@ GB_BASE_URL=https://api.yourdomain.com node qa/run-functional.js
 
 The database is small (91 MB with the full seed) so this is cheap and there is no excuse.
 
-```bash
-# ~/backup.sh
-set -euo pipefail
-cd /home/gamebuddy/gamebuddy
-STAMP=$(date +%F-%H%M)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec -T postgres \
-  pg_dump -U gamebuddy -d gamebuddy --format=custom \
-  > /home/gamebuddy/backups/gamebuddy-$STAMP.dump
-# Off the box: a backup on the same disk is not a backup.
-rclone copy /home/gamebuddy/backups/gamebuddy-$STAMP.dump r2:gamebuddy-backups/
-find /home/gamebuddy/backups -name '*.dump' -mtime +7 -delete
-```
+**Retention here is a published promise, not housekeeping.** `documentation/legal/PRIVACY.md`
+section 9 tells account holders that each backup is destroyed seven days after it is taken. A
+backup that outlives that is a copy of somebody who asked to be deleted, so all four steps
+below are load-bearing — the script is no longer optional to install, and the lifecycle rule is
+not an optimisation.
+
+**1. Install the script.** It is `deploy/backup.sh` in the repository now, rather than a
+snippet to paste — it prunes both the local dumps and the remote ones, and the comments explain
+why both prunes exist.
 
 ```bash
-mkdir -p ~/backups && chmod +x ~/backup.sh
-crontab -e   # 30 3 * * *  /home/gamebuddy/backup.sh >> /home/gamebuddy/backup.log 2>&1
+mkdir -p ~/backups
+cp ~/gamebuddy/deploy/backup.sh ~/backup.sh && chmod +x ~/backup.sh
 ```
 
-**Restore-test it once**, now, while nothing is at stake. A backup you have never restored
-is a hypothesis. Also enable Hetzner's automatic snapshots (20% of the server price, ~€0.80/mo)
-— they cover the whole disk, not just the database.
+**2. Install the log retention pass.** Caddy's access log and Docker's console capture both
+rotate by *size*, and at this traffic neither reaches its 10 MB threshold for months — so the
+IP addresses inside them would outlive the seven days the policy promises by a wide margin.
+`deploy/enforce-log-retention.sh` reads the age from the oldest entry in each file, rather than
+from its modification time (a file being appended to is always "modified" seconds ago, which is
+why the obvious `find -mtime +7` never fires), and truncates what has aged out. It needs root
+for `/var/lib/docker`, so it goes in root's crontab rather than `gamebuddy`'s.
+
+```bash
+sudo cp ~/gamebuddy/deploy/enforce-log-retention.sh /usr/local/bin/ && sudo chmod +x /usr/local/bin/enforce-log-retention.sh
+crontab -e        # as gamebuddy: 30 3 * * *  /home/gamebuddy/backup.sh >> /home/gamebuddy/backup.log 2>&1
+sudo crontab -e   # as root:      45 3 * * *  /usr/local/bin/enforce-log-retention.sh >> /var/log/gamebuddy-log-retention.log 2>&1
+```
+
+The backend's own log needs nothing here — `LOG_MAX_HISTORY: 7` in `docker-compose.prod.yml` is
+a day count Logback enforces itself, and it is the log worth reading when something breaks.
+
+**3. The R2 lifecycle rule — done, 2026-08-20.** The script only prunes on the nights it runs;
+the bucket rule holds when cron is dead, the disk is full, or the box is being rebuilt. Without
+it the seven days is an intention rather than a control.
+
+The bucket did not exist until now, which is worth knowing: `rclone` creates a bucket on first
+upload, so its absence was the evidence that the job in step 1 had never run. `gamebuddy-backups`
+now exists in the **European Union** jurisdiction — matching `gamebuddy-media` and
+`gamebuddy-uploads`, and matching what section 6 of the privacy policy says about backups
+staying in the EU — with **Standard** storage class, because Infrequent Access bills a 30-day
+minimum per object and nothing here survives seven.
+
+The rule is `expire-backups-after-7-days`, no prefix, **delete objects after 7 days**, enabled.
+Cloudflare dashboard → **R2** → `gamebuddy-backups` → **Settings** → **Object lifecycle rules**
+if it ever needs changing. There is a Wrangler equivalent —
+`npx wrangler r2 bucket lifecycle --help` for the current subcommands — and either way, prove
+it still exists rather than assuming:
+
+```bash
+rclone lsl r2:gamebuddy-backups/    # nothing older than seven days should survive
+```
+
+**4. Restore-test it once**, now, while nothing is at stake. A backup you have never restored
+is a hypothesis.
+
+**Disk-level backups are a second copy of everything, including deleted accounts.** Hetzner's
+automatic backups (20% of the server price, ~€0.80/mo) cover the whole disk and rotate through
+seven slots, which matches what the policy says. Manual snapshots do not rotate at all — they
+live until somebody deletes them, and one taken today is still holding an account that asked to
+be erased next year. Check which of the two you have, and write the answer here so the next
+person does not have to ask:
+
+```bash
+hcloud server describe gamebuddy     # Backups: enabled?
+hcloud image list --type snapshot    # manual snapshots, kept until deleted by hand
+```
+
+If manual snapshots exist, either delete the stale ones on the same seven-day rhythm or amend
+section 9 of the privacy policy to say how long they are kept. Do not leave it unstated.
 
 ## 8. Tuning a rate limit without a rebuild
 

@@ -194,9 +194,10 @@ section 13.
 - **Backups**: the database is backed up nightly, and each backup is destroyed seven days
   after it is taken. So an account deleted today is gone from the live service at once, and
   out of the last backup within a week.
-- **Server logs**: these rotate by size rather than by date — we keep the most recent 30 MB
-  per service and nothing older, which at current volumes is a matter of weeks. They record IP
-  addresses, request paths and errors; they do not record message content.
+- **Server logs**: 7 days. They record IP addresses, request paths and errors; they do not
+  record message content. Three separate logs are involved — the web server's access log, the
+  application's own log, and the copy the container runtime keeps — and all three are pruned on
+  the same seven-day rule, plus a size cap that can only remove things sooner.
 - **Records we must keep by law** (purchases, and material relating to a report we acted
   on): as long as the law requires.
 
