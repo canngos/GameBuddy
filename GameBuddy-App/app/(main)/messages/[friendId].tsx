@@ -5,17 +5,23 @@ import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { profileApi } from '../../../src/api/catalogue';
 import { chatApi } from '../../../src/api/chat';
 import { socialApi } from '../../../src/api/social';
-import type { Conversation } from '../../../src/api/types';
+import type {
+  Candidate,
+  Conversation,
+  GamerSummary,
+  InboxEntry,
+} from '../../../src/api/types';
 import { useConversation } from '../../../src/chat/useConversation';
 import type { Dictionary } from '../../../src/i18n/dictionaries/en';
 import { useT } from '../../../src/i18n/useT';
+import type { QueryKeyRoot } from '../../../src/query/keys';
 import { useThemeColors } from '../../../src/theme';
 import {
   ActionSheet,
-  Avatar,
   cn,
   ConfirmDialog,
   ErrorNotice,
+  FramedAvatar,
   Screen,
   Text,
   TextField,
@@ -31,25 +37,76 @@ export default function Chat() {
     username?: string;
   }>();
 
+  const queryClient = useQueryClient();
+
   /**
-   * The name in the header, resolved rather than assumed.
+   * What the screen this was opened from already knows about the other person.
    *
-   * The param is an optimisation — the inbox already knows the name, so passing it paints
-   * the header before anything loads. It is not a source of truth, and treating it as one
-   * meant every entry point that *cannot* supply it showed "Conversation" with a "?"
-   * avatar, permanently. Opening a chat from a push notification did exactly that, which
-   * is the one route where you most need to know who is talking to you.
+   * The inbox draws this exact face one tap away, out of three caches that are still in
+   * memory when it pushes this screen — so the header reads them rather than asking the
+   * server to describe somebody it was just shown. The three are the ones the inbox
+   * itself merges, and they are read in its order for the same reason: `['inbox']` is
+   * authoritative on the name and the picture, and carries no worn frame, so the frame
+   * comes from `['matches']` or `['friends']`, which do.
    *
-   * Only fetched when the param is missing, so the common path still costs no request.
-   * Shares the `['gamer', id]` key with the profile screen this header opens, so arriving
-   * there is already warm.
+   * A plain read rather than three more `useQuery` subscriptions. This is wanted once, at
+   * mount, and by then it is either there or it never will be — whatever route filled
+   * these caches did so before navigating here. So a miss is a real miss, and it falls
+   * through to {@link profile} below, which *is* reactive.
+   */
+  const known = useMemo(() => {
+    const roots = ['inbox', 'matches', 'friends'] satisfies QueryKeyRoot[];
+    const entry = queryClient
+      .getQueryData<InboxEntry[]>([roots[0]])
+      ?.find((row) => row.userId === friendId);
+    const match = queryClient
+      .getQueryData<Candidate[]>([roots[1]])
+      ?.find((row) => row.userId === friendId);
+    const friend = queryClient
+      .getQueryData<GamerSummary[]>([roots[2]])
+      ?.find((row) => row.userId === friendId);
+
+    // Absent from all three is the answer, not an empty one: it means this screen was
+    // reached without passing through the inbox, and only then is a request warranted.
+    if (!entry && !match && !friend) return null;
+
+    return {
+      username: entry?.username ?? match?.gamerUsername ?? friend?.username ?? null,
+      // `??` and not `||`, throughout: null here means "has no avatar", which is a fact
+      // worth keeping — falling through to the next list would not improve on it, and
+      // the monogram is the right answer for somebody who has not set one.
+      avatar: entry?.avatar ?? match?.avatar ?? friend?.avatar ?? null,
+      frame: match?.frame ?? friend?.frame ?? null,
+    };
+  }, [queryClient, friendId]);
+
+  /**
+   * The fallback for the entry points that cannot have those caches warm.
+   *
+   * Two of the three routes here are exactly that: a MESSAGE push on a cold start has no
+   * cache at all, and a fresh match is somebody `['matches']` was fetched before. Both
+   * need the round trip, and both are rare — opening a conversation from the inbox, which
+   * is how this screen is nearly always reached, still costs nothing.
+   *
+   * The `username` param is a separate optimisation and is kept: it paints the name before
+   * anything at all has loaded. It is not a source of truth, though, and treating it as
+   * one is what caused this. Gating the fetch on it meant the ordinary route learned the
+   * name and nothing else — no avatar to draw, so the header hardcoded a blank one and
+   * showed a monogram where the row it was opened from showed a face. Every entry point
+   * without the param, meanwhile, showed "Conversation" and a "?" permanently.
+   *
+   * Shares the `['gamer', id]` key with the profile this header opens, so if it does run,
+   * tapping through is already warm.
    */
   const profile = useQuery({
     queryKey: ['gamer', friendId],
     queryFn: () => profileApi.byId(friendId),
-    enabled: !passedUsername,
+    enabled: !known,
   });
-  const username = passedUsername ?? profile.data?.username ?? undefined;
+
+  const username = passedUsername ?? known?.username ?? profile.data?.username ?? undefined;
+  const avatar = known?.avatar ?? profile.data?.avatar ?? null;
+  const frame = known?.frame ?? profile.data?.frame ?? null;
 
   const chat = useConversation(friendId);
   const [draft, setDraft] = useState('');
@@ -116,7 +173,16 @@ export default function Chat() {
           accessibilityLabel={t.messages.viewProfileA11y(username ?? t.messages.thisGamer)}
           className="flex-1 flex-row items-center gap-3 active:opacity-70"
         >
-          <Avatar source={null} name={username ?? '?'} colorSeed={friendId} size={36} />
+          {/* Framed, like the inbox row this was opened from: a frame somebody paid for
+              should not vanish the moment you start talking to them. Safe here because
+              the ring overhangs its box by ~14% and nothing in this header clips. */}
+          <FramedAvatar
+            frame={frame}
+            source={avatar}
+            name={username ?? '?'}
+            colorSeed={friendId}
+            size={36}
+          />
 
           <View className="flex-1">
             <Text variant="bodyStrong">{username ?? t.messages.conversation}</Text>
