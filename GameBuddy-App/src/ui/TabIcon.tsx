@@ -1,8 +1,8 @@
 import {
   ChartColumn,
+  createLucideIcon,
   Flag,
   ImagePlus,
-  Layers,
   MessageCircle,
   Settings,
   ShoppingBasket,
@@ -53,8 +53,22 @@ export type TabIconName =
  * like, which is also what makes the lit active state possible: a glow and a heavier stroke
  * are not things a single `color` prop can express.
  */
+/**
+ * Two fanned cards, drawn to Lucide's spec (24x24 viewBox, 2px stroke) through Lucide's
+ * own factory, so it types and renders exactly like the stock set.
+ *
+ * The header comment above tells the history: the original hand-built deck glyph *was*
+ * two rotated rectangles, the Lucide switch flattened it to `Layers`, and the rotated
+ * pair came back by request - it reads as a swipe deck where Layers read as generic
+ * stacked sheets. Each card rotates about its own centre so the fan stays symmetric.
+ */
+const DeckCards = createLucideIcon('DeckCards', [
+  ['rect', { x: '4', y: '3', width: '12', height: '17', rx: '2', transform: 'rotate(-6 10 11.5)', key: 'back' }],
+  ['rect', { x: '9', y: '4', width: '12', height: '17', rx: '2', transform: 'rotate(6 15 12.5)', key: 'front' }],
+]);
+
 const GLYPHS: Record<TabIconName, LucideIcon> = {
-  deck: Layers,
+  deck: DeckCards,
   // A group of people, not a controller. A lobby is who you are playing with — the deck
   // already carries the "games" meaning, and two game-shaped glyphs in one bar read as
   // the same destination twice.

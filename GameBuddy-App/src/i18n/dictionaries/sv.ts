@@ -173,7 +173,7 @@ export const sv: Dictionary = {
   },
 
   tabs: {
-    home: 'Hem',
+    home: 'Kortlek',
     lobby: 'Lobby',
     messages: 'Meddelanden',
     market: 'Butik',
