@@ -174,7 +174,7 @@ export const es: Dictionary = {
   },
 
   tabs: {
-    home: 'Inicio',
+    home: 'Mazo',
     lobby: 'Lobby',
     messages: 'Mensajes',
     market: 'Tienda',

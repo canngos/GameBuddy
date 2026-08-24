@@ -223,7 +223,7 @@ export const en = {
   },
 
   tabs: {
-    home: 'Home',
+    home: 'Deck',
     lobby: 'Lobby',
     messages: 'Messages',
     market: 'Market',

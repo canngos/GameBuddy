@@ -173,7 +173,7 @@ export const tr: Dictionary = {
   },
 
   tabs: {
-    home: 'Ana sayfa',
+    home: 'Deste',
     lobby: 'Lobi',
     messages: 'Mesajlar',
     market: 'Mağaza',

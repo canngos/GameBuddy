@@ -176,7 +176,7 @@ export const fi: Dictionary = {
   },
 
   tabs: {
-    home: 'Koti',
+    home: 'Pakka',
     lobby: 'Aula',
     messages: 'Viestit',
     market: 'Kauppa',
