@@ -239,7 +239,14 @@ export function createChatSocket(token: string, listeners: Listeners) {
     stopKeepalive();
     keepalive = setInterval(() => {
       if (!client.connected) return;
-      client.publish({ destination: '/app/chat.keepalive' });
+      try {
+        client.publish({ destination: '/app/chat.keepalive' });
+      } catch (error) {
+        // The socket can close in the gap between the check above and this publish;
+        // a throw here escapes into a timer, where only the global handler would see
+        // it - as a phantom crash report. The next interval simply checks again.
+        console.warn('[chat] keepalive publish failed', error);
+      }
     }, KEEPALIVE_MS);
   }
 
