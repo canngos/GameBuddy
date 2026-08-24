@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Award, Heart, MessageCircle, Search, Settings2, Swords, Zap } from 'lucide-react-native';
 import { THEME_OPTIONS, brand, useGradient, useScheme, useThemeColors } from '../../src/theme';
 import { CandidateCard } from '../../src/match/CandidateCard';
+import { SwipeCard } from '../../src/match/SwipeCard';
 import { CandidateSheet } from '../../src/match/CandidateSheet';
 import { Burst } from '../../src/ui/Burst';
 import { GradientSurface, GradientView } from '../../src/ui/Gradient';
@@ -50,6 +51,7 @@ export default function Gallery() {
         <SpikeGradients />
         <TokenStrip />
         <DeckCard onOpenProfile={() => setProfileOpen(true)} />
+        <SwipeStamps />
         <BurstSection />
         <Toasts />
         <Counting />
@@ -320,6 +322,34 @@ const GALLERY_CANDIDATE = {
   ],
   platforms: ['PC', 'PlayStation'],
 } as const;
+
+/**
+ * The real `SwipeCard`, gesture and stamps included, on the same backend-free fixture.
+ *
+ * This exists because the stamps cannot be seen anywhere else without a running backend,
+ * and they are exactly the layer that has broken invisibly on real devices (elevation
+ * stacking, flick-speed commits, font scale). A committed swipe throws the card away, so
+ * the section re-keys a fresh one after the exit animation clears.
+ *
+ * The pan claims any touch that moves, so the page cannot be scrolled from on top of the
+ * card - the hint says to scroll from the side gutters.
+ */
+function SwipeStamps() {
+  const [round, setRound] = useState(0);
+  return (
+    <Section title="SWIPE STAMPS" hint="drag the card; scroll the page from the side gutters">
+      <View className="h-[520px]">
+        <SwipeCard
+          key={round}
+          candidate={GALLERY_CANDIDATE as never}
+          onDecide={() => {
+            setTimeout(() => setRound((current) => current + 1), 400);
+          }}
+        />
+      </View>
+    </Section>
+  );
+}
 
 function DeckCard({ onOpenProfile }: { onOpenProfile: () => void }) {
   return (

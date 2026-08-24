@@ -44,6 +44,10 @@ export type DeckLayout = {
   actionsGap: number;
   /** Vertical gutter between the header and the card, and the card and the actions. */
   cardGutter: number;
+  /** Offset of the swipe stamps from the card's top edge. */
+  stampTop: number;
+  /** Stamp type metrics. Inline style, not a class - the value changes with the device. */
+  stampType: { fontSize: number; lineHeight: number };
 };
 
 export function useDeckLayout(): DeckLayout {
@@ -86,5 +90,14 @@ export function useDeckLayout(): DeckLayout {
     actionsPaddingY: pick(8, 12, 20),
     actionsGap: pick(14, 18, 24),
     cardGutter: pick(4, 8, 12),
+    // The swipe stamps were the one deck element with no tier awareness - 24/30 type at
+    // top: 28 on every phone. Roomy keeps those exact numbers, so nothing moves on the
+    // devices that were already right.
+    stampTop: pick(14, 20, 28),
+    stampType: pick(
+      { fontSize: 20, lineHeight: 25 },
+      { fontSize: 22, lineHeight: 28 },
+      { fontSize: 24, lineHeight: 30 },
+    ),
   };
 }

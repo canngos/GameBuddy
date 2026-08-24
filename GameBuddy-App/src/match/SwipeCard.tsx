@@ -17,6 +17,7 @@ import { glow } from '../ui/glow';
 import { commit as commitHaptic, tapLight } from '../ui/haptics';
 import { Text } from '../ui/Text';
 import { CandidateCard } from './CandidateCard';
+import { useDeckLayout } from './deckLayout';
 import type { Decision } from './useDeck';
 
 type SwipeCardProps = {
@@ -78,6 +79,7 @@ export function SwipeCard({
   const { width, height } = useWindowDimensions();
   const colors = useThemeColors();
   const t = useT();
+  const layout = useDeckLayout();
   const commitDistance = width * COMMIT_RATIO;
   const superCommitDistance = height * SUPER_COMMIT_RATIO;
 
@@ -92,6 +94,20 @@ export function SwipeCard({
    * still change it, not after.
    */
   const armed = useSharedValue(false);
+  /*
+   * Which decision the release committed: 0 none, 1 accept, -1 decline, 2 super.
+   *
+   * A fast flick commits on velocity alone (see onEnd), often at 60-90px of travel -
+   * where the drag-driven stamp is still at a quarter opacity. The card then exits in
+   * 220ms, so on a real thumb-flick the stamp was gone before it ever became legible;
+   * that is the "stamps never appear" report from devices, which a slow mouse-drag on an
+   * emulator can never reproduce. `commitFlash` ramps to 1 the moment the release
+   * commits, and each stamp shows whichever is stronger: the drag or the flash. No reset
+   * needed - the card is keyed per candidate, so every card starts with fresh values.
+   * Named `decided` because onEnd already has a local boolean called `committed`.
+   */
+  const decided = useSharedValue(0);
+  const commitFlash = useSharedValue(0);
 
   const pan = Gesture.Pan()
     .enabled(!frozen)
@@ -123,6 +139,8 @@ export function SwipeCard({
         (-translateY.value > superCommitDistance || -event.velocityY > COMMIT_VELOCITY);
 
       if (superCommitted) {
+        decided.value = 2;
+        commitFlash.value = withTiming(1, { duration: 90 });
         // Straight up and out of the frame. No tilt: the rotation is driven by horizontal
         // travel, which is near zero here, so the card leaves square — which is what makes
         // this read as a different act rather than a crooked accept.
@@ -138,6 +156,8 @@ export function SwipeCard({
 
       if (committed) {
         const direction = translateX.value > 0 ? 1 : -1;
+        decided.value = direction;
+        commitFlash.value = withTiming(1, { duration: 90 });
         // Past the screen edge, so the card is fully gone before it unmounts.
         translateX.value = withTiming(direction * width * 1.5, { duration: 220 });
         translateY.value = withTiming(translateY.value + 40, { duration: 220 });
@@ -225,57 +245,49 @@ export function SwipeCard({
    * Both horizontal stamps drop to zero while the drag reads as upward, so a diagonal never
    * shows MATCH and SUPER arguing about what letting go will do.
    */
-  const acceptStampStyle = useAnimatedStyle(() => ({
-    opacity: isSuper(translateX.value, translateY.value)
+  const acceptStampStyle = useAnimatedStyle(() => {
+    const drag = isSuper(translateX.value, translateY.value)
       ? 0
-      : interpolate(translateX.value, [0, commitDistance], [0, 1], Extrapolation.CLAMP),
-    transform: [
-      { rotate: '-12deg' },
-      {
-        scale: interpolate(
-          translateX.value,
-          [0, commitDistance],
-          [0.7, 1],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
-  }));
-  const declineStampStyle = useAnimatedStyle(() => ({
-    opacity: isSuper(translateX.value, translateY.value)
+      : interpolate(translateX.value, [0, commitDistance], [0, 1], Extrapolation.CLAMP);
+    // Whichever is stronger: how far the thumb has dragged, or the release flash. The
+    // flash is what makes a velocity-committed flick show its stamp during the exit
+    // flight instead of leaving at a quarter opacity.
+    const presence = Math.max(drag, decided.value === 1 ? commitFlash.value : 0);
+    return {
+      opacity: presence,
+      transform: [
+        { rotate: '-12deg' },
+        { scale: 0.7 + 0.3 * presence },
+      ],
+    };
+  });
+  const declineStampStyle = useAnimatedStyle(() => {
+    const drag = isSuper(translateX.value, translateY.value)
       ? 0
-      : interpolate(translateX.value, [-commitDistance, 0], [1, 0], Extrapolation.CLAMP),
-    transform: [
-      { rotate: '12deg' },
-      {
-        scale: interpolate(
-          translateX.value,
-          [-commitDistance, 0],
-          [1, 0.7],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
-  }));
+      : interpolate(translateX.value, [-commitDistance, 0], [1, 0], Extrapolation.CLAMP);
+    const presence = Math.max(drag, decided.value === -1 ? commitFlash.value : 0);
+    return {
+      opacity: presence,
+      transform: [
+        { rotate: '12deg' },
+        { scale: 0.7 + 0.3 * presence },
+      ],
+    };
+  });
 
   // Centred and upright rather than tilted into a corner like the other two, because it is
   // the one decision made along the card's own axis — and because at the point it appears
   // the thumb is over the middle of the card, not either edge.
-  const superStampStyle = useAnimatedStyle(() => ({
-    opacity: isSuper(translateX.value, translateY.value)
+  const superStampStyle = useAnimatedStyle(() => {
+    const drag = isSuper(translateX.value, translateY.value)
       ? interpolate(-translateY.value, [0, superCommitDistance], [0, 1], Extrapolation.CLAMP)
-      : 0,
-    transform: [
-      {
-        scale: interpolate(
-          -translateY.value,
-          [0, superCommitDistance],
-          [0.7, 1],
-          Extrapolation.CLAMP,
-        ),
-      },
-    ],
-  }));
+      : 0;
+    const presence = Math.max(drag, decided.value === 2 ? commitFlash.value : 0);
+    return {
+      opacity: presence,
+      transform: [{ scale: 0.7 + 0.3 * presence }],
+    };
+  });
 
   return (
     <GestureDetector gesture={gesture}>
@@ -285,7 +297,7 @@ export function SwipeCard({
         {/* Over the card and under the stamps. `pointerEvents` off so it never competes
             with the tap that opens the profile. */}
         <Animated.View
-          style={[StyleSheet.absoluteFill, superWashStyle]}
+          style={[StyleSheet.absoluteFill, styles.wash, superWashStyle]}
           pointerEvents="none"
         >
           <View
@@ -308,7 +320,10 @@ export function SwipeCard({
             StyleSheet and a `transform` in the animated one do not merge, the animated one
             replaces it wholesale, so declaring the tilt in both places would silently drop
             it the moment the scale was added. */}
-        <Animated.View style={[styles.stamp, styles.stampLeft, acceptStampStyle]} pointerEvents="none">
+        <Animated.View
+          style={[styles.stamp, styles.stampLeft, { top: layout.stampTop }, acceptStampStyle]}
+          pointerEvents="none"
+        >
           {/* The glow is what makes it read as neon rather than as a rubber stamp, and it
               goes on this inner plain View because `glow()` returns a style and the node
               carrying it must not be the one Reanimated is driving. */}
@@ -316,29 +331,54 @@ export function SwipeCard({
             className="rounded-xl border-4 border-accent px-4 py-1.5"
             style={glow('strong', colors.accent)}
           >
-            <Text variant="numeral" className="text-[24px] leading-[30px] tracking-[2px] text-accent">
+            {/* Type is an inline style from the deck's tier table, not a class - the value
+                changes with the device and a class cannot. The multiplier cap keeps large
+                system text from overrunning the fixed line box, which trimmed the glyphs
+                to nothing inside the border. */}
+            <Text
+              variant="numeral"
+              className="tracking-[2px] text-accent"
+              style={layout.stampType}
+              maxFontSizeMultiplier={1.2}
+            >
               MATCH
             </Text>
           </View>
         </Animated.View>
 
-        <Animated.View style={[styles.stamp, styles.stampRight, declineStampStyle]} pointerEvents="none">
+        <Animated.View
+          style={[styles.stamp, styles.stampRight, { top: layout.stampTop }, declineStampStyle]}
+          pointerEvents="none"
+        >
           <View
             className="rounded-xl border-4 border-white/90 px-4 py-1.5"
             style={glow('soft', '#FFFFFF')}
           >
-            <Text variant="numeral" className="text-[24px] leading-[30px] tracking-[2px] text-white">
+            <Text
+              variant="numeral"
+              className="tracking-[2px] text-white"
+              style={layout.stampType}
+              maxFontSizeMultiplier={1.2}
+            >
               PASS
             </Text>
           </View>
         </Animated.View>
 
-        <Animated.View style={[styles.superStamp, superStampStyle]} pointerEvents="none">
+        <Animated.View
+          style={[styles.superStamp, { top: layout.stampTop }, superStampStyle]}
+          pointerEvents="none"
+        >
           <View
             className="rounded-xl border-4 border-gold px-4 py-1.5"
             style={glow('strong', colors.gold)}
           >
-            <Text variant="numeral" className="text-[24px] leading-[30px] tracking-[2px] text-gold">
+            <Text
+              variant="numeral"
+              className="tracking-[2px] text-gold"
+              style={layout.stampType}
+              maxFontSizeMultiplier={1.2}
+            >
               {t.deck.card.superStamp}
             </Text>
           </View>
@@ -349,12 +389,20 @@ export function SwipeCard({
 }
 
 // No `transform` here — the tilt lives in the animated styles above, because an animated
-// `transform` replaces a static one rather than merging with it.
+// `transform` replaces a static one rather than merging with it. `top` is tiered and
+// lives in the deck layout table, applied inline at the call sites.
+//
+// The zIndex/elevation pairs are load-bearing on Android: `CandidateCard` carries
+// `lift('lg')`, which is `elevation: 10` there, and Android orders *siblings* by Z before
+// it considers JSX order — so an overlay with no elevation of its own can paint underneath
+// the very card it is stamped on. iOS and web order by JSX and ignore the extra keys.
+// The wash sits at 11 (over the card), the stamps at 12 (over the wash).
 const styles = StyleSheet.create({
-  stamp: { position: 'absolute', top: 28 },
+  wash: { zIndex: 11, elevation: 11 },
+  stamp: { position: 'absolute', zIndex: 12, elevation: 12 },
   stampLeft: { left: 24 },
   stampRight: { right: 24 },
   // Centred horizontally by pinning both edges and letting the row centre its content,
   // which needs no measurement of the stamp itself.
-  superStamp: { position: 'absolute', top: 28, left: 0, right: 0, alignItems: 'center' },
+  superStamp: { position: 'absolute', left: 0, right: 0, alignItems: 'center', zIndex: 12, elevation: 12 },
 });
