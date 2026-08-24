@@ -38,6 +38,15 @@ export function setSessionExpiredHandler(handler: () => void): void {
   onSessionExpired = handler;
 }
 
+/**
+ * Lets sibling transports report an expired session. `unwrap` below calls the handler
+ * for everything that goes through `request`; the upload path in catalogue.ts has its
+ * own unwrap over expo-file-system and must trigger the same sign-out.
+ */
+export function notifySessionExpired(): void {
+  onSessionExpired();
+}
+
 async function request<T>(
   method: Method,
   path: string,
