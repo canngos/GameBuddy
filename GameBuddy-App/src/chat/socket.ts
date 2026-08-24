@@ -204,11 +204,21 @@ export function createChatSocket(token: string, listeners: Listeners) {
     },
 
     onStompError: (frame) => {
-      // A STOMP ERROR frame is the server refusing us — a bad or expired token, most
-      // likely. Retrying with the same token cannot help, so stop rather than loop.
-      console.warn('[chat] Broker refused the connection:', frame.headers.message);
-      void client.deactivate();
-      listeners.onStatus('idle');
+      const message = frame.headers.message ?? '';
+      console.warn('[chat] Broker refused the connection:', message);
+      // Only an auth refusal is worth giving up on: retrying with the same token cannot
+      // help, and the token effect rebuilds the socket when it renews. Anything else -
+      // a broker restart, a decoder error, a transient server fault - used to deactivate
+      // too, which left chat and presence silently dead for the rest of the process
+      // (`active === false` means stompjs never retries; the only rescue was
+      // backgrounding the app). Now the client stays active and the reconnectDelay
+      // loop above brings it back.
+      if (/token|auth|unauthori[sz]ed|credential|expired|401/i.test(message)) {
+        void client.deactivate();
+        listeners.onStatus('idle');
+        return;
+      }
+      listeners.onStatus('reconnecting');
     },
   });
 
@@ -256,8 +266,12 @@ export function createChatSocket(token: string, listeners: Listeners) {
     },
     disconnect() {
       stopKeepalive();
-      void client.deactivate();
+      // Handed back so the provider can sequence the *next* socket behind it. A React
+      // cleanup cannot await, and activate() racing this deactivate is exactly the
+      // two-sessions-for-one-principal case reconnect() documents below.
+      const done = client.deactivate();
       listeners.onStatus('idle');
+      return done;
     },
 
     /**

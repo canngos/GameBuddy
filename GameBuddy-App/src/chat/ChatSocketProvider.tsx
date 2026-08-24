@@ -94,6 +94,14 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
   const socket = useRef<ReturnType<typeof createChatSocket> | null>(null);
   /** One expiry timer per person typing, so a stale indicator cannot get stuck on. */
   const typingTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  /**
+   * The outgoing socket's teardown, awaited before the next one activates. socket.ts
+   * holds the invariant (see its reconnect()): activate() must never race a deactivate,
+   * or the server briefly counts two sessions for one principal - a presence flicker for
+   * everybody watching. Effect cleanups cannot await, so the promise is carried across
+   * runs of the [token] effect instead.
+   */
+  const teardown = useRef<Promise<void>>(Promise.resolve());
 
   useEffect(() => {
     if (!token) {
@@ -166,10 +174,14 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
     }
 
     socket.current = instance;
-    instance.connect();
+    let cancelled = false;
+    void teardown.current.then(() => {
+      if (!cancelled) instance.connect();
+    });
 
     return () => {
-      instance.disconnect();
+      cancelled = true;
+      teardown.current = instance.disconnect();
       socket.current = null;
       timers.forEach(clearTimeout);
       timers.clear();
