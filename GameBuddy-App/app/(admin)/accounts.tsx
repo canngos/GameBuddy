@@ -35,12 +35,13 @@ export default function AccountsScreen() {
 
   // Stable, so the extracted row below can memoise. It was an inline arrow inside
   // `renderItem`, which is also why the row could not be a component at all.
+  const { mutate: unbanMutate } = unban;
   const confirmUnban = useCallback((userId: string, username: string | null) =>
     Alert.alert(`Restore ${username ?? 'this account'}?`, 'They will be able to sign in and be matched again.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Restore', onPress: () => unban.mutate(userId) },
+      { text: 'Restore', onPress: () => unbanMutate(userId) },
     ]),
-    [unban],
+    [unbanMutate],
   );
 
   const rows = banned.data?.blockedUsers ?? [];

@@ -49,14 +49,15 @@ export default function Friends() {
     },
   });
 
+  const { mutate: removeMutate } = remove;
   // Stable across renders so the memo on each row can actually bail out — see FriendRow.
   const confirmRemove = useCallback(
     (person: GamerSummary) =>
       Alert.alert(t.profile.removeConfirmTitle(person.username), t.profile.removeConfirmBody, [
         { text: t.common.cancel, style: 'cancel' },
-        { text: t.common.remove, style: 'destructive', onPress: () => remove.mutate(person.userId) },
+        { text: t.common.remove, style: 'destructive', onPress: () => removeMutate(person.userId) },
       ]),
-    [remove, t],
+    [removeMutate, t],
   );
 
   const openProfile = useCallback(

@@ -158,14 +158,18 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
    * Optimistic on purpose: waiting for the round trip before the next card appears
    * makes a deck feel broken, and the swipe animation has already committed visually.
    */
+  const { mutate: decideMutate } = decide;
   const submit = useCallback(
     (decision: Decision) => {
       const candidate = candidates[cursor];
       if (!candidate) return;
       setCursor((c) => c + 1);
-      decide.mutate({ decision, candidate });
+      decideMutate({ decision, candidate });
     },
-    [candidates, cursor, decide],
+    // `mutate` rather than the mutation object, which is a fresh literal every render -
+    // with [decide] here, every render of the deck rebuilt SwipeCard's Pan/Tap gesture
+    // chain. Now it rebuilds only when a swipe actually moves the cursor.
+    [candidates, cursor, decideMutate],
   );
 
   /**

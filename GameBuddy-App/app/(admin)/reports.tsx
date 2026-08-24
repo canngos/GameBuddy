@@ -40,6 +40,7 @@ export default function ReportsScreen() {
 
   // Stable, so the extracted row below can memoise. It was an inline arrow, which is also
   // why the row could not be a component at all.
+  const { mutate: settleMutate } = settle;
   const confirmRemove = useCallback(
     (report: Report) =>
       Alert.alert(
@@ -50,19 +51,19 @@ export default function ReportsScreen() {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: () => settle.mutate({ reportId: report.reportId, remove: true }),
+            onPress: () => settleMutate({ reportId: report.reportId, remove: true }),
           },
         ],
       ),
-    [settle],
+    [settleMutate],
   );
 
   const open = reports.data?.reports ?? [];
 
   const keyExtractor = useCallback((report: Report) => report.reportId, []);
   const onKeep = useCallback(
-    (reportId: string) => settle.mutate({ reportId, remove: false }),
-    [settle],
+    (reportId: string) => settleMutate({ reportId, remove: false }),
+    [settleMutate],
   );
   const renderRow = useCallback(
     ({ item }: { item: Report }) => (

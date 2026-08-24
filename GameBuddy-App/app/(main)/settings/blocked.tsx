@@ -26,7 +26,8 @@ export default function BlockedUsers() {
 
   const people = blocked.data ?? [];
 
-  const onUnblock = useCallback((userId: string) => unblock.mutate(userId), [unblock]);
+  const { mutate: unblockMutate } = unblock;
+  const onUnblock = useCallback((userId: string) => unblockMutate(userId), [unblockMutate]);
   const keyExtractor = useCallback((person: GamerSummary) => person.userId, []);
 
   const renderItem = useCallback(
