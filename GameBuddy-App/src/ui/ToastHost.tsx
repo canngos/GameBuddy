@@ -77,11 +77,21 @@ function ToastCard({ toast, onDone }: { toast: Toast; onDone: () => void }) {
    */
   const leaving = useRef(false);
 
+  /**
+   * The exit animation's onDone timer. Cleared on unmount: sign-out clears the whole
+   * toast store while a card may be mid-exit, and a late onDone would dismiss the head
+   * of the *next* account's queue.
+   */
+  const exitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     progress.value = withSpring(1, { damping: 18, stiffness: 220 });
 
     const timer = setTimeout(() => leave(), LIFETIME_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (exitTimer.current) clearTimeout(exitTimer.current);
+    };
     // Mount-only, deliberately, and the empty dependency list is not an oversight. `leave`
     // touches only refs and shared values, all of which are stable across renders — and
     // re-running this would restart the four-second lifetime every time the parent
@@ -95,7 +105,7 @@ function ToastCard({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     leaving.current = true;
 
     progress.value = withTiming(0, { duration: EXIT_MS });
-    setTimeout(onDone, EXIT_MS);
+    exitTimer.current = setTimeout(onDone, EXIT_MS);
   }
 
   function act() {

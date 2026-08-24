@@ -56,8 +56,13 @@ export default function NotificationSettings() {
     setAsking(true);
     try {
       if (await requestSystemPermission()) await registerDeviceToken();
-    } finally {
       setSystem(await permissionState());
+    } catch (error) {
+      // permissionState rejects on devices without Play Services, and it used to do so
+      // from inside the finally - before setAsking(false), leaving the button spinning
+      // until the screen was left. The focus handler re-reads the state anyway.
+      console.warn('[notifications] could not enable', error);
+    } finally {
       setAsking(false);
     }
   };
