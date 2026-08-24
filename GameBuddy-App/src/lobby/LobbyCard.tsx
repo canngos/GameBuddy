@@ -1,8 +1,9 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Zap } from 'lucide-react-native';
-import { memo, useCallback, useEffect, useMemo } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -136,15 +137,24 @@ function BoostedFrame() {
   const colors = useThemeColors();
   const pulse = useSharedValue(0.35);
 
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) }),
-      // -1 repeats forever; `true` reverses, so it breathes rather than snapping back to
-      // dim at the end of each cycle.
-      -1,
-      true,
-    );
-  }, [pulse]);
+  // A focus effect, not a mount effect: -1 repeats forever, and `freezeOnBlur` freezes
+  // React renders but not Reanimated worklets - so every boosted card in a blurred tab
+  // kept a UI-thread animation ticking indefinitely. Cancelled on blur, restarted on
+  // focus; the frame is invisible while the tab is away either way.
+  useFocusEffect(
+    useCallback(() => {
+      pulse.value = withRepeat(
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad) }),
+        // -1 repeats forever; `true` reverses, so it breathes rather than snapping back
+        // to dim at the end of each cycle.
+        -1,
+        true,
+      );
+      return () => {
+        cancelAnimation(pulse);
+      };
+    }, [pulse]),
+  );
 
   const style = useAnimatedStyle(() => ({ opacity: pulse.value }));
 

@@ -62,17 +62,25 @@ export function FriendRequestsSection() {
    * when it matters least: react-query is wired to `focusManager` in `app/_layout.tsx`, so
    * this stops entirely while the app is backgrounded, and the query is cheap and idempotent.
    */
+  // focusManager stops the poll while the app is backgrounded, but not while this tab
+  // is merely blurred: `freezeOnBlur` suspends rendering via react-freeze, and query
+  // observers keep firing underneath it. Gating the interval on tab focus is what
+  // actually stops the 4-requests-a-minute drip from a tab nobody is looking at.
+  const [focused, setFocused] = useState(false);
+
   const query = useQuery({
     queryKey: ['friendRequests'],
     queryFn: socialApi.pendingRequests,
     staleTime: 0,
-    refetchInterval: 15_000,
+    refetchInterval: focused ? 15_000 : false,
   });
 
   const refetch = query.refetch;
   useFocusEffect(
     useCallback(() => {
+      setFocused(true);
       void refetch();
+      return () => setFocused(false);
     }, [refetch]),
   );
 

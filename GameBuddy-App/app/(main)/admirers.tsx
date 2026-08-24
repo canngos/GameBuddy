@@ -77,7 +77,9 @@ export default function Admirers() {
   const renderTile = useCallback(
     ({ item }: { item: Tile }) =>
       item.candidate ? (
-        <AdmirerCard candidate={item.candidate} onPress={() => openProfile(item.candidate!.userId)} />
+        // The stable `openProfile` goes down as a prop; an inline closure here was a
+        // fresh function per tile per render, which defeated AdmirerCard's memo.
+        <AdmirerCard candidate={item.candidate} onOpen={openProfile} />
       ) : (
         <AdmirerCard locked />
       ),

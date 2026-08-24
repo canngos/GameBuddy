@@ -26,6 +26,13 @@ export default function Verify() {
   const { email } = useLocalSearchParams<{ email: string }>();
   const adoptToken = useSession((s) => s.adoptToken);
 
+  // The type above is a promise the router cannot keep: a direct deep link opens this
+  // screen with no params at all, and verifying `undefined` posts a request that can
+  // only be refused. Back to the start instead.
+  useEffect(() => {
+    if (!email) router.replace("/welcome" as never);
+  }, [email, router]);
+
   const [code, setCode] = useState("");
   const [touched, setTouched] = useState(false);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);

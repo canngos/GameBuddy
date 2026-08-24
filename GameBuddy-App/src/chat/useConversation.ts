@@ -5,7 +5,8 @@ import { chatApi } from '../api/chat';
 import type { Conversation, InboxEntry } from '../api/types';
 import { useSession } from '../session/store';
 import { useActiveConversation } from './activeConversation';
-import { useChatSocket } from './ChatSocketProvider';
+import { useChatSocketApi, useChatSocketStatus } from './ChatSocketProvider';
+import { useChatPresence } from './presenceStore';
 
 /** Smallest gap between two "I am typing" frames for the same conversation. */
 const TYPING_THROTTLE_MS = 3000;
@@ -27,7 +28,15 @@ const TYPING_THROTTLE_MS = 3000;
 export function useConversation(friendId: string) {
   const queryClient = useQueryClient();
   const myId = useSession((s) => s.userId);
-  const { status, presence, typing, onMessage, sendTyping } = useChatSocket();
+  const { onMessage, sendTyping } = useChatSocketApi();
+  const { status } = useChatSocketStatus();
+  /*
+   * This friend's slice only. Selecting `presence[friendId]` from the store instead of
+   * consuming the whole pushed map is what stops a stranger going online elsewhere in
+   * the app from re-rendering the one screen holding an unbounded message list.
+   */
+  const pushedPresence = useChatPresence((s) => s.presence[friendId]);
+  const friendIsTyping = useChatPresence((s) => s.typing[friendId] === true);
 
   /** Messages that arrived over the socket since this screen opened. */
   const [live, setLive] = useState<Conversation[]>([]);
@@ -183,7 +192,7 @@ export function useConversation(friendId: string) {
    * cheap version of the same idea, and the header refuses to claim anything at all when
    * our own connection is down (see StatusLabel).
    */
-  const friendPresence = presence[friendId] ?? fetchedPresence.data ?? null;
+  const friendPresence = pushedPresence ?? fetchedPresence.data ?? null;
 
   /**
    * Reports that we are typing, at most once every few seconds.
@@ -208,7 +217,7 @@ export function useConversation(friendId: string) {
     status,
     /** Null until the first answer arrives, which is not the same as "offline". */
     presence: friendPresence,
-    isTyping: typing[friendId] === true,
+    isTyping: friendIsTyping,
     notifyTyping,
     isLoading: history.isPending,
     error: history.error,

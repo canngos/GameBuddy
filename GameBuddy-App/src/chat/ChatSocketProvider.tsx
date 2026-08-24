@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { useSession } from '../session/store';
+import { useChatPresence } from './presenceStore';
 import {
   createChatSocket,
   type ChatNotification,
   type LobbyEvent,
-  type PresenceUpdate,
   type SocketStatus,
 } from './socket';
 
@@ -32,15 +32,6 @@ type ChatSocketApi = {
 /** Connection state. Changes a handful of times per session. */
 type ChatSocketStatus = { status: SocketStatus };
 
-/** Who is online and who is typing. Changes constantly, for people all over the app. */
-type ChatSocketPresence = {
-  /** Presence by user id, for everyone the server has told us about this session. */
-  presence: Record<string, PresenceUpdate>;
-  /** User ids currently typing to us. */
-  typing: Record<string, true>;
-};
-
-type ChatSocketValue = ChatSocketApi & ChatSocketStatus & ChatSocketPresence;
 
 /*
  * Three contexts, split by how often each part changes.
@@ -54,7 +45,6 @@ type ChatSocketValue = ChatSocketApi & ChatSocketStatus & ChatSocketPresence;
  */
 const ApiContext = createContext<ChatSocketApi | null>(null);
 const StatusContext = createContext<ChatSocketStatus | null>(null);
-const PresenceContext = createContext<ChatSocketPresence | null>(null);
 
 /**
  * One socket, open for as long as somebody is signed in.
@@ -79,8 +69,10 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
   const token = useSession((s) => s.token);
 
   const [status, setStatus] = useState<SocketStatus>('idle');
-  const [presence, setPresence] = useState<Record<string, PresenceUpdate>>({});
-  const [typing, setTyping] = useState<Record<string, true>>({});
+  // Presence and typing live in `useChatPresence` (a zustand store), not in state here:
+  // they change on every frame about anyone, and a store lets the one consumer select a
+  // single person's slice instead of re-rendering for the whole map. This provider is
+  // the store's only writer.
 
   /**
    * Handlers in a ref, not state.
@@ -128,8 +120,7 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
         // Cleared rather than refetched: with nothing pushed, each screen falls through to
         // its own `GET /presence/{id}`, which is already asked for on reconnect.
         if (next !== 'connected') {
-          setPresence({});
-          setTyping({});
+          useChatPresence.setState({ presence: {}, typing: {} });
           timers.forEach(clearTimeout);
           timers.clear();
         }
@@ -141,7 +132,7 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
         handlers.current.forEach((handler) => handler(notification));
       },
       onPresence: (update) => {
-        setPresence((current) => ({ ...current, [update.userId]: update }));
+        useChatPresence.setState((s) => ({ presence: { ...s.presence, [update.userId]: update } }));
         // Somebody who just went offline is not still typing.
         if (!update.online) clearTyping(update.userId);
       },
@@ -149,7 +140,9 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
         lobbyHandlers.current.forEach((handler) => handler(event));
       },
       onTyping: ({ senderId }) => {
-        setTyping((current) => (current[senderId] ? current : { ...current, [senderId]: true }));
+        useChatPresence.setState((s) =>
+          s.typing[senderId] ? s : { typing: { ...s.typing, [senderId]: true } },
+        );
 
         // Restarted on every keystroke, so the indicator follows the typing rather than
         // blinking off every five seconds mid-sentence. Expiry rather than a "stopped"
@@ -165,11 +158,11 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
     function clearTyping(userId: string) {
       clearTimeout(timers.get(userId));
       timers.delete(userId);
-      setTyping((current) => {
-        if (!current[userId]) return current;
-        const next = { ...current };
+      useChatPresence.setState((s) => {
+        if (!s.typing[userId]) return s;
+        const next = { ...s.typing };
         delete next[userId];
-        return next;
+        return { typing: next };
       });
     }
 
@@ -188,8 +181,7 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
       // Presence is only true while we are connected to hear about it. Keeping the last
       // known values would leave the app confidently showing people as online after we
       // stopped being told otherwise.
-      setPresence({});
-      setTyping({});
+      useChatPresence.setState({ presence: {}, typing: {} });
     };
   }, [token]);
 
@@ -242,16 +234,10 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
   );
 
   const statusValue = useMemo<ChatSocketStatus>(() => ({ status }), [status]);
-  const presenceValue = useMemo<ChatSocketPresence>(
-    () => ({ presence, typing }),
-    [presence, typing],
-  );
 
   return (
     <ApiContext.Provider value={api}>
-      <StatusContext.Provider value={statusValue}>
-        <PresenceContext.Provider value={presenceValue}>{children}</PresenceContext.Provider>
-      </StatusContext.Provider>
+      <StatusContext.Provider value={statusValue}>{children}</StatusContext.Provider>
     </ApiContext.Provider>
   );
 }
@@ -263,10 +249,6 @@ export function ChatSocketProvider({ children }: { children: ReactNode }) {
  * once; a missing provider should be a crash in development, not a screen that looks fine
  * and never receives anything.
  */
-export function useChatSocket(): ChatSocketValue {
-  return { ...useChatSocketApi(), ...useChatSocketStatus(), ...useChatSocketPresence() };
-}
-
 /**
  * Subscribe and send, without depending on anything that moves.
  *
@@ -287,9 +269,5 @@ export function useChatSocketStatus(): ChatSocketStatus {
   return value;
 }
 
-/** Presence and typing. Re-renders on every frame the server sends about anyone. */
-export function useChatSocketPresence(): ChatSocketPresence {
-  const value = useContext(PresenceContext);
-  if (!value) throw new Error('useChatSocketPresence must be used inside a ChatSocketProvider');
-  return value;
-}
+// Presence and typing are read from `useChatPresence` in presenceStore.ts, selected per
+// person - never as the whole map, which changes on every frame about anyone.
