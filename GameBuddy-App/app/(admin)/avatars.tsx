@@ -38,9 +38,10 @@ export default function AvatarsScreen() {
   const pending = queue.data?.pending ?? [];
 
   const keyExtractor = useCallback((item: PendingAvatar) => item.userId, []);
+  const { mutate: decideMutate } = decide;
   const onDecide = useCallback(
-    (userId: string, approve: boolean) => decide.mutate({ userId, approve }),
-    [decide],
+    (userId: string, approve: boolean) => decideMutate({ userId, approve }),
+    [decideMutate],
   );
   const renderRow = useCallback(
     ({ item }: { item: PendingAvatar }) => (

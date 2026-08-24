@@ -180,12 +180,16 @@ export default function LobbyScreen() {
    * the roster and the lobby header are in the list's `ListHeaderComponent` — so every
    * character typed rebuilt the whole header, every member row and every pending request.
    */
+  const { mutate: sendMutate, isPending: sendPending } = send;
   const submit = useCallback(
     (text: string) => {
-      if (!text || send.isPending) return;
-      send.mutate(text);
+      if (!text || sendPending) return;
+      sendMutate(text);
     },
-    [send],
+    // `mutate` is the stable part of the mutation object (which is a fresh literal every
+    // render); isPending has to stay a dependency to keep the guard honest, so this
+    // changes twice per send rather than on every socket frame.
+    [sendMutate, sendPending],
   );
 
   const keyExtractor = useCallback((m: LobbyMessage) => m.id, []);

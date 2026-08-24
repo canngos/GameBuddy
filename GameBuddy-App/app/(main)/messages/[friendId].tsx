@@ -135,7 +135,10 @@ export default function Chat() {
   // The conversation arrives oldest first, which is the order it is written and read in.
   // The list below is inverted, so it wants the other one.
   const newestFirst = useMemo(() => [...chat.messages].reverse(), [chat.messages]);
-  const onReport = useCallback((id: string) => report.mutate(id), [report]);
+  // Depends on `mutate`, not the mutation: react-query's mutation *object* is a fresh literal every render; `mutate` is its stable part.
+  // With [report] here, every keystroke in the compose box re-rendered every bubble.
+  const { mutate: reportMutate } = report;
+  const onReport = useCallback((id: string) => reportMutate(id), [reportMutate]);
   const renderBubble = useCallback(
     ({ item }: { item: Conversation }) => (
       <Bubble message={item} mine={item.sender === chat.myId} onReport={onReport} />

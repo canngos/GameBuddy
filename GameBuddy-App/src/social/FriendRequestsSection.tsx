@@ -112,10 +112,12 @@ export function FriendRequestsSection() {
     },
   });
 
-  // Stable, so the rows below can actually bail out of re-rendering.
+  // Stable, so the rows below can actually bail out of re-rendering. Depends on
+  // `mutate`, not the mutation: react-query's mutation *object* is a fresh literal every render; `mutate` is its stable part.
+  const { mutate: answerMutate } = answer;
   const onAnswer = useCallback(
-    (userId: string, accept: boolean) => answer.mutate({ userId, accept }),
-    [answer],
+    (userId: string, accept: boolean) => answerMutate({ userId, accept }),
+    [answerMutate],
   );
 
   const requests = query.data ?? [];
