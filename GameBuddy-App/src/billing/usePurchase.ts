@@ -96,15 +96,23 @@ export function usePurchase(kind: PurchaseKind = 'subscription') {
       // our backend knows about it.
       const deadline = Date.now() + ENTITLEMENT_TIMEOUT_MS;
       while (Date.now() < deadline) {
-        if (kind === 'coins') {
-          if ((await coinBalance(queryClient)) > baseline) return { granted: true, cancelled: false };
-        } else {
-          const subscription = await queryClient.fetchQuery({
-            queryKey: ['subscription'],
-            queryFn: billingApi.subscription,
-            staleTime: 0,
-          });
-          if (entitlementArrived(subscription)) return { granted: true, cancelled: false };
+        // A failed check is not a failed purchase. The store has already taken the money
+        // by this point; one 500 or dropped connection rethrowing out of here rendered
+        // "purchase failed" to somebody who had paid - the exact message the comment
+        // below exists to prevent. A check that errors counts as "not yet".
+        try {
+          if (kind === 'coins') {
+            if ((await coinBalance(queryClient)) > baseline) return { granted: true, cancelled: false };
+          } else {
+            const subscription = await queryClient.fetchQuery({
+              queryKey: ['subscription'],
+              queryFn: billingApi.subscription,
+              staleTime: 0,
+            });
+            if (entitlementArrived(subscription)) return { granted: true, cancelled: false };
+          }
+        } catch (error) {
+          if (__DEV__) console.warn('[billing] entitlement check failed; still waiting', error);
         }
         await sleep(POLL_INTERVAL_MS);
       }

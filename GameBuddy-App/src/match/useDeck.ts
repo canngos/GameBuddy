@@ -103,10 +103,17 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     },
 
     onError: (error, variables) => {
-      // The card was advanced optimistically. A refusal has to put it back, or the
-      // gamer silently loses the person they were looking at — and on a rate limit
+      // The card was advanced optimistically. A refusal has to put back *the card this
+      // refusal belongs to*: with two swipes in flight, a blind step back resurrects the
+      // wrong candidate and silently consumes the one that actually failed. Falls back
+      // to one step when the queue was replaced under the request — and on a rate limit
       // that is the *worst* card to lose, because it is the one they wanted.
-      setCursor((c) => Math.max(0, c - 1));
+      setCursor((c) => {
+        const index = candidates.findIndex(
+          (candidate) => candidate.userId === variables.candidate.userId,
+        );
+        return index >= 0 ? Math.min(c, index) : Math.max(0, c - 1);
+      });
 
       if (error instanceof ApiError) {
         // The backend spends a Super Like from the consumable balance and refuses with

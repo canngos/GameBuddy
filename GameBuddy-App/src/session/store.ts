@@ -67,6 +67,15 @@ type SessionState = {
   signOut: () => Promise<void>;
 };
 
+/**
+ * The renewal currently in flight, if any. `renewIfStale` is called from both the cold
+ * start (`verify`) and every AppState 'active' transition, and iOS delivers those in
+ * bursts. Two overlapping refreshes both carry the *old* bearer token; if the server
+ * rotates on refresh, the loser's 401 walks through the expiry handler and signs the
+ * user out mid-session. Single-flight makes the burst harmless.
+ */
+let renewalInFlight: Promise<void> | null = null;
+
 export const useSession = create<SessionState>((set, get) => ({
   status: 'loading',
   token: null,
@@ -154,19 +163,25 @@ export const useSession = create<SessionState>((set, get) => ({
     const token = get().token;
     if (!token || !shouldRefresh(token)) return;
 
-    try {
-      const renewed = await authApi.refresh();
+    if (renewalInFlight) return renewalInFlight;
+    renewalInFlight = (async () => {
+      try {
+        const renewed = await authApi.refresh();
       // The store may have moved on while the request was in flight — a sign-out, or a
       // sign-in as somebody else. Writing the new token then would resurrect a session
       // the user just ended.
-      if (get().token !== token) return;
+        if (get().token !== token) return;
 
-      await persist(renewed.accessToken, renewed.userId);
-      set({ token: renewed.accessToken, userId: renewed.userId });
-    } catch {
-      // Includes the server refusing because the session hit its ceiling, which arrives
-      // as TOKEN_INVALID and has already signed the user out through the expiry handler.
-    }
+        await persist(renewed.accessToken, renewed.userId);
+        set({ token: renewed.accessToken, userId: renewed.userId });
+      } catch {
+        // Includes the server refusing because the session hit its ceiling, which arrives
+        // as TOKEN_INVALID and has already signed the user out through the expiry handler.
+      } finally {
+        renewalInFlight = null;
+      }
+    })();
+    return renewalInFlight;
   },
 
   adoptToken: async (token, userId) => {

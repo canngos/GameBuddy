@@ -1,5 +1,5 @@
 import { File, UploadType } from 'expo-file-system';
-import { api, authHeader } from './client';
+import { api, authHeader, notifySessionExpired } from './client';
 import { API_BASE_URL } from './config';
 import { ApiError, type Envelope } from './envelope';
 import type { Avatar, AvatarUpload, Game, Keyword, UserInfo } from './types';
@@ -119,11 +119,15 @@ function unwrapUpload<T>(response: { status: number; body: string }): T {
   const status = envelope.status;
   if (response.status < 200 || response.status >= 300 || status?.success === false) {
     if (__DEV__) console.warn('[api] upload failed', response.status, response.body.slice(0, 300));
-    throw new ApiError(
+    const error = new ApiError(
       status?.message?.trim() || 'Something went wrong. Please try again.',
       status?.code ?? String(response.status),
       response.status,
     );
+    // Same rule as `unwrap` in client.ts: an expired session must clear the token, or an
+    // upload with a dead token surfaces as a generic error and the user stays stuck.
+    if (error.isSessionExpired) notifySessionExpired();
+    throw error;
   }
   return (envelope.body?.data ?? (undefined as T)) as T;
 }
