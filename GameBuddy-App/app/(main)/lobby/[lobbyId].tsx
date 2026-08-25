@@ -43,7 +43,6 @@ export default function LobbyScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const t = useT();
-  const upper = useUpper();
   const queryClient = useQueryClient();
   const myId = useSession((s) => s.userId);
 

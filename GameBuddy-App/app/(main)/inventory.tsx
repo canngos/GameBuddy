@@ -79,7 +79,12 @@ export default function Inventory() {
   const busy = equip.isPending || unequip.isPending;
   const failure = equip.error ?? unequip.error;
 
-  const all = kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? []);
+  // Memoised so it is a stable input to the memos below; the `?? []` fallback minted a
+  // fresh array every render while the store was still loading.
+  const all = useMemo(
+    () => (kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? [])),
+    [kind, store.data],
+  );
   const owned = useMemo(() => all.filter((item) => item.owned), [all]);
   const wearingOne = all.some((item) => item.equipped);
 

@@ -254,15 +254,6 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
       onConfirm: () => block.mutate(),
     });
 
-  const confirmWithdraw = () =>
-    setConfirm({
-      title: t.profile.withdrawConfirmTitle(who),
-      body: t.profile.withdrawConfirmBody,
-      confirmLabel: t.profile.withdrawRequest,
-      destructive: true,
-      onConfirm: () => withdrawRequest.mutate(),
-    });
-
   const busy =
     remove.isPending ||
     block.isPending ||

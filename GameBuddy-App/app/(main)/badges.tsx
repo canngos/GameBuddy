@@ -109,7 +109,9 @@ export default function Badges() {
   });
 
   const busy = collect.isPending || showcase.isPending;
-  const badges = board.data?.badges ?? [];
+  // Memoised so it is a stable input to the memos below; the `?? []` fallback minted a
+  // fresh array every render while the board was still loading.
+  const badges = useMemo(() => board.data?.badges ?? [], [board.data]);
   const slots = board.data?.showcaseSlots ?? 3;
 
   // Derived from the whole catalogue, so both were a scan of it on every render — and

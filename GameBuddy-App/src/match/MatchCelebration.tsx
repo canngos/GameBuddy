@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { QueryKeyRoot } from '../query/keys';
 import { useCelebration, type MatchedGamer } from './celebration';
 import { MatchOverlay } from './MatchOverlay';
@@ -17,7 +17,12 @@ import { MatchOverlay } from './MatchOverlay';
 const lastPathname = { current: '/' };
 
 function PathnameRecorder() {
-  lastPathname.current = usePathname();
+  const pathname = usePathname();
+  // In an effect, not during render: the handlers that read this run on presses, which
+  // can only happen after the commit, so nothing observes the one-frame lag.
+  useEffect(() => {
+    lastPathname.current = pathname;
+  }, [pathname]);
   return null;
 }
 

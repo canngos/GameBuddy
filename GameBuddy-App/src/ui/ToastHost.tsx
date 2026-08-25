@@ -98,6 +98,7 @@ function ToastCard({ toast, onDone }: { toast: Toast; onDone: () => void }) {
     // re-rendered, which for a toast raised during a busy screen means one that never
     // leaves. Each toast gets a fresh mount via its key, so mount-only is exactly once per
     // toast.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function leave() {

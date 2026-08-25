@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, Code } from '../api/envelope';
 import { matchApi } from '../api/match';
 import type { Candidate } from '../api/types';
@@ -72,7 +72,9 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     staleTime: 60 * 1000,
   });
 
-  const candidates = feed.data ?? [];
+  // Memoised so it is a stable input to the callbacks below; the `?? []` fallback minted
+  // a fresh array every render while the feed was still loading.
+  const candidates = useMemo(() => feed.data ?? [], [feed.data]);
   const current = candidates[cursor] ?? null;
   const upcoming = candidates[cursor + 1] ?? null;
   // A failed fetch also leaves the queue empty, and "that's everyone for now" is a lie

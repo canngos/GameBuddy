@@ -466,6 +466,7 @@ function FriendAction({ userId, onOpenMenu }: { userId: string; onOpenMenu: () =
       void incoming.refetch();
       void outgoing.refetch();
       // Refetch functions are stable, so this runs once per focus.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [friends.refetch, incoming.refetch, outgoing.refetch]),
   );
 

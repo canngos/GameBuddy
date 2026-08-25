@@ -85,22 +85,6 @@ export const profileApi = {
 
 
 /**
- * A filename for the multipart part.
- *
- * The picker does not always supply one — on Android it frequently returns a content://
- * URI with no name at all — and a part without a filename is refused by the server's
- * parser as malformed, which surfaces as a 400 about the image rather than about the
- * request.
- */
-function fileNameFor(uri: string, mimeType?: string | null): string {
-  const fromUri = uri.split('/').pop()?.split('?')[0];
-  if (fromUri && fromUri.includes('.')) return fromUri;
-  const extension = mimeType?.split('/')[1] ?? 'jpg';
-  return `avatar.${extension}`;
-}
-
-
-/**
  * Unwraps an expo-file-system upload into the same shape everything else returns.
  *
  * `File.upload` hands back a status and a raw string rather than a `Response`, so the
