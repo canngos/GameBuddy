@@ -4,7 +4,7 @@
  * There are two independent caps and they are frequently confused, so both are asserted
  * separately: the *daily allowance* is a monetisation lever measured in days
  * (SwipeQuota), and the *rate limiter* is an abuse control measured in a minute
- * (MatchRateLimitConfig, 30/min). A script hits the second long before the first; a person
+ * (MatchRateLimitConfig, 120/min). A script hits the second long before the first; a person
  * hits the first and never the second.
  *
  * These limits also set the shape of the load tests — a load script that swipes hard as a
@@ -17,6 +17,7 @@ const assert = require('node:assert/strict');
 const { get, post, P, CODE } = require('./helpers/api');
 const db = require('./helpers/db');
 const { cleanup } = require('./helpers/accounts');
+const { grantGold } = require('./helpers/billing');
 const fixtures = require('./helpers/fixtures');
 
 /** Untouched seeded fixtures. See helpers/fixtures.js for why they must be untouched. */
@@ -134,16 +135,39 @@ describe('swipe and match', () => {
       `a gamer must not be able to match with themselves; got ${res.status}`);
   });
 
-  test('the 30-per-minute decision rate limiter fires', async () => {
+  test('the decision rate limiter fires once its budget is spent', async () => {
     // Deliberately serial: the limiter is a sliding window and a burst of parallel
     // requests would race it, making the test flaky about *where* it trips rather than
     // whether it does.
+    //
+    // MatchRateLimitConfig.decision allows 120 a minute. The refusal is the call after the
+    // last permit, so the loop has to be able to reach BUDGET + 1 or it can never see one.
+    // Gold, because the two caps are ordered against each other: BASIC gets 50 swipes a
+    // day and the limiter allows 120 a minute, so a free account is stopped by the daily
+    // allowance (163) and can never reach the limiter at all. Only an unmetered tier can
+    // demonstrate that this control exists.
+    //
+    // The feed answers a page at a time and declining removes people from it, so one page
+    // cannot supply the whole budget — refill from a fresh page as it empties.
+    const BUDGET = 120;
     const [a] = seeded(1);
-    const candidates = ids(await feed(a.token));
-    assert.ok(candidates.length >= 35, `need 35 candidates to test the limit, got ${candidates.length}`);
+    await grantGold(a.userId);
+    const seen = new Set();
+    let queue = [];
+
+    const nextTarget = async () => {
+      if (queue.length === 0) {
+        queue = ids(await feed(a.token)).filter((id) => !seen.has(id));
+      }
+      return queue.shift();
+    };
 
     const statuses = [];
-    for (const target of candidates.slice(0, 35)) {
+    for (let i = 0; i < BUDGET + 1; i++) {
+      const target = await nextTarget();
+      assert.ok(target, `ran out of candidates after ${i} decisions, before the limit fired`);
+      seen.add(target);
+
       const res = await post(`${P.match}/decline`, { userId: target }, { token: a.token });
       statuses.push(res.status);
       if (res.status === 429) {
@@ -153,8 +177,8 @@ describe('swipe and match', () => {
     }
 
     assert.ok(statuses.includes(429),
-      `expected a 429 within 35 decisions; got ${statuses.filter((s) => s !== 200).length} non-200s`);
-    assert.ok(statuses.filter((s) => s === 200).length >= 25,
+      `expected a 429 once the budget of ${BUDGET} was spent; got ${statuses.filter((s) => s !== 200).length} non-200s`);
+    assert.ok(statuses.filter((s) => s === 200).length >= BUDGET * 0.8,
       'the limiter fired far too early — a real user swiping quickly would hit it');
   });
 

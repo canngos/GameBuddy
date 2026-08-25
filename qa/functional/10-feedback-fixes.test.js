@@ -13,37 +13,10 @@
 
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const { get, post, request, P, CODE } = require('./helpers/api');
+const { get, post, P, CODE } = require('./helpers/api');
 const { createAccount, cleanup } = require('./helpers/accounts');
-const { env } = require('./helpers/tokens');
+const { grantGold } = require('./helpers/billing');
 const db = require('./helpers/db');
-
-const WEBHOOK_TOKEN = env().REVENUECAT_WEBHOOK_TOKEN || 'local-development-webhook-token';
-
-/** Grants Gold the way production does: through the webhook, never the database. */
-async function grantGold(userId) {
-  const now = Date.now();
-  const res = await request('POST', `${P.billing}/revenuecat/webhook`, {
-    body: {
-      api_version: '1.0',
-      event: {
-        id: crypto.randomUUID(),
-        type: 'INITIAL_PURCHASE',
-        app_user_id: userId,
-        product_id: 'gamebuddy.gold.monthly',
-        purchased_at_ms: now,
-        expiration_at_ms: now + 30 * 24 * 60 * 60 * 1000,
-        store: 'PLAY_STORE',
-        transaction_id: crypto.randomUUID(),
-        original_transaction_id: crypto.randomUUID(),
-        entitlement_ids: ['gold'],
-        period_type: 'NORMAL',
-      },
-    },
-    headers: { Authorization: WEBHOOK_TOKEN },
-  });
-  assert.equal(res.status, 200, `webhook refused: ${res.status} ${res.text}`);
-}
 
 /**
  * Tops up a balance directly.
