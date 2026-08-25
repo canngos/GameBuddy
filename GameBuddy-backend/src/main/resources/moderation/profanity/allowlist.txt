@@ -1,0 +1,23 @@
+# Words that must never be masked, subtracted from the merged list at load.
+#
+# These are collisions that cannot be fixed by dropping a list entry, because the innocent
+# word and the profanity fold to the same string. Dropping would only move the damage; an
+# allowlist at least puts it where the common word wins.
+#
+# Written in natural spelling, folded on load like every other list.
+# Mask tier only — this cannot unblock a slur.
+
+# Swedish "slut" = end, finished (det är slut, slutsåld, slutspurt). One of the most common
+# words a Swedish player types. The cost is that the English noun now passes unmasked:
+# a word list cannot tell them apart, and masking every Swedish sentence about a match
+# ending is the worse of the two failures.
+#
+# The plural has to come too. Usernames are matched as substrings, so "sluts" would refuse
+# "Slutspurt99" and "Slutsald" on its own.
+slut
+sluts
+
+# Considered and deliberately not allowlisted: Swedish "prick" ("dot", "prick kl 8"). It
+# collides with the English insult, but unlike "slut" it is not a word a Swedish player
+# types every match, and the English sense is common in game chat. A Swede writing about a
+# dot gets asterisks; that is the cheaper of the two mistakes here.

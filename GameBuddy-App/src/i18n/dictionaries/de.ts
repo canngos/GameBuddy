@@ -897,6 +897,7 @@ export const de: Dictionary = {
       '180': 'Diese Lobby ist nicht mehr offen.',
       '183': 'Beende oder storniere zuerst deine aktuelle Lobby.',
       '185': 'Die Person hat deine Anfrage bereits beantwortet.',
+      '187': 'Dieser Benutzername ist nicht erlaubt. Bitte wähle einen anderen.',
     },
   },
 

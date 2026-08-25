@@ -1,0 +1,23 @@
+Word list attribution
+=====================
+
+fi, sv, de, fr, es, tr (and English reference material)
+    List of Dirty, Naughty, Obscene, and Otherwise Bad Words
+    https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words
+    Copyright (c) 2012-2020 Shutterstock, Inc.
+    Licensed under Creative Commons Attribution 4.0 International (CC-BY 4.0)
+    https://creativecommons.org/licenses/by/4.0/
+
+tr (additional entries)
+    turkce-kufur-karaliste
+    https://github.com/ooguz/turkce-kufur-karaliste
+    Licensed under Creative Commons Attribution-ShareAlike 4.0 International
+    (CC-BY-SA 4.0) https://creativecommons.org/licenses/by-sa/4.0/
+    tr.txt is a derivative of that list and remains under CC-BY-SA 4.0.
+
+Both lists have been filtered and curated for this application: entries that collide with
+ordinary words in the seven languages the app ships were removed. See
+tools/regenerate-profanity-lists.sh for the removals and the reason for each.
+
+en.txt is hand-maintained by the GameBuddy project and is not derived from either list.
+allowlist.txt is hand-maintained by the GameBuddy project.

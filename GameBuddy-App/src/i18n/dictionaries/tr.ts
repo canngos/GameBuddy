@@ -890,6 +890,7 @@ export const tr: Dictionary = {
       '180': 'Bu lobi artık açık değil.',
       '183': 'Önce mevcut lobini bitir veya iptal et.',
       '185': 'Sahibi isteğini zaten yanıtladı.',
+      '187': 'Bu kullanıcı adı kullanılamaz. Lütfen başka bir ad seç.',
     },
   },
 

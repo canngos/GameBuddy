@@ -949,6 +949,7 @@ export const en = {
       '180': 'This lobby is no longer open.',
       '183': 'Finish or cancel your current lobby first.',
       '185': 'The owner already answered your request.',
+      '187': 'That username is not allowed. Please choose another one.',
     },
   },
 

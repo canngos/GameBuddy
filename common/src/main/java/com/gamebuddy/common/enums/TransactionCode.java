@@ -225,6 +225,13 @@ public enum TransactionCode {
      * is only ever told about their own half of it.
      */
     USER_BLOCKED_BY_YOU(186, "You have blocked this gamer", HttpStatus.FORBIDDEN),
+    /**
+     * A username the content filter will not accept. Separate from {@link #CONTENT_BLOCKED}
+     * because the person has to do something about it: a message that breaks the rules is
+     * simply not sent, but a username has to be replaced before the account can go on, and
+     * being told "that message breaks the rules" while naming yourself explains nothing.
+     */
+    USERNAME_NOT_ALLOWED(187, "Pick a different username — that one is not allowed", HttpStatus.BAD_REQUEST),
 
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);

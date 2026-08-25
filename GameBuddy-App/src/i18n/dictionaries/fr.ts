@@ -898,6 +898,7 @@ export const fr: Dictionary = {
       '180': "Ce lobby n'est plus ouvert.",
       '183': "Termine ou annule d'abord ton lobby actuel.",
       '185': 'Le propriétaire a déjà répondu à ta demande.',
+      "187": "Ce pseudo n'est pas autorisé. Choisis-en un autre.",
     },
   },
 
