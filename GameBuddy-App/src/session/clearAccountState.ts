@@ -1,3 +1,4 @@
+import { forgetIdentity } from '../billing/purchases';
 import { useActiveConversation } from '../chat/activeConversation';
 import { useCelebration } from '../match/celebration';
 import { queryClient } from '../query';
@@ -38,4 +39,8 @@ export function clearAccountState() {
   useCelebration.setState({ matched: null, onDismiss: null });
   useActiveConversation.setState({ friendId: null });
   useToasts.getState().clear();
+  // RevenueCat holds the same kind of leftover outside this process's memory: the SDK
+  // stays logged in as the previous account, and the next purchase would be attributed
+  // to it. Fire-and-forget - failing to reach RevenueCat must not block sign-out.
+  void forgetIdentity();
 }

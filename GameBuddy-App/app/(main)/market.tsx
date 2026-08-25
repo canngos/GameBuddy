@@ -139,7 +139,12 @@ export default function Market() {
   });
 
   const busy = buy.isPending;
-  const all = kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? []);
+  // Memoised so it is a stable input to the memo below; the `?? []` fallback minted a
+  // fresh array every render while the store was still loading.
+  const all = useMemo(
+    () => (kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? [])),
+    [kind, store.data],
+  );
 
   /*
    * Membership items are not on this shelf.
@@ -155,7 +160,10 @@ export default function Market() {
 
   // Stable, so the memoised rows below can bail out instead of rebuilding the whole shelf
   // whenever anything on this screen changes.
-  const onBuy = useCallback((id: string) => buy.mutate(id), [buy]);
+  // `mutate`, not the mutation object: the object is a fresh literal every render, and
+  // these rows are .map()ed into a ScrollView, so all of them re-rendered together.
+  const { mutate: buyMutate } = buy;
+  const onBuy = useCallback((id: string) => buyMutate(id), [buyMutate]);
 
   return (
     <Screen scroll edges={['top']} scrollRef={scrollRef}>

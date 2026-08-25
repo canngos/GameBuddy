@@ -1084,6 +1084,18 @@ class DefaultAuthServiceTest {
         }
 
         @Test
+        @DisplayName("a username the filter refuses is rejected, never masked, and says to pick another")
+        void testSetUsername_whenUsernameIsProfane_ReturnError187() {
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+
+            var request = request("SiktirGamer");
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.setUsername(gamer, request));
+
+            assertEquals(187, ex.getTransactionCode().getId());
+            verify(gamerRepository, never()).save(any());
+        }
+
+        @Test
         void testSetUsername_whenUsernameAlreadyTakenByAnotherUser_ReturnError107() {
             Gamer other = new Gamer();
             other.setUserId(UUID.randomUUID().toString());

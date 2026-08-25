@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiError, Code } from '../api/envelope';
 import { matchApi } from '../api/match';
 import type { Candidate } from '../api/types';
@@ -72,7 +72,9 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     staleTime: 60 * 1000,
   });
 
-  const candidates = feed.data ?? [];
+  // Memoised so it is a stable input to the callbacks below; the `?? []` fallback minted
+  // a fresh array every render while the feed was still loading.
+  const candidates = useMemo(() => feed.data ?? [], [feed.data]);
   const current = candidates[cursor] ?? null;
   const upcoming = candidates[cursor + 1] ?? null;
   // A failed fetch also leaves the queue empty, and "that's everyone for now" is a lie
@@ -103,10 +105,17 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
     },
 
     onError: (error, variables) => {
-      // The card was advanced optimistically. A refusal has to put it back, or the
-      // gamer silently loses the person they were looking at — and on a rate limit
+      // The card was advanced optimistically. A refusal has to put back *the card this
+      // refusal belongs to*: with two swipes in flight, a blind step back resurrects the
+      // wrong candidate and silently consumes the one that actually failed. Falls back
+      // to one step when the queue was replaced under the request — and on a rate limit
       // that is the *worst* card to lose, because it is the one they wanted.
-      setCursor((c) => Math.max(0, c - 1));
+      setCursor((c) => {
+        const index = candidates.findIndex(
+          (candidate) => candidate.userId === variables.candidate.userId,
+        );
+        return index >= 0 ? Math.min(c, index) : Math.max(0, c - 1);
+      });
 
       if (error instanceof ApiError) {
         // The backend spends a Super Like from the consumable balance and refuses with
@@ -151,14 +160,18 @@ export function useDeck(filters: FeedFilters = NO_FILTERS) {
    * Optimistic on purpose: waiting for the round trip before the next card appears
    * makes a deck feel broken, and the swipe animation has already committed visually.
    */
+  const { mutate: decideMutate } = decide;
   const submit = useCallback(
     (decision: Decision) => {
       const candidate = candidates[cursor];
       if (!candidate) return;
       setCursor((c) => c + 1);
-      decide.mutate({ decision, candidate });
+      decideMutate({ decision, candidate });
     },
-    [candidates, cursor, decide],
+    // `mutate` rather than the mutation object, which is a fresh literal every render -
+    // with [decide] here, every render of the deck rebuilt SwipeCard's Pan/Tap gesture
+    // chain. Now it rebuilds only when a swipe actually moves the cursor.
+    [candidates, cursor, decideMutate],
   );
 
   /**

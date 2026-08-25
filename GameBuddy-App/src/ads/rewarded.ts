@@ -181,12 +181,32 @@ export async function showRewardedAd(userId: string): Promise<RewardedOutcome> {
       // time, so leaving them attached leaks one set per advert watched.
       const off: (() => void)[] = [];
       const finish = (outcome: RewardedOutcome) => {
+        clearTimeout(watchdog);
         off.forEach((unsubscribe) => unsubscribe());
         resolve(outcome);
       };
 
+      // A load that neither fires LOADED nor ERROR (SDK wedged, network gone mid-flight)
+      // would hang this promise forever - and EarnCoins disables every claim row on the
+      // screen while it waits. Cleared once show() has actually presented; after that the
+      // gamer controls how long the advert stays up and CLOSED/ERROR takes over.
+      const watchdog = setTimeout(() => {
+        console.warn('[ads] rewarded ad timed out before showing');
+        finish('error');
+      }, 30_000);
+
       off.push(
-        ad.addAdEventListener(ads.RewardedAdEventType.LOADED, () => ad.show()),
+        ad.addAdEventListener(ads.RewardedAdEventType.LOADED, () => {
+          ad.show().then(
+            () => clearTimeout(watchdog),
+            (error) => {
+              // A rejected show() fires neither CLOSED nor ERROR, so without this the
+              // promise above never settles and the whole Earn screen stays disabled.
+              console.warn('[ads] rewarded ad could not be shown', error);
+              finish('error');
+            },
+          );
+        }),
         ad.addAdEventListener(ads.RewardedAdEventType.EARNED_REWARD, () => {
           // Only a note to ourselves about what to show next. The coins come from the
           // server-side callback, which has already been sent by the time this fires.

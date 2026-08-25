@@ -29,9 +29,12 @@ import org.springframework.stereotype.Service;
  * report button and a moderator who answers it, which is why the 24-hour commitment
  * matters more than this file does.
  *
- * <p>The lists are deliberately short and deliberately clinical: a starting set, not a
- * considered corpus. Replacing the whole approach with a managed classification service is
- * the right move the moment there is money to pay for one.
+ * <p>The refuse tier is deliberately short and hand-written: every entry there costs
+ * somebody their message, so the bar is that no innocent reading exists. The mask tier is
+ * the opposite — it is generated data, loaded per language from
+ * {@code /moderation/profanity/}, and a wrong entry there costs a few asterisks. Replacing
+ * the whole approach with a managed classification service is the right move the moment
+ * there is money to pay for one.
  */
 @Slf4j
 @Service
@@ -63,29 +66,46 @@ public class TextModerationService {
     private static final Set<String> BLOCKED_PHRASES =
             normalisedSet("killyourself", "childporn", "childpornography", "rapeyou", "iwillrapeyou");
 
-    /** Masked rather than refused. What people say when they lose a round. */
-    private static final Set<String> PROFANITY = normalisedSet(
-            "fuck",
-            "fucking",
-            "fucker",
-            "motherfucker",
-            "shit",
-            "bullshit",
-            "bitch",
-            "cunt",
-            "asshole",
-            "dickhead",
-            "whore",
-            "slut",
-            "wanker",
-            "bastard",
-            "prick",
-            "twat",
-            "cock",
-            "pussy",
-            "piss");
+    /** The seven languages the app ships in. A message is not tagged with one, so they merge. */
+    private static final List<String> LANGUAGES = List.of("en", "fi", "sv", "de", "fr", "es", "tr");
+
+    /**
+     * Masked rather than refused. What people say when they lose a round, in every language
+     * the app ships in.
+     *
+     * <p>Loaded from {@code /moderation/profanity/} rather than written here, because the
+     * lists are generated data — see {@code tools/regenerate-profanity-lists.sh}. All seven
+     * languages merge into one set: nothing tells us which language a message is in, and
+     * guessing wrong would be worse than checking all of them, which costs a hash lookup.
+     *
+     * <p>{@code allowlist.txt} is subtracted last. That is where words live that fold onto
+     * a profanity in another language and have to win anyway — Swedish {@code slut}, "end".
+     */
+    private static final Set<String> PROFANITY = loadProfanity();
+
+    private static Set<String> loadProfanity() {
+        Set<String> merged = new LinkedHashSet<>();
+        for (String language : LANGUAGES) {
+            merged.addAll(WordLists.load("/moderation/profanity/" + language + ".txt"));
+        }
+        merged.removeAll(WordLists.load("/moderation/profanity/allowlist.txt"));
+        return merged;
+    }
 
     private static final char MASK = '*';
+
+    /**
+     * How long a profanity has to be before it is hunted for <em>inside</em> a username.
+     *
+     * <p>Whole-word matching has no length problem — {@code amk} is a real Turkish
+     * profanity and is masked in a message like any other word. Substring matching does:
+     * three letters turn up inside ordinary names constantly, and at three the filter
+     * refuses <em>EpicGamer</em> for {@code pic}, <em>Diana</em> for {@code ana} and
+     * <em>Emily</em> for {@code emi}. Four is where the English list's own shortest real
+     * entries sit ({@code fuck}, {@code shit}, {@code cunt}), so nothing that was caught
+     * before this became seven languages stops being caught now.
+     */
+    private static final int MIN_SUBSTRING_LENGTH = 4;
 
     /** How many consecutive single letters count as somebody spelling a word out. */
     private static final int MIN_SPELLED_RUN = 3;
@@ -245,7 +265,7 @@ public class TextModerationService {
             }
         }
         for (String word : PROFANITY) {
-            if (normalised.contains(word)) {
+            if (word.length() >= MIN_SUBSTRING_LENGTH && normalised.contains(word)) {
                 return false;
             }
         }

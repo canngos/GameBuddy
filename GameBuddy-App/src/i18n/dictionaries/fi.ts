@@ -176,7 +176,7 @@ export const fi: Dictionary = {
   },
 
   tabs: {
-    home: 'Koti',
+    home: 'Pakka',
     lobby: 'Aula',
     messages: 'Viestit',
     market: 'Kauppa',
@@ -896,6 +896,7 @@ export const fi: Dictionary = {
       '180': 'Aula ei ole enää auki.',
       '183': 'Päätä tai peruuta nykyinen aulasi ensin.',
       '185': 'Omistaja on jo vastannut pyyntöösi.',
+      '187': 'Tämä käyttäjänimi ei käy. Valitse toinen nimi.',
     },
   },
 

@@ -327,6 +327,23 @@ class DefaultLobbyServiceTest {
         }
 
         @Test
+        @DisplayName("profanity in the title and the description is masked, in any of the seven languages")
+        void testCreate_whenTitleOrDescriptionContainsForeignProfanity_MasksBoth() {
+            CreateLobbyRequest request = createRequest();
+            request.setTitle("paras vittu lobby");
+            request.setDescription("nur wer scheisse spielt bleibt draussen");
+
+            lobbyService.create(owner, request);
+
+            ArgumentCaptor<Lobby> saved = ArgumentCaptor.forClass(Lobby.class);
+            verify(lobbyRepository).save(saved.capture());
+            assertFalse(saved.getValue().getTitle().contains("vittu"));
+            assertTrue(saved.getValue().getTitle().contains("*"));
+            assertFalse(saved.getValue().getDescription().contains("scheisse"));
+            assertTrue(saved.getValue().getDescription().contains("*"));
+        }
+
+        @Test
         @DisplayName("a planned start in the past is refused; fifteen minutes of clock skew is not")
         void testCreate_startsAtBounds() {
             CreateLobbyRequest longAgo = createRequest();

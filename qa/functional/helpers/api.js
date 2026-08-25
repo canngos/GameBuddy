@@ -48,6 +48,7 @@ const CODE = {
   LOBBY_LIMIT_REACHED: '183',
   LOBBY_REQUEST_NOT_FOUND: '184',
   LOBBY_REJECTED: '185',
+  USERNAME_NOT_ALLOWED: '187',
 };
 
 /** Controller base paths, so a test never hard-codes a prefix that moved. */

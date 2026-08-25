@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Clock, Users } from "lucide-react-native";
-import { useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
 import { LIVE_QUERY } from "../../../src/lobby/live";
 import { lobbyApi, PAGE_SIZE } from "../../../src/api/lobby";
@@ -31,9 +31,7 @@ import { cn } from "../../../src/ui/cn";
  */
 export default function LobbyHome() {
   const router = useRouter();
-  const colors = useThemeColors();
   const t = useT();
-  const upper = useUpper();
   const [tone, setTone] = useState<LobbyTone | null>(null);
   // Its own switch, not a fifth tone. "When it plays" and "what it plays like" are
   // different questions, and somebody wanting a competitive game *right now* should be
@@ -57,7 +55,7 @@ export default function LobbyHome() {
       last.length < PAGE_SIZE ? undefined : all.length,
   });
 
-  const myLobbies = mine.data ?? [];
+  const myLobbies = mine.data ?? EMPTY_LOBBIES;
 
   /**
    * My own lobbies are pinned above; repeating them in the feed would list them twice.
@@ -82,6 +80,23 @@ export default function LobbyHome() {
       lobby.myStatus === "OWNER" &&
       (lobby.status === "OPEN" || lobby.status === "LOCKED"),
   );
+
+  const { refetch: refetchFeed } = feed;
+  const { refetch: refetchMine } = mine;
+  const onCreate = useCallback(() => router.push("/lobby/create" as never), [router]);
+  const onToggleStartingSoon = useCallback(() => setStartingSoon((value) => !value), []);
+  // Tapping the active chip clears the filter - four chips and an implicit "all" beats
+  // a fifth chip saying so.
+  const onSelectTone = useCallback(
+    (value: LobbyTone) => setTone((current) => (current === value ? null : value)),
+    [],
+  );
+  const onRetryFeed = useCallback(() => {
+    void refetchFeed();
+  }, [refetchFeed]);
+  const onRetryMine = useCallback(() => {
+    void refetchMine();
+  }, [refetchMine]);
 
   const keyExtractor = useCallback((lobby: Lobby) => lobby.id, []);
   const renderLobby = useCallback(
@@ -108,75 +123,20 @@ export default function LobbyHome() {
         }}
         renderItem={renderLobby}
         ListHeaderComponent={
-          <View className="gap-5 pb-2">
-            <View className="flex-row items-end justify-between pt-8">
-              <View className="gap-1">
-                <Text variant="overline">{upper(t.tabs.lobby)}</Text>
-                <Text variant="title">{t.lobby.list.title}</Text>
-              </View>
-            </View>
-
-            <View className="gap-2">
-              <Button
-                label={t.lobby.list.open}
-                disabled={ownsLive}
-                onPress={() => router.push("/lobby/create" as never)}
-              />
-              {ownsLive && (
-                <Text variant="caption" className="text-center">
-                  {t.lobby.list.ownsLive}
-                </Text>
-              )}
-            </View>
-
-            {myLobbies.length > 0 && (
-              <View className="gap-2">
-                <Text variant="overline">
-                  {upper(
-                    myLobbies.length === 1
-                      ? t.lobby.list.yourLobby
-                      : t.lobby.list.yourLobbies,
-                  )}
-                </Text>
-                {myLobbies.map((lobby) => (
-                  <LobbyCard key={lobby.id} lobby={lobby} />
-                ))}
-              </View>
-            )}
-
-            <View className="gap-2">
-              <Text variant="overline">{upper(t.lobby.list.openLobbies)}</Text>
-              <View className="flex-row flex-wrap items-center gap-2">
-                {/* First, and set apart, because it filters a different thing: the tone
-                    chips are one-of-four, this one is on or off alongside them. */}
-                <StartingSoonChip
-                  active={startingSoon}
-                  onPress={() => setStartingSoon(!startingSoon)}
-                />
-                <View className="h-6 w-px bg-line" />
-                {TONES.map((value) => (
-                  <ToneChip
-                    key={value}
-                    tone={value}
-                    active={tone === value}
-                    // Tapping the active chip clears the filter — four chips and an
-                    // implicit "all" beats a fifth chip saying so.
-                    onPress={() => setTone(tone === value ? null : value)}
-                  />
-                ))}
-              </View>
-            </View>
-
-            {feed.isPending && (
-              <ActivityIndicator color={colors.primary} className="mt-4" />
-            )}
-            {feed.error && (
-              <ErrorNotice error={feed.error} onRetry={() => feed.refetch()} />
-            )}
-            {mine.error && (
-              <ErrorNotice error={mine.error} onRetry={() => mine.refetch()} />
-            )}
-          </View>
+          <FeedHeader
+            myLobbies={myLobbies}
+            ownsLive={ownsLive}
+            startingSoon={startingSoon}
+            tone={tone}
+            feedPending={feed.isPending}
+            feedError={feed.error}
+            mineError={mine.error}
+            onCreate={onCreate}
+            onToggleStartingSoon={onToggleStartingSoon}
+            onSelectTone={onSelectTone}
+            onRetryFeed={onRetryFeed}
+            onRetryMine={onRetryMine}
+          />
         }
         ListEmptyComponent={
           feed.isPending || feed.error ? null : (
@@ -197,6 +157,103 @@ export default function LobbyHome() {
     </Screen>
   );
 }
+
+const EMPTY_LOBBIES: Lobby[] = [];
+
+/**
+ * Everything above the feed: title, the create button, my pinned lobbies and the filter
+ * chips. Built inline it was reconstructed on every render of an infinite-scroll screen -
+ * every page fetch and every LIVE_QUERY refetch reconciled two chip rows and the pinned
+ * cards for nothing. Memoised on stable or slow-moving props instead.
+ */
+const FeedHeader = memo(function FeedHeader({
+  myLobbies,
+  ownsLive,
+  startingSoon,
+  tone,
+  feedPending,
+  feedError,
+  mineError,
+  onCreate,
+  onToggleStartingSoon,
+  onSelectTone,
+  onRetryFeed,
+  onRetryMine,
+}: {
+  myLobbies: Lobby[];
+  ownsLive: boolean;
+  startingSoon: boolean;
+  tone: LobbyTone | null;
+  feedPending: boolean;
+  feedError: Error | null;
+  mineError: Error | null;
+  onCreate: () => void;
+  onToggleStartingSoon: () => void;
+  onSelectTone: (value: LobbyTone) => void;
+  onRetryFeed: () => void;
+  onRetryMine: () => void;
+}) {
+  const colors = useThemeColors();
+  const t = useT();
+  const upper = useUpper();
+
+  return (
+    <View className="gap-5 pb-2">
+      <View className="flex-row items-end justify-between pt-8">
+        <View className="gap-1">
+          <Text variant="overline">{upper(t.tabs.lobby)}</Text>
+          <Text variant="title">{t.lobby.list.title}</Text>
+        </View>
+      </View>
+
+      <View className="gap-2">
+        <Button label={t.lobby.list.open} disabled={ownsLive} onPress={onCreate} />
+        {ownsLive && (
+          <Text variant="caption" className="text-center">
+            {t.lobby.list.ownsLive}
+          </Text>
+        )}
+      </View>
+
+      {myLobbies.length > 0 && (
+        <View className="gap-2">
+          <Text variant="overline">
+            {upper(
+              myLobbies.length === 1
+                ? t.lobby.list.yourLobby
+                : t.lobby.list.yourLobbies,
+            )}
+          </Text>
+          {myLobbies.map((lobby) => (
+            <LobbyCard key={lobby.id} lobby={lobby} />
+          ))}
+        </View>
+      )}
+
+      <View className="gap-2">
+        <Text variant="overline">{upper(t.lobby.list.openLobbies)}</Text>
+        <View className="flex-row flex-wrap items-center gap-2">
+          {/* First, and set apart, because it filters a different thing: the tone
+              chips are one-of-four, this one is on or off alongside them. */}
+          <StartingSoonChip active={startingSoon} onPress={onToggleStartingSoon} />
+          <View className="h-6 w-px bg-line" />
+          {TONES.map((value) => (
+            <ToneChip
+              key={value}
+              tone={value}
+              active={tone === value}
+              onPress={() => onSelectTone(value)}
+            />
+          ))}
+        </View>
+      </View>
+
+      {feedPending && <ActivityIndicator color={colors.primary} className="mt-4" />}
+      {feedError && <ErrorNotice error={feedError} onRetry={onRetryFeed} />}
+      {mineError && <ErrorNotice error={mineError} onRetry={onRetryMine} />}
+    </View>
+  );
+});
 
 function emptyTitle(
   startingSoon: boolean,

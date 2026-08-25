@@ -549,6 +549,9 @@ function ActiveMembership({ expiresAt }: { expiresAt: string | null }) {
    */
   const expiry = expiresAt ? new Date(expiresAt) : null;
   const withinTwoDays =
+    // Reading the clock in render is deliberate: the threshold must track *now*, and a
+    // snapshot taken at mount would go stale while the screen sits behind the tab bar.
+    // eslint-disable-next-line react-hooks/purity
     expiry != null && expiry.getTime() - Date.now() < 2 * 24 * 60 * 60 * 1000;
 
   const renews = expiry

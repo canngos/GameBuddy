@@ -1,8 +1,30 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
+import { useCallback, useEffect } from 'react';
 import type { QueryKeyRoot } from '../query/keys';
-import { useCelebration } from './celebration';
+import { useCelebration, type MatchedGamer } from './celebration';
 import { MatchOverlay } from './MatchOverlay';
+
+/**
+ * Where the app currently is, held outside React.
+ *
+ * `MatchCelebration` sits in the (main) layout, so a `usePathname()` inside it re-ran the
+ * whole component - two worklet creations and three hook reads deep in `MatchOverlay` -
+ * on every navigation anyone ever made, only to return null. The pathname is read purely
+ * inside the press handler, so a null-rendering leaf records it and the celebration
+ * itself renders only when a match actually arrives.
+ */
+const lastPathname = { current: '/' };
+
+function PathnameRecorder() {
+  const pathname = usePathname();
+  // In an effect, not during render: the handlers that read this run on presses, which
+  // can only happen after the commit, so nothing observes the one-frame lag.
+  useEffect(() => {
+    lastPathname.current = pathname;
+  }, [pathname]);
+  return null;
+}
 
 /**
  * The match celebration, mounted once for the whole app.
@@ -16,16 +38,12 @@ import { MatchOverlay } from './MatchOverlay';
  */
 export function MatchCelebration() {
   const router = useRouter();
-  const pathname = usePathname();
   const queryClient = useQueryClient();
   const matched = useCelebration((s) => s.matched);
   const dismiss = useCelebration((s) => s.dismiss);
 
-  return (
-    <MatchOverlay
-      candidate={matched}
-      onDismiss={dismiss}
-      onMessage={(gamer) => {
+  const onMessage = useCallback(
+    (gamer: MatchedGamer) => {
         // Dismiss before navigating. The overlay is mounted above the whole tab navigator
         // now, so leaving it up would follow the gamer into the conversation and sit on
         // top of it.
@@ -44,12 +62,19 @@ export function MatchCelebration() {
         // so back goes to the inbox rather than bouncing off the profile of somebody
         // just messaged. Matched anywhere else (the deck, mostly): a cross-tab push,
         // anchored so the inbox sits underneath the new conversation.
-        if (pathname.startsWith('/messages/gamer/')) {
+        if (lastPathname.current.startsWith('/messages/gamer/')) {
           router.replace(conversation);
         } else {
           router.push(conversation, { withAnchor: true });
         }
-      }}
-    />
+      },
+    [dismiss, queryClient, router],
+  );
+
+  return (
+    <>
+      <PathnameRecorder />
+      <MatchOverlay candidate={matched} onDismiss={dismiss} onMessage={onMessage} />
+    </>
   );
 }

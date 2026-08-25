@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
 import { LOBBY_BOOST_COST_COINS, lobbyApi } from "../../../src/api/lobby";
 import type {
@@ -31,7 +31,7 @@ import { cn } from "../../../src/ui/cn";
 /**
  * One lobby: header, roster, the owner's pending inbox, and the chat.
  *
- * Everything lives in the chat list's `ListHeaderComponent` so the screen is a single
+ * Everything lives in the chat list's roster block (`LobbyAbove`) so the screen is a single
  * scrolling surface — a ScrollView with a FlatList inside it is the layout RN warns
  * about, and the chat is the part that grows.
  *
@@ -43,10 +43,8 @@ export default function LobbyScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const t = useT();
-  const upper = useUpper();
   const queryClient = useQueryClient();
   const myId = useSession((s) => s.userId);
-  const listRef = useRef<FlatList<LobbyMessage>>(null);
 
   const detail = useQuery({
     queryKey: ["lobby", lobbyId],
@@ -177,22 +175,67 @@ export default function LobbyScreen() {
    * Takes the text rather than reading it from this component's state.
    *
    * The half-typed message lives in {@link Composer} now. It used to be state up here, and
-   * the roster and the lobby header are in the list's `ListHeaderComponent` — so every
+   * the roster and the lobby header are in the list's roster block (`LobbyAbove`) — so every
    * character typed rebuilt the whole header, every member row and every pending request.
    */
+  const { mutate: sendMutate, isPending: sendPending } = send;
   const submit = useCallback(
     (text: string) => {
-      if (!text || send.isPending) return;
-      send.mutate(text);
+      if (!text || sendPending) return;
+      sendMutate(text);
     },
-    [send],
+    // `mutate` is the stable part of the mutation object (which is a fresh literal every
+    // render); isPending has to stay a dependency to keep the guard honest, so this
+    // changes twice per send rather than on every socket frame.
+    [sendMutate, sendPending],
   );
 
   const keyExtractor = useCallback((m: LobbyMessage) => m.id, []);
-  const scrollToEnd = useCallback(
-    () => listRef.current?.scrollToEnd({ animated: false }),
-    [],
+  // The list below is inverted, so it wants newest first - same shape as the DM thread.
+  const newestFirst = useMemo(
+    () => (messages.data ? [...messages.data].reverse() : []),
+    [messages.data],
   );
+
+  /*
+   * Stable handlers for the roster block above the chat. `LobbyAbove` is memoised so a
+   * socket frame that changes nothing (and every render this screen does while somebody
+   * types) can bail out of reconciling the header, the action row and every member row -
+   * which is only possible if none of these change identity per render. `mutate` is the
+   * stable part of each mutation object.
+   */
+  const { mutate: joinMutate } = join;
+  const { mutate: leaveMutate } = leave;
+  const { mutate: lockMutate } = lock;
+  const { mutate: unlockMutate } = unlock;
+  const { mutate: endMutate } = end;
+  const { mutate: cancelMutate } = cancel;
+  const { mutate: boostMutate } = boost;
+  const { mutate: answerMutate } = answer;
+  const { mutate: kickMutate } = kick;
+  const { refetch: refetchMessages } = messages;
+  const myStatus = lobby?.myStatus;
+  const onJoin = useCallback(() => joinMutate(), [joinMutate]);
+  const onLeave = useCallback(() => {
+    leaveMutate();
+    // Leaving is also how a pending request is withdrawn; either way this screen is no
+    // longer somewhere the viewer belongs.
+    if (myStatus === "ACCEPTED") router.back();
+  }, [leaveMutate, myStatus, router]);
+  const onLock = useCallback(() => lockMutate(), [lockMutate]);
+  const onUnlock = useCallback(() => unlockMutate(), [unlockMutate]);
+  const onEnd = useCallback(() => endMutate(), [endMutate]);
+  const onCancel = useCallback(() => cancelMutate(), [cancelMutate]);
+  const onBoost = useCallback(() => boostMutate(), [boostMutate]);
+  const onAnswer = useCallback(
+    (userId: string, accept: boolean) => answerMutate({ userId, accept }),
+    [answerMutate],
+  );
+  const onKick = useCallback((userId: string) => kickMutate(userId), [kickMutate]);
+  const onRetryMessages = useCallback(() => {
+    void refetchMessages();
+  }, [refetchMessages]);
+
   const renderLine = useCallback(
     ({ item }: { item: LobbyMessage }) => (
       <ChatLine line={item} mine={item.senderId === myId} />
@@ -247,118 +290,51 @@ export default function LobbyScreen() {
       </View>
 
       <FlatList
-        ref={listRef}
-        data={inTeam ? (messages.data ?? []) : []}
+        // Newest first, drawn bottom-up. The DM thread documents the whole story: the
+        // old shape (oldest first + scrollToEnd on onContentSizeChange) opened long
+        // histories part-way up and then chased a moving target as row heights arrived.
+        // Inverting pins index 0 - the latest message - against the composer for free.
+        // The roster block moves to ListFooterComponent, which an inverted list draws
+        // at the visual top.
+        inverted
+        data={inTeam ? newestFirst : []}
         keyExtractor={keyExtractor}
-        contentContainerClassName="gap-2 px-6 pb-4"
+        // Code-side paddingTop is the visual bottom once inverted - the gap against the
+        // composer.
+        contentContainerClassName="gap-2 px-6 pt-4"
         showsVerticalScrollIndicator={false}
-        onContentSizeChange={scrollToEnd}
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={7}
         renderItem={renderLine}
-        ListHeaderComponent={
-          <View className="gap-4 pb-4 pt-2">
-            <LobbyHeader detail={detail.data} />
-
-            {firstError && <ErrorNotice error={firstError} />}
-
-            <ActionRow
-              detail={detail.data}
-              pending={{
-                join: join.isPending,
-                leave: leave.isPending,
-                lock: lock.isPending,
-                unlock: unlock.isPending,
-                end: end.isPending,
-                cancel: cancel.isPending,
-                boost: boost.isPending,
-              }}
-              on={{
-                join: () => join.mutate(),
-                leave: () => {
-                  leave.mutate();
-                  // Leaving is also how a pending request is withdrawn; either way this
-                  // screen is no longer somewhere the viewer belongs.
-                  if (lobby.myStatus === "ACCEPTED") router.back();
-                },
-                lock: () => lock.mutate(),
-                unlock: () => unlock.mutate(),
-                end: () => end.mutate(),
-                cancel: () => cancel.mutate(),
-                boost: () => boost.mutate(),
-              }}
-            />
-
-            {isOwner &&
-              detail.data.pendingRequests.length > 0 &&
-              lobby.status === "OPEN" && (
-                <View className="gap-2">
-                  <Text variant="overline">
-                    {upper(t.lobby.detail.wantsToJoin)}
-                  </Text>
-                  {detail.data.pendingRequests.map((request) => (
-                    <MemberRow key={request.userId} member={request}>
-                      <Button
-                        label={t.lobby.detail.accept}
-                        size="md"
-                        loading={answer.isPending}
-                        onPress={() =>
-                          answer.mutate({
-                            userId: request.userId,
-                            accept: true,
-                          })
-                        }
-                      />
-                      <Button
-                        label={t.lobby.detail.pass}
-                        variant="ghost"
-                        size="md"
-                        loading={answer.isPending}
-                        onPress={() =>
-                          answer.mutate({
-                            userId: request.userId,
-                            accept: false,
-                          })
-                        }
-                      />
-                    </MemberRow>
-                  ))}
-                </View>
-              )}
-
-            <View className="gap-2">
-              <Text variant="overline">
-                {upper(
-                  t.lobby.detail.team(lobby.playerCount, lobby.maxPlayers),
-                )}
-              </Text>
-              {detail.data.members.map((member) => (
-                <MemberRow key={member.userId} member={member}>
-                  {isOwner && member.status !== "OWNER" && chatOpen && (
-                    <Button
-                      label={t.common.remove}
-                      variant="ghost"
-                      size="md"
-                      loading={kick.isPending}
-                      onPress={() => kick.mutate(member.userId)}
-                    />
-                  )}
-                </MemberRow>
-              ))}
-            </View>
-
-            {inTeam && (
-              <Text variant="overline">
-                {upper(
-                  chatOpen ? t.lobby.detail.chat : t.lobby.detail.chatReadOnly,
-                )}
-              </Text>
-            )}
-            {inTeam && messages.error && (
-              <ErrorNotice
-                error={messages.error}
-                onRetry={() => messages.refetch()}
-              />
-            )}
-          </View>
+        ListFooterComponent={
+          <LobbyAbove
+            detail={detail.data}
+            firstError={firstError}
+            messagesError={inTeam ? (messages.error ?? null) : null}
+            isOwner={isOwner}
+            chatOpen={chatOpen}
+            inTeam={inTeam}
+            joinPending={join.isPending}
+            leavePending={leave.isPending}
+            lockPending={lock.isPending}
+            unlockPending={unlock.isPending}
+            endPending={end.isPending}
+            cancelPending={cancel.isPending}
+            boostPending={boost.isPending}
+            answerPending={answer.isPending}
+            kickPending={kick.isPending}
+            onJoin={onJoin}
+            onLeave={onLeave}
+            onLock={onLock}
+            onUnlock={onUnlock}
+            onEnd={onEnd}
+            onCancel={onCancel}
+            onBoost={onBoost}
+            onAnswer={onAnswer}
+            onKick={onKick}
+            onRetryMessages={onRetryMessages}
+          />
         }
         ListEmptyComponent={
           inTeam && !messages.isPending && !messages.error ? (
@@ -389,7 +365,7 @@ export default function LobbyScreen() {
  * The compose box, and the only thing that knows what is half-typed.
  *
  * Owning `draft` down here is the whole point: the roster, the lobby header and the
- * pending-request list all live in the message list's `ListHeaderComponent`, so while this
+ * pending-request list all live in the message list's roster block (`LobbyAbove`), so while this
  * state was held by the screen above, typing one character re-rendered every one of them.
  *
  * Memoised, and both its props are stable — `sending` is a boolean and `onSend` is a
@@ -439,6 +415,155 @@ const Composer = memo(function Composer({
       >
         <View className="h-3 w-3 rotate-45 border-r-2 border-t-2 border-white" />
       </Pressable>
+    </View>
+  );
+});
+
+/**
+ * Everything drawn above the chat: the lobby card, the action row, pending requests and
+ * the roster. It used to be a ~105-line element built inline in `ListHeaderComponent`,
+ * reconstructed on every render of the screen - which arrives on every socket lobby
+ * frame and every LIVE_QUERY refetch. Memoised with only stable or slow-moving props, so
+ * a render that changes none of them reconciles nothing up here.
+ *
+ * Lives in `ListFooterComponent` because the chat list is inverted, and an inverted list
+ * draws its footer at the visual top.
+ */
+const LobbyAbove = memo(function LobbyAbove({
+  detail,
+  firstError,
+  messagesError,
+  isOwner,
+  chatOpen,
+  inTeam,
+  joinPending,
+  leavePending,
+  lockPending,
+  unlockPending,
+  endPending,
+  cancelPending,
+  boostPending,
+  answerPending,
+  kickPending,
+  onJoin,
+  onLeave,
+  onLock,
+  onUnlock,
+  onEnd,
+  onCancel,
+  onBoost,
+  onAnswer,
+  onKick,
+  onRetryMessages,
+}: {
+  detail: LobbyDetail;
+  firstError: Error | null;
+  messagesError: Error | null;
+  isOwner: boolean;
+  chatOpen: boolean;
+  inTeam: boolean;
+  joinPending: boolean;
+  leavePending: boolean;
+  lockPending: boolean;
+  unlockPending: boolean;
+  endPending: boolean;
+  cancelPending: boolean;
+  boostPending: boolean;
+  answerPending: boolean;
+  kickPending: boolean;
+  onJoin: () => void;
+  onLeave: () => void;
+  onLock: () => void;
+  onUnlock: () => void;
+  onEnd: () => void;
+  onCancel: () => void;
+  onBoost: () => void;
+  onAnswer: (userId: string, accept: boolean) => void;
+  onKick: (userId: string) => void;
+  onRetryMessages: () => void;
+}) {
+  const t = useT();
+  const upper = useUpper();
+  const { lobby } = detail;
+
+  return (
+    <View className="gap-4 pb-4 pt-2">
+      <LobbyHeader detail={detail} />
+
+      {firstError && <ErrorNotice error={firstError} />}
+
+      <ActionRow
+        detail={detail}
+        pending={{
+          join: joinPending,
+          leave: leavePending,
+          lock: lockPending,
+          unlock: unlockPending,
+          end: endPending,
+          cancel: cancelPending,
+          boost: boostPending,
+        }}
+        on={{
+          join: onJoin,
+          leave: onLeave,
+          lock: onLock,
+          unlock: onUnlock,
+          end: onEnd,
+          cancel: onCancel,
+          boost: onBoost,
+        }}
+      />
+
+      {isOwner && detail.pendingRequests.length > 0 && lobby.status === "OPEN" && (
+        <View className="gap-2">
+          <Text variant="overline">{upper(t.lobby.detail.wantsToJoin)}</Text>
+          {detail.pendingRequests.map((request) => (
+            <MemberRow key={request.userId} member={request}>
+              <Button
+                label={t.lobby.detail.accept}
+                size="md"
+                loading={answerPending}
+                onPress={() => onAnswer(request.userId, true)}
+              />
+              <Button
+                label={t.lobby.detail.pass}
+                variant="ghost"
+                size="md"
+                loading={answerPending}
+                onPress={() => onAnswer(request.userId, false)}
+              />
+            </MemberRow>
+          ))}
+        </View>
+      )}
+
+      <View className="gap-2">
+        <Text variant="overline">
+          {upper(t.lobby.detail.team(lobby.playerCount, lobby.maxPlayers))}
+        </Text>
+        {detail.members.map((member) => (
+          <MemberRow key={member.userId} member={member}>
+            {isOwner && member.status !== "OWNER" && chatOpen && (
+              <Button
+                label={t.common.remove}
+                variant="ghost"
+                size="md"
+                loading={kickPending}
+                onPress={() => onKick(member.userId)}
+              />
+            )}
+          </MemberRow>
+        ))}
+      </View>
+
+      {inTeam && (
+        <Text variant="overline">
+          {upper(chatOpen ? t.lobby.detail.chat : t.lobby.detail.chatReadOnly)}
+        </Text>
+      )}
+      {inTeam && messagesError && (
+        <ErrorNotice error={messagesError} onRetry={onRetryMessages} />
+      )}
     </View>
   );
 });

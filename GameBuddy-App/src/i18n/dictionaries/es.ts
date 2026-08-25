@@ -174,7 +174,7 @@ export const es: Dictionary = {
   },
 
   tabs: {
-    home: 'Inicio',
+    home: 'Mazo',
     lobby: 'Lobby',
     messages: 'Mensajes',
     market: 'Tienda',
@@ -892,6 +892,7 @@ export const es: Dictionary = {
       '180': 'Este lobby ya no está abierto.',
       '183': 'Termina o cancela tu lobby actual primero.',
       '185': 'El propietario ya respondió a tu solicitud.',
+      '187': 'Ese nombre de usuario no está permitido. Elige otro.',
     },
   },
 

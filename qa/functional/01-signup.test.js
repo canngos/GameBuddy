@@ -183,13 +183,19 @@ describe('signup', () => {
   test('/auth/sendCode is rate limited', async () => {
     const account = await createAccount();
 
-    // AuthRateLimitConfig allows 3 sendCode calls per 15 minutes. The limit exists so the
-    // endpoint cannot be used to mail-bomb a registered address.
+    // AuthRateLimitConfig.sendCode allows 6 calls per 15 minutes. The limit exists so the
+    // endpoint cannot be used to mail-bomb a registered address. Spend the whole budget and
+    // then one more: the refusal is the call after the last permit, so a loop of exactly
+    // BUDGET can never see it.
+    const BUDGET = 6;
     const codes = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < BUDGET + 1; i++) {
       const res = await post(`${P.auth}/sendCode`, { email: account.email, isRegister: false });
       codes.push(res.status);
     }
-    assert.ok(codes.includes(429), `expected a 429 within 6 calls; got ${codes.join(',')}`);
+    assert.ok(
+      codes.includes(429),
+      `expected a 429 once the budget of ${BUDGET} was spent; got ${codes.join(',')}`,
+    );
   });
 });

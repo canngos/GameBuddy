@@ -13,8 +13,17 @@ import { cn } from "../ui/cn";
 import { useHairline } from "../ui/hairline";
 
 type AdmirerCardProps =
-  | { locked: true; candidate?: undefined; onPress?: undefined }
-  | { locked?: false; candidate: Candidate; onPress: () => void };
+  | { locked: true; candidate?: undefined; onOpen?: undefined }
+  | {
+      locked?: false;
+      candidate: Candidate;
+      /**
+       * Takes the user id rather than being a pre-bound closure: the caller passes one
+       * stable function to every tile, so the memo below can actually bail out. A
+       * per-tile `() => open(id)` was a fresh prop on every render of the grid.
+       */
+      onOpen: (userId: string) => void;
+    };
 
 /**
  * One person who liked you, as a tile.
@@ -38,7 +47,7 @@ const styles = StyleSheet.create({
 export const AdmirerCard = memo(function AdmirerCard({
   locked,
   candidate,
-  onPress,
+  onOpen,
 }: AdmirerCardProps) {
   const t = useT();
   const colors = useThemeColors();
@@ -84,7 +93,7 @@ export const AdmirerCard = memo(function AdmirerCard({
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onOpen(candidate.userId)}
       accessibilityRole="button"
       accessibilityLabel={`${candidate.gamerUsername}, ${candidate.age}`}
       style={box}

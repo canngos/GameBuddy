@@ -116,12 +116,18 @@ export function routeFor(kind: string | undefined, targetId: string | undefined,
  * from cold. The second is the one that is easy to miss and the more common in practice —
  * a notification usually arrives when the app is closed.
  */
+// Per-process, not per-mount: the OS keeps returning the same stored response for
+// the life of the process, and this hook remounts whenever the session leaves and
+// re-enters the (main) group. A per-effect flag replayed a days-old notification
+// tap onto whoever signed in next.
+let consumedColdStartResponse = false;
+
 export function useNotificationRouting(enabled: boolean) {
   const router = useRouter();
 
   useEffect(() => {
     if (!enabled) return;
-    let handled = false;
+    let cancelled = false;
 
     const go = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
@@ -139,13 +145,15 @@ export function useNotificationRouting(enabled: boolean) {
     // A tap that started the app. Read once — asking again later would re-navigate on
     // every remount, dragging somebody back out of wherever they had moved to.
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!handled) {
-        handled = true;
-        go(response);
-      }
+      if (cancelled || consumedColdStartResponse) return;
+      consumedColdStartResponse = true;
+      go(response);
     });
 
     const subscription = Notifications.addNotificationResponseReceivedListener(go);
-    return () => subscription.remove();
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
   }, [enabled, router]);
 }

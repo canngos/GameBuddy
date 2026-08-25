@@ -232,6 +232,9 @@ export function AvatarCropper({
         width: side,
         height: side,
       };
+      // The dimensions are all this decode was for; the full-resolution bitmap behind it
+      // must not wait for GC - on a 100+ MP photo it sits next to the preview's own copy.
+      original.release();
 
       const context = ImageManipulator.manipulate(uri);
       context.crop(rect).resize({ width: OUTPUT, height: OUTPUT });
@@ -240,6 +243,7 @@ export function AvatarCropper({
         format: SaveFormat.JPEG,
         compress: 0.9,
       });
+      rendered.release();
       onDone(saved.uri);
     } catch {
       setFailed(true);

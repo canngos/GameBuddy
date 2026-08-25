@@ -83,10 +83,17 @@ export function AnimatedSplash({ onDone }: AnimatedSplashProps) {
      */
     overlayOpacity.value = withDelay(
       1400,
-      withTiming(0, { duration: 280 }, (finished) => {
-        if (finished) runOnJS(onDone)();
+      withTiming(0, { duration: 280 }, () => {
+        // Called on cancellation too: an interrupted fade must still hand over,
+        // or the opaque overlay sits over a mounted, interactive app forever.
+        runOnJS(onDone)();
       }),
     );
+    // Safety net for the path where the timing callback never runs at all
+    // (backgrounded at the wrong moment, a UI-thread hiccup). Cleared on unmount,
+    // which is what a normal hand-over does; firing twice is harmless either way.
+    const fallback = setTimeout(onDone, 2300);
+    return () => clearTimeout(fallback);
     // The timeline plays exactly once, on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
