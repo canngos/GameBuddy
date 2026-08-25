@@ -889,6 +889,7 @@ export const sv: Dictionary = {
       '180': 'Lobbyn är inte öppen längre.',
       '183': 'Avsluta eller avbryt din nuvarande lobby först.',
       '185': 'Ägaren har redan svarat på din förfrågan.',
+      '187': 'Det användarnamnet är inte tillåtet. Välj ett annat.',
     },
   },
 

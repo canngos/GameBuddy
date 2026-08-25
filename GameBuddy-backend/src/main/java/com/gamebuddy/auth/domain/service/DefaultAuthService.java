@@ -462,7 +462,7 @@ public class DefaultAuthService implements AuthService {
         // ever appears on, so it is refused rather than masked — there is no useful
         // rendering of a slur with asterisks in it.
         if (!textModeration.isCleanIdentifier(username)) {
-            throw new BusinessException(TransactionCode.CONTENT_BLOCKED);
+            throw new BusinessException(TransactionCode.USERNAME_NOT_ALLOWED);
         }
 
         Optional<Gamer> clash = gamerRepository.findByGamerUsernameIgnoreCase(username);

@@ -17,36 +17,9 @@ const { test, describe, after, before } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-const { get, post, request, P, CODE } = require('./helpers/api');
+const { get, post, P, CODE } = require('./helpers/api');
 const { createAccount, cleanup } = require('./helpers/accounts');
-const { env } = require('./helpers/tokens');
-
-const WEBHOOK_TOKEN = env().REVENUECAT_WEBHOOK_TOKEN || 'local-development-webhook-token';
-
-/** Grants Gold the way production does: through the webhook, never the database. */
-async function grantGold(userId) {
-  const now = Date.now();
-  const res = await request('POST', `${P.billing}/revenuecat/webhook`, {
-    body: {
-      api_version: '1.0',
-      event: {
-        id: crypto.randomUUID(),
-        type: 'INITIAL_PURCHASE',
-        app_user_id: userId,
-        product_id: 'gamebuddy.gold.monthly',
-        purchased_at_ms: now,
-        expiration_at_ms: now + 30 * 24 * 60 * 60 * 1000,
-        store: 'PLAY_STORE',
-        transaction_id: crypto.randomUUID(),
-        original_transaction_id: crypto.randomUUID(),
-        entitlement_ids: ['gold'],
-        period_type: 'NORMAL',
-      },
-    },
-    headers: { Authorization: WEBHOOK_TOKEN },
-  });
-  assert.equal(res.status, 200, `webhook refused: ${res.status} ${res.text}`);
-}
+const { grantGold } = require('./helpers/billing');
 
 function lobbyRequest(overrides = {}) {
   return {
@@ -117,6 +90,21 @@ describe('lobbies', () => {
     );
     assert.equal(res.status, 400, res.text);
     assert.equal(res.code, CODE.CONTENT_BLOCKED);
+  });
+
+  test('foreign profanity in the title is masked rather than refused', async () => {
+    const second = await createAccount();
+    await grantGold(second.userId);
+    const res = await post(
+      `${P.lobby}/create`,
+      lobbyRequest({ gameId, title: 'paras vittu ranked' }),
+      { token: second.token },
+    );
+    assert.equal(res.status, 200, res.text);
+    assert.ok(
+      !res.data.lobby.title.toLowerCase().includes('vittu'),
+      'Finnish profanity in a title should be masked',
+    );
   });
 
   test('a planned start in the past is refused as invalid', async () => {
@@ -243,6 +231,23 @@ describe('lobbies', () => {
     const history = await get(`${P.lobby}/${lobbyId}/messages`, { token: owner.token });
     assert.equal(history.status, 200, history.text);
     assert.equal(history.data.messages.length, 1, 'the refused slur must not be stored');
+  });
+
+  test('lobby chat: profanity is masked in the other six languages too', async () => {
+    // The word lists are resource files rather than compiled-in literals, so this is the
+    // case that proves they are packaged into the running jar and not merely on the unit
+    // test classpath.
+    const sent = await post(
+      `${P.lobby}/${lobbyId}/messages/send`,
+      { message: 'vittu tuo oli lähellä' },
+      { token: member.token },
+    );
+    assert.equal(sent.status, 200, sent.text);
+    assert.ok(
+      !sent.data.message.message.toLowerCase().includes('vittu'),
+      'Finnish profanity should come back masked',
+    );
+    assert.ok(sent.data.message.message.includes('*'), 'the mask should be asterisks');
   });
 
   test('a non-member is refused the chat in both directions', async () => {

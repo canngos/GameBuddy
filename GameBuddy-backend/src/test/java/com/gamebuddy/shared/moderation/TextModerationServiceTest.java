@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("TextModerationService")
@@ -65,6 +66,65 @@ class TextModerationServiceTest {
             // "spic" and "pedo" are blocked words, and both hide inside ordinary English.
             assertFalse(privateText("that looks suspicious").blocked());
             assertFalse(privateText("my pedometer says 9000 steps").blocked());
+        }
+    }
+
+    @Nested
+    @DisplayName("the other six languages")
+    class Multilingual {
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @DisplayName("profanity is masked whatever language it is in")
+        @CsvSource({
+            "fi, vittu",
+            "sv, fitta",
+            "de, scheisse",
+            "fr, putain",
+            "es, mierda",
+            "tr, siktir",
+        })
+        void masksEachLanguage(String language, String word) {
+            TextAssessment result = privateText("gg " + word + " lol");
+
+            assertFalse(result.blocked());
+            assertTrue(result.modified(), language + ": '" + word + "' was not masked");
+            assertFalse(result.cleaned().toLowerCase().contains(word), language + ": the word survived");
+        }
+
+        @ParameterizedTest
+        @DisplayName("evasion works the same in Turkish, including the dotted capital I")
+        @ValueSource(strings = {"s!ktir", "siktiiiir", "s i k t i r", "SİKTİR", "sıktır"})
+        void defeatsTurkishEvasion(String written) {
+            TextAssessment result = privateText("ya " + written + " be");
+
+            assertFalse(result.blocked());
+            assertTrue(result.modified(), written + " was not masked");
+        }
+
+        @ParameterizedTest
+        @DisplayName("German sharp s folds onto ss")
+        @ValueSource(strings = {"scheiße", "SCHEISSE", "sche!sse", "scheisssse"})
+        void defeatsGermanEvasion(String written) {
+            assertTrue(privateText("das ist " + written).modified(), written + " was not masked");
+        }
+
+        @ParameterizedTest(name = "[{index}] {0}")
+        @DisplayName("ordinary sentences in those languages are left alone")
+        @ValueSource(
+                strings = {
+                    "filmen är slut i morgon", // sv: "slut" = end. The allowlist case.
+                    "biljetterna är slutsålda", // sv: sold out
+                    "tengo 25 años y juego mucho", // es: "años" folds near "anos"
+                    "le concours commence à huit heures", // fr: "con" hides inside "concours"
+                    "kiitos paljon, pelataan huomenna", // fi
+                    "sık sık oyun oynuyorum", // tr: "sık" folds onto "sik"
+                    "die Analyse ist fertig", // de
+                })
+        void leavesOrdinaryForeignTextAlone(String sentence) {
+            TextAssessment result = privateText(sentence);
+
+            assertFalse(result.blocked(), sentence + " was blocked");
+            assertFalse(result.modified(), sentence + " was masked: " + result.cleaned());
         }
     }
 
@@ -146,6 +206,34 @@ class TextModerationServiceTest {
         void acceptsAnOrdinaryName() {
             assertTrue(service.isCleanIdentifier("can_baturlar"));
             assertTrue(service.isCleanIdentifier("ShadowStrike99"));
+        }
+
+        @Test
+        @DisplayName("foreign profanity in a handle is refused too")
+        void rejectsForeignProfanity() {
+            assertFalse(service.isCleanIdentifier("vittupaa"));
+            assertFalse(service.isCleanIdentifier("SiktirGamer"));
+        }
+
+        @Test
+        @DisplayName("the allowlist reaches the substring pass, so Swedish handles survive")
+        void acceptsAllowlistedWordInsideAHandle() {
+            assertTrue(service.isCleanIdentifier("Slutspurt99"));
+        }
+
+        @ParameterizedTest
+        @DisplayName("a three-letter entry is not hunted for inside a name")
+        @ValueSource(strings = {"EpicGamer", "Diana", "Emily", "Picasso", "Anakin", "Bokchoy"})
+        void doesNotRefuseOrdinaryNamesForShortEntries(String handle) {
+            // "pic", "ana", "emi" and "bok" are all real entries — as whole words. Matching
+            // them inside a handle refuses half the names people actually pick.
+            assertTrue(service.isCleanIdentifier(handle), handle + " should be an acceptable username");
+        }
+
+        @Test
+        @DisplayName("but a short entry is still masked when it is the whole word")
+        void stillMasksShortEntriesAsWholeWords() {
+            assertTrue(privateText("amk ya").modified());
         }
     }
 
