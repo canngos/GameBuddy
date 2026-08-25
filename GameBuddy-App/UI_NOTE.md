@@ -334,10 +334,13 @@ Match stays the full-screen celebration.
 
 ### 5.3 Sound — done
 
-- `scripts/make-sounds.py` generates four cues into `assets/sounds/` (`match`, `purchase`,
-  `reward`, `message`). Stdlib `wave` only. **They are placeholders** — pentatonic sine
-  blips, quiet, all under 800ms. Replace the files with designed audio and no call site
-  changes.
+- The four cues in `assets/sounds/` (`match`, `purchase`, `reward`, `message`) are **sourced
+  audio** (Pixabay / Mixkit, free commercial licenses) — picked from an auditioned shortlist
+  and processed to the original spec: mono 16-bit 44.1 kHz WAV, peak 0.35, all under 900 ms.
+  Provenance and license links live in `assets/sounds/SOURCES.md`.
+- `scripts/make-sounds.py` is the previous synth generator, kept as fallback — running it
+  overwrites the sourced files with the old pentatonic sine placeholders. Its design rules
+  (short, quiet, same filenames, no call-site changes) still govern any future replacement.
 - `src/ui/sound.ts` — named intents mirroring `haptics.ts`. `playsInSilentMode: false` (the
   silent switch wins) and `interruptionMode: 'mixWithOthers'` (never duck someone's music).
   Players are created once and reused.
