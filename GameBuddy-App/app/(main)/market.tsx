@@ -139,7 +139,12 @@ export default function Market() {
   });
 
   const busy = buy.isPending;
-  const all = kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? []);
+  // Memoised so it is a stable input to the memo below; the `?? []` fallback minted a
+  // fresh array every render while the store was still loading.
+  const all = useMemo(
+    () => (kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? [])),
+    [kind, store.data],
+  );
 
   /*
    * Membership items are not on this shelf.

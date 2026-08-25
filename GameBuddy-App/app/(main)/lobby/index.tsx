@@ -31,9 +31,7 @@ import { cn } from "../../../src/ui/cn";
  */
 export default function LobbyHome() {
   const router = useRouter();
-  const colors = useThemeColors();
   const t = useT();
-  const upper = useUpper();
   const [tone, setTone] = useState<LobbyTone | null>(null);
   // Its own switch, not a fifth tone. "When it plays" and "what it plays like" are
   // different questions, and somebody wanting a competitive game *right now* should be

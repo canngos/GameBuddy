@@ -129,6 +129,9 @@ export default function CreateLobby() {
     [typedDay, typedMonth, typedHour, typedMinute],
   );
   const typedTooFar =
+    // Reading the clock in render is deliberate: freshly typed input has to be compared
+    // against *now*, and a timestamp frozen at mount would drift while the form is open.
+    // eslint-disable-next-line react-hooks/purity
     typedStart !== null && typedStart.getTime() > Date.now() + HORIZON_DAYS * 86_400_000;
   const startsAt = when === CUSTOM_WHEN ? typedStart : WHEN_PRESETS[when].startsAt();
   const zone = localZone();

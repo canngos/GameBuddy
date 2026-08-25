@@ -130,6 +130,7 @@ export default function Messages() {
       // catches messages that arrived while the socket was down.
       void inbox.refetch();
       // Refetch functions are stable across renders, so this runs once per focus.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [friends.refetch, matches.refetch, inbox.refetch]),
   );
 
@@ -137,23 +138,29 @@ export default function Messages() {
    * The merge, and the only expensive thing on this screen.
    *
    * Keyed on the three payloads alone — deliberately not on the fold state, so opening
-   * or closing a section does not rebuild any of it.
+   * or closing a section does not rebuild any of it. The payloads are pulled into locals
+   * so the memo closes over exactly what its dependency list names; reading
+   * `friends.data` inside while depending on `friends.data` made the compiler infer
+   * `friends` and bail out of optimizing the whole screen.
    */
+  const friendsData = friends.data;
+  const matchesData = matches.data;
+  const inboxData = inbox.data;
   const { friendRows, matchRows } = useMemo(() => {
-    const friendIds = new Set((friends.data ?? []).map((friend) => friend.userId));
+    const friendIds = new Set((friendsData ?? []).map((friend) => friend.userId));
 
     // The inbox does not carry a worn frame; the other two do. Resolving it here keeps a
     // row looking like the same person they are on every other screen.
     const frames = new Map<string, string | null>();
-    for (const match of matches.data ?? []) frames.set(match.userId, match.frame);
-    for (const friend of friends.data ?? []) frames.set(friend.userId, friend.frame);
+    for (const match of matchesData ?? []) frames.set(match.userId, match.frame);
+    for (const friend of friendsData ?? []) frames.set(friend.userId, friend.frame);
 
     const all: Row[] = [];
     const seen = new Set<string>();
 
     // The inbox first, in its own order — the server sorts it by most recent message, and
     // that ordering is what this screen is for.
-    for (const entry of inbox.data ?? []) {
+    for (const entry of inboxData ?? []) {
       seen.add(entry.userId);
       all.push({
         userId: entry.userId,
@@ -166,7 +173,7 @@ export default function Messages() {
       });
     }
 
-    for (const match of matches.data ?? []) {
+    for (const match of matchesData ?? []) {
       if (seen.has(match.userId)) continue;
       seen.add(match.userId);
       all.push({
@@ -183,7 +190,7 @@ export default function Messages() {
     // A friend in neither list still belongs here. Friendship is granted on top of a
     // match so it should not happen — but "should not" is not a reason to drop somebody
     // from the one screen they are meant to be reachable on.
-    for (const friend of friends.data ?? []) {
+    for (const friend of friendsData ?? []) {
       if (seen.has(friend.userId)) continue;
       seen.add(friend.userId);
       all.push({
@@ -201,7 +208,7 @@ export default function Messages() {
       friendRows: all.filter((row) => friendIds.has(row.userId)),
       matchRows: all.filter((row) => !friendIds.has(row.userId)),
     };
-  }, [inbox.data, matches.data, friends.data]);
+  }, [inboxData, matchesData, friendsData]);
 
   const [open, setOpen] = useState<Record<SectionId, boolean>>({ friends: true, matches: true });
 

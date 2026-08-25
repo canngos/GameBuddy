@@ -66,6 +66,9 @@ export function ConsumableShelf({ balance }: { balance: number }) {
 
       feedback.purchase();
       showToast({
+        // This is a mutation callback, not render — it runs once per purchase, at event
+        // time, so the clock read is fine; the rule cannot see past the config object.
+        // eslint-disable-next-line react-hooks/purity
         id: `consumable:${code}:${Date.now()}`,
         title: item ? t.market.consumables.addedTitle(labels[item.code].title) : t.market.consumables.added,
         body: t.market.consumables.addedBody,

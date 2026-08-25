@@ -129,7 +129,7 @@ function sdk(): PurchasesSdk | null {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     sdkCache = (require('react-native-purchases') as typeof import('react-native-purchases')).default;
   } catch (error) {
     if (__DEV__) console.warn('[billing] react-native-purchases failed to load', error);
