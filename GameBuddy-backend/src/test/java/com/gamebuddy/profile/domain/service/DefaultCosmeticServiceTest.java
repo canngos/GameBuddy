@@ -10,9 +10,11 @@ import com.gamebuddy.profile.interfaces.response.CosmeticsResponse;
 import com.gamebuddy.shared.coin.CoinLedger;
 import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.entity.Cosmetic;
+import com.gamebuddy.shared.entity.CosmeticBundle;
 import com.gamebuddy.shared.entity.CosmeticKind;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.GamerCosmetic;
+import com.gamebuddy.shared.repository.CosmeticBundleRepository;
 import com.gamebuddy.shared.repository.CosmeticRepository;
 import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
@@ -43,6 +45,9 @@ class DefaultCosmeticServiceTest {
     private CosmeticRepository cosmeticRepository;
 
     @Mock
+    private CosmeticBundleRepository bundleRepository;
+
+    @Mock
     private GamerCosmeticRepository ownershipRepository;
 
     @Mock
@@ -63,6 +68,7 @@ class DefaultCosmeticServiceTest {
         // below passing without a coin having gone anywhere.
         cosmeticService = new DefaultCosmeticService(
                 cosmeticRepository,
+                bundleRepository,
                 ownershipRepository,
                 gamerRepository,
                 cosmeticUrls,
@@ -401,6 +407,164 @@ class DefaultCosmeticServiceTest {
                             .unequip(gamer, CosmeticKind.BANNER)
                             .getStatus()
                             .getCode());
+        }
+    }
+
+    @Nested
+    @DisplayName("Bundles")
+    class Bundles {
+
+        private CosmeticBundle bundle(int price, Cosmetic... items) {
+            CosmeticBundle b = new CosmeticBundle();
+            b.setId(UUID.randomUUID());
+            b.setName("Test set");
+            b.setPrice(price);
+            b.setItems(List.of(items));
+            when(bundleRepository.findWithItemsById(b.getId())).thenReturn(Optional.of(b));
+            return b;
+        }
+
+        @Test
+        @DisplayName("charges the set price once and grants every part")
+        void buysTheWholeSet() {
+            Cosmetic frame = cosmetic(CosmeticKind.FRAME, 900);
+            Cosmetic banner = cosmetic(CosmeticKind.BANNER, 1100);
+            CosmeticBundle set = bundle(1600, frame, banner);
+            gamer.setCoin(2000);
+
+            cosmeticService.buyBundle(gamer, set.getId().toString());
+
+            assertEquals(400, gamer.getCoin(), "one debit of the set price, not of the parts");
+
+            ArgumentCaptor<GamerCosmetic> rows = ArgumentCaptor.forClass(GamerCosmetic.class);
+            verify(ownershipRepository, times(2)).save(rows.capture());
+            assertEquals(2, rows.getAllValues().size());
+        }
+
+        @Test
+        @DisplayName("splits the receipt across the parts so it sums to what was charged")
+        void splitsPaidAcrossItems() {
+            // `paid` is a receipt, and upgrade-2026-18 refunds people by reading it — so a
+            // discounted set has to record the discounted share, not the shelf price.
+            Cosmetic frame = cosmetic(CosmeticKind.FRAME, 900);
+            Cosmetic banner = cosmetic(CosmeticKind.BANNER, 1100);
+            CosmeticBundle set = bundle(1600, frame, banner);
+            gamer.setCoin(2000);
+
+            cosmeticService.buyBundle(gamer, set.getId().toString());
+
+            ArgumentCaptor<GamerCosmetic> rows = ArgumentCaptor.forClass(GamerCosmetic.class);
+            verify(ownershipRepository, times(2)).save(rows.capture());
+            int total = rows.getAllValues().stream()
+                    .mapToInt(GamerCosmetic::getPaid)
+                    .sum();
+            assertEquals(1600, total, "the receipts must sum to the price charged");
+            assertEquals(720, rows.getAllValues().get(0).getPaid());
+            assertEquals(880, rows.getAllValues().get(1).getPaid());
+        }
+
+        @Test
+        @DisplayName("refuses the whole set when any part is already owned")
+        void refusesWhenPartlyOwned() {
+            Cosmetic frame = cosmetic(CosmeticKind.FRAME, 900);
+            Cosmetic banner = cosmetic(CosmeticKind.BANNER, 1100);
+            CosmeticBundle set = bundle(1600, frame, banner);
+            gamer.setCoin(2000);
+            when(ownershipRepository.findOwnedIds(gamer.getUserId())).thenReturn(Set.of(frame.getId()));
+
+            BusinessException thrown = assertThrows(
+                    BusinessException.class,
+                    () -> cosmeticService.buyBundle(gamer, set.getId().toString()));
+            assertEquals(189, thrown.getTransactionCode().getId());
+            assertEquals(2000, gamer.getCoin(), "a refused set costs nothing");
+            verify(ownershipRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("refuses when the balance is short, without granting anything")
+        void refusesWhenBroke() {
+            CosmeticBundle set = bundle(1600, cosmetic(CosmeticKind.FRAME, 900), cosmetic(CosmeticKind.BANNER, 1100));
+            gamer.setCoin(100);
+
+            BusinessException thrown = assertThrows(
+                    BusinessException.class,
+                    () -> cosmeticService.buyBundle(gamer, set.getId().toString()));
+            assertEquals(129, thrown.getTransactionCode().getId());
+            verify(ownershipRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("an unknown bundle is 188, not a 500")
+        void unknownBundle() {
+            UUID missing = UUID.randomUUID();
+            when(bundleRepository.findWithItemsById(missing)).thenReturn(Optional.empty());
+
+            BusinessException thrown =
+                    assertThrows(BusinessException.class, () -> cosmeticService.buyBundle(gamer, missing.toString()));
+            assertEquals(188, thrown.getTransactionCode().getId());
+        }
+    }
+
+    @Nested
+    @DisplayName("Themes")
+    class Themes {
+
+        private Cosmetic theme(String slug, int price) {
+            Cosmetic c = new Cosmetic();
+            c.setId(UUID.randomUUID());
+            c.setKind(CosmeticKind.THEME);
+            c.setName(slug);
+            c.setAssetKey("themes/" + slug);
+            c.setPrice(price);
+            return c;
+        }
+
+        @Test
+        @DisplayName("wearing a theme leaves the banner slot alone")
+        void themeHasItsOwnSlot() {
+            // The regression this exists for: `wear` used to be an if/else, so anything
+            // that was not a frame went into the banner slot — a theme would have silently
+            // replaced the banner somebody was wearing.
+            Cosmetic banner = cosmetic(CosmeticKind.BANNER, 200);
+            Cosmetic card = theme("nova", 1200);
+            gamer.setEquippedBanner(banner);
+            when(cosmeticRepository.findById(card.getId())).thenReturn(Optional.of(card));
+            when(ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), card.getId()))
+                    .thenReturn(true);
+
+            cosmeticService.equip(gamer, card.getId().toString());
+
+            assertEquals(card, gamer.getEquippedTheme());
+            assertEquals(banner, gamer.getEquippedBanner(), "the banner must not have moved");
+            assertNull(gamer.getEquippedFrame());
+        }
+
+        @Test
+        @DisplayName("taking a theme off clears only that slot")
+        void unequipClearsOnlyTheTheme() {
+            Cosmetic banner = cosmetic(CosmeticKind.BANNER, 200);
+            gamer.setEquippedBanner(banner);
+            gamer.setEquippedTheme(theme("royal", 900));
+
+            cosmeticService.unequip(gamer, CosmeticKind.THEME);
+
+            assertNull(gamer.getEquippedTheme());
+            assertEquals(banner, gamer.getEquippedBanner());
+        }
+
+        @Test
+        @DisplayName("a theme is listed with a slug and no image")
+        void themesCarryASlugNotAUrl() {
+            Cosmetic card = theme("viridian", 400);
+            when(cosmeticRepository.findAllByOrderByKindAscSortOrderAsc()).thenReturn(List.of(card));
+            when(cosmeticUrls.slug(card)).thenReturn("viridian");
+            when(cosmeticUrls.urlFor(card)).thenReturn(null);
+
+            var body = cosmeticService.getCosmetics(gamer).getBody().getData();
+
+            assertEquals(1, body.getThemes().size());
+            assertEquals("viridian", body.getThemes().get(0).getTheme());
+            assertNull(body.getThemes().get(0).getImage(), "a theme has no picture");
         }
     }
 }

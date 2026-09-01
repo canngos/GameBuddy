@@ -18,10 +18,10 @@ import { TabIcon, type TabIconName } from '../../src/ui/TabIcon';
  * mounting it would announce the moderator as online to a population that is not
  * supposed to know the account exists.
  *
- * Five tabs, in the order the work actually arrives: what happened (Overview), what needs
- * judging (Reports, Avatars), who has already been dealt with (Accounts), and Settings —
- * which is also the way out, because sign out belongs somewhere reachable from every
- * screen rather than in one screen's header.
+ * Six tabs, in the order the work actually arrives: what happened (Overview), what needs
+ * judging (Reports, Avatars), who has already been dealt with (Accounts), what is being
+ * given away (Codes), and Settings — which is also the way out, because sign out belongs
+ * somewhere reachable from every screen rather than in one screen's header.
  */
 export default function AdminLayout() {
   const colors = useThemeColors();
@@ -51,12 +51,19 @@ export default function AdminLayout() {
         <Tabs.Screen name="reports" options={tab('Reports', 'reports')} />
         <Tabs.Screen name="avatars" options={tab('Avatars', 'avatars')} />
         <Tabs.Screen name="accounts" options={tab('Accounts', 'profile')} />
+        <Tabs.Screen name="promo" options={tab('Codes', 'promo')} />
         <Tabs.Screen name="settings" options={tab('Settings', 'settings')} />
 
         {/* Reached from Settings, and not a tab of its own. The bar is hidden while it
             is open: changing the password ends every session, so a tab press mid-edit
             would abandon a half-typed change without saying so. */}
         <Tabs.Screen name="password" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+
+        {/* Both reached from the Codes tab. The editor hides the bar because leaving it
+            mid-edit would abandon a half-filled form without saying so, and the picker
+            because its selection is only carried back by returning to the editor. */}
+        <Tabs.Screen name="promo-edit" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+        <Tabs.Screen name="promo-users" options={{ href: null, tabBarStyle: { display: 'none' } }} />
       </Tabs>
     </RouteGuard>
   );

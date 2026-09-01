@@ -30,7 +30,8 @@ class JwtServiceTest {
 
     private static final String SECRET = "a-test-signing-key-that-is-long-enough-for-hs256";
 
-    private final JwtService jwtService = new JwtService(new JwtProperties(SECRET, Duration.ofDays(7), null, "gamebuddy"));
+    private final JwtService jwtService =
+            new JwtService(new JwtProperties(SECRET, Duration.ofDays(7), null, "gamebuddy"));
 
     private static UserDetails user(String email) {
         return User.withUsername(email).password("x").roles("USER").build();
@@ -200,8 +201,12 @@ class JwtServiceTest {
             // The token is new — a later expiry is the whole point — but the session is
             // still twenty days old. Resetting this is what would let a stolen token be
             // renewed forever.
-            assertEquals(began.getEpochSecond(), jwtService.extractSessionStart(refreshed).getEpochSecond());
-            assertTrue(jwtService.extractExpiration(refreshed).isAfter(Instant.now().plus(Duration.ofDays(6))));
+            assertEquals(
+                    began.getEpochSecond(),
+                    jwtService.extractSessionStart(refreshed).getEpochSecond());
+            assertTrue(jwtService
+                    .extractExpiration(refreshed)
+                    .isAfter(Instant.now().plus(Duration.ofDays(6))));
         }
 
         @Test

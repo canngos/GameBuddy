@@ -10,6 +10,7 @@ import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -153,24 +154,38 @@ public class PurchaseService {
      * @param storeExpiry the store's own expiry, authoritative when present
      */
     private Instant grantSubscription(Gamer gamer, Product product, Instant storeExpiry) {
+        if (storeExpiry != null) {
+            gamer.setSubscriptionTier(product.tier());
+            gamer.setSubscriptionExpiresAt(storeExpiry);
+            return storeExpiry;
+        }
+        return extendGold(gamer, product.period());
+    }
+
+    /**
+     * Adds a period of Gold to whatever the account already holds, and returns the new
+     * expiry. Does not save — the caller owns the transaction and the gamer.
+     *
+     * <p>Extended from the later of "now" and the existing expiry. Using the existing
+     * expiry alone would back-date a renewal made after a lapse; using now alone would
+     * throw away time an early renewer had already paid for.
+     *
+     * <p>Public and shared with the promotion codes because there must be exactly one
+     * answer to "what does another month mean for somebody who already has three weeks".
+     * The alternative was a second copy of these six lines in the promo service, which
+     * would agree with this one on the day it was written and not for much longer.
+     */
+    public Instant extendGold(Gamer gamer, Duration period) {
         Instant now = clock.instant();
 
-        Instant expiresAt;
-        if (storeExpiry != null) {
-            expiresAt = storeExpiry;
-        } else {
-            // Extend from the later of "now" and the existing expiry. Using the existing
-            // expiry alone would back-date a renewal made after a lapse; using now alone
-            // would throw away time an early renewer had already paid for.
-            SubscriptionTier current =
-                    SubscriptionTier.effective(gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), now);
-            Instant base = current == SubscriptionTier.BASIC || gamer.getSubscriptionExpiresAt() == null
-                    ? now
-                    : gamer.getSubscriptionExpiresAt();
-            expiresAt = base.plus(product.period());
-        }
+        SubscriptionTier current =
+                SubscriptionTier.effective(gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), now);
+        Instant base = current == SubscriptionTier.BASIC || gamer.getSubscriptionExpiresAt() == null
+                ? now
+                : gamer.getSubscriptionExpiresAt();
+        Instant expiresAt = base.plus(period);
 
-        gamer.setSubscriptionTier(product.tier());
+        gamer.setSubscriptionTier(SubscriptionTier.GOLD);
         gamer.setSubscriptionExpiresAt(expiresAt);
         return expiresAt;
     }

@@ -446,6 +446,17 @@ export const de: Dictionary = {
       free: 'Gratis',
       coinsPrice: (n: number) => `${n} Münzen`,
       animatedSuffix: ', animiert',
+      previewOn: { FRAME: 'Auf deinem Avatar', BANNER: 'Auf deinem Profil', THEME: 'Auf deiner Karte' },
+      themes: 'Themes',
+      bundles: 'Sets',
+      bundlesBlurb: 'Ein passendes Set, günstiger als die Einzelteile.',
+      bundleParts: (n: number) => `${n} Münzen einzeln`,
+      bundleSaving: (n: number) => `${n} sparen`,
+      bundleTogether: 'Zusammen getragen',
+      bundleOwned: 'Dieses Set gehört dir',
+      bundleA11y: (name: string, price: number, saving: number) =>
+        `Set ${name}, ${price} Münzen, spart ${saving}`,
+      previewA11y: (name: string) => `${name} ansehen`,
       ownedA11y: (name: string) => `${name}, gehört dir. Leg es im Inventar an.`,
       buyA11y: (name: string, price: number) => `${name} kaufen, ${price} Münzen`,
       cantAffordA11y: (name: string, price: number) =>
@@ -527,13 +538,6 @@ export const de: Dictionary = {
       onTheWayBody: 'Es kann einen Moment dauern. Nochmal kaufen ist nicht nötig.',
     },
 
-    season: {
-      header: 'Season Pass',
-      coming: 'Bald verfügbar',
-      blurb: 'Jede Saison neue Belohnungen.',
-      a11y: 'Season Pass. Bald verfügbar — jede Saison neue Belohnungen.',
-    },
-
     gold: {
       done: 'Fertig',
       continuePrice: (price: string) => `Weiter — ${price}`,
@@ -579,15 +583,19 @@ export const de: Dictionary = {
     inventory: {
       title: 'Inventar',
       subtitle: 'Was dir gehört und was du trägst',
-      noFramesYet: 'Noch keine Rahmen',
-      noBannersYet: 'Noch keine Banner',
-      emptyBlurbFrames:
-        'Alles, was du im Shop kaufst, landet hier. Die Gratis-Rahmen gehören dir schon.',
-      emptyBlurbBanners:
-        'Alles, was du im Shop kaufst, landet hier. Die Gratis-Banner gehören dir schon.',
+      nothingYet: { FRAME: 'Noch keine Rahmen', BANNER: 'Noch keine Banner', THEME: 'Noch keine Themes' },
+      emptyBlurb: {
+        FRAME: 'Alles aus dem Markt landet hier. Kostenlose Rahmen gehören dir bereits.',
+        BANNER: 'Alles aus dem Markt landet hier. Kostenlose Banner gehören dir bereits.',
+        THEME: 'Alles aus dem Markt landet hier.',
+      },
+      kindLabel: { FRAME: 'Rahmen', BANNER: 'Banner', THEME: 'Kartenthema' },
       goToMarket: 'Zum Shop',
-      takeOffFrame: 'Rahmen ablegen',
-      takeOffBanner: 'Banner ablegen',
+      takeOff: {
+        FRAME: 'Rahmen ablegen',
+        BANNER: 'Banner ablegen',
+        THEME: 'Theme ablegen',
+      },
     },
 
     badges: {
@@ -739,6 +747,27 @@ export const de: Dictionary = {
     passwordHint: 'Meldet dich überall ab',
     blocked: 'Blockiert',
     blockedHint: 'Wen du blockiert hast',
+    promo: 'Aktionscodes',
+    promoHint: 'Einen Code für Münzen oder Gold einlösen',
+    promoScreen: {
+      title: 'Aktionscodes',
+      subtitle: 'Codes für dich erscheinen hier. Du kannst auch einen eingeben.',
+      waiting: 'Wartet auf dich',
+      waitingEmpty: 'Gerade wartet nichts auf dich.',
+      enterTitle: 'Code eingeben',
+      codeLabel: 'Code',
+      codeHint: 'Buchstaben und Zahlen, egal wie geschrieben.',
+      redeem: 'Einlösen',
+      validUntil: (date: string) => `Gültig bis ${date}`,
+      rewardCoins: (n: number) => `${n} Münzen`,
+      rewardGold: (days: number) => `${days} ${days === 1 ? 'Tag' : 'Tage'} Gold`,
+      successCoinsTitle: 'Münzen gutgeschrieben',
+      successCoinsBody: (balance: number) => `Du hast jetzt ${balance} Münzen.`,
+      successGoldTitle: 'Gold gehört dir',
+      successGoldBody: (date: string) => `Gold läuft bis ${date}.`,
+      history: 'Bereits eingelöst',
+      done: 'Fertig',
+    },
     gamesScreen: {
       title: 'Spiele, die du spielst',
       subtitle: (n: number) => `Mindestens ${n}. Änderungen hier ändern, wem du gezeigt wirst.`,
@@ -898,6 +927,13 @@ export const de: Dictionary = {
       '183': 'Beende oder storniere zuerst deine aktuelle Lobby.',
       '185': 'Die Person hat deine Anfrage bereits beantwortet.',
       '187': 'Dieser Benutzername ist nicht erlaubt. Bitte wähle einen anderen.',
+      '190': 'Dieser Code ist ungültig.',
+      '191': 'Dieser Code ist abgelaufen.',
+      '192': 'Dieser Code wurde schon vollständig eingelöst.',
+      '193': 'Du hast diesen Code schon eingelöst.',
+      '194': 'Dieser Code wurde an ein anderes Konto geschickt.',
+      '195': 'Einen Code mit diesem Namen gibt es schon.',
+      '196': 'Dieses Konto kann keinen Code erhalten.',
     },
   },
 

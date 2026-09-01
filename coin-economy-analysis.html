@@ -1,0 +1,463 @@
+<title>Where The Coins Go</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap">
+
+<style>
+  :root {
+    --ground: #f6f6fa;
+    --surface: #ffffff;
+    --surface-2: #efeff5;
+    --line: #e0e0ea;
+    --line-strong: #c9c9d8;
+    --ink: #16161f;
+    --ink-2: #4a4a5c;
+    --ink-3: #74748a;
+    --brand: #e03a55;
+    --brand-soft: rgba(224, 58, 85, 0.10);
+    --violet: #6d3af0;
+    --violet-soft: rgba(109, 58, 240, 0.10);
+    --gold: #9a6b00;
+    --gold-soft: rgba(255, 197, 61, 0.18);
+    --green: #0f8f5b;
+    --green-soft: rgba(41, 232, 143, 0.16);
+    --shadow: 0 1px 2px rgba(20, 20, 40, 0.05), 0 8px 24px rgba(20, 20, 40, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0b0b12;
+      --surface: #14141f;
+      --surface-2: #1b1b28;
+      --line: #26263a;
+      --line-strong: #3a3a52;
+      --ink: #f2f2f7;
+      --ink-2: #b6b6c8;
+      --ink-3: #85859c;
+      --brand: #ff4d67;
+      --brand-soft: rgba(255, 77, 103, 0.14);
+      --violet: #8f66ff;
+      --violet-soft: rgba(143, 102, 255, 0.16);
+      --gold: #ffc53d;
+      --gold-soft: rgba(255, 197, 61, 0.14);
+      --green: #29e88f;
+      --green-soft: rgba(41, 232, 143, 0.14);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0b0b12;
+    --surface: #14141f;
+    --surface-2: #1b1b28;
+    --line: #26263a;
+    --line-strong: #3a3a52;
+    --ink: #f2f2f7;
+    --ink-2: #b6b6c8;
+    --ink-3: #85859c;
+    --brand: #ff4d67;
+    --brand-soft: rgba(255, 77, 103, 0.14);
+    --violet: #8f66ff;
+    --violet-soft: rgba(143, 102, 255, 0.16);
+    --gold: #ffc53d;
+    --gold-soft: rgba(255, 197, 61, 0.14);
+    --green: #29e88f;
+    --green-soft: rgba(41, 232, 143, 0.14);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 2.5rem) 5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  .prose { max-width: 40rem; }
+
+  h1, h2, h3, .eyebrow, .chip, th, .rank, .stat-n {
+    font-family: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  .eyebrow {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--brand);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5.5vw, 3rem);
+    font-weight: 700;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0.5rem 0 0;
+  }
+
+  .standfirst {
+    margin: 1rem 0 0;
+    font-size: 1.075rem;
+    color: var(--ink-2);
+    max-width: 38rem;
+  }
+
+  .meta {
+    margin: 1.75rem 0 0;
+    padding-top: 1.1rem;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 2rem;
+    font-size: 0.82rem;
+    color: var(--ink-3);
+  }
+  .meta b { font-weight: 500; color: var(--ink-2); }
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  h2 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    text-wrap: balance;
+    margin: 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--brand);
+    align-self: flex-start;
+  }
+
+  h3 {
+    font-size: 1.075rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    text-wrap: balance;
+  }
+
+  p { margin: 0 0 0.9rem; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; color: var(--ink); }
+
+  code {
+    font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0.08em 0.34em;
+    word-break: break-word;
+  }
+
+  .scroller { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    min-width: 34rem;
+  }
+  thead th {
+    text-align: left;
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 0.85rem 1rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  td { padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  td b, td strong { color: var(--ink); font-weight: 500; }
+  .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rank { color: var(--brand); font-weight: 700; font-variant-numeric: tabular-nums; width: 2.5rem; }
+
+  .chip {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .s { color: var(--green); background: var(--green-soft); border-color: var(--green-soft); }
+  .m { color: var(--violet); background: var(--violet-soft); border-color: var(--violet-soft); }
+  .l { color: var(--brand); background: var(--brand-soft); border-color: var(--brand-soft); }
+
+  .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.25rem 1.35rem;
+    box-shadow: var(--shadow);
+  }
+  .card .head { display: flex; align-items: baseline; gap: 0.7rem; margin-bottom: 0.55rem; }
+  .card .n {
+    font-family: "Chakra Petch", sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--brand);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .card h3 { margin: 0; flex: 1; }
+  .card p { font-size: 0.9rem; color: var(--ink-2); }
+
+  .note {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 10px 10px 0;
+    padding: 1rem 1.25rem;
+    font-size: 0.92rem;
+    color: var(--ink-2);
+  }
+  .note b { color: var(--ink); font-weight: 600; }
+
+  ul, ol { margin: 0; padding-left: 1.15rem; color: var(--ink-2); display: flex; flex-direction: column; gap: 0.55rem; }
+  li::marker { color: var(--ink-3); }
+  ol li::marker { font-family: "Chakra Petch", sans-serif; font-weight: 600; color: var(--brand); }
+
+  .sources { font-size: 0.82rem; color: var(--ink-3); }
+  .sources li { line-height: 1.5; }
+
+  footer {
+    border-top: 1px solid var(--line);
+    padding-top: 1.25rem;
+    font-size: 0.8rem;
+    color: var(--ink-3);
+  }
+
+  a { color: var(--brand); }
+  a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; border-radius: 3px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card { transition: border-color 140ms ease; }
+    .card:hover { border-color: var(--line-strong); }
+  }
+</style>
+<style>
+  .kpi { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr)); }
+  .kpi .box { background:var(--surface); border:1px solid var(--line); border-radius:12px;
+              padding:1rem 1.1rem; box-shadow:var(--shadow); }
+  .kpi .n { font-family:"Chakra Petch",sans-serif; font-size:1.85rem; font-weight:700;
+            line-height:1; font-variant-numeric:tabular-nums; }
+  .kpi .k { font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3);
+            margin-top:.45rem; font-family:"Chakra Petch",sans-serif; }
+  .bad { color:var(--brand); } .good { color:var(--green); } .neutral { color:var(--violet); }
+  .bar { height:.6rem; border-radius:999px; background:var(--surface-2); overflow:hidden; display:flex; }
+  .bar span { display:block; height:100%; }
+  .legend { display:flex; gap:1.1rem; flex-wrap:wrap; font-size:.78rem; color:var(--ink-3); margin-top:.55rem; }
+  .legend i { display:inline-block; width:.7rem; height:.7rem; border-radius:3px; margin-right:.35rem; vertical-align:-1px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">GameBuddy &middot; Economy</p>
+    <h1>Where the coins go</h1>
+    <p class="standfirst">
+      An engaged free player was earning about 950 coins a week against a documented target of
+      250&ndash;400, and rewarded adverts were paying out four to eight times what they earned.
+      Here is the audit, what changed, and what is still open.
+    </p>
+    <div class="meta">
+      <span><b>31 August 2026</b></span>
+      <span>Companion to <b>monetization-analysis.md</b></span>
+      <span>Changes are <b>shipped</b>, not proposed</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>The headline</h2>
+    <div class="kpi">
+      <div class="box"><div class="n bad">950</div><div class="k">Coins / week, before</div></div>
+      <div class="box"><div class="n good">530</div><div class="k">Ceiling, after</div></div>
+      <div class="box"><div class="n neutral">320</div><div class="k">Typical, after</div></div>
+      <div class="box"><div class="n">250&ndash;400</div><div class="k">The stated target</div></div>
+    </div>
+    <div class="prose">
+      <p>
+        Coins are what the shop is priced in, so how easily they arrive decides whether anybody
+        ever buys a pack. Three faults compounded, and all three were invisible: every rate was
+        a hardcoded Java constant, and the admin dashboard reported only two aggregate sums, so
+        nothing could say which faucet the coins had come from.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What was shipped, and the three faults</h2>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Faucet</th><th>Shipped</th><th>Spec</th><th class="num">Per week</th></tr></thead>
+        <tbody>
+          <tr><td><b>Rewarded video</b></td><td><b>20 coins &times; 5/day</b></td><td>15 &times; 3/day</td><td class="num"><b>700</b></td></tr>
+          <tr><td>Daily streak</td><td>5&rarr;25, then <b>flat 25 forever</b></td><td>escalating</td><td class="num">175</td></tr>
+          <tr><td>Weekly quests</td><td>3 &times; 25</td><td>~75</td><td class="num">75</td></tr>
+          <tr><td>Gold stipend</td><td>600 / 30 days</td><td>600/mo</td><td class="num">&asymp;140</td></tr>
+          <tr><td>Badges</td><td>775 total, once</td><td>&mdash;</td><td class="num">one-off</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <ol>
+        <li><b>The advert faucet shipped at more than twice its spec.</b> 20 &times; 5 where the
+        plan said 15 &times; 3 &mdash; <b>+385 coins a week</b> on its own, and enough to miss
+        the target by itself.</li>
+        <li><b>The streak stopped rewarding streaks.</b> The ladder clamped at its last rung, so
+        day 8, day 80 and day 800 all paid 25: an unconditional payment for opening the app.</li>
+        <li><b>&ldquo;Daily&rdquo; did not mean daily.</b> A 24-hour cooldown with a 48-hour
+        grace let an unbroken run survive on about <b>3.5 claims a week</b> &mdash; half the
+        days, the full ladder.</li>
+      </ol>
+    </div>
+
+    <div class="note">
+      <p><b>What it cost in real money.</b> A rewarded impression clears roughly
+      $0.010&ndash;0.020, so five views a day earn <b>$0.05&ndash;0.10</b> &mdash; and paid out
+      100 coins, which at the $1.99 / 500 pack is <b>$0.40 of pack value</b>.</p>
+      <p style="margin-bottom:0">The app was giving away four to eight times what the advert
+      brought in, and a free user matched the smallest coin pack every five days. There is no
+      version of that where somebody buys coins.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What changed</h2>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Lever</th><th>Was</th><th>Now</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><b>Rewarded advert</b></td><td class="num">20 &times; 5/day</td><td class="num"><b>15 &times; 3/day</b></td><td>Back to spec. Adverts stay the largest faucet &mdash; they are the activity we want &mdash; but at roughly break-even instead of a 4&ndash;8&times; giveaway.</td></tr>
+          <tr><td><b>Daily ladder</b></td><td>5,10,15,20,25,25,25 &mdash; plateau</td><td><b>5,10,15,20,25,30,35 &mdash; cycling</b></td><td>Day 8 starts the week again, so the best days exist only at the end of an unbroken run. A modulo where there was a clamp; no schema change.</td></tr>
+          <tr><td><b>Streak grace</b></td><td class="num">48h</td><td class="num"><b>36h</b></td><td>Still absorbs twelve hours of drift, so claiming later each day costs nothing. No longer survives on half the days.</td></tr>
+          <tr><td>Weekly quests</td><td colspan="2">unchanged</td><td>They pay for the three behaviours the product wants. Not a leak.</td></tr>
+          <tr><td>Gold stipend</td><td colspan="2">unchanged</td><td>A paid perk, not free-player income.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Before and after</h2>
+    <div class="scroller">
+      <table>
+        <thead><tr><th>Source</th><th class="num">Before</th><th class="num">After</th></tr></thead>
+        <tbody>
+          <tr><td>Daily streak (max)</td><td class="num">175</td><td class="num">140</td></tr>
+          <tr><td>Weekly quests</td><td class="num">75</td><td class="num">75</td></tr>
+          <tr><td><b>Passive subtotal</b></td><td class="num"><b>250</b></td><td class="num"><b>215</b></td></tr>
+          <tr><td>Rewarded adverts (max)</td><td class="num">700</td><td class="num">315</td></tr>
+          <tr><td><b>Ceiling</b></td><td class="num"><b>950</b></td><td class="num"><b>530</b></td></tr>
+          <tr><td>Typical &mdash; claims + ~1 advert/day</td><td class="num">&mdash;</td><td class="num"><b>320</b></td></tr>
+          <tr><td>Adverts as a share of the ceiling</td><td class="num">74%</td><td class="num">59%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <p><b>Where a full week of coins comes from, after:</b></p>
+      <div class="bar">
+        <span style="width:26.4%;background:var(--violet)"></span>
+        <span style="width:14.2%;background:var(--gold)"></span>
+        <span style="width:59.4%;background:var(--brand)"></span>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--violet)"></i>Daily streak 140</span>
+        <span><i style="background:var(--gold)"></i>Quests 75</span>
+        <span><i style="background:var(--brand)"></i>Adverts 315</span>
+      </div>
+      <p style="margin-top:1rem">
+        <strong>320 a week is the number to hold on to.</strong> It sits inside the band, and it
+        is only reachable by turning up <em>and</em> watching an advert &mdash; passive income
+        alone caps at 215. The full 530 needs every claim and all three adverts every day, which
+        should feel like effort rather than the default. It is asserted in
+        <code>CoinFaucetTest</code>, so it cannot drift again quietly.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>And the rates are deployable now</h2>
+    <div class="prose">
+      <p>
+        They moved out of Java constants into <code>CoinEconomyProperties</code>, bound from
+        <code>gamebuddy.coins.*</code> with <code>COINS_*</code> environment overrides. Retuning
+        is a deploy, not a release, and the defaults are exactly what this build was tested with
+        &mdash; an environment that sets nothing behaves as verified.
+      </p>
+      <p>
+        The client stopped keeping its own copies too: <code>GET /coins/earn</code> now returns
+        the ladder and the advert amount, and the streak strip renders from those. That mattered
+        &mdash; it was half the reason the numbers were never retuned, because changing them
+        needed an app release to stop the UI lying about them.
+      </p>
+      <p>
+        And the ledger is finally readable: analytics now group coin movement <b>by reason</b>,
+        so the advert share of issuance is a number on the dashboard rather than something you
+        have to go looking for. In a month it should have fallen from roughly three quarters
+        toward a half.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Still open</h2>
+    <div class="prose">
+      <ul>
+        <li><b>Multi-accounting.</b> The advert cap is per account and nothing bounds the number
+        of accounts. The verification itself is sound &mdash; real server-side verification, and
+        the transaction id is claimed before any coins move, so a replayed callback pays
+        nothing.</li>
+        <li><b>No rate limit on the earn endpoints.</b> <code>/coins/earn/**</code> and
+        <code>/ads/reward</code> sit outside the rate-limit namespace. Not exploitable today
+        &mdash; every claim is idempotent against its own state &mdash; but recommend 30/min and
+        30/day per account.</li>
+        <li><b>The advert user id is not bound to the session.</b> Signed by Google in transit,
+        so it cannot be tampered with, but nothing ties it to who was logged in. A gifting
+        vector rather than a minting one, and it consumes the victim&rsquo;s cap.</li>
+        <li><b>Doc drift.</b> <code>monetization-analysis.md</code> &sect;1.3 still says 975
+        coins from 13 badges and a 9,400-coin catalogue; it is 775 from 10 and 18,450 across
+        34 items.</li>
+        <li><b>The sinks are still finite.</b> Retuning income buys time; it does not give a
+        long-term player somewhere to spend. That is what limited-time drops are for.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <p style="margin:0 0 .6rem"><b style="color:var(--ink-2);font-weight:500">Sources</b></p>
+    <ul class="sources" style="padding-left:1rem">
+      <li>Rewarded video eCPM benchmarks 2026 &mdash; Business of Apps, MonetizeMore, AdReact, Playwire</li>
+      <li>Free-to-play faucet and sink design &mdash; Machinations.io game-economy guidance</li>
+      <li>Internal &mdash; CoinFaucet, Badge, Consumable, Product, AnalyticsRepository, and monetization-analysis.md &sect;1.3 and &sect;3.4</li>
+    </ul>
+  </footer>
+
+</div>

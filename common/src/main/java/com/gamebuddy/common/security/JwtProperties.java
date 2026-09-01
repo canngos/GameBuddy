@@ -20,8 +20,7 @@ import org.springframework.validation.annotation.Validated;
  */
 @Validated
 @ConfigurationProperties(prefix = "gamebuddy.jwt")
-public record JwtProperties(
-        @NotBlank String secret, Duration expiration, Duration maxSessionAge, String issuer) {
+public record JwtProperties(@NotBlank String secret, Duration expiration, Duration maxSessionAge, String issuer) {
 
     public JwtProperties {
         // Previously 30 days. Shortened to 7; override via gamebuddy.jwt.expiration.

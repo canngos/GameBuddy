@@ -50,4 +50,15 @@ public class EarnResponseBody implements BaseModel {
      * gamer has no way to learn it exists again.
      */
     private int adsLeftToday;
+
+    /**
+     * The streak cycle, so the strip draws what the server actually pays.
+     *
+     * <p>The app keeps a copy only as a render fallback for a response that predates this
+     * field; the server is the authority.
+     */
+    private java.util.List<Integer> dailyLadder;
+
+    /** What one finished advert pays. */
+    private int adCoins;
 }

@@ -250,7 +250,7 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
               ? t.market.earn.videosLeft(state.adsLeftToday)
               : t.market.earn.videosDone
           }
-          reward={REWARDED_AD_COINS}
+          reward={(state?.adCoins ?? REWARDED_AD_COINS)}
           ready={state.adsLeftToday > 0}
           busy={busy}
           onPress={() => void watchAd()}

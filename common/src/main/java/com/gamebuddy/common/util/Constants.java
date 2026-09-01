@@ -68,6 +68,31 @@ public final class Constants {
             "If it was not, somebody else can reach this mailbox. Reset the password again straight away, then "
                     + "secure your email account.";
 
+    /**
+     * A promotion code an administrator addressed to this account.
+     *
+     * <p>The reward leads the subject, where a verification mail leads with the code. Both
+     * choices are about what the notification alone should be worth reading: for a code you
+     * are already waiting for, the digits are; for a gift you did not ask for, "500 coins"
+     * is, and the code means nothing until the message is open.
+     *
+     * <p>It says the code is already waiting in the app because it is — the assignment is
+     * what makes it redeemable, and somebody who never opens the email loses nothing.
+     */
+    public static final String EMAIL_SUBJECT_PROMO_CODE = "%s for you on GameBuddy";
+
+    public static final String EMAIL_PREHEADER_PROMO_CODE = "A code is waiting in your account.";
+    public static final String EMAIL_HEADING_PROMO_CODE = "A gift for you";
+
+    public static final String EMAIL_INTRO_PROMO_CODE =
+            "We have put %s on your GameBuddy account. Open Settings, then Promotion codes, and tap Redeem — "
+                    + "or enter the code below yourself.";
+
+    public static final String EMAIL_CODE_CAPTION_PROMO_CODE = "Valid until %s.";
+
+    public static final String EMAIL_FOOTNOTE_PROMO_CODE =
+            "The code works only on the account this was sent to, and only once.";
+
     // --- Push notification copy ---------------------------------------------
     public static final String FRIEND_REQUEST_TITLE = "New friend request!";
     public static final String FRIEND_REQUEST_BODY = "%s sent you a friend request.";

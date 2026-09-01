@@ -104,13 +104,21 @@ public interface GamerCosmeticRepository extends JpaRepository<GamerCosmetic, Ga
                             WHEN g.equipped_banner_id IS NOT NULL AND NOT EXISTS (
                                 SELECT 1 FROM gamer_cosmetic gc
                                 WHERE gc.user_id = g.user_id AND gc.cosmetic_id = g.equipped_banner_id)
-                            THEN NULL ELSE g.equipped_banner_id END
+                            THEN NULL ELSE g.equipped_banner_id END,
+                        equipped_theme_id = CASE
+                            WHEN g.equipped_theme_id IS NOT NULL AND NOT EXISTS (
+                                SELECT 1 FROM gamer_cosmetic gc
+                                WHERE gc.user_id = g.user_id AND gc.cosmetic_id = g.equipped_theme_id)
+                            THEN NULL ELSE g.equipped_theme_id END
                     WHERE (g.equipped_frame_id IS NOT NULL AND NOT EXISTS (
                                SELECT 1 FROM gamer_cosmetic gc
                                WHERE gc.user_id = g.user_id AND gc.cosmetic_id = g.equipped_frame_id))
                        OR (g.equipped_banner_id IS NOT NULL AND NOT EXISTS (
                                SELECT 1 FROM gamer_cosmetic gc
                                WHERE gc.user_id = g.user_id AND gc.cosmetic_id = g.equipped_banner_id))
+                       OR (g.equipped_theme_id IS NOT NULL AND NOT EXISTS (
+                               SELECT 1 FROM gamer_cosmetic gc
+                               WHERE gc.user_id = g.user_id AND gc.cosmetic_id = g.equipped_theme_id))
                     """, nativeQuery = true)
     int unequipUnownedCosmetics();
 }

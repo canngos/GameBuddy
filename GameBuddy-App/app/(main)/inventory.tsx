@@ -5,14 +5,16 @@ import { Shirt } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { cosmeticsApi } from '../../src/api/cosmetics';
-import type { Cosmetic, CosmeticStore } from '../../src/api/types';
+import type { Cosmetic, CosmeticKind, CosmeticStore } from '../../src/api/types';
 import { useT } from '../../src/i18n/useT';
-import { useThemeColors } from '../../src/theme';
+import { useGamerGradient, useThemeColors } from '../../src/theme';
+import { ThemeSwatch } from '../../src/market/ThemeSwatch';
 import {
   BackHeader,
   Card,
   EmptyState,
   ErrorNotice,
+  GradientView,
   Screen,
   Segment,
   SegmentRow,
@@ -46,7 +48,7 @@ export default function Inventory() {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const [kind, setKind] = useState<'FRAME' | 'BANNER'>('FRAME');
+  const [kind, setKind] = useState<CosmeticKind>('FRAME');
 
   const store = useQuery({ queryKey: STORE_KEY, queryFn: cosmeticsApi.store });
 
@@ -82,7 +84,14 @@ export default function Inventory() {
   // Memoised so it is a stable input to the memos below; the `?? []` fallback minted a
   // fresh array every render while the store was still loading.
   const all = useMemo(
-    () => (kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? [])),
+    () => {
+      const shelves: Record<CosmeticKind, Cosmetic[] | undefined> = {
+        FRAME: store.data?.frames,
+        BANNER: store.data?.banners,
+        THEME: store.data?.themes,
+      };
+      return shelves[kind] ?? [];
+    },
     [kind, store.data],
   );
   const owned = useMemo(() => all.filter((item) => item.owned), [all]);
@@ -107,6 +116,11 @@ export default function Inventory() {
           active={kind === 'BANNER'}
           onPress={() => setKind('BANNER')}
         />
+        <Segment
+          label={t.market.shop.themes}
+          active={kind === 'THEME'}
+          onPress={() => setKind('THEME')}
+        />
       </SegmentRow>
 
       <View className="pt-5">
@@ -124,14 +138,8 @@ export default function Inventory() {
         {!store.isPending && !store.error && owned.length === 0 && (
           <EmptyState
             icon={Shirt}
-            title={
-              kind === 'FRAME' ? t.market.inventory.noFramesYet : t.market.inventory.noBannersYet
-            }
-            blurb={
-              kind === 'FRAME'
-                ? t.market.inventory.emptyBlurbFrames
-                : t.market.inventory.emptyBlurbBanners
-            }
+            title={t.market.inventory.nothingYet[kind]}
+            blurb={t.market.inventory.emptyBlurb[kind]}
           >
             <Pressable
               onPress={() => router.push('/market')}
@@ -166,9 +174,7 @@ export default function Inventory() {
                 className="items-center rounded-card py-3 active:opacity-70"
               >
                 <Text variant="label" className="text-muted">
-                  {kind === 'FRAME'
-                    ? t.market.inventory.takeOffFrame
-                    : t.market.inventory.takeOffBanner}
+                  {t.market.inventory.takeOff[kind]}
                 </Text>
               </Pressable>
             )}
@@ -197,6 +203,8 @@ const Row = memo(function Row({
 }) {
   const t = useT();
   const isBanner = item.kind === 'BANNER';
+  const isTheme = item.kind === 'THEME';
+  const themeStops = useGamerGradient(item.id, item.theme);
   const equipThis = useCallback(() => onEquip(item.id), [onEquip, item.id]);
 
   return (
@@ -206,13 +214,18 @@ const Row = memo(function Row({
             a picture with a hole punched in it. */}
         <View
           className={
-            isBanner
-              ? 'h-16 w-24 overflow-hidden rounded-xl bg-raised'
-              : 'h-16 w-16 items-center justify-center rounded-full bg-raised'
+            isTheme
+              ? ''
+              : isBanner
+                ? 'h-16 w-24 overflow-hidden rounded-xl bg-raised'
+                : 'h-16 w-16 items-center justify-center rounded-full bg-raised'
           }
         >
+          {isTheme ? (
+            <ThemeSwatch stops={themeStops} />
+          ) : (
           <Image
-            source={{ uri: item.image }}
+            source={{ uri: item.image ?? undefined }}
             style={FILL}
             contentFit={isBanner ? 'cover' : 'contain'}
             autoplay
@@ -222,6 +235,7 @@ const Row = memo(function Row({
             cachePolicy="memory-disk"
             recyclingKey={item.id}
           />
+          )}
         </View>
 
         <View className="min-w-0 flex-1 gap-0.5">
@@ -232,11 +246,7 @@ const Row = memo(function Row({
               already owned. A membership item stops being yours when the membership does,
               and that is worth knowing before you get attached to it. */}
           <Text variant="caption" numberOfLines={1} className={item.membershipOnly ? 'text-gold' : ''}>
-            {item.membershipOnly
-              ? t.market.gold.withGold
-              : isBanner
-                ? t.market.gold.banner
-                : t.market.gold.frame}
+            {item.membershipOnly ? t.market.gold.withGold : t.market.inventory.kindLabel[item.kind]}
           </Text>
         </View>
 

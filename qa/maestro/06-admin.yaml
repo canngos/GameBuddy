@@ -17,6 +17,11 @@ name: 06 admin
     visible: "I already have one"
     timeout: 60000
 - tapOn: "I already have one"
+
+# This flow signs in inline rather than through `_login.yaml`, so it needs the consent
+# form answered here too. See `_consent.yaml`.
+- runFlow: _consent.yaml
+
 - assertVisible: "Welcome back"
 
 - tapOn:
@@ -65,7 +70,7 @@ name: 06 admin
 - assertVisible: "Messages"
 - takeScreenshot: artifacts/06-02-console-stats
 
-# The admin tab bar: Overview, Reports, Avatars, Accounts, Settings.
+# The admin tab bar: Overview, Reports, Avatars, Accounts, Codes, Settings.
 - tapOn: "Reports"
 - extendedWaitUntil:
     visible: "Moderation"
@@ -93,6 +98,57 @@ name: 06 admin
     timeout: 3000
 - takeScreenshot: artifacts/06-05-accounts
 
+# Promotion codes. The list and the form, not a live code: creating one from here would
+# leave a redeemable coupon behind on whatever instance the flow ran against, and every
+# rule about what a code does is asserted in qa/functional/13-promo-codes.test.js. What
+# this covers is the half that suite cannot — that the tab mounts, that the form draws,
+# and that its fields are reachable on a real phone with a real keyboard.
+- tapOn: "Codes"
+- extendedWaitUntil:
+    visible: "Promotion codes"
+    timeout: 20000
+- takeScreenshot: artifacts/06-06-promo-codes
+
+- tapOn: "New code"
+- extendedWaitUntil:
+    visible: "New promotion code"
+    timeout: 20000
+
+# Both halves of the reward switch, because which field is on screen depends on it.
+- assertVisible: "Coins"
+- tapOn: "Gold"
+- assertVisible: "Days of Gold"
+- tapOn: "Coins"
+
+- tapOn:
+    id: "field-coins"
+- inputText: "500"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# The recipient picker, which is the one screen in the console that names individual
+# gamers. Reached rather than used: selecting somebody here would put a real account on a
+# draft, and Cancel is the way back out.
+- assertVisible: "Choose people"
+- takeScreenshot: artifacts/06-07-promo-new
+
+- tapOn: "Choose people"
+- extendedWaitUntil:
+    visible: "Choose people"
+    timeout: 20000
+- assertVisible: "Away 14d"
+- assertVisible: "Reporters"
+- takeScreenshot: artifacts/06-08-promo-picker
+- tapOn: "Done"
+
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    visible: "Promotion codes"
+    timeout: 20000
+
 # --- and now the half that matters ------------------------------------------------------
 # Sign out and back in as an ordinary member. The console must not be reachable.
 - runFlow: _login.yaml
@@ -100,7 +156,7 @@ name: 06 admin
 - assertVisible: "DISCOVER"
 - assertNotVisible: "Console"
 - assertNotVisible: "Avatars to review"
-- takeScreenshot: artifacts/06-06-member-no-console
+- takeScreenshot: artifacts/06-09-member-no-console
 
 # The admin route by direct navigation, which is what someone would actually try. The app
 # must send them back rather than render it.
@@ -113,4 +169,4 @@ name: 06 admin
     notVisible: "Avatars to review"
     timeout: 15000
 - assertNotVisible: "Open reports"
-- takeScreenshot: artifacts/06-07-deeplink-refused
+- takeScreenshot: artifacts/06-10-deeplink-refused

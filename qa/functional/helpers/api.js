@@ -49,6 +49,13 @@ const CODE = {
   LOBBY_REQUEST_NOT_FOUND: '184',
   LOBBY_REJECTED: '185',
   USERNAME_NOT_ALLOWED: '187',
+  PROMO_CODE_INVALID: '190',
+  PROMO_CODE_EXPIRED: '191',
+  PROMO_CODE_EXHAUSTED: '192',
+  PROMO_CODE_ALREADY_REDEEMED: '193',
+  PROMO_CODE_NOT_YOURS: '194',
+  PROMO_CODE_EXISTS: '195',
+  PROMO_USER_NOT_FOUND: '196',
 };
 
 /** Controller base paths, so a test never hard-codes a prefix that moved. */

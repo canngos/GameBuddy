@@ -445,6 +445,17 @@ export const fi: Dictionary = {
       free: 'Ilmainen',
       coinsPrice: (n: number) => `${n} kolikkoa`,
       animatedSuffix: ', animoitu',
+      previewOn: { FRAME: 'Avatarissasi', BANNER: 'Profiilissasi', THEME: 'Kortissasi' },
+      themes: 'Teemat',
+      bundles: 'Setit',
+      bundlesBlurb: 'Yhteensopiva setti, halvempi kuin osat erikseen.',
+      bundleParts: (n: number) => `${n} kolikkoa erikseen`,
+      bundleSaving: (n: number) => `Säästä ${n}`,
+      bundleTogether: 'Yhdessä puettuna',
+      bundleOwned: 'Tämä setti on jo sinun',
+      bundleA11y: (name: string, price: number, saving: number) =>
+        `Setti ${name}, ${price} kolikkoa, säästät ${saving}`,
+      previewA11y: (name: string) => `Esikatsele ${name}`,
       ownedA11y: (name: string) => `${name}, omistat. Pue se Varastostasi.`,
       buyA11y: (name: string, price: number) => `Osta ${name}, ${price} kolikkoa`,
       cantAffordA11y: (name: string, price: number) =>
@@ -526,13 +537,6 @@ export const fi: Dictionary = {
       onTheWayBody: 'Niiden saapuminen voi kestää hetken. Uutta ostoa ei tarvita.',
     },
 
-    season: {
-      header: 'Kausipassi',
-      coming: 'Tulossa pian',
-      blurb: 'Uusia palkintoja joka kausi.',
-      a11y: 'Kausipassi. Tulossa pian — uusia palkintoja joka kausi.',
-    },
-
     gold: {
       done: 'Valmis',
       continuePrice: (price: string) => `Jatka — ${price}`,
@@ -578,15 +582,19 @@ export const fi: Dictionary = {
     inventory: {
       title: 'Varasto',
       subtitle: 'Mitä omistat ja mitä sinulla on päällä',
-      noFramesYet: 'Ei vielä kehyksiä',
-      noBannersYet: 'Ei vielä bannereita',
-      emptyBlurbFrames:
-        'Kaikki Kaupasta ostamasi päätyy tänne. Ilmaiset kehykset ovat jo sinun.',
-      emptyBlurbBanners:
-        'Kaikki Kaupasta ostamasi päätyy tänne. Ilmaiset bannerit ovat jo sinun.',
+      nothingYet: { FRAME: 'Ei vielä kehyksiä', BANNER: 'Ei vielä bannereita', THEME: 'Ei vielä teemoja' },
+      emptyBlurb: {
+        FRAME: 'Kaikki Kaupasta ostamasi päätyy tänne. Ilmaiset kehykset ovat jo sinun.',
+        BANNER: 'Kaikki Kaupasta ostamasi päätyy tänne. Ilmaiset bannerit ovat jo sinun.',
+        THEME: 'Kaikki Kaupasta ostamasi päätyy tänne.',
+      },
+      kindLabel: { FRAME: 'Kehys', BANNER: 'Banneri', THEME: 'Korttiteema' },
       goToMarket: 'Siirry Kauppaan',
-      takeOffFrame: 'Riisu kehykseni',
-      takeOffBanner: 'Riisu bannerini',
+      takeOff: {
+        FRAME: 'Riisu kehys',
+        BANNER: 'Riisu banneri',
+        THEME: 'Riisu teema',
+      },
     },
 
     badges: {
@@ -737,6 +745,27 @@ export const fi: Dictionary = {
     passwordHint: 'Kirjaa sinut ulos kaikkialta',
     blocked: 'Estetyt',
     blockedHint: 'Ketkä olet estänyt',
+    promo: 'Kampanjakoodit',
+    promoHint: 'Lunasta koodi kolikoiksi tai Goldiksi',
+    promoScreen: {
+      title: 'Kampanjakoodit',
+      subtitle: 'Sinulle lähetetyt koodit näkyvät tässä. Voit myös kirjoittaa koodin.',
+      waiting: 'Odottaa sinua',
+      waitingEmpty: 'Juuri nyt ei odota mitään.',
+      enterTitle: 'Kirjoita koodi',
+      codeLabel: 'Koodi',
+      codeHint: 'Kirjaimia ja numeroita, miten tahansa kirjoitettuna.',
+      redeem: 'Lunasta',
+      validUntil: (date: string) => `Voimassa ${date} asti`,
+      rewardCoins: (n: number) => `${n} kolikkoa`,
+      rewardGold: (days: number) => `${days} ${days === 1 ? 'päivä' : 'päivää'} Goldia`,
+      successCoinsTitle: 'Kolikot lisätty',
+      successCoinsBody: (balance: number) => `Sinulla on nyt ${balance} kolikkoa.`,
+      successGoldTitle: 'Gold on sinun',
+      successGoldBody: (date: string) => `Gold on voimassa ${date} asti.`,
+      history: 'Jo käytetyt',
+      done: 'Valmis',
+    },
     gamesScreen: {
       title: 'Pelaamasi pelit',
       subtitle: (n: number) =>
@@ -897,6 +926,13 @@ export const fi: Dictionary = {
       '183': 'Päätä tai peruuta nykyinen aulasi ensin.',
       '185': 'Omistaja on jo vastannut pyyntöösi.',
       '187': 'Tämä käyttäjänimi ei käy. Valitse toinen nimi.',
+      '190': 'Koodi ei kelpaa.',
+      '191': 'Koodi on vanhentunut.',
+      '192': 'Koodi on jo käytetty loppuun.',
+      '193': 'Olet jo käyttänyt tämän koodin.',
+      '194': 'Koodi lähetettiin toiselle tilille.',
+      '195': 'Samanniminen koodi on jo olemassa.',
+      '196': 'Tämä tili ei voi vastaanottaa koodia.',
     },
   },
 

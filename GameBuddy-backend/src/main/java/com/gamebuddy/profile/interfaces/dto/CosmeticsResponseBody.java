@@ -25,6 +25,17 @@ public class CosmeticsResponseBody implements BaseModel {
     private List<CosmeticDto> frames;
     private List<CosmeticDto> banners;
 
+    /**
+     * Card themes: colour, not artwork.
+     *
+     * <p>Each carries a slug in place of an image — see
+     * {@link com.gamebuddy.shared.entity.CosmeticKind#THEME}.
+     */
+    private List<CosmeticDto> themes;
+
+    /** Sets sold at a discount. Their parts also appear in the lists above. */
+    private List<BundleDto> bundles;
+
     /** The gamer's balance after whatever this call did. */
     private int coins;
 }

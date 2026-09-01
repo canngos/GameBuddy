@@ -442,6 +442,17 @@ export const es: Dictionary = {
       free: 'Gratis',
       coinsPrice: (n: number) => `${n} monedas`,
       animatedSuffix: ', animado',
+      previewOn: { FRAME: 'En tu avatar', BANNER: 'En tu perfil', THEME: 'En tu tarjeta' },
+      themes: 'Temas',
+      bundles: 'Packs',
+      bundlesBlurb: 'Un conjunto a juego, más barato que por separado.',
+      bundleParts: (n: number) => `${n} monedas por separado`,
+      bundleSaving: (n: number) => `Ahorra ${n}`,
+      bundleTogether: 'Puestos juntos',
+      bundleOwned: 'Ya tienes este pack',
+      bundleA11y: (name: string, price: number, saving: number) =>
+        `Pack ${name}, ${price} monedas, ahorras ${saving}`,
+      previewA11y: (name: string) => `Ver ${name}`,
       ownedA11y: (name: string) => `${name}, tuyo. Equípalo desde tu Inventario.`,
       buyA11y: (name: string, price: number) => `Comprar ${name}, ${price} monedas`,
       cantAffordA11y: (name: string, price: number) =>
@@ -523,13 +534,6 @@ export const es: Dictionary = {
       onTheWayBody: 'Pueden tardar un momento. No hace falta volver a comprar.',
     },
 
-    season: {
-      header: 'Pase de temporada',
-      coming: 'Muy pronto',
-      blurb: 'Nuevas recompensas cada temporada.',
-      a11y: 'Pase de temporada. Muy pronto — nuevas recompensas cada temporada.',
-    },
-
     gold: {
       done: 'Listo',
       continuePrice: (price: string) => `Continuar — ${price}`,
@@ -575,15 +579,19 @@ export const es: Dictionary = {
     inventory: {
       title: 'Inventario',
       subtitle: 'Lo que tienes y lo que llevas puesto',
-      noFramesYet: 'Aún no hay marcos',
-      noBannersYet: 'Aún no hay banners',
-      emptyBlurbFrames:
-        'Todo lo que compres en la Tienda llega aquí. Los marcos gratis ya son tuyos.',
-      emptyBlurbBanners:
-        'Todo lo que compres en la Tienda llega aquí. Los banners gratis ya son tuyos.',
+      nothingYet: { FRAME: 'Aún no hay marcos', BANNER: 'Aún no hay banners', THEME: 'Aún no hay temas' },
+      emptyBlurb: {
+        FRAME: 'Todo lo que compres en el Mercado aparece aquí. Los marcos gratuitos ya son tuyos.',
+        BANNER: 'Todo lo que compres en el Mercado aparece aquí. Los banners gratuitos ya son tuyos.',
+        THEME: 'Todo lo que compres en el Mercado aparece aquí.',
+      },
+      kindLabel: { FRAME: 'Marco', BANNER: 'Banner', THEME: 'Tema de tarjeta' },
       goToMarket: 'Ir a la Tienda',
-      takeOffFrame: 'Quitarme el marco',
-      takeOffBanner: 'Quitarme el banner',
+      takeOff: {
+        FRAME: 'Quitar mi marco',
+        BANNER: 'Quitar mi banner',
+        THEME: 'Quitar mi tema',
+      },
     },
 
     badges: {
@@ -734,6 +742,27 @@ export const es: Dictionary = {
     passwordHint: 'Cierra tu sesión en todas partes',
     blocked: 'Bloqueados',
     blockedHint: 'A quién has bloqueado',
+    promo: 'Códigos promocionales',
+    promoHint: 'Canjea un código por monedas o Gold',
+    promoScreen: {
+      title: 'Códigos promocionales',
+      subtitle: 'Los códigos que te envían aparecen aquí. También puedes escribir uno.',
+      waiting: 'Te está esperando',
+      waitingEmpty: 'Ahora mismo no te espera nada.',
+      enterTitle: 'Escribe un código',
+      codeLabel: 'Código',
+      codeHint: 'Letras y números, como esté escrito.',
+      redeem: 'Canjear',
+      validUntil: (date: string) => `Válido hasta el ${date}`,
+      rewardCoins: (n: number) => `${n} monedas`,
+      rewardGold: (days: number) => `${days} ${days === 1 ? 'día' : 'días'} de Gold`,
+      successCoinsTitle: 'Monedas añadidas',
+      successCoinsBody: (balance: number) => `Ahora tienes ${balance} monedas.`,
+      successGoldTitle: 'Gold es tuyo',
+      successGoldBody: (date: string) => `Gold dura hasta el ${date}.`,
+      history: 'Ya usados',
+      done: 'Listo',
+    },
     gamesScreen: {
       title: 'Juegos a los que juegas',
       subtitle: (n: number) => `Al menos ${n}. Cambiarlos cambia a quién se te muestra.`,
@@ -893,6 +922,13 @@ export const es: Dictionary = {
       '183': 'Termina o cancela tu lobby actual primero.',
       '185': 'El propietario ya respondió a tu solicitud.',
       '187': 'Ese nombre de usuario no está permitido. Elige otro.',
+      '190': 'Ese código no es válido.',
+      '191': 'Ese código ha caducado.',
+      '192': 'Ese código ya se ha usado por completo.',
+      '193': 'Ya has usado este código.',
+      '194': 'Ese código se envió a otra cuenta.',
+      '195': 'Ya existe un código con ese nombre.',
+      '196': 'Esa cuenta no puede recibir un código.',
     },
   },
 

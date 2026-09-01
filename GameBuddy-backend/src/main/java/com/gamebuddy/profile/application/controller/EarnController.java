@@ -82,7 +82,9 @@ public class EarnController {
                 earnings.stipendAmount(),
                 earnings.stipendReadyAt(),
                 earnings.coinBalance(),
-                earnings.adsLeftToday());
+                earnings.adsLeftToday(),
+                earnings.dailyLadder(),
+                earnings.adCoins());
 
         EarnResponse response = new EarnResponse();
         response.setBody(new BaseBody<>(body));

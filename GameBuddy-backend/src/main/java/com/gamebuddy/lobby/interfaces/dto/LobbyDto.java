@@ -29,6 +29,7 @@ public class LobbyDto {
     private int maxPlayers;
     /** Seats taken, owner included. The browse card's "3/5". */
     private int playerCount;
+
     private Instant startsAt;
     private LobbyStatus status;
     /** The viewer's own standing, or null for a stranger browsing. */
@@ -42,5 +43,6 @@ public class LobbyDto {
      * the ordering, so when it was bought is nobody else's business.
      */
     private boolean boosted;
+
     private Instant createdAt;
 }

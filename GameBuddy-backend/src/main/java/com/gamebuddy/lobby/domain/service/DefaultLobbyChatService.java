@@ -7,6 +7,7 @@ import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.ratelimit.RateLimiter;
+import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.lobby.application.mapper.LobbyMapper;
 import com.gamebuddy.lobby.infrastructure.entity.Lobby;
 import com.gamebuddy.lobby.infrastructure.entity.LobbyMember;
@@ -30,7 +31,6 @@ import com.gamebuddy.shared.moderation.TextAssessment;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.moderation.TextSurface;
 import com.gamebuddy.shared.repository.GamerRepository;
-import com.gamebuddy.common.util.Constants;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -85,10 +85,14 @@ public class DefaultLobbyChatService implements LobbyChatService {
         memberRepository.save(me);
 
         List<LobbyMessage> history = messageRepository.findAllByLobbyIdOrderByCreatedAtAsc(lobbyId);
-        Map<String, Gamer> senders = gamerRepository
-                .findAllById(history.stream().map(LobbyMessage::getSenderId).distinct().toList())
-                .stream()
-                .collect(Collectors.toMap(Gamer::getUserId, Function.identity()));
+        Map<String, Gamer> senders =
+                gamerRepository
+                        .findAllById(history.stream()
+                                .map(LobbyMessage::getSenderId)
+                                .distinct()
+                                .toList())
+                        .stream()
+                        .collect(Collectors.toMap(Gamer::getUserId, Function.identity()));
 
         List<LobbyMessageDto> messages = history.stream()
                 .map(m -> mapper.toMessageDto(

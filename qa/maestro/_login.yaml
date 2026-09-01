@@ -17,6 +17,10 @@ appId: com.findgamebuddy.app
     visible: "I already have one"
     timeout: 60000
 - tapOn: "I already have one"
+
+# See `_consent.yaml`: `clearState` above wipes the answer, so the form is up on every run.
+- runFlow: _consent.yaml
+
 - assertVisible: "Welcome back"
 
 - tapOn:

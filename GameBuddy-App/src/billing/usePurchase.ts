@@ -14,8 +14,12 @@ import { PurchaseCancelledError, entitlementArrived, purchase as openStoreSheet 
  * Listed once because forgetting one is invisible in testing and obvious to a user: buying
  * Gold and finding the deck still capped at yesterday's number reads as the purchase not
  * working, which is the impression a paywall can least afford.
+ *
+ * Exported because redeeming a promotion code grants exactly the same things a purchase
+ * does, and a second list written next to this one would agree with it on the day it was
+ * written and not for much longer.
  */
-const ENTITLEMENT_QUERIES = [
+export const ENTITLEMENT_QUERIES = [
   ['subscription'],
   ['admirers'],
   ['allowance'],

@@ -273,8 +273,8 @@ class DefaultBadgeServiceTest {
 
             ArgumentCaptor<List<GamerBadge>> saved = ArgumentCaptor.captor();
             verify(badgeRepository).saveAll(saved.capture());
-            assertTrue(saved.getValue().stream()
-                    .anyMatch(row -> row.getBadgeCode().equals(Badge.ICEBREAKER.getCode())));
+            assertTrue(
+                    saved.getValue().stream().anyMatch(row -> row.getBadgeCode().equals(Badge.ICEBREAKER.getCode())));
         }
 
         @Test

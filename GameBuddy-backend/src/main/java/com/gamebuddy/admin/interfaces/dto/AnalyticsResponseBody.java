@@ -96,7 +96,25 @@ public class AnalyticsResponseBody implements BaseModel {
             long cohort30,
             long cohort30Paid,
             long coinsEarned,
-            long coinsSpent) {}
+            long coinsSpent,
+            /**
+             * The same movement, split by what caused it.
+             *
+             * <p>The two totals above say whether the economy is inflating; only this says
+             * because of what — which is the only form of the question anyone can act on.
+             */
+            List<CoinFlow> coinFlow) {}
+
+    /**
+     * Coins in and out for one ledger reason.
+     *
+     * @param reason the {@code CoinReason} name, e.g. {@code REWARDED_AD}
+     * @param earned coins this reason paid out over the window
+     * @param spent coins this reason took back
+     * @param moves how many ledger rows it wrote — a large sum over few rows is a
+     *     different economy from the same sum over many
+     */
+    public record CoinFlow(String reason, long earned, long spent, long moves) {}
 
     /**
      * One like-cap cohort's day-7 retention.

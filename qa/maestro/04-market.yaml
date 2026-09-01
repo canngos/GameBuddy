@@ -37,7 +37,14 @@ name: 04 market
 # --- Shop --------------------------------------------------------------------------------
 - tapOn: "Shop"
 # Scrolled to, because Shop opens on the coin packs and the consumables shelf — cosmetics
-# are the third section down and are off-screen when the tab is selected.
+# are further down and are off-screen when the tab is selected. Bundles sit above the
+# individual shelves, so they are passed on the way there and asserted first.
+- scrollUntilVisible:
+    element:
+      text: "BUNDLES"
+    direction: DOWN
+    timeout: 20000
+
 - scrollUntilVisible:
     element:
       text: "FRAMES AND BANNERS"
@@ -47,15 +54,12 @@ name: 04 market
 
 - assertVisible: "Frames"
 - assertVisible: "Banners"
+# The third kind. Themes are colour rather than artwork, so the row draws a gradient
+# swatch where the others draw a picture -- see CosmeticKind.THEME.
+- assertVisible: "Themes"
 
-# The Season Pass teaser is server-controlled (SEASON_PASS_TEASER), so it is asserted as
-# optional: its absence is a configuration choice, not a defect.
-- assertVisible:
-    text: "Season Pass"
-    optional: true
-
-# Both cosmetic kinds render. A free account owns none of the paid ones, so this is only
-# asserting that the grid draws — what an unaffordable item does is checked below.
+# The shelves themselves render. A free account owns none of the paid items, so this is
+# only asserting that the grid draws — what an unaffordable item does is checked below.
 - tapOn: "Banners"
 - waitForAnimationToEnd:
     timeout: 3000
@@ -72,11 +76,16 @@ name: 04 market
 # Back to Earn, which also proves the segment is a real toggle rather than a one-way trip.
 # Scrolled back up first: the segments live under the header, and by this point the screen
 # has been scrolled well past them.
+#
+# Faster and longer than the default since the wave-2 catalogue landed: bundles, five more
+# frames and banners and six themes sit between here and the header, and the old speed 40 /
+# 20s ran out of time somewhere in the middle of the shelf.
 - scrollUntilVisible:
     element:
       text: "Earn"
     direction: UP
-    timeout: 20000
+    speed: 80
+    timeout: 40000
 - tapOn: "Earn"
 - extendedWaitUntil:
     visible: "EARN"

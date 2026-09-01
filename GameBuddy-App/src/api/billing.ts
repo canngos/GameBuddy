@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { Subscription } from './types';
+import type { MyPromoCodes, PromoRedemption, Subscription } from './types';
 
 /**
  * Which store product a plan maps to.
@@ -99,4 +99,25 @@ export const billingApi = {
    * see the prompt once more, which is not worth an error in front of them.
    */
   markUpgradePromptSeen: () => api.post<{ message: string }>('/billing/upgrade-prompt/seen'),
+};
+
+/**
+ * Promotion codes, from the gamer's side.
+ *
+ * The neighbouring comment about `POST /billing/redeem` still stands and this is not a way
+ * back to it. That endpoint let the app assert a purchase; this one sends a string the
+ * server looks up. Everything about what it is worth, who it was for and whether there is
+ * any left is decided there, against rows an administrator wrote.
+ */
+export const promoApi = {
+  /** What is waiting for this account, and what it has already used. */
+  mine: () => api.get<MyPromoCodes>('/billing/promo-codes'),
+
+  /**
+   * Redeems a code, and answers with the resulting balance and expiry rather than only
+   * what the code was worth — the cached balance on this side may be minutes old, and
+   * adding to it locally is how the number ends up wrong in the moment somebody is
+   * watching it.
+   */
+  redeem: (code: string) => api.post<PromoRedemption>('/billing/promo-codes/redeem', { code }),
 };

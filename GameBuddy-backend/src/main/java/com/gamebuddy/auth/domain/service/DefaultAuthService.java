@@ -591,9 +591,7 @@ public class DefaultAuthService implements AuthService {
         // the cheaper of the two mistakes.
         if (previousKey != null) {
             objectStorage.delete(
-                    previousStatus == AvatarStatus.APPROVED
-                            ? ObjectStorage.Bucket.MEDIA
-                            : ObjectStorage.Bucket.UPLOADS,
+                    previousStatus == AvatarStatus.APPROVED ? ObjectStorage.Bucket.MEDIA : ObjectStorage.Bucket.UPLOADS,
                     previousKey);
         }
 

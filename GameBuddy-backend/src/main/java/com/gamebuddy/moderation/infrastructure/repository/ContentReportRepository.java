@@ -4,6 +4,7 @@ import com.gamebuddy.moderation.infrastructure.entity.ContentReport;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -37,4 +38,15 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, UU
      */
     @Query("select min(r.createdAt) from ContentReport r where r.status = :status")
     Optional<Instant> oldestCreatedAt(@Param("status") ContentReport.Status status);
+
+    /**
+     * Everybody whose report was upheld.
+     *
+     * <p>By reporter, which is the opposite direction to everything else here — the rest of
+     * this file asks about the reported party. Distinct because one person can report
+     * several accounts, and because actioning a report closes every open report against the
+     * same target, so a single moderator decision can add a dozen names at once.
+     */
+    @Query("select distinct r.reporterId from ContentReport r where r.status = :status")
+    Set<String> reporterIdsByStatus(@Param("status") ContentReport.Status status);
 }

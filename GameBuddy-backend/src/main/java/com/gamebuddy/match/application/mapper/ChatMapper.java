@@ -41,6 +41,7 @@ public interface ChatMapper {
     @Mapping(target = "avatar", ignore = true)
     @Mapping(target = "favoriteGames", ignore = true)
     @Mapping(target = "frame", ignore = true)
+    @Mapping(target = "theme", ignore = true)
     @Mapping(target = "selectedKeywords", ignore = true)
     @Mapping(target = "platforms", ignore = true)
     GamerDto toDto(Gamer gamer);

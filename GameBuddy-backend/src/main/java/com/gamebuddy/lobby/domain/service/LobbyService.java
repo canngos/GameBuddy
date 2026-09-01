@@ -30,8 +30,7 @@ public interface LobbyService {
      * @param startingSoon only lobbies whose planned start is inside the next quarter of
      *     an hour — including ones a little past it, which are the most "now" of all
      */
-    LobbiesResponse browse(
-            Gamer principal, String gameId, LobbyTone tone, boolean startingSoon, Pageable pageable);
+    LobbiesResponse browse(Gamer principal, String gameId, LobbyTone tone, boolean startingSoon, Pageable pageable);
 
     /** Everything of mine: owned, joined, and requests I am waiting on. */
     LobbiesResponse mine(Gamer principal);

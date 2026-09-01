@@ -24,7 +24,7 @@ versioned SDK 57 docs are the authority.
 | 7 | Gold cosmetics + raise free like cap to 15 | **P1** | Makes Gold visible; stops churning users before their first match. |
 | 8 | Coin faucets — streak, quests, rewarded video | **P2** | Coin income is currently finite and then permanently zero. |
 | 9 | Consumables in the Market | **P2** | Cosmetics are bought once; a recurring income needs a recurring sink. |
-| 10 | Season Pass — **placeholder card only for v1** | **P2** | Logic deferred. See §4.3. |
+| 10 | ~~Season Pass — placeholder card only for v1~~ | — | **Dropped 31 Aug 2026 — no level/XP system to progress along. See the note under §4.** |
 
 ---
 
@@ -84,7 +84,8 @@ These are settled. Listed so nobody re-opens them mid-sprint.
    both stores, and pushes us into a "simulated gambling" content rating. **Revisit only at
    60–100+ cosmetics with a seasonal art pipeline.**
 2. **Group chat is dropped — Communities cover it.** See §3.1.
-3. **Season Pass ships as a placeholder in v1.** Logic deferred. See §4.3.
+3. ~~**Season Pass ships as a placeholder in v1.**~~ Reversed 31 Aug 2026 — dropped entirely,
+   see the note under §4.
 4. **One currency.** Coins, both earnable and purchasable. No second premium currency — we
    sell only cosmetics, so there is no pay-to-win line to protect and a second currency
    would just create unspendable remainders.
@@ -319,7 +320,7 @@ adding value.
 Restructure `app/(main)/market.tsx` into sections, in this order:
 
 1. **Gold card** — status if subscribed, pitch + trial if not
-2. **Season Pass** — placeholder in v1, see §4.3
+2. ~~**Season Pass**~~ — dropped, see the note under §4
 3. **Coins** — balance, 3 packs, "free coins" entry to rewarded video + quests
 4. **Quests & streak** — today's streak, this week's quests, with progress
 5. **Consumables** — Boost, Super Like, Rewind
@@ -331,6 +332,15 @@ already answers the one question a user has on this screen.
 ---
 
 ## 4. Season Pass — v1 is a placeholder only
+
+> **Update, 31 August 2026 — the Season Pass was dropped entirely.** Not deferred: dropped.
+> A pass needs a track to progress along, and GameBuddy has no level or XP system and is not
+> getting one. The teaser card, the `seasonPassTeaser` field on `GET /billing/subscription`,
+> the `gamebuddy.season-pass.teaser` property and the `SEASON_PASS_TEASER` env var are all
+> removed. The shop was widened instead — eight frames and eight banners, see
+> `db/upgrade-2026-35-shelf-expansion.sql` and `cosmetics-market-research.md` for what else
+> coins could buy. Everything below in this section, plus §0 row 10, §2 item 3, §3.4.4 item 2,
+> §6 and §7 Q2, is kept as the record of a decision that has since been reversed.
 
 ### 4.1 Decision
 
@@ -414,7 +424,7 @@ Two backend patterns worth preserving as you extend them:
 
 - Paid loot boxes / crates of any kind (§2.1)
 - Group chat (§3.1)
-- Season Pass logic — placeholder only (§4)
+- Season Pass — dropped entirely, not merely deferred (see the note under §4)
 - Banner and interstitial ads (§3.4.3)
 - Secondary market / cosmetic trading
 
@@ -424,9 +434,8 @@ Two backend patterns worth preserving as you extend them:
 
 1. **Trial length** — 3 days is the recommendation. 7 days converts more trials to paid but
    delays first revenue and raises the refund window. Worth an A/B test once volume exists.
-2. **Is the premium Season Pass track included with Gold, or sold separately?** Included is
-   the stronger retention play; separate earns more per season from non-subscribers. Needs a
-   decision before the pass is built, not before the placeholder ships.
+2. ~~**Is the premium Season Pass track included with Gold, or sold separately?**~~ Moot —
+   the pass was dropped on 31 Aug 2026, see the note under §4.
 3. **Rewarded video network** — needs picking, and it changes the eCPM assumption in the
    revenue model.
 4. **Does the free like cap move to 15 at launch, or do we A/B it?** A/B is better data but

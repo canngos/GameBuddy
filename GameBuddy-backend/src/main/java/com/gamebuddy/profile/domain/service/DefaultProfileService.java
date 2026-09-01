@@ -104,6 +104,7 @@ public class DefaultProfileService implements ProfileService {
                         : avatarUrls.visibleTo(gamer));
         body.setFrame(cosmeticUrls.frameUrl(gamer));
         body.setBanner(cosmeticUrls.bannerUrl(gamer));
+        body.setTheme(cosmeticUrls.themeOf(gamer));
         body.setGames(profileCatalogueMapper.toGameDtos(gamer.getLikedgames()));
         body.setKeywords(profileCatalogueMapper.toKeywordDtos(gamer.getKeywords()));
         body.setPlatforms(gamer.getPlatforms().stream().map(Platform::label).toList());

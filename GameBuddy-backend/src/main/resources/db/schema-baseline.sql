@@ -180,7 +180,7 @@ CREATE TABLE gamebuddy.cosmetic (
     created_date timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     membership_only boolean DEFAULT false NOT NULL,
-    CONSTRAINT cosmetic_kind_check CHECK (((kind)::text = ANY (ARRAY[('FRAME'::character varying)::text, ('BANNER'::character varying)::text]))),
+    CONSTRAINT cosmetic_kind_check CHECK (((kind)::text = ANY (ARRAY[('FRAME'::character varying)::text, ('BANNER'::character varying)::text, ('THEME'::character varying)::text]))),
     CONSTRAINT cosmetic_price_check CHECK ((price >= 0))
 );
 
@@ -287,6 +287,7 @@ CREATE TABLE gamebuddy.gamer (
     avatar_status character varying(16),
     equipped_frame_id uuid,
     equipped_banner_id uuid,
+    equipped_theme_id uuid,
     last_active_at timestamp with time zone,
     last_nudged_at timestamp with time zone,
     nudge_count integer DEFAULT 0 NOT NULL,
@@ -447,6 +448,30 @@ CREATE TABLE gamebuddy.gamer_badge (
 --
 -- Name: gamer_cosmetic; Type: TABLE; Schema: gamebuddy; Owner: -
 --
+
+--
+-- Name: cosmetic_bundle; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.cosmetic_bundle (
+    id uuid NOT NULL,
+    name character varying(64) NOT NULL,
+    price integer NOT NULL,
+    sort_order integer DEFAULT 0 NOT NULL,
+    created_date timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cosmetic_bundle_price_check CHECK ((price >= 0))
+);
+
+
+--
+-- Name: cosmetic_bundle_item; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.cosmetic_bundle_item (
+    bundle_id uuid NOT NULL,
+    cosmetic_id uuid NOT NULL
+);
+
 
 CREATE TABLE gamebuddy.gamer_cosmetic (
     user_id character varying(255) NOT NULL,
@@ -882,6 +907,38 @@ ALTER TABLE ONLY gamebuddy.content_report
 
 ALTER TABLE ONLY gamebuddy.cosmetic
     ADD CONSTRAINT cosmetic_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: cosmetic_bundle cosmetic_bundle_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle
+    ADD CONSTRAINT cosmetic_bundle_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: cosmetic_bundle_item cosmetic_bundle_item_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
+    ADD CONSTRAINT cosmetic_bundle_item_pkey PRIMARY KEY (bundle_id, cosmetic_id);
+
+
+--
+-- Name: cosmetic_bundle_item cosmetic_bundle_item_bundle_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
+    ADD CONSTRAINT cosmetic_bundle_item_bundle_id_fkey FOREIGN KEY (bundle_id) REFERENCES gamebuddy.cosmetic_bundle(id) ON DELETE CASCADE;
+
+
+--
+-- Name: cosmetic_bundle_item cosmetic_bundle_item_cosmetic_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
+    ADD CONSTRAINT cosmetic_bundle_item_cosmetic_id_fkey FOREIGN KEY (cosmetic_id) REFERENCES gamebuddy.cosmetic(id);
 
 
 --
@@ -1660,6 +1717,14 @@ ALTER TABLE ONLY gamebuddy.gamer_cosmetic
 
 ALTER TABLE ONLY gamebuddy.gamer
     ADD CONSTRAINT gamer_equipped_banner_id_fkey FOREIGN KEY (equipped_banner_id) REFERENCES gamebuddy.cosmetic(id);
+
+
+--
+-- Name: gamer gamer_equipped_theme_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer
+    ADD CONSTRAINT gamer_equipped_theme_id_fkey FOREIGN KEY (equipped_theme_id) REFERENCES gamebuddy.cosmetic(id);
 
 
 --

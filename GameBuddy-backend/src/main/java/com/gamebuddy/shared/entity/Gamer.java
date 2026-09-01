@@ -552,6 +552,16 @@ public class Gamer implements RevocableUser {
     @JoinColumn(name = "equipped_banner_id")
     private Cosmetic equippedBanner;
 
+    /**
+     * The card theme others see on this gamer's deck card, or null for none.
+     *
+     * <p>Its own slot rather than sharing one: a theme, a frame and a banner are worn at
+     * the same time and chosen independently.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "equipped_theme_id")
+    private Cosmetic equippedTheme;
+
     // --- UserDetails -------------------------------------------------------
 
     @Override

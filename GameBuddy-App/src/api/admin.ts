@@ -1,5 +1,16 @@
 import { api } from './client';
-import type { Analytics, BlockedUsers, PendingAvatars, Reports } from './types';
+import type {
+  Analytics,
+  BlockedUsers,
+  DirectoryFilter,
+  PendingAvatars,
+  PromoCode,
+  PromoCodeInput,
+  PromoCodes,
+  Reports,
+  UserDirectory,
+  UserIds,
+} from './types';
 
 /**
  * The moderator console.
@@ -54,4 +65,57 @@ export const adminApi = {
   banUser: (userId: string) => api.post<{ message: string }>(`/admin/ban/user/${userId}`),
 
   unbanUser: (userId: string) => api.post<{ message: string }>(`/admin/unban/user/${userId}`),
+
+  // --- promotion codes -----------------------------------------------------
+
+  promoCodes: () => api.get<PromoCodes>('/admin/promo-codes'),
+
+  /** One code with its recipient list; the list endpoint sends counts instead. */
+  promoCode: (id: string) => api.get<PromoCode>(`/admin/promo-codes/${id}`),
+
+  createPromoCode: (body: PromoCodeInput) => api.post<PromoCode>('/admin/promo-codes', body),
+
+  /**
+   * Edits everything except the code string, which the server ignores if it is sent.
+   * Renaming a code would break the one already sitting in somebody's inbox.
+   */
+  updatePromoCode: (id: string, body: PromoCodeInput) =>
+    api.put<PromoCode>(`/admin/promo-codes/${id}`, body),
+
+  /** Reversible, and the reason the row keeps its history. */
+  disablePromoCode: (id: string) => api.post<{ message: string }>(`/admin/promo-codes/${id}/disable`),
+
+  enablePromoCode: (id: string) => api.post<{ message: string }>(`/admin/promo-codes/${id}/enable`),
+
+  /**
+   * Removes the code, who it was for, and who used it. Coins and Gold already granted
+   * stay where they are — the ledger has no reference to the code.
+   */
+  deletePromoCode: (id: string) => api.delete<{ message: string }>(`/admin/promo-codes/${id}`),
+
+  // --- the recipient picker ------------------------------------------------
+
+  /**
+   * Accounts a code can be addressed to, one page at a time.
+   *
+   * The only endpoint in the console that names individual gamers. It exists because a
+   * gift has to be addressed to somebody; see the controller for the argument.
+   */
+  searchUsers: (params: { q?: string; filter?: DirectoryFilter; page?: number }) =>
+    api.get<UserDirectory>(
+      `/admin/users?${new URLSearchParams({
+        ...(params.q ? { q: params.q } : {}),
+        filter: params.filter ?? 'ALL',
+        page: String(params.page ?? 0),
+      }).toString()}`,
+    ),
+
+  /** Everybody matching the same search, as ids — what "select all" resolves to. */
+  searchUserIds: (params: { q?: string; filter?: DirectoryFilter }) =>
+    api.get<UserIds>(
+      `/admin/users/ids?${new URLSearchParams({
+        ...(params.q ? { q: params.q } : {}),
+        filter: params.filter ?? 'ALL',
+      }).toString()}`,
+    ),
 };

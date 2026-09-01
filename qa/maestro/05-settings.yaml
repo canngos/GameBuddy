@@ -33,7 +33,7 @@ name: 05 settings
     direction: DOWN
     timeout: 20000
 - assertVisible: "Plays on"
-- assertVisible: "Keywords"
+- assertVisible: "Play style"
 - takeScreenshot: artifacts/05-02-profile-tags
 
 # The cog in the header. It carries accessibilityLabel="Settings", which is a real
@@ -44,8 +44,23 @@ name: 05 settings
     visible: "PROFILE"
     timeout: 15000
 - assertVisible: "APPEARANCE"
-- assertVisible: "NOTIFICATIONS"
+# Scrolled to rather than asserted in place: Appearance grew a Language row, which pushed
+# this section off the first screenful. A bare assertVisible only ever passed because the
+# list used to be one row shorter.
+- scrollUntilVisible:
+    element:
+      text: "NOTIFICATIONS"
+    direction: DOWN
+    timeout: 20000
 - takeScreenshot: artifacts/05-03-settings
+
+# Back to the top, because the scroll above left the Profile rows off-screen above and the
+# sub-screens below are all reached from them.
+- scrollUntilVisible:
+    element:
+      text: "PROFILE"
+    direction: UP
+    timeout: 20000
 
 # --- every sub-screen, each asserted on its own title -------------------------------------
 
@@ -63,7 +78,7 @@ name: 05 settings
 - takeScreenshot: artifacts/05-05-platforms
 - back
 
-- tapOn: "Keywords"
+- tapOn: "Play style"
 - extendedWaitUntil:
     visible: "How you play"
     timeout: 15000
@@ -108,6 +123,34 @@ name: 05 settings
     visible: "Blocked"
     timeout: 15000
 - takeScreenshot: artifacts/05-09-blocked
+- back
+
+# Promotion codes, between Password and Blocked in the ACCOUNT group. A wrong code rather
+# than a real one: the refusal is the half that has to work on a phone — it is the message
+# somebody sees after mistyping something from an email — and a code that actually worked
+# would have to exist on whatever instance this ran against.
+- scrollUntilVisible:
+    element:
+      text: "Promotion codes"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Promotion codes"
+- extendedWaitUntil:
+    visible: "Enter a code"
+    timeout: 15000
+- takeScreenshot: artifacts/05-09b-promo-codes
+
+- tapOn:
+    id: "field-code"
+- inputText: "NOSUCHCODE"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Redeem"
+- extendedWaitUntil:
+    visible: "That code is not valid."
+    timeout: 20000
+- takeScreenshot: artifacts/05-09c-promo-refused
 - back
 
 # Sign out and Delete my account sit *below* the ACCOUNT rows, so bringing ACCOUNT onto the

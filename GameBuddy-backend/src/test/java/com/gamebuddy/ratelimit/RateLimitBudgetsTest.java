@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.gamebuddy.auth.config.AuthRateLimitConfig;
 import com.gamebuddy.auth.domain.service.AuthRateLimiters;
+import com.gamebuddy.billing.config.BillingRateLimitConfig;
 import com.gamebuddy.common.ratelimit.Budget;
 import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.lobby.config.LobbyRateLimitConfig;
@@ -71,6 +72,7 @@ class RateLimitBudgetsTest {
     private static final MatchRateLimitConfig MATCH = fromYaml("match", new MatchRateLimitConfig());
     private static final LobbyRateLimitConfig LOBBY = fromYaml("lobby", new LobbyRateLimitConfig());
     private static final AuthRateLimitConfig AUTH = fromYaml("auth", new AuthRateLimitConfig());
+    private static final BillingRateLimitConfig BILLING = fromYaml("billing", new BillingRateLimitConfig());
 
     private static <T> T fromYaml(String subtree, T target) {
         return fromYaml(subtree, target, Map.of());
@@ -176,6 +178,21 @@ class RateLimitBudgetsTest {
         }
     }
 
+    @Nested
+    @DisplayName("billing")
+    class Billing {
+
+        @Test
+        @DisplayName("a code read off a screen is mistyped more than once")
+        void redeemSurvivesFumbledCodes() {
+            // Eight characters from a deliberately unambiguous alphabet, usually copied
+            // off a newsletter or read out loud. Getting it wrong a few times in a row is
+            // ordinary; this is also the only limiter here that faces guessing, and the
+            // code space rather than this number is what makes guessing hopeless.
+            allowsRunOf(BILLING.promoRedeemRateLimiter(), 10, "typing a promotion code");
+        }
+    }
+
     /**
      * Every budget is written down twice — once as the Java field default, once as the
      * {@code ${ENV:default}} fallback in {@code application.yml} — and these assert the
@@ -230,6 +247,15 @@ class RateLimitBudgetsTest {
             sameInBothPlaces(AUTH, javaDefaults, "auth.send-code", AuthRateLimitConfig::getSendCode);
             sameInBothPlaces(AUTH, javaDefaults, "auth.reset-password", AuthRateLimitConfig::getResetPassword);
         }
+
+        @Test
+        void billingAgrees() {
+            sameInBothPlaces(
+                    BILLING,
+                    new BillingRateLimitConfig(),
+                    "billing.promo-redeem",
+                    BillingRateLimitConfig::getPromoRedeem);
+        }
     }
 
     /**
@@ -277,6 +303,13 @@ class RateLimitBudgetsTest {
             assertEquals(2, auth.getVerify().permits(), "AUTH_VERIFY_PERMITS");
             assertEquals(3, auth.getSendCode().permits(), "AUTH_SEND_CODE_PERMITS");
             assertEquals(4, auth.getResetPassword().permits(), "AUTH_RESET_PASSWORD_PERMITS");
+
+            BillingRateLimitConfig billing = fromYaml(
+                    "billing",
+                    new BillingRateLimitConfig(),
+                    Map.of("BILLING_PROMO_REDEEM_PERMITS", "5", "BILLING_PROMO_REDEEM_WINDOW", "10m"));
+            assertEquals(5, billing.getPromoRedeem().permits(), "BILLING_PROMO_REDEEM_PERMITS");
+            assertEquals(Duration.ofMinutes(10), billing.getPromoRedeem().window(), "BILLING_PROMO_REDEEM_WINDOW");
         }
 
         @Test
@@ -397,6 +430,17 @@ class RateLimitBudgetsTest {
                         assertEquals(2, budgetOf(limiters.verify()));
                         assertEquals(3, budgetOf(limiters.sendCode()));
                         assertEquals(4, budgetOf(limiters.resetPassword()));
+                    });
+        }
+
+        @Test
+        void billingIsWired() {
+            container
+                    .withUserConfiguration(BillingRateLimitConfig.class)
+                    .withPropertyValues("gamebuddy.rate-limit.billing.promo-redeem.permits=5")
+                    .run(context -> {
+                        assertNull(context.getStartupFailure());
+                        assertEquals(5, budgetOf(context.getBean("promoRedeemRateLimiter", RateLimiter.class)));
                     });
         }
 

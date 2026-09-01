@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { CosmeticStore } from './types';
+import type { CosmeticKind, CosmeticStore } from './types';
 
 /**
  * Frames and banners: the store, and the two things you can do to an item.
@@ -16,6 +16,15 @@ export const cosmeticsApi = {
   buy: (cosmeticId: string) =>
     api.post<CosmeticStore>(`/application/cosmetics/${cosmeticId}/buy`),
 
+  /**
+   * Buys a whole set at the set's price.
+   *
+   * All or nothing: owning any part is refused with `BUNDLE_PARTLY_OWNED` rather than
+   * charged for a smaller set.
+   */
+  buyBundle: (bundleId: string) =>
+    api.post<CosmeticStore>(`/application/cosmetics/bundles/${bundleId}/buy`),
+
   equip: (cosmeticId: string) =>
     api.post<CosmeticStore>(`/application/cosmetics/${cosmeticId}/equip`),
 
@@ -25,6 +34,6 @@ export const cosmeticsApi = {
    * Keyed by kind, not by the item's id: "remove my frame" is what the gamer means, and
    * it does not require the screen to know what is currently on.
    */
-  unequip: (kind: 'FRAME' | 'BANNER') =>
+  unequip: (kind: CosmeticKind) =>
     api.delete<CosmeticStore>(`/application/cosmetics/equipped/${kind}`),
 };

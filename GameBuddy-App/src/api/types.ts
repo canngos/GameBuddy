@@ -84,6 +84,13 @@ export type UserInfo = {
   frame: string | null;
   /** The worn banner's URL, shown behind the profile header. Null for none. */
   banner: string | null;
+  /**
+   * The worn card theme's slug, or null for none.
+   *
+   * A slug rather than colours: `src/theme/cardThemes.js` holds the palette so the
+   * contrast gate can check it at build time.
+   */
+  theme: string | null;
   gender: string | null;
   /** Own profile only. */
   coin?: number;
@@ -127,6 +134,14 @@ export type Candidate = {
   avatar: string | null;
   /** The worn frame's URL, or null for none — the common case, and not an error. */
   frame: string | null;
+  /**
+   * The worn card theme's slug, or null for none.
+   *
+   * The one cosmetic that colours the card itself rather than sitting on the avatar: the
+   * deck paints its identity block in these colours instead of the hue derived from the
+   * user id. Optional because an older server never sends it.
+   */
+  theme?: string | null;
   favoriteGames: { gameName: string; gameIcon: string | null }[];
   /** Names, not ids — this DTO flattens keywords to plain strings. */
   selectedKeywords: string[];
@@ -168,13 +183,6 @@ export type Subscription = {
   canUseAdvancedFilters: boolean;
   /** Whether opening a game lobby is included. Gold's perk; joining is free for everyone. */
   canCreateLobby: boolean;
-  /**
-   * Whether to show the Season Pass teaser.
-   *
-   * Not an entitlement — nothing is unlocked by it. It rides on this response so the card
-   * can be withdrawn from the server rather than by a store release.
-   */
-  seasonPassTeaser: boolean;
   /**
    * Whether the one-time day-3 Gold prompt is due right now.
    *
@@ -229,6 +237,14 @@ export type Earn = {
    * be back.
    */
   adsLeftToday: number;
+  /**
+   * The whole streak cycle, and what one advert pays — the server's numbers, not ours.
+   *
+   * Optional because a client on a new build can be talking to an older server; the two
+   * screens that draw them keep a local constant purely as that fallback.
+   */
+  dailyLadder?: number[];
+  adCoins?: number;
 };
 
 /** What a consumable purchase leaves the gamer holding. */
@@ -385,11 +401,21 @@ export type AvatarUpload = {
  * cosmetic is owned by everyone without any purchase existing, and the rule for that
  * lives on the backend so there is one place it can be wrong.
  */
+export type CosmeticKind = "FRAME" | "BANNER" | "THEME";
+
 export type Cosmetic = {
   id: string;
-  kind: "FRAME" | "BANNER";
+  kind: CosmeticKind;
   name: string;
-  image: string;
+  /** Null for a theme, which is a pair of colours rather than a picture. */
+  image: string | null;
+  /**
+   * A theme's slug, and null for every other kind.
+   *
+   * The colours themselves live in `src/theme/cardThemes.js` so the contrast gate can
+   * check them at build time; the server only names which one is worn.
+   */
+  theme: string | null;
   animated: boolean;
   price: number;
   owned: boolean;
@@ -412,7 +438,27 @@ export type Cosmetic = {
 export type CosmeticStore = {
   frames: Cosmetic[];
   banners: Cosmetic[];
+  themes: Cosmetic[];
+  bundles: Bundle[];
   coins: number;
+};
+
+/**
+ * A set sold for less than the sum of its parts.
+ *
+ * There is no "owned bundle" — buying one grants its items exactly as buying them
+ * separately would, so `owned` here is derived from the parts. See `CosmeticBundle` on the
+ * server for why it is a price rather than a possession.
+ */
+export type Bundle = {
+  id: string;
+  name: string;
+  /** What the set costs. */
+  price: number;
+  /** What the parts cost separately — the number the saving is quoted against. */
+  partsPrice: number;
+  items: Cosmetic[];
+  owned: boolean;
 };
 
 /**
@@ -609,3 +655,134 @@ export type BlockedUser = {
 };
 
 export type BlockedUsers = { blockedUsers: BlockedUser[] };
+
+// --- promotion codes -------------------------------------------------------
+
+/** What a promotion code hands over. */
+export type PromoCodeKind = 'COIN' | 'GOLD';
+
+/** Why a code can or cannot be redeemed right now. Worked out by the server's clock. */
+export type PromoCodeStatus = 'ACTIVE' | 'EXPIRED' | 'EXHAUSTED' | 'DISABLED';
+
+/** One recipient of a code, as the console's edit screen lists them. */
+export type PromoAssignee = {
+  userId: string;
+  username: string | null;
+  email: string | null;
+  /** Null if the code was never emailed to this account. */
+  emailedAt: string | null;
+  /** Already used it. Those recipients cannot be taken off the list. */
+  redeemed: boolean;
+};
+
+/** One promotion code, as the console shows it. */
+export type PromoCode = {
+  id: string;
+  code: string;
+  kind: PromoCodeKind;
+  coinAmount: number | null;
+  goldDays: number | null;
+  expiresAt: string;
+  /** Null means unlimited. */
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  /** How many accounts it was addressed to. Zero means anybody may type it. */
+  assigneeCount: number;
+  emailedCount: number;
+  disabledAt: string | null;
+  status: PromoCodeStatus;
+  note: string | null;
+  createdAt: string;
+  /** Only present when one code was asked for by id. */
+  assignees?: PromoAssignee[];
+  /** How the send went, on the answer to a create or an edit that asked for one. */
+  emailed?: { sent: number; failed: number };
+};
+
+export type PromoCodes = { codes: PromoCode[] };
+
+/** The body both creating and editing a code take. */
+export type PromoCodeInput = {
+  kind: PromoCodeKind;
+  coinAmount?: number | null;
+  goldDays?: number | null;
+  /** Creating only. A code cannot be renamed — it may already be in somebody's inbox. */
+  code?: string;
+  validDays: number;
+  maxRedemptions?: number | null;
+  /** Empty makes the code public. */
+  assigneeIds?: string[];
+  sendEmail?: boolean;
+  /** Editing only. */
+  disabled?: boolean;
+  note?: string | null;
+};
+
+/** One account in the console's picker. */
+export type DirectoryUser = {
+  userId: string;
+  username: string | null;
+  email: string | null;
+  avatar: string | null;
+  createdDate: string | null;
+  /** Null for an account that has never done anything. */
+  lastActiveAt: string | null;
+  gold: boolean;
+};
+
+/** Which group of accounts the picker is showing. */
+export type DirectoryFilter =
+  | 'ALL'
+  | 'OFFLINE_14D'
+  | 'REPORT_CONTRIBUTORS'
+  | 'GOLD'
+  | 'FREE'
+  | 'NEW_7D';
+
+export type UserDirectory = {
+  users: DirectoryUser[];
+  page: number;
+  totalPages: number;
+  total: number;
+};
+
+/** What "select everybody matching" resolves to. */
+export type UserIds = {
+  ids: string[];
+  /** True when more accounts matched than the 200 a single send allows. */
+  truncated: boolean;
+};
+
+/** A code addressed to this account that has not been used yet. */
+export type WaitingPromoCode = {
+  id: string;
+  code: string;
+  kind: PromoCodeKind;
+  coinAmount: number | null;
+  goldDays: number | null;
+  expiresAt: string;
+};
+
+export type RedeemedPromoCode = {
+  code: string;
+  kind: PromoCodeKind;
+  coinAmount: number | null;
+  goldDays: number | null;
+  redeemedAt: string;
+};
+
+export type MyPromoCodes = {
+  waiting: WaitingPromoCode[];
+  redeemed: RedeemedPromoCode[];
+};
+
+/** What a redemption actually did, so the screen can show the resulting numbers. */
+export type PromoRedemption = {
+  kind: PromoCodeKind;
+  coinAmount: number | null;
+  goldDays: number | null;
+  /** The balance after crediting. */
+  coinBalance: number;
+  /** When Gold now runs out, or null. */
+  goldExpiresAt: string | null;
+};

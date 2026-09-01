@@ -12,23 +12,17 @@ import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 
 /**
- * What each consecutive day pays, capped at the last entry.
+ * The ladder to draw when the server has not sent one.
  *
- * **This mirrors `CoinFaucet.DAILY_BY_STREAK` on the backend, and the duplication is
- * deliberate and bounded.** The server is still the only thing that decides what a claim
- * actually pays — `Earn.dailyReward` is its figure for the next claim, and that is the
- * number on the button. This copy exists purely to draw the days *ahead*, which no
- * endpoint reports.
+ * **The server sends `earn.dailyLadder` and that always wins.** This exists only so the
+ * strip has something to render against a response from an older build, and so it never
+ * flashes empty while the first request is in flight — the same trade
+ * `src/profile/platforms.ts` makes for its labels.
  *
- * If the two ever disagree the visible effect is a wrong number on a future day, not a
- * wrong payment: the claim still credits whatever the server says. That is the same trade
- * `src/profile/platforms.ts` makes for its labels, for the same reason — a strip that
- * cannot render until a request returns is a strip that flashes empty.
+ * It used to be the only source, which was the problem: retuning the economy meant a store
+ * release to stop this drawing numbers the backend had stopped paying.
  */
-const DAILY_BY_STREAK = [5, 10, 15, 20, 25, 25, 25];
-
-/** How many days the cycle shows. The reward is flat past this, so there is nothing to add. */
-const CYCLE = DAILY_BY_STREAK.length;
+const FALLBACK_LADDER = [5, 10, 15, 20, 25, 30, 35];
 
 type StreakStripProps = {
   earn: Earn;
@@ -67,9 +61,15 @@ export function StreakStrip({ earn, busy, onClaim, readyIn }: StreakStripProps) 
    * ahead. Getting this wrong by one is what would make the strip disagree with the button
    * beside it, which is the one thing it must never do.
    */
-  const banked = Math.min(earn.streak, CYCLE);
+  // The server's cycle when it sends one; the fallback only covers an older response.
+  const ladder = earn.dailyLadder?.length ? earn.dailyLadder : FALLBACK_LADDER;
+  const CYCLE = ladder.length;
+
+  // Position within the cycle, not the raw streak: past day seven the ladder starts again,
+  // so a 30-day run is on day two of its fifth week and the strip should say so.
+  const banked = ((Math.max(0, earn.streak) - 1) % CYCLE) + (earn.streak > 0 ? 1 : 0);
   const liveIndex = earn.dailyAvailable ? Math.min(banked, CYCLE - 1) : banked - 1;
-  const weekTotal = DAILY_BY_STREAK.reduce((sum, n) => sum + n, 0);
+  const weekTotal = ladder.reduce((sum, n) => sum + n, 0);
 
   return (
     <View className="overflow-hidden rounded-card" style={glow(earn.dailyAvailable ? 'soft' : 'none', colors.gold)}>
@@ -103,7 +103,7 @@ export function StreakStrip({ earn, busy, onClaim, readyIn }: StreakStripProps) 
           </View>
 
           <View className="flex-row justify-between gap-1">
-            {DAILY_BY_STREAK.map((reward, index) => (
+            {ladder.map((reward, index) => (
               <DayCell
                 key={index}
                 day={index + 1}

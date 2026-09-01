@@ -41,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class CoinEarningService {
 
     private final GamerRepository gamers;
+    private final CoinFaucet faucet;
     private final List<BadgeMetricSource> metricSources;
     private final Clock clock;
     private final CoinLedger coins;
@@ -57,7 +58,18 @@ public class CoinEarningService {
             Instant stipendReadyAt,
             int coinBalance,
             /** Rewarded adverts this gamer may still be paid for today. */
-            int adsLeftToday) {}
+            int adsLeftToday,
+            /**
+             * The whole streak cycle, and what one advert pays.
+             *
+             * <p>Sent because the client used to hold its own copies of both — the strip
+             * drew a seven-day ladder from a constant in the app, and the advert row
+             * printed another. Retuning the economy then needed a store release to stop
+             * the UI lying about it, which is most of the reason the rates were never
+             * retuned at all.
+             */
+            List<Integer> dailyLadder,
+            int adCoins) {}
 
     public record QuestProgress(Quest quest, int progress, boolean claimed) {}
 
@@ -82,12 +94,12 @@ public class CoinEarningService {
         Gamer gamer = reload(principal);
         Instant now = clock.instant();
 
-        if (!CoinFaucet.dailyAvailable(gamer.getDailyClaimedAt(), now)) {
+        if (!faucet.dailyAvailable(gamer.getDailyClaimedAt(), now)) {
             throw new BusinessException(TransactionCode.REWARD_NOT_READY);
         }
 
-        int streak = CoinFaucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
-        int reward = CoinFaucet.dailyReward(streak);
+        int streak = faucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
+        int reward = faucet.dailyReward(streak);
 
         gamer.setDailyStreak(streak);
         gamer.setDailyClaimedAt(now);
@@ -131,17 +143,17 @@ public class CoinEarningService {
         if (effectiveTier(gamer, now) != SubscriptionTier.GOLD) {
             throw new BusinessException(TransactionCode.SUBSCRIPTION_REQUIRED);
         }
-        if (!CoinFaucet.stipendAvailable(gamer.getStipendClaimedAt(), now)) {
+        if (!faucet.stipendAvailable(gamer.getStipendClaimedAt(), now)) {
             throw new BusinessException(TransactionCode.REWARD_NOT_READY);
         }
 
         gamer.setStipendClaimedAt(now);
-        coins.earn(gamer, CoinFaucet.STIPEND, CoinReason.GOLD_STIPEND);
+        coins.earn(gamer, faucet.stipend(), CoinReason.GOLD_STIPEND);
 
         rollWeek(gamer, now);
         gamers.save(gamer);
 
-        log.info("Stipend {} coins to {}", CoinFaucet.STIPEND, gamer.getUserId());
+        log.info("Stipend {} coins to {}", faucet.stipend(), gamer.getUserId());
         return snapshot(gamer, now);
     }
 
@@ -198,21 +210,23 @@ public class CoinEarningService {
                 .toList();
 
         boolean gold = effectiveTier(gamer, now) == SubscriptionTier.GOLD;
-        int streakIfClaimed = CoinFaucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
+        int streakIfClaimed = faucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
 
         return new Earnings(
-                CoinFaucet.dailyAvailable(gamer.getDailyClaimedAt(), now),
-                CoinFaucet.dailyReward(streakIfClaimed),
+                faucet.dailyAvailable(gamer.getDailyClaimedAt(), now),
+                faucet.dailyReward(streakIfClaimed),
                 gamer.getDailyStreak(),
                 gamer.getDailyClaimedAt() == null
                         ? null
-                        : gamer.getDailyClaimedAt().plus(CoinFaucet.DAILY_COOLDOWN),
+                        : gamer.getDailyClaimedAt().plus(faucet.dailyCooldown()),
                 quests,
-                gold && CoinFaucet.stipendAvailable(gamer.getStipendClaimedAt(), now),
-                CoinFaucet.STIPEND,
-                gold ? CoinFaucet.nextStipendAt(gamer.getStipendClaimedAt(), now) : null,
+                gold && faucet.stipendAvailable(gamer.getStipendClaimedAt(), now),
+                faucet.stipend(),
+                gold ? faucet.nextStipendAt(gamer.getStipendClaimedAt(), now) : null,
                 gamer.getCoin(),
-                CoinFaucet.rewardedAdsLeft(gamer.getRewardedAdsToday(), gamer.getRewardedAdDay(), now));
+                faucet.rewardedAdsLeft(gamer.getRewardedAdsToday(), gamer.getRewardedAdDay(), now),
+                faucet.dailyLadder(),
+                faucet.rewardedAdCoins());
     }
 
     private Map<BadgeMetric, Integer> measure(Gamer gamer) {

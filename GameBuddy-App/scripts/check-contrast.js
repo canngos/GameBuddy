@@ -106,6 +106,40 @@ for (const [name, spec] of Object.entries(GRADIENTS)) {
   }
 }
 
+/*
+ * Card themes, against the white username that sits on them.
+ *
+ * Read from `src/theme/cardThemes.js` rather than restated here — these are *sold*, and a
+ * palette copied into this file would let a bought theme ship with colours the gate never
+ * saw. That is the whole argument for the app owning the palette instead of the database.
+ *
+ * Measured through the scrim, not against the raw stop. Every surface that draws a theme
+ * puts the same fixed 0 -> 0.55 black gradient over it before any text lands (see
+ * `CandidateCard`), so the honest question is what white measures against the *composited*
+ * colour. That is stricter than checking the bare stop, and it is what is actually drawn.
+ */
+const { CARD_THEMES } = require('../src/theme/cardThemes');
+
+/** The scrim at its darkest, where the username sits. */
+const SCRIM_ALPHA = 0.55;
+
+function underScrim(hex) {
+  const value = parseInt(hex.slice(1), 16);
+  // Composited over black at SCRIM_ALPHA: every channel simply loses that fraction.
+  const mix = (c) => Math.round(c * (1 - SCRIM_ALPHA));
+  const rgb = [(value >> 16) & 255, (value >> 8) & 255, value & 255].map(mix);
+  return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+}
+
+console.log('\nCard themes, #FFFFFF on each stop under the card scrim');
+for (const [slug, stops] of Object.entries(CARD_THEMES)) {
+  for (const scheme of ['light', 'dark']) {
+    for (const stop of stops[scheme]) {
+      report(`${slug} ${scheme} ${stop}`, ratio('#FFFFFF', underScrim(stop)), 4.5);
+    }
+  }
+}
+
 if (failures > 0) {
   console.error(`\n${failures} contrast failure(s).\n`);
   process.exit(1);

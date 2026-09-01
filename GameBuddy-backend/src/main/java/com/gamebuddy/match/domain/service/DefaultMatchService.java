@@ -4,7 +4,6 @@ import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.AgeBand;
 import com.gamebuddy.common.enums.Platform;
-import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
@@ -15,9 +14,9 @@ import com.gamebuddy.match.domain.client.PredictClient;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent.ServedCandidate;
 import com.gamebuddy.match.infrastructure.entity.*;
+import com.gamebuddy.match.infrastructure.entity.SuperLike;
 import com.gamebuddy.match.infrastructure.entity.UnlockedAdmirer;
 import com.gamebuddy.match.infrastructure.repository.DeclinedMatchRepository;
-import com.gamebuddy.match.infrastructure.entity.SuperLike;
 import com.gamebuddy.match.infrastructure.repository.SuperLikeRepository;
 import com.gamebuddy.match.infrastructure.repository.UnlockedAdmirerRepository;
 import com.gamebuddy.match.interfaces.dto.AcceptResponseBody;
@@ -1026,6 +1025,7 @@ public class DefaultMatchService implements MatchService {
                     // reference across a page of gamers costs one extra query, not one
                     // per row.
                     dto.setFrame(cosmeticUrls.frameUrl(g));
+                    dto.setTheme(cosmeticUrls.themeOf(g));
                     dto.setFavoriteGames(chatMapper.toGameDtos(g.getLikedgames()));
                     dto.setSelectedKeywords(g.getKeywords().stream()
                             .map(Keywords::getKeywordName)

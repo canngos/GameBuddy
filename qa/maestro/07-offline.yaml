@@ -73,7 +73,7 @@ name: 07 offline
 # button disappearing therefore only means the inbox query settled; the rows come from the
 # other two, and those are refetched by the `useFocusEffect` that runs on re-entering the
 # tab. That is why the first attempt at this cleared the error and still showed nothing.
-- tapOn: "Home"
+- tapOn: "Deck"
 - extendedWaitUntil:
     visible: "DISCOVER"
     timeout: 30000

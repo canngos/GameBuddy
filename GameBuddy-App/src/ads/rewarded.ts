@@ -117,11 +117,13 @@ export function rewardedUnitId(): string {
 /**
  * What one advert pays, for the label on the button.
  *
- * A copy of `CoinFaucet.REWARDED_AD_COINS`, and only ever used to render a number. The
- * server pays whatever its own constant says, so if these two drift the button is briefly
- * wrong and nobody is paid the wrong amount.
+ * The fallback for what one advert pays.
+ *
+ * `Earn.adCoins` is the server's figure and it wins wherever it is available; this covers
+ * a response from an older build and the first render before one arrives. Only ever used
+ * to draw a number — the server pays what it decides either way.
  */
-export const REWARDED_AD_COINS = 20;
+export const REWARDED_AD_COINS = 15;
 
 let initialised = false;
 

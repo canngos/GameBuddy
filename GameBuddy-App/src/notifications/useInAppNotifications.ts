@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import {
   Award,
   Bell,
+  Ticket,
   MessageCircle,
   Star,
   UserPlus,
@@ -121,6 +122,9 @@ const PRESENTATION: Record<NotificationKind, { icon: LucideIcon; tone: Tone }> =
   LOBBY_MESSAGE: { icon: Users, tone: 'primary' },
   LOBBY_CANCELLED: { icon: Users, tone: 'muted' },
   RETURN: { icon: Bell, tone: 'muted' },
+  // Gold, like everything else worth coins or membership. The same ticket the console
+  // wears on its Codes tab.
+  PROMO: { icon: Ticket, tone: 'gold' },
 };
 
 /**
@@ -149,4 +153,6 @@ const REFRESH_ON: Record<NotificationKind, readonly QueryKeyRoot[]> = {
   LOBBY_MESSAGE: [],
   LOBBY_CANCELLED: ['my-lobbies'],
   RETURN: [],
+  // The screen this opens reads ['promo'], and nothing else on screen shows a code.
+  PROMO: ['promo'],
 };
