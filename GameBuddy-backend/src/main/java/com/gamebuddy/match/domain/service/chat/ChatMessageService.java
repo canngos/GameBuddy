@@ -28,14 +28,14 @@ import com.gamebuddy.shared.entity.Avatars;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
+import com.gamebuddy.shared.messaging.MessageCipher;
+import com.gamebuddy.shared.messaging.UserMessaging;
 import com.gamebuddy.shared.moderation.TextAssessment;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.moderation.TextSurface;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
-import com.gamebuddy.shared.messaging.MessageCipher;
-import com.gamebuddy.shared.messaging.UserMessaging;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.*;
@@ -316,8 +316,7 @@ public class ChatMessageService {
     @Transactional
     public DefaultMessageResponse markConversationRead(Gamer principal, String friendId) {
         Gamer gamer = requireGamer(principal.getUserId());
-        chatRoomService.find(gamer.getUserId(), friendId)
-                .ifPresent(room -> markRead(room.getId(), gamer.getUserId()));
+        chatRoomService.find(gamer.getUserId(), friendId).ifPresent(room -> markRead(room.getId(), gamer.getUserId()));
         return DefaultMessageResponse.of("Conversation marked read");
     }
 

@@ -342,7 +342,7 @@ when a step goes wrong at midnight, which is where the interesting failures are:
 
 | failure | what it looks like without a guard | guard |
 |---|---|---|
-| export returns a fraction of the population | training succeeds; a valid artefact that knows almost nobody replaces one that knew everybody; every deck goes thin and nothing errors | `--min-gamers`, plus a floor at 70% of the currently-served population |
+| export returns a fraction of the population | training succeeds; a valid artefact that knows almost nobody replaces one that knew everybody; every deck goes thin and nothing errors | `--min-gamers`, plus a floor at 70% of the currently-served population — applied only when the artefact in place recognises at least half the export, so a launching product's first real retrain is not read as a collapse against the synthetic artefact it is replacing |
 | artefact is corrupt or ranks nothing | swapped in, feed dies | loaded and asked real questions — including a cold-start probe — before it goes near the serving path |
 | service reloads mid-write | unpickles a truncated file | written to a temp name, then `os.replace`, which is atomic |
 | a bad artefact passes anyway | retrain to recover | the previous seven are kept beside it; rollback is a rename |

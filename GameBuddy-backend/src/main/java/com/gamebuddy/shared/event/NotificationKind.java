@@ -62,6 +62,16 @@ public enum NotificationKind {
     LOBBY_CANCELLED,
 
     /**
+     * An administrator put a promotion code on this account. No target — the promotion
+     * codes screen in Settings lists everything waiting.
+     *
+     * <p>Under REMINDERS rather than SOCIAL: nobody did anything to this gamer, and the
+     * switch somebody flips to stop hearing from the app itself is the one that should
+     * silence it.
+     */
+    PROMO,
+
+    /**
      * A nudge to somebody who has not opened the app in a while.
      *
      * <p>The only kind the gamer did not cause. Everything else here is a response to
@@ -84,10 +94,15 @@ public enum NotificationKind {
             // the existing toggles already carry the right meaning, and the retired
             // COMMUNITIES category was not reused because it held people's old "mute
             // community noise" choice, which must not silently apply to a new feature.
-            case MATCH, SUPER_LIKE, FRIEND_REQUEST, FRIEND_ACCEPTED, BADGE, LOBBY_JOIN_REQUEST,
-                    LOBBY_REQUEST_ACCEPTED, LOBBY_CANCELLED ->
-                NotificationCategory.SOCIAL;
-            case RETURN -> NotificationCategory.REMINDERS;
+            case MATCH,
+                    SUPER_LIKE,
+                    FRIEND_REQUEST,
+                    FRIEND_ACCEPTED,
+                    BADGE,
+                    LOBBY_JOIN_REQUEST,
+                    LOBBY_REQUEST_ACCEPTED,
+                    LOBBY_CANCELLED -> NotificationCategory.SOCIAL;
+            case RETURN, PROMO -> NotificationCategory.REMINDERS;
         };
     }
 }

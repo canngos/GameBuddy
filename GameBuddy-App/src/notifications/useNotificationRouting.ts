@@ -29,6 +29,9 @@ export const NOTIFICATION_KINDS = [
   'LOBBY_MESSAGE',
   'LOBBY_CANCELLED',
   'RETURN',
+  // An administrator put a code on this account. No target — the promotion codes screen
+  // lists everything that is waiting.
+  'PROMO',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -98,6 +101,11 @@ export function routeFor(kind: string | undefined, targetId: string | undefined,
 
     case 'LOBBY_CANCELLED':
       return '/lobby';
+
+    case 'PROMO':
+      // Straight to the screen that can redeem it. The code is already on the account by
+      // the time this arrives, so the tap that opens it is one tap from the coins.
+      return '/settings/promo';
 
     case 'RETURN':
       // Whatever was waiting is what the copy promised, and both of the things it can

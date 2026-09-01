@@ -16,6 +16,11 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>Aggregates only. Nothing here identifies a gamer — the console shows how many minors
  * are on the platform, never which accounts they are — because a dashboard is the screen
  * most likely to be left open, screenshotted and pasted somewhere.
+ *
+ * <p>{@code UserDirectoryController}, added alongside promotion codes, is the one place in
+ * this module that does name accounts, and it is not a relaxation of the rule above: a code
+ * has to be addressed to somebody, and it is a search behind ADMIN rather than anything
+ * this screen shows.
  */
 @RestController
 @RequestMapping("/admin/analytics")

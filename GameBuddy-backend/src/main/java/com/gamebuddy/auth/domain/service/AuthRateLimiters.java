@@ -15,8 +15,7 @@ import com.gamebuddy.common.ratelimit.RateLimiter;
  *     than sharing {@code verify}, so somebody resetting a password cannot exhaust the budget
  *     that a half-finished signup needs, and vice versa.
  */
-public record AuthRateLimiters(
-        RateLimiter verify, RateLimiter sendCode, RateLimiter login, RateLimiter resetPassword) {
+public record AuthRateLimiters(RateLimiter verify, RateLimiter sendCode, RateLimiter login, RateLimiter resetPassword) {
 
     /** Drops expired windows so the in-memory maps cannot grow without bound. */
     public void evictExpired() {

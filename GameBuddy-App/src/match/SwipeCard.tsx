@@ -16,9 +16,13 @@ import { GradientView } from '../ui/Gradient';
 import { glow } from '../ui/glow';
 import { commit as commitHaptic, tapLight } from '../ui/haptics';
 import { Text } from '../ui/Text';
+import { ThemedCardFrame } from '../ui/ThemedCardFrame';
 import { CandidateCard } from './CandidateCard';
 import { useDeckLayout } from './deckLayout';
 import type { Decision } from './useDeck';
+
+/** `rounded-card` in dp — the frame has to match it to stay concentric. */
+const CARD_RADIUS = 24;
 
 type SwipeCardProps = {
   candidate: Candidate;
@@ -292,6 +296,11 @@ export function SwipeCard({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[StyleSheet.absoluteFill, cardStyle]}>
+        {/* Outside `CandidateCard`, not inside it: the card's own root is
+            `overflow-hidden` (it clips the identity gradient to the rounded corners), and
+            this frame is drawn *past* the card's bounds, so mounted in there it would be
+            clipped away to nothing. See `ThemedCardFrame`. */}
+        <ThemedCardFrame theme={candidate.theme} radius={CARD_RADIUS} />
         <CandidateCard candidate={candidate} />
 
         {/* Over the card and under the stamps. `pointerEvents` off so it never competes

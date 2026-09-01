@@ -495,6 +495,19 @@ export const en = {
       coinsPrice: (n: number) => `${n} coins`,
       /** Appended to the item name in screen-reader labels; the preview plays for everyone else. */
       animatedSuffix: ', animated',
+      /** The close-up sheet. Only reachable for items this account does not own yet. */
+      /** Keyed by kind so a third one is a new entry rather than a new ternary. */
+      previewOn: { FRAME: 'On your avatar', BANNER: 'On your profile', THEME: 'On your card' },
+      themes: 'Themes',
+      bundles: 'Bundles',
+      bundlesBlurb: 'A matching set, cheaper than buying the pieces.',
+      bundleParts: (n: number) => `${n} coins separately`,
+      bundleSaving: (n: number) => `Save ${n}`,
+      bundleTogether: 'Worn together',
+      bundleOwned: 'You own this set',
+      bundleA11y: (name: string, price: number, saving: number) =>
+        `${name} bundle, ${price} coins, saves ${saving}`,
+      previewA11y: (name: string) => `Preview ${name}`,
       ownedA11y: (name: string) => `${name}, owned. Equip it from your Inventory.`,
       buyA11y: (name: string, price: number) => `Buy ${name}, ${price} coins`,
       cantAffordA11y: (name: string, price: number) => `${name}, ${price} coins, not enough coins`,
@@ -582,13 +595,6 @@ export const en = {
       onTheWayBody: 'They can take a moment to arrive. There is no need to buy again.',
     },
 
-    season: {
-      header: 'Season Pass',
-      coming: 'Coming soon',
-      blurb: 'New rewards every season.',
-      a11y: 'Season Pass. Coming soon — new rewards every season.',
-    },
-
     gold: {
       done: 'Done',
       continuePrice: (price: string) => `Continue — ${price}`,
@@ -634,13 +640,20 @@ export const en = {
     inventory: {
       title: 'Inventory',
       subtitle: 'What you own, and what you are wearing',
-      noFramesYet: 'No frames yet',
-      noBannersYet: 'No banners yet',
-      emptyBlurbFrames: 'Anything you buy in the Market lands here. Free frames are already yours.',
-      emptyBlurbBanners: 'Anything you buy in the Market lands here. Free banners are already yours.',
+      nothingYet: { FRAME: 'No frames yet', BANNER: 'No banners yet', THEME: 'No themes yet' },
+      emptyBlurb: {
+        FRAME: 'Anything you buy in the Market lands here. Free frames are already yours.',
+        BANNER: 'Anything you buy in the Market lands here. Free banners are already yours.',
+        THEME: 'Anything you buy in the Market lands here.',
+      },
+      /** What an owned item is, said once per kind. */
+      kindLabel: { FRAME: 'Frame', BANNER: 'Banner', THEME: 'Card theme' },
       goToMarket: 'Go to the Market',
-      takeOffFrame: 'Take off my frame',
-      takeOffBanner: 'Take off my banner',
+      takeOff: {
+        FRAME: 'Take off my frame',
+        BANNER: 'Take off my banner',
+        THEME: 'Take off my theme',
+      },
     },
 
     badges: {
@@ -791,6 +804,27 @@ export const en = {
     passwordHint: 'Signs you out everywhere',
     blocked: 'Blocked',
     blockedHint: 'Who you have blocked',
+    promo: 'Promotion codes',
+    promoHint: 'Redeem a code for coins or Gold',
+    promoScreen: {
+      title: 'Promotion codes',
+      subtitle: 'Codes sent to you appear here. You can also type one in.',
+      waiting: 'Waiting for you',
+      waitingEmpty: 'Nothing is waiting right now.',
+      enterTitle: 'Enter a code',
+      codeLabel: 'Code',
+      codeHint: 'Letters and numbers, however it was written.',
+      redeem: 'Redeem',
+      validUntil: (date: string) => `Valid until ${date}`,
+      rewardCoins: (n: number) => `${n} coins`,
+      rewardGold: (days: number) => `${days} ${days === 1 ? 'day' : 'days'} of Gold`,
+      successCoinsTitle: 'Coins added',
+      successCoinsBody: (balance: number) => `You now have ${balance} coins.`,
+      successGoldTitle: 'Gold is yours',
+      successGoldBody: (date: string) => `Gold runs until ${date}.`,
+      history: 'Already used',
+      done: 'Done',
+    },
     gamesScreen: {
       title: 'Games you play',
       subtitle: (n: number) => `At least ${n}. Changing these changes who you are shown.`,
@@ -950,6 +984,13 @@ export const en = {
       '183': 'Finish or cancel your current lobby first.',
       '185': 'The owner already answered your request.',
       '187': 'That username is not allowed. Please choose another one.',
+      '190': 'That code is not valid.',
+      '191': 'That code has expired.',
+      '192': 'That code has been fully used.',
+      '193': 'You have already used this code.',
+      '194': 'That code was sent to another account.',
+      '195': 'A code with that name already exists.',
+      '196': 'That account cannot receive a code.',
     },
   },
 

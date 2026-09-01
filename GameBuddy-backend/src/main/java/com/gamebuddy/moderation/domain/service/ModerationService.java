@@ -4,6 +4,7 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.moderation.interfaces.request.ReportRequest;
 import com.gamebuddy.moderation.interfaces.response.ReportsResponse;
 import com.gamebuddy.shared.entity.Gamer;
+import java.util.Set;
 import org.springframework.data.domain.Pageable;
 
 /**
@@ -49,4 +50,17 @@ public interface ModerationService {
      * waiting. The single number that says whether the 24-hour commitment is being kept.
      */
     long oldestOpenReportHours();
+
+    /**
+     * Everybody whose report a moderator upheld.
+     *
+     * <p>For the console's user directory, where it is one of the filters an administrator
+     * can pick recipients by: the people who took the trouble to report something that
+     * turned out to be real are a group worth being able to thank.
+     *
+     * <p>A set of ids rather than reports, for the same reason {@link #openReportCount}
+     * returns a number — the caller is in another module and has no business holding the
+     * reports themselves.
+     */
+    Set<String> reporterIdsWithActionedReports();
 }

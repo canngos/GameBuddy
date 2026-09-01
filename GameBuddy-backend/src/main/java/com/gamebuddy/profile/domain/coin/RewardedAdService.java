@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RewardedAdService {
 
     private final GamerRepository gamers;
+    private final CoinFaucet faucet;
     private final RewardedAdGrantRepository grants;
     private final CoinLedger coins;
     private final Clock clock;
@@ -76,7 +77,7 @@ public class RewardedAdService {
         // An insert that reports whether it inserted, rather than a save() whose exception
         // is caught — see RewardedAdGrantRepository#claim for why save() cannot work here
         // and what it cost to find that out.
-        if (grants.claim(transactionId, userId, CoinFaucet.REWARDED_AD_COINS, now) == 0) {
+        if (grants.claim(transactionId, userId, faucet.rewardedAdCoins(), now) == 0) {
             // The normal case for a retry, and the only thing that stops a replayed URL.
             log.debug("Rewarded ad {} already honoured", transactionId);
             return Outcome.DUPLICATE;
@@ -85,7 +86,7 @@ public class RewardedAdService {
         Instant today = CoinFaucet.adDay(now);
         int watched = today.equals(gamer.getRewardedAdDay()) ? gamer.getRewardedAdsToday() : 0;
 
-        if (watched >= CoinFaucet.REWARDED_AD_DAILY_CAP) {
+        if (watched >= faucet.rewardedAdDailyCap()) {
             // The row above stays: this transaction is now spent either way, so a retry of
             // it cannot come back tomorrow and be paid against a fresh allowance.
             log.info("Rewarded ad for {} refused, daily cap reached", userId);
@@ -94,22 +95,21 @@ public class RewardedAdService {
 
         gamer.setRewardedAdDay(today);
         gamer.setRewardedAdsToday(watched + 1);
-        coins.earn(gamer, CoinFaucet.REWARDED_AD_COINS, CoinReason.REWARDED_AD);
+        coins.earn(gamer, faucet.rewardedAdCoins(), CoinReason.REWARDED_AD);
         gamers.save(gamer);
 
         log.info(
                 "Rewarded ad paid {} coins to {} ({} of {} today)",
-                CoinFaucet.REWARDED_AD_COINS,
+                faucet.rewardedAdCoins(),
                 userId,
                 watched + 1,
-                CoinFaucet.REWARDED_AD_DAILY_CAP);
+                faucet.rewardedAdDailyCap());
         return Outcome.GRANTED;
     }
 
     /** How many more adverts this gamer may be paid for today. Drives the Earn screen. */
     @Transactional(readOnly = true)
     public int remainingToday(Gamer principal) {
-        return CoinFaucet.rewardedAdsLeft(
-                principal.getRewardedAdsToday(), principal.getRewardedAdDay(), clock.instant());
+        return faucet.rewardedAdsLeft(principal.getRewardedAdsToday(), principal.getRewardedAdDay(), clock.instant());
     }
 }

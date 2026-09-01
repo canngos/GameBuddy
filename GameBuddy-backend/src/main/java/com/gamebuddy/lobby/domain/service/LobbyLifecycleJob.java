@@ -68,8 +68,8 @@ public class LobbyLifecycleJob {
 
     /** Still OPEN a day past the planned start: the team never formed. */
     private void cancelAbandoned(Instant now) {
-        List<Lobby> abandoned = lobbyRepository.findAllByStatusAndStartsAtBefore(
-                LobbyStatus.OPEN, now.minus(CANCEL_UNSTARTED_AFTER));
+        List<Lobby> abandoned =
+                lobbyRepository.findAllByStatusAndStartsAtBefore(LobbyStatus.OPEN, now.minus(CANCEL_UNSTARTED_AFTER));
         for (Lobby lobby : abandoned) {
             lobby.setStatus(LobbyStatus.CANCELLED);
             lobby.setEndedAt(now);
@@ -95,8 +95,8 @@ public class LobbyLifecycleJob {
 
     /** LOCKED two days past the planned start: presumably played, never closed. */
     private void endForgotten(Instant now) {
-        List<Lobby> forgotten = lobbyRepository.findAllByStatusAndStartsAtBefore(
-                LobbyStatus.LOCKED, now.minus(END_FORGOTTEN_AFTER));
+        List<Lobby> forgotten =
+                lobbyRepository.findAllByStatusAndStartsAtBefore(LobbyStatus.LOCKED, now.minus(END_FORGOTTEN_AFTER));
         for (Lobby lobby : forgotten) {
             lobby.setStatus(LobbyStatus.ENDED);
             lobby.setEndedAt(now);

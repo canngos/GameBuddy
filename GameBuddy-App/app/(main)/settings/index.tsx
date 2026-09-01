@@ -244,6 +244,12 @@ export default function Settings() {
               position="first"
             />
             <LinkRow
+              label={t.settings.promo}
+              hint={t.settings.promoHint}
+              href="/settings/promo"
+              position="middle"
+            />
+            <LinkRow
               label={t.settings.blocked}
               hint={t.settings.blockedHint}
               href="/settings/blocked"

@@ -7,8 +7,8 @@ import com.gamebuddy.admin.interfaces.response.AnalyticsResponse;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.TransactionCode;
-import com.gamebuddy.moderation.domain.service.ModerationService;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
+import com.gamebuddy.moderation.domain.service.ModerationService;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -88,7 +88,12 @@ public class AnalyticsService {
                 f.getCohort30(),
                 f.getCohort30Paid(),
                 f.getCoinsEarned(),
-                f.getCoinsSpent()));
+                f.getCoinsSpent(),
+                // Same window as the totals beside it, so the parts add up to the whole.
+                analytics.coinFlowByReason(since).stream()
+                        .map(r -> new AnalyticsResponseBody.CoinFlow(
+                                r.getReason(), r.getEarned(), r.getSpent(), r.getMoves()))
+                        .toList()));
 
         // Only accounts that have had seven days to come back. Including younger ones would
         // report every cohort as sinking, because a signup from yesterday cannot yet have

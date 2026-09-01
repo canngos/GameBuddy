@@ -74,8 +74,7 @@ public class LobbyController {
      * detail screen updates its button and its frame from one response.
      */
     @PostMapping("/{lobbyId}/boost")
-    public ResponseEntity<LobbyResponse> boost(
-            @AuthenticationPrincipal Gamer principal, @PathVariable UUID lobbyId) {
+    public ResponseEntity<LobbyResponse> boost(@AuthenticationPrincipal Gamer principal, @PathVariable UUID lobbyId) {
         return ResponseEntity.ok(lobbyService.boost(principal, lobbyId));
     }
 

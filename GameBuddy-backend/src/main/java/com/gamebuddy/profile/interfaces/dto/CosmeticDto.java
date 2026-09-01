@@ -9,13 +9,21 @@ public class CosmeticDto {
 
     private String id;
 
-    /** {@code FRAME} or {@code BANNER}. Sent as a string; the client switches on it. */
+    /** {@code FRAME}, {@code BANNER} or {@code THEME}. Sent as a string; the client switches on it. */
     private String kind;
 
     private String name;
 
-    /** A resolved URL, not the stored object key. */
+    /** A resolved URL, not the stored object key. Null for a theme, which has no image. */
     private String image;
+
+    /**
+     * A theme's slug, and null for every other kind.
+     *
+     * <p>The client maps it to the pair of colours it draws — see
+     * {@link com.gamebuddy.shared.entity.CosmeticKind#THEME}.
+     */
+    private String theme;
 
     private boolean animated;
 

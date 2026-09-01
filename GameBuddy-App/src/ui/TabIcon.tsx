@@ -6,6 +6,7 @@ import {
   MessageCircle,
   Settings,
   ShoppingBasket,
+  Ticket,
   User,
   Users,
   type LucideIcon,
@@ -26,6 +27,7 @@ export type TabIconName =
   | 'analytics'
   | 'reports'
   | 'avatars'
+  | 'promo'
   | 'settings';
 
 /**
@@ -79,6 +81,9 @@ const GLYPHS: Record<TabIconName, LucideIcon> = {
   analytics: ChartColumn,
   reports: Flag,
   avatars: ImagePlus,
+  // A ticket, not a gift box: these are coupons somebody types in, and the shop already
+  // owns the "something to unwrap" reading with its basket.
+  promo: Ticket,
   settings: Settings,
 };
 

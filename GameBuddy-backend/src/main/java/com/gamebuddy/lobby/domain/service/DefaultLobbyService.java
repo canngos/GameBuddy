@@ -169,9 +169,8 @@ public class DefaultLobbyService implements LobbyService {
                         .filter(lobby -> lobby.getStatus() != LobbyStatus.ARCHIVED)
                         .map(lobby -> {
                             long unread = row.getStatus().inTeam() ? unreadCount(row) : 0;
-                            Gamer owner = gamerRepository
-                                    .findById(lobby.getOwnerId())
-                                    .orElse(null);
+                            Gamer owner =
+                                    gamerRepository.findById(lobby.getOwnerId()).orElse(null);
                             return toDto(lobby, owner, row.getStatus(), unread);
                         }))
                 .toList();
@@ -338,8 +337,7 @@ public class DefaultLobbyService implements LobbyService {
         if (existing.isPresent()) {
             LobbyMember row = existing.get();
             switch (row.getStatus()) {
-                case OWNER, ACCEPTED, PENDING ->
-                    throw new BusinessException(TransactionCode.LOBBY_ALREADY_MEMBER);
+                case OWNER, ACCEPTED, PENDING -> throw new BusinessException(TransactionCode.LOBBY_ALREADY_MEMBER);
                 // A rejection is the owner's final word for this lobby; see LOBBY_REJECTED.
                 case REJECTED -> throw new BusinessException(TransactionCode.LOBBY_REJECTED);
                 // Someone who left or was kicked may ask again — the row asks again.
@@ -432,8 +430,7 @@ public class DefaultLobbyService implements LobbyService {
 
         LobbyMember row = memberRepository
                 .findByLobbyIdAndUserId(lobbyId, gamer.getUserId())
-                .filter(m -> m.getStatus() == LobbyMemberStatus.ACCEPTED
-                        || m.getStatus() == LobbyMemberStatus.PENDING)
+                .filter(m -> m.getStatus() == LobbyMemberStatus.ACCEPTED || m.getStatus() == LobbyMemberStatus.PENDING)
                 .orElseThrow(() -> new BusinessException(TransactionCode.LOBBY_NOT_MEMBER));
 
         // Withdrawing a pending request and leaving the team are the same gesture.
@@ -529,11 +526,13 @@ public class DefaultLobbyService implements LobbyService {
 
         // Locking answers the people still waiting, silently. They were not chosen; a
         // push saying so helps nobody, and their screen shows it.
-        memberRepository.findAllByLobbyIdAndStatus(lobbyId, LobbyMemberStatus.PENDING).forEach(pending -> {
-            pending.setStatus(LobbyMemberStatus.REJECTED);
-            pending.setDecidedAt(clock.instant());
-            memberRepository.save(pending);
-        });
+        memberRepository
+                .findAllByLobbyIdAndStatus(lobbyId, LobbyMemberStatus.PENDING)
+                .forEach(pending -> {
+                    pending.setStatus(LobbyMemberStatus.REJECTED);
+                    pending.setDecidedAt(clock.instant());
+                    memberRepository.save(pending);
+                });
 
         lobby.setStatus(LobbyStatus.LOCKED);
         lobby.setLockedAt(clock.instant());
@@ -600,8 +599,9 @@ public class DefaultLobbyService implements LobbyService {
     void notifyCancelled(Lobby lobby) {
         memberRepository
                 .findAllByLobbyIdAndStatus(lobby.getId(), LobbyMemberStatus.ACCEPTED)
-                .forEach(member -> gamerRepository.findById(member.getUserId()).ifPresent(gamer ->
-                        events.publishEvent(new NotificationRequestedEvent(
+                .forEach(member -> gamerRepository
+                        .findById(member.getUserId())
+                        .ifPresent(gamer -> events.publishEvent(new NotificationRequestedEvent(
                                 gamer.getUserId(),
                                 gamer.getFcmToken(),
                                 lobby.getTitle(),
@@ -655,9 +655,7 @@ public class DefaultLobbyService implements LobbyService {
     }
 
     private Map<UUID, LobbyMemberStatus> myStatuses(String userId) {
-        return memberRepository
-                .findAllByUserIdAndStatusIn(userId, EnumSet.allOf(LobbyMemberStatus.class))
-                .stream()
+        return memberRepository.findAllByUserIdAndStatusIn(userId, EnumSet.allOf(LobbyMemberStatus.class)).stream()
                 .collect(Collectors.toMap(LobbyMember::getLobbyId, LobbyMember::getStatus));
     }
 

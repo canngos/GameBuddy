@@ -92,8 +92,7 @@ class LobbyLifecycleJobTest {
         accepted.setUserId("member-1");
         accepted.setEmail("member@example.com");
         when(memberRepository.findAllByLobbyIdAndStatus(abandoned.getId(), LobbyMemberStatus.ACCEPTED))
-                .thenReturn(List.of(
-                        new LobbyMember(abandoned.getId(), "member-1", LobbyMemberStatus.ACCEPTED, NOW)));
+                .thenReturn(List.of(new LobbyMember(abandoned.getId(), "member-1", LobbyMemberStatus.ACCEPTED, NOW)));
         when(gamerRepository.findById("member-1")).thenReturn(Optional.of(accepted));
 
         job.sweep();

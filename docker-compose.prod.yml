@@ -230,7 +230,13 @@ services:
       FIREBASE_CONFIG_PATH: /run/secrets/firebase-service-account.json
 
       REVENUECAT_WEBHOOK_TOKEN: ${REVENUECAT_WEBHOOK_TOKEN:?set REVENUECAT_WEBHOOK_TOKEN in .env}
-      SEASON_PASS_TEASER: ${SEASON_PASS_TEASER:-true}
+
+      # The coin economy is deliberately NOT forwarded bare here, unlike the rate limits
+      # below. Those bind into a nested object, where Spring skips an empty value; these
+      # are plain numbers on the properties class, and an empty string is not an int -- a
+      # bare `${COINS_AD_COINS:-}` stops the application booting. To retune a rate, set the
+      # variable in this block explicitly, or edit the defaults in application.yml under
+      # `gamebuddy.coins`.
 
       # Empty, deliberately. Mobile clients are not subject to CORS, so nothing legitimate
       # needs this in production — and the development value allows any page on localhost,

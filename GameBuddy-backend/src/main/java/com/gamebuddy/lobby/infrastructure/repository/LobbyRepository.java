@@ -45,16 +45,16 @@ public interface LobbyRepository extends JpaRepository<Lobby, UUID> {
     Page<Lobby> browse(
             @Param("status") LobbyStatus status, @Param("startsBefore") Instant startsBefore, Pageable pageable);
 
-    @Query("SELECT l FROM Lobby l WHERE l.status = :status AND l.startsAt < :startsBefore"
-            + " AND l.gameId = :gameId" + BROWSE_ORDER)
+    @Query("SELECT l FROM Lobby l WHERE l.status = :status AND l.startsAt < :startsBefore" + " AND l.gameId = :gameId"
+            + BROWSE_ORDER)
     Page<Lobby> browseByGame(
             @Param("status") LobbyStatus status,
             @Param("startsBefore") Instant startsBefore,
             @Param("gameId") String gameId,
             Pageable pageable);
 
-    @Query("SELECT l FROM Lobby l WHERE l.status = :status AND l.startsAt < :startsBefore"
-            + " AND l.tone = :tone" + BROWSE_ORDER)
+    @Query("SELECT l FROM Lobby l WHERE l.status = :status AND l.startsAt < :startsBefore" + " AND l.tone = :tone"
+            + BROWSE_ORDER)
     Page<Lobby> browseByTone(
             @Param("status") LobbyStatus status,
             @Param("startsBefore") Instant startsBefore,

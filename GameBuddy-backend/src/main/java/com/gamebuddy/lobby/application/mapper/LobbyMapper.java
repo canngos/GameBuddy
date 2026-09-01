@@ -75,8 +75,7 @@ public class LobbyMapper {
         return dto;
     }
 
-    public LobbyMessageDto toMessageDto(
-            UUID id, String senderId, String senderUsername, String message, Instant date) {
+    public LobbyMessageDto toMessageDto(UUID id, String senderId, String senderUsername, String message, Instant date) {
         LobbyMessageDto dto = new LobbyMessageDto();
         dto.setId(id.toString());
         dto.setSenderId(senderId);

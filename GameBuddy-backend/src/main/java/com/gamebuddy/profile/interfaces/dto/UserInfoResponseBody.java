@@ -40,6 +40,14 @@ public class UserInfoResponseBody implements BaseModel {
 
     private String banner;
 
+    /**
+     * The worn card theme's slug, or null for none.
+     *
+     * <p>A slug rather than colours: the client owns the palette so the contrast gate can
+     * check it at build time. See {@link com.gamebuddy.shared.entity.CosmeticKind#THEME}.
+     */
+    private String theme;
+
     private String gender;
 
     /** Own profile only. */

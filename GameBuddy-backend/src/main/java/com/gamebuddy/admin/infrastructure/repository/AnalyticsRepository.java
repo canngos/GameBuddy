@@ -185,6 +185,38 @@ public interface AnalyticsRepository extends Repository<Gamer, String> {
                     """, nativeQuery = true)
     List<CohortRetention> retentionByCohort(@Param("since") Instant since, @Param("cutoff") Instant cutoff);
 
+    /**
+     * Where coins came from and went, per reason, over the window.
+     *
+     * <p>The two aggregate sums above answer "is the economy inflating"; they cannot answer
+     * "inflating because of what", which is the only version of the question anyone can act
+     * on. Splitting by reason is what showed that rewarded adverts were paying out roughly
+     * three quarters of all free coins — a fact that had been true for months and was
+     * invisible on this dashboard.
+     */
+    @Query(value = """
+                    SELECT reason                                              AS reason,
+                           COALESCE(SUM(delta) FILTER (WHERE delta > 0), 0)    AS earned,
+                           COALESCE(-SUM(delta) FILTER (WHERE delta < 0), 0)   AS spent,
+                           COUNT(*)                                            AS moves
+                      FROM coin_ledger
+                     WHERE created_at >= :since
+                  GROUP BY reason
+                  ORDER BY reason
+                    """, nativeQuery = true)
+    List<CoinFlow> coinFlowByReason(@Param("since") Instant since);
+
+    /** One row of {@link #coinFlowByReason}. */
+    interface CoinFlow {
+        String getReason();
+
+        long getEarned();
+
+        long getSpent();
+
+        long getMoves();
+    }
+
     interface FunnelCounts {
         long getPaywallViewers();
 

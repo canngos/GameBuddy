@@ -387,7 +387,7 @@ function GoldCosmeticRow({
         }
       >
         <Image
-          source={{ uri: item.image }}
+          source={{ uri: item.image ?? undefined }}
           style={FILL}
           contentFit={isBanner ? "cover" : "contain"}
           autoplay

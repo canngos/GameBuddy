@@ -208,6 +208,15 @@ gamebuddy:
         permits: ${AUTH_RESET_PASSWORD_PERMITS:20}
         window: ${AUTH_RESET_PASSWORD_WINDOW:15m}
 
+    billing:
+      # Guesses at a promotion code, per account. The code space is what actually holds
+      # this shut; the limit only makes guessing pointless, and it is keyed by the person
+      # redeeming rather than by the code, so nobody can lock a real campaign code out for
+      # everybody else holding it.
+      promo-redeem:
+        permits: ${BILLING_PROMO_REDEEM_PERMITS:20}
+        window: ${BILLING_PROMO_REDEEM_WINDOW:1h}
+
   predict:
     # The only remaining out-of-process dependency: the Python model is a different
     # runtime. Everything that used to be an HTTP call between services is a method call.
@@ -230,12 +239,24 @@ gamebuddy:
     retention: ${IMPRESSION_RETENTION:P90D}
     cleanup-cron: ${IMPRESSION_CLEANUP_CRON:0 30 3 * * *}
 
-  season-pass:
-    # The teaser card in the Market. On by default; turn it off from the server rather than
-    # a release, because it promises seasons that are an art commitment before they are an
-    # engineering one — six cosmetics every six weeks, forever — and a promise that has to
-    # be withdrawn should not need a store review to withdraw.
-    teaser: ${SEASON_PASS_TEASER:true}
+  # The coin economy. Every faucet rate lives here so it can be retuned by a deploy
+  # rather than a release -- see CoinEconomyProperties for what good numbers look like.
+  #
+  # The defaults in that class are what this build was tested with; these lines exist so
+  # the values are visible and overridable, not because they differ.
+  coins:
+    # One full cycle. Day 8 pays what day 1 pays, so a streak has to be kept to be worth
+    # anything -- it used to plateau at the top rate forever.
+    daily-ladder: ${COINS_DAILY_LADDER:5,10,15,20,25,30,35}
+    daily-cooldown: ${COINS_DAILY_COOLDOWN:24h}
+    # 36h, not 48: at 48 a "daily" streak survived on about three and a half claims a week.
+    streak-grace: ${COINS_STREAK_GRACE:36h}
+    # 15 x 3/day. A rewarded view earns roughly one to two cents, so the old 20 x 5 gave
+    # away about four times what it brought in.
+    ad-coins: ${COINS_AD_COINS:15}
+    ad-daily-cap: ${COINS_AD_DAILY_CAP:3}
+    stipend: ${COINS_STIPEND:600}
+    stipend-interval: ${COINS_STIPEND_INTERVAL:30d}
 
   billing:
     revenuecat:

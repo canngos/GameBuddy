@@ -128,6 +128,63 @@ def test_a_collapsed_population_never_reaches_the_serving_path(tmp_path, monkeyp
     assert artefact.read_bytes() == before
 
 
+def _export_of(data: Path, user_ids) -> None:
+    data.mkdir(exist_ok=True)
+    (data / "gamers.csv").write_text(
+        "user_id,username\n" + "\n".join(f"{uid},n{i}" for i, uid in enumerate(user_ids)),
+        encoding="utf-8")
+
+
+def test_a_collapse_the_artefact_recognises_is_still_refused(tmp_path, monkeypatch, artefact,
+                                                             capsys):
+    """The churn guard, on the population it exists to protect.
+
+    A hundred of the four hundred gamers already being served: the same people, most of
+    them missing. That is a half-applied migration, and it must not become an artefact.
+    """
+    survivors = sorted(retrain.serving_population(artefact))[:100]
+    _export_of(tmp_path / "data", survivors)
+
+    monkeypatch.setattr(retrain, "run", lambda *a, **k: None)
+    monkeypatch.setattr(retrain.tempfile, "TemporaryDirectory",
+                        lambda **kw: _FixedDir(tmp_path))
+
+    before = artefact.read_bytes()
+    with pytest.raises(SystemExit):
+        retrain.main(["--artifacts", str(artefact.parent), "--database-url", "postgresql://x",
+                      "--min-gamers", "100"])
+
+    assert "Real churn does not look like this" in capsys.readouterr().err
+    assert artefact.read_bytes() == before, "the serving artefact must be untouched"
+
+
+def test_the_first_real_retrain_is_not_mistaken_for_a_collapse(tmp_path, monkeypatch, artefact,
+                                                               capsys):
+    """The launch case, and the reason the guard needed identity rather than counts.
+
+    A fresh install serves the synthetic artefact baked into the image, so the product's
+    first hundred real signups look like a 75% collapse against gamers who were never its
+    users. Refusing there means the job never runs at all — the artefact stays synthetic,
+    every id it returns resolves to nobody, and no deck is ever ranked.
+    """
+    _export_of(tmp_path / "data", [f"real-user-{i}" for i in range(100)])
+
+    monkeypatch.setattr(retrain, "run", lambda *a, **k: None)
+    monkeypatch.setattr(retrain.tempfile, "TemporaryDirectory",
+                        lambda **kw: _FixedDir(tmp_path))
+
+    with pytest.raises(SystemExit):
+        # Still exits: `run` is stubbed, so no artefact is trained and the job stops at the
+        # next check. What matters is which check it reached.
+        retrain.main(["--artifacts", str(artefact.parent), "--database-url", "postgresql://x",
+                      "--min-gamers", "100"])
+
+    captured = capsys.readouterr()
+    assert "Real churn" not in captured.err, "the churn guard fired on an unrelated population"
+    assert "skipping the churn check" in captured.out
+    assert "wrote no artefact" in captured.err, "it should have got as far as training"
+
+
 def test_reload_failure_is_not_fatal(monkeypatch):
     """The artefact is already swapped in by then. Exiting non-zero would report a failed
     retrain that actually succeeded, and page someone for nothing."""

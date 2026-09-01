@@ -52,8 +52,7 @@ public class FCMService {
             message.putData("targetId", tokenRequest.getTargetId());
         }
 
-        AndroidConfig.Builder android =
-                AndroidConfig.builder().setPriority(priorityFor(tokenRequest.getKind()));
+        AndroidConfig.Builder android = AndroidConfig.builder().setPriority(priorityFor(tokenRequest.getKind()));
 
         // Collapse on the kind and target, so ten messages from one person while the
         // phone is in a pocket arrive as one line rather than ten. Android replaces a

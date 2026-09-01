@@ -20,6 +20,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -155,6 +156,12 @@ public class DefaultModerationService implements ModerationService {
                 .oldestCreatedAt(ContentReport.Status.OPEN)
                 .map(oldest -> Duration.between(oldest, clock.instant()).toHours())
                 .orElse(0L);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Set<String> reporterIdsWithActionedReports() {
+        return reportRepository.reporterIdsByStatus(ContentReport.Status.ACTIONED);
     }
 
     // =======================================================================

@@ -2,8 +2,8 @@ package com.gamebuddy.match.domain.service.chat;
 
 import com.gamebuddy.match.interfaces.dto.PresenceUpdate;
 import com.gamebuddy.shared.entity.Gamer;
-import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.messaging.UserMessaging;
+import com.gamebuddy.shared.repository.GamerRepository;
 import java.security.Principal;
 import java.util.Optional;
 import java.util.Set;

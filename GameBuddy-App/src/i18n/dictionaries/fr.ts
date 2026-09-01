@@ -448,6 +448,17 @@ export const fr: Dictionary = {
       free: 'Gratuit',
       coinsPrice: (n: number) => `${n} pièces`,
       animatedSuffix: ', animé',
+      previewOn: { FRAME: 'Sur ton avatar', BANNER: 'Sur ton profil', THEME: 'Sur ta carte' },
+      themes: 'Thèmes',
+      bundles: 'Packs',
+      bundlesBlurb: 'Un ensemble assorti, moins cher que les pièces séparées.',
+      bundleParts: (n: number) => `${n} pièces séparément`,
+      bundleSaving: (n: number) => `Économise ${n}`,
+      bundleTogether: 'Portés ensemble',
+      bundleOwned: 'Tu possèdes cet ensemble',
+      bundleA11y: (name: string, price: number, saving: number) =>
+        `Pack ${name}, ${price} pièces, économise ${saving}`,
+      previewA11y: (name: string) => `Aperçu de ${name}`,
       ownedA11y: (name: string) => `${name}, possédé. Équipe-le depuis ton Inventaire.`,
       buyA11y: (name: string, price: number) => `Acheter ${name}, ${price} pièces`,
       cantAffordA11y: (name: string, price: number) =>
@@ -529,13 +540,6 @@ export const fr: Dictionary = {
       onTheWayBody: "Ça peut prendre un instant. Pas besoin de racheter.",
     },
 
-    season: {
-      header: 'Passe de saison',
-      coming: 'Bientôt disponible',
-      blurb: 'De nouvelles récompenses à chaque saison.',
-      a11y: 'Passe de saison. Bientôt disponible — de nouvelles récompenses à chaque saison.',
-    },
-
     gold: {
       done: 'Terminé',
       continuePrice: (price: string) => `Continuer — ${price}`,
@@ -581,15 +585,19 @@ export const fr: Dictionary = {
     inventory: {
       title: 'Inventaire',
       subtitle: 'Ce que tu possèdes, et ce que tu portes',
-      noFramesYet: 'Pas encore de cadres',
-      noBannersYet: 'Pas encore de bannières',
-      emptyBlurbFrames:
-        'Tout ce que tu achètes à la Boutique arrive ici. Les cadres gratuits sont déjà à toi.',
-      emptyBlurbBanners:
-        'Tout ce que tu achètes à la Boutique arrive ici. Les bannières gratuites sont déjà à toi.',
+      nothingYet: { FRAME: 'Pas encore de cadres', BANNER: 'Pas encore de bannières', THEME: 'Pas encore de thèmes' },
+      emptyBlurb: {
+        FRAME: 'Tout ce que tu achètes au Marché arrive ici. Les cadres gratuits sont déjà à toi.',
+        BANNER: 'Tout ce que tu achètes au Marché arrive ici. Les bannières gratuites sont déjà à toi.',
+        THEME: 'Tout ce que tu achètes au Marché arrive ici.',
+      },
+      kindLabel: { FRAME: 'Cadre', BANNER: 'Bannière', THEME: 'Thème de carte' },
       goToMarket: 'Aller à la Boutique',
-      takeOffFrame: 'Retirer mon cadre',
-      takeOffBanner: 'Retirer ma bannière',
+      takeOff: {
+        FRAME: 'Retirer mon cadre',
+        BANNER: 'Retirer ma bannière',
+        THEME: 'Retirer mon thème',
+      },
     },
 
     badges: {
@@ -740,6 +748,27 @@ export const fr: Dictionary = {
     passwordHint: 'Te déconnecte partout',
     blocked: 'Bloqués',
     blockedHint: 'Qui tu as bloqué',
+    promo: 'Codes promo',
+    promoHint: 'Utilise un code pour des pièces ou Gold',
+    promoScreen: {
+      title: 'Codes promo',
+      subtitle: 'Les codes qui te sont envoyés apparaissent ici. Tu peux aussi en saisir un.',
+      waiting: 'Ça t’attend',
+      waitingEmpty: 'Rien ne t’attend pour le moment.',
+      enterTitle: 'Saisir un code',
+      codeLabel: 'Code',
+      codeHint: 'Lettres et chiffres, quelle que soit l’écriture.',
+      redeem: 'Utiliser',
+      validUntil: (date: string) => `Valable jusqu’au ${date}`,
+      rewardCoins: (n: number) => `${n} pièces`,
+      rewardGold: (days: number) => `${days} ${days === 1 ? 'jour' : 'jours'} de Gold`,
+      successCoinsTitle: 'Pièces ajoutées',
+      successCoinsBody: (balance: number) => `Tu as maintenant ${balance} pièces.`,
+      successGoldTitle: 'Gold est à toi',
+      successGoldBody: (date: string) => `Gold court jusqu’au ${date}.`,
+      history: 'Déjà utilisés',
+      done: 'Terminé',
+    },
     gamesScreen: {
       title: 'Les jeux auxquels tu joues',
       subtitle: (n: number) => `Au moins ${n}. Les changer change à qui tu es montré.`,
@@ -899,6 +928,13 @@ export const fr: Dictionary = {
       '183': "Termine ou annule d'abord ton lobby actuel.",
       '185': 'Le propriétaire a déjà répondu à ta demande.',
       "187": "Ce pseudo n'est pas autorisé. Choisis-en un autre.",
+      '190': 'Ce code n’est pas valable.',
+      '191': 'Ce code a expiré.',
+      '192': 'Ce code a déjà été entièrement utilisé.',
+      '193': 'Tu as déjà utilisé ce code.',
+      '194': 'Ce code a été envoyé à un autre compte.',
+      '195': 'Un code portant ce nom existe déjà.',
+      '196': 'Ce compte ne peut pas recevoir de code.',
     },
   },
 

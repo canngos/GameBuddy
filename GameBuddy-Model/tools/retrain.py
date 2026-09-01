@@ -44,12 +44,36 @@ from pathlib import Path
 #: broken export rather than a small product. The recommender itself copes with far fewer —
 #: it falls back to a single cluster — but an artefact this size replacing a real one is
 #: the outcome being prevented.
-MIN_GAMERS = 500
+#:
+#: Lowered from 500 so that a launching product starts learning from its own users months
+#: earlier. That is a trade rather than a free win, and the direction it trades in is worth
+#: being clear about: at a hundred gamers the clustering is coarse and the desirability
+#: prior has very little to go on, so the ranking will be thin. It is still built from the
+#: people actually using the product, which the alternative — a synthetic artefact whose
+#: every id resolves to nobody — is not.
+MIN_GAMERS = 100
 
 #: A retrain that finds less than this share of the currently-served population is treated
 #: as a bad export rather than as churn. Real attrition does not remove a third of the
 #: accounts overnight; a half-applied migration or a mis-set schema does.
 MIN_SHARE_OF_CURRENT = 0.7
+
+#: How much of the export the current artefact must already know before the share check
+#: above is allowed to mean anything.
+#:
+#: The churn guard silently assumes the artefact in place was built from *this* population,
+#: and until the first successful retrain that assumption is false: the image ships a
+#: synthetic 20,000-gamer artefact, so a real product's first hundred signups read as a 99%
+#: collapse and the job refuses — every night, forever, with the count floor already
+#: satisfied. Lowering MIN_GAMERS alone does not reach this; the two guards have to be
+#: fixed together or the second one keeps the first from ever mattering.
+#:
+#: Identity is what separates the two cases, and counts cannot. A half-applied migration
+#: leaves an export the artefact recognises almost completely — the same people, fewer of
+#: them — which is exactly when the guard should fire. An artefact that recognises hardly
+#: anybody in the export is not describing this population at all, and comparing sizes
+#: against it is a category error rather than a safety check.
+MIN_RECOGNISED_SHARE = 0.5
 
 
 def log(message: str) -> None:
@@ -70,21 +94,32 @@ def run(args: list[str], **kwargs) -> None:
         die(f"{args[0]} {args[1] if len(args) > 1 else ''} exited {result.returncode}")
 
 
-def count_rows(path: Path) -> int:
+def user_ids_in(path: Path) -> set[str]:
+    """The gamer ids in an exported gamers.csv."""
     with path.open(encoding="utf-8") as fh:
-        return max(0, sum(1 for _ in fh) - 1)
+        return {row["user_id"] for row in csv.DictReader(fh)}
+
+
+def serving_population(artefact: Path) -> set[str]:
+    """Who the artefact currently in place knows about, or nothing if there is none.
+
+    The ids and not merely the count, because the churn guard has to ask whether the
+    outgoing artefact describes the same population as the incoming export — a question
+    sizes cannot answer. See ``MIN_RECOGNISED_SHARE``.
+    """
+    if not artefact.exists():
+        return set()
+    try:
+        with artefact.open("rb") as fh:
+            return set(pickle.load(fh).user_ids)
+    except Exception as exc:  # noqa: BLE001 - a corrupt current artefact must not stop a retrain
+        log(f"could not read the current artefact ({exc}); treating as empty")
+        return set()
 
 
 def gamers_in(artefact: Path) -> int:
     """How many gamers the artefact currently in place knows about, or 0 if there is none."""
-    if not artefact.exists():
-        return 0
-    try:
-        with artefact.open("rb") as fh:
-            return len(pickle.load(fh).user_ids)
-    except Exception as exc:  # noqa: BLE001 - a corrupt current artefact must not stop a retrain
-        log(f"could not read the current artefact ({exc}); treating as empty")
-        return 0
+    return len(serving_population(artefact))
 
 
 def verify(candidate: Path, expected_gamers: int) -> None:
@@ -246,7 +281,8 @@ def retrain_once(args: argparse.Namespace) -> int:
     artefact_dir = Path(args.artifacts)
     artefact_dir.mkdir(parents=True, exist_ok=True)
     live = artefact_dir / "recommender.pkl"
-    currently_serving = gamers_in(live)
+    serving = serving_population(live)
+    currently_serving = len(serving)
     started = time.time()
 
     with tempfile.TemporaryDirectory(prefix="gamebuddy-retrain-") as tmp:
@@ -259,15 +295,25 @@ def retrain_once(args: argparse.Namespace) -> int:
             export_cmd.append("--include-bots")
         run(export_cmd)
 
-        exported = count_rows(data / "gamers.csv")
+        exported_ids = user_ids_in(data / "gamers.csv")
+        exported = len(exported_ids)
         log(f"exported {exported} gamers (currently serving {currently_serving})")
 
         if exported < args.min_gamers:
             die(f"only {exported} gamers exported, below the floor of {args.min_gamers}. "
                 "This is far more likely to be a broken export than a shrunken product.")
         if currently_serving and exported < currently_serving * MIN_SHARE_OF_CURRENT:
-            die(f"exported {exported} gamers against {currently_serving} currently served "
-                f"({exported / currently_serving:.0%}). Real churn does not look like this.")
+            recognised = len(exported_ids & serving) / exported
+            if recognised >= MIN_RECOGNISED_SHARE:
+                die(f"exported {exported} gamers against {currently_serving} currently served "
+                    f"({exported / currently_serving:.0%}), and the artefact in place knows "
+                    f"{recognised:.0%} of them. Real churn does not look like this.")
+            # The artefact in place is describing somebody else's population — on a fresh
+            # install, the synthetic one baked into the image. Nothing about its size tells
+            # us whether this export is sound, so the count floor above is the only guard
+            # that applies.
+            log(f"the artefact in place knows {recognised:.0%} of the exported gamers, so it "
+                "is not a predecessor of this population; skipping the churn check")
 
         run([sys.executable, "-m", "gamebuddy_model", "train",
              "--data", str(data), "--out", str(out)])

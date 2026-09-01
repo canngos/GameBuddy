@@ -10,6 +10,7 @@ import { useUpper } from "../../src/i18n/case";
 import { useCountryName } from "../../src/i18n/countryNames";
 import { useT } from "../../src/i18n/useT";
 import { useThemeColors } from "../../src/theme";
+import { ThemedCardFrame } from "../../src/ui/ThemedCardFrame";
 import {
   Card,
   ErrorNotice,
@@ -32,6 +33,8 @@ export default function Profile() {
   const localize = useCountryName();
 
   const me = useQuery({ queryKey: ["me"], queryFn: profileApi.me });
+  // Only reaches the banner strip when no banner is worn — a picture bought for that
+  // strip beats a colour bought for the card.
   const friends = useQuery({
     queryKey: ["friends"],
     queryFn: socialApi.friends,
@@ -86,76 +89,83 @@ export default function Profile() {
 
       <View className="gap-6">
         {me.data && (
-          <Card className={header.cardGap}>
-            <ProfileBanner source={me.data.banner} />
+          /* The wrapper exists only so the theme's edge has somewhere to sit: it draws
+             just *outside* the card, and a card's own background is painted before any of
+             its children, so a frame mounted inside it would cover the card rather than
+             ring it. See `ThemedCardFrame`. */
+          <View>
+            <ThemedCardFrame theme={me.data.theme} radius={24} />
+            <Card className={header.cardGap}>
+              <ProfileBanner source={me.data.banner} />
 
-            {/* Pulled up over the banner's lower edge, which is the arrangement every
-                profile header uses: it ties the two together instead of stacking a
-                picture on top of an unrelated strip of art. */}
-            <View className={`${header.overlap} flex-row items-end gap-4`}>
-              <FramedAvatar
-                frame={me.data.frame}
-                source={me.data.avatar}
-                name={me.data.username}
-                colorSeed={me.data.userId}
-                size={header.avatar}
-              />
-              <View className="flex-1 gap-0.5 pb-1">
-                {/* The name shrinks and truncates so the tag beside it is never pushed off
-                    the row. A long username losing its tail is a smaller loss than a
-                    membership badge that silently disappears for exactly the people who
-                    have one. */}
-                <View className="flex-row items-center gap-2">
-                  <Text variant="heading" numberOfLines={1} className="shrink">
-                    {me.data.username}
+              {/* Pulled up over the banner's lower edge, which is the arrangement every
+                  profile header uses: it ties the two together instead of stacking a
+                  picture on top of an unrelated strip of art. */}
+              <View className={`${header.overlap} flex-row items-end gap-4`}>
+                <FramedAvatar
+                  frame={me.data.frame}
+                  source={me.data.avatar}
+                  name={me.data.username}
+                  colorSeed={me.data.userId}
+                  size={header.avatar}
+                />
+                <View className="flex-1 gap-0.5 pb-1">
+                  {/* The name shrinks and truncates so the tag beside it is never pushed off
+                      the row. A long username losing its tail is a smaller loss than a
+                      membership badge that silently disappears for exactly the people who
+                      have one. */}
+                  <View className="flex-row items-center gap-2">
+                    <Text variant="heading" numberOfLines={1} className="shrink">
+                      {me.data.username}
+                    </Text>
+                    {isGold && <GoldTag />}
+                  </View>
+                  <Text variant="caption">
+                    {[me.data.age, localize(me.data.country)]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </Text>
-                  {isGold && <GoldTag />}
                 </View>
-                <Text variant="caption">
-                  {[me.data.age, localize(me.data.country)]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
               </View>
-            </View>
 
-            <View className="flex-row gap-3">
-              {/* Two of the three go somewhere, and the count is the way in: a number
-                  you can tap beats the same number printed above a list of the thing it
-                  counts. Coins is the odd one out on purpose — spending them is the
-                  Market's job, and sending people there from here would be a shop
-                  doorway in the middle of a profile. */}
-              <Stat
-                label={t.profile.friends}
-                value={friends.data?.length ?? 0}
-                onPress={() => router.push("/friends")}
-              />
-              <Stat label={t.profile.coins} value={me.data.coin ?? 0} />
-              <Stat
-                label={t.profile.badges}
-                value={me.data.badgeCount ?? 0}
+              <View className="flex-row gap-3">
+                {/* Two of the three go somewhere, and the count is the way in: a number
+                    you can tap beats the same number printed above a list of the thing it
+                    counts. Coins is the odd one out on purpose — spending them is the
+                    Market's job, and sending people there from here would be a shop
+                    doorway in the middle of a profile. */}
+                <Stat
+                  label={t.profile.friends}
+                  value={friends.data?.length ?? 0}
+                  onPress={() => router.push("/friends")}
+                />
+                <Stat label={t.profile.coins} value={me.data.coin ?? 0} />
+                <Stat
+                  label={t.profile.badges}
+                  value={me.data.badgeCount ?? 0}
+                  onPress={() => router.push("/badges")}
+                />
+              </View>
+
+              <Showcase
+                badges={me.data.badges ?? []}
                 onPress={() => router.push("/badges")}
               />
-            </View>
 
-            <Showcase
-              badges={me.data.badges ?? []}
-              onPress={() => router.push("/badges")}
-            />
+              <View className="h-px bg-line" />
 
-            <View className="h-px bg-line" />
-
-            {/* The same pills as the deck, cover art and all — `games` has carried
-                `gameIcon` all along and this used to render only the name. */}
-            <GameSection title={t.profile.games} games={me.data.games} />
-            {/* Directly under games, because it is the second half of the same question:
-                what you play, and what you play it on. */}
-            <Tags title={t.profile.playsOn} items={me.data.platforms ?? []} />
-            <Tags
-              title={t.profile.keywords}
-              items={me.data.keywords.map((k) => k.keywordName)}
-            />
-          </Card>
+              {/* The same pills as the deck, cover art and all — `games` has carried
+                  `gameIcon` all along and this used to render only the name. */}
+              <GameSection title={t.profile.games} games={me.data.games} />
+              {/* Directly under games, because it is the second half of the same question:
+                  what you play, and what you play it on. */}
+              <Tags title={t.profile.playsOn} items={me.data.platforms ?? []} />
+              <Tags
+                title={t.profile.keywords}
+                items={me.data.keywords.map((k) => k.keywordName)}
+              />
+            </Card>
+          </View>
         )}
 
         {/* Friend requests used to sit here. They are now at the top of the messages

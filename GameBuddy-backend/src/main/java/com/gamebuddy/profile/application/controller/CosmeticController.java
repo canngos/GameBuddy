@@ -35,6 +35,17 @@ public class CosmeticController {
         return ResponseEntity.ok(cosmeticService.buy(principal, cosmeticId));
     }
 
+    /**
+     * Buys a whole set. Its own path segment rather than a flag on {@code buy}, because a
+     * bundle id and a cosmetic id name different things and a caller that confused them
+     * should get a 404 rather than a surprise.
+     */
+    @PostMapping("/bundles/{bundleId}/buy")
+    public ResponseEntity<CosmeticsResponse> buyBundle(
+            @AuthenticationPrincipal Gamer principal, @PathVariable String bundleId) {
+        return ResponseEntity.ok(cosmeticService.buyBundle(principal, bundleId));
+    }
+
     @PostMapping("/{cosmeticId}/equip")
     public ResponseEntity<CosmeticsResponse> equip(
             @AuthenticationPrincipal Gamer principal, @PathVariable String cosmeticId) {

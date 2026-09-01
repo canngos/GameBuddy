@@ -22,6 +22,16 @@ public class GamerDto {
      */
     private String frame;
 
+    /**
+     * The card theme this gamer is wearing, as a slug, or null for none.
+     *
+     * <p>This is the one cosmetic that changes the card itself rather than sitting on the
+     * avatar — the deck paints its identity block in the theme's colours instead of the
+     * hue derived from the gamer's id. Colours live in the client; see
+     * {@link com.gamebuddy.shared.entity.CosmeticKind#THEME}.
+     */
+    private String theme;
+
     private List<GamesDto> favoriteGames;
     private List<String> selectedKeywords;
 

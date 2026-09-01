@@ -11,7 +11,6 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.shared.entity.Gamer;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -36,16 +35,6 @@ public class BillingController {
     private final UpgradePromptService upgradePrompts;
 
     /**
-     * Whether the Season Pass teaser is shown.
-     *
-     * <p>Server-side so the card can be withdrawn in a deploy rather than a store release.
-     * Defaults to on: the slot exists to be seen, and a teaser nobody can switch on is the
-     * same as no teaser.
-     */
-    @Value("${gamebuddy.season-pass.teaser:true}")
-    private boolean seasonPassTeaser;
-
-    /**
      * What the gamer currently holds, derived rather than read straight off the row.
      *
      * <p>This is what the app polls after a purchase. The store sheet closing and our
@@ -66,7 +55,6 @@ public class BillingController {
                 // The lobby gate is "is Gold", checked the same way the service checks it,
                 // so the create button can route to the paywall before the round trip.
                 tier == SubscriptionTier.GOLD,
-                seasonPassTeaser,
                 upgradePrompts.isDue(principal));
 
         SubscriptionResponse response = new SubscriptionResponse();

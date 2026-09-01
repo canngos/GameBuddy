@@ -30,6 +30,8 @@ import org.junit.jupiter.api.Test;
 @DisplayName("RewardedAdService")
 class RewardedAdServiceTest {
 
+    private final CoinFaucet faucet = new CoinFaucet(new CoinEconomyProperties());
+
     private static final Instant NOON = Instant.parse("2026-08-12T12:00:00Z");
     private static final String USER = "gamer-1";
     private static final String TXN = "txn-1";
@@ -60,7 +62,8 @@ class RewardedAdServiceTest {
         Clock clock = Clock.fixed(now, ZoneOffset.UTC);
         // A real ledger over a mocked repository: it is what moves the balance, and a
         // stubbed one would make every coin assertion below pass without a coin moving.
-        return new RewardedAdService(gamers, grants, new CoinLedger(mock(CoinLedgerRepository.class), clock), clock);
+        return new RewardedAdService(
+                gamers, faucet, grants, new CoinLedger(mock(CoinLedgerRepository.class), clock), clock);
     }
 
     @Nested
@@ -72,7 +75,7 @@ class RewardedAdServiceTest {
         void paysOut() {
             assertEquals(Outcome.GRANTED, service.grant(TXN, USER));
 
-            assertEquals(CoinFaucet.REWARDED_AD_COINS, gamer.getCoin());
+            assertEquals(faucet.rewardedAdCoins(), gamer.getCoin());
             assertEquals(1, gamer.getRewardedAdsToday());
             assertEquals(CoinFaucet.adDay(NOON), gamer.getRewardedAdDay());
         }
@@ -98,7 +101,7 @@ class RewardedAdServiceTest {
             // The console's reward_amount never reaches this class. The economy is
             // balanced in CoinFaucet, and a fat-fingered 2000 in a web form must not be
             // able to inflate the currency.
-            assertEquals(CoinFaucet.REWARDED_AD_COINS, gamer.getCoin());
+            assertEquals(faucet.rewardedAdCoins(), gamer.getCoin());
         }
     }
 
@@ -126,17 +129,17 @@ class RewardedAdServiceTest {
         @DisplayName("the last advert of the day still pays")
         void capIsInclusive() {
             gamer.setRewardedAdDay(CoinFaucet.adDay(NOON));
-            gamer.setRewardedAdsToday(CoinFaucet.REWARDED_AD_DAILY_CAP - 1);
+            gamer.setRewardedAdsToday(faucet.rewardedAdDailyCap() - 1);
 
             assertEquals(Outcome.GRANTED, service.grant(TXN, USER));
-            assertEquals(CoinFaucet.REWARDED_AD_COINS, gamer.getCoin());
+            assertEquals(faucet.rewardedAdCoins(), gamer.getCoin());
         }
 
         @Test
         @DisplayName("one past the cap pays nothing")
         void capIsEnforced() {
             gamer.setRewardedAdDay(CoinFaucet.adDay(NOON));
-            gamer.setRewardedAdsToday(CoinFaucet.REWARDED_AD_DAILY_CAP);
+            gamer.setRewardedAdsToday(faucet.rewardedAdDailyCap());
 
             assertEquals(Outcome.CAPPED, service.grant(TXN, USER));
             assertEquals(0, gamer.getCoin());
@@ -146,7 +149,7 @@ class RewardedAdServiceTest {
         @DisplayName("a capped transaction is still spent, so it cannot be replayed tomorrow")
         void cappedTransactionIsStillConsumed() {
             gamer.setRewardedAdDay(CoinFaucet.adDay(NOON));
-            gamer.setRewardedAdsToday(CoinFaucet.REWARDED_AD_DAILY_CAP);
+            gamer.setRewardedAdsToday(faucet.rewardedAdDailyCap());
 
             service.grant(TXN, USER);
 
@@ -159,7 +162,7 @@ class RewardedAdServiceTest {
         @DisplayName("yesterday's count does not carry into today")
         void countResetsWithTheDay() {
             gamer.setRewardedAdDay(CoinFaucet.adDay(NOON.minus(Duration.ofDays(1))));
-            gamer.setRewardedAdsToday(CoinFaucet.REWARDED_AD_DAILY_CAP);
+            gamer.setRewardedAdsToday(faucet.rewardedAdDailyCap());
 
             assertEquals(Outcome.GRANTED, service.grant(TXN, USER));
             assertEquals(1, gamer.getRewardedAdsToday());
@@ -169,9 +172,9 @@ class RewardedAdServiceTest {
         @DisplayName("the allowance is read from the stored day, not from the stale count")
         void remainingIgnoresAStaleDay() {
             gamer.setRewardedAdDay(CoinFaucet.adDay(NOON.minus(Duration.ofDays(3))));
-            gamer.setRewardedAdsToday(CoinFaucet.REWARDED_AD_DAILY_CAP);
+            gamer.setRewardedAdsToday(faucet.rewardedAdDailyCap());
 
-            assertEquals(CoinFaucet.REWARDED_AD_DAILY_CAP, service.remainingToday(gamer));
+            assertEquals(faucet.rewardedAdDailyCap(), service.remainingToday(gamer));
         }
     }
 

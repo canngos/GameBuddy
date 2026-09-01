@@ -87,6 +87,14 @@ if (-not $codeSrvUp) {
   throw "Code helper is not running. Start it:  node qa/maestro/code-server.js"
 }
 
+# 07-offline turns airplane mode on and turns it back off at the end. Maestro aborts a flow
+# at the first failed step, so any failure between those two points leaves the emulator with
+# no network — and every flow of the *next* run then fails at sign-in, which looks like a
+# suite-wide regression and is really one stale device setting. Cleared here rather than in
+# 07 itself, because the flow that failed is exactly the one that will not run its cleanup.
+& adb shell "settings put global airplane_mode_on 0" | Out-Null
+& adb shell "cmd connectivity airplane-mode disable" | Out-Null
+
 # `takeScreenshot: artifacts/...` does NOT create its own parent directory. Maestro reports
 # the step COMPLETED either way and writes nothing, so a missing folder looks exactly like a
 # flow that stopped before reaching its screenshots — which is how the whole suite ran for a

@@ -64,7 +64,11 @@ final class WordLists {
 
                 String normalised = TextNormaliser.normalise(trimmed);
                 if (normalised.length() < MIN_LENGTH) {
-                    log.warn("Dropped '{}' from {}: {} characters once normalised", trimmed, resource, normalised.length());
+                    log.warn(
+                            "Dropped '{}' from {}: {} characters once normalised",
+                            trimmed,
+                            resource,
+                            normalised.length());
                     continue;
                 }
                 entries.add(normalised);

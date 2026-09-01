@@ -4,6 +4,8 @@ import com.gamebuddy.shared.badge.BadgeMetric;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import org.springframework.stereotype.Component;
 
 /**
  * Where coins come from, and how much.
@@ -15,56 +17,52 @@ import java.time.temporal.ChronoUnit;
  *
  * <p>All the arithmetic is here rather than in the service so the rates can be read, argued
  * about and tested without a database. The target is 250–400 coins a week for an engaged
- * free player, which puts the cheapest 150-coin frame about a week away and the 1,500-coin
- * flagship about a month away — close enough to be worth working towards, far enough that
- * buying coins is still a real shortcut.
+ * free player — and it is met only by somebody who turns up and watches adverts, which is
+ * the point. It puts the cheapest 150-coin frame about half a week away and the 1,500-coin
+ * flagship about a month away: close enough to work towards, far enough that buying coins
+ * is a real shortcut rather than a formality.
+ *
+ * <p>The numbers themselves live in {@link CoinEconomyProperties}, not here, so the economy
+ * can be retuned by a deployment instead of a release.
  */
-public final class CoinFaucet {
-
-    private CoinFaucet() {}
+@Component
+public class CoinFaucet {
 
     // -- Daily streak --------------------------------------------------------
 
-    /**
-     * What each consecutive day pays, capped at the last entry.
-     *
-     * <p>Rising rather than flat because the point is the streak, not the coins: a fixed
-     * five every day gives nobody a reason to mind breaking it. A week is 125 coins.
-     */
-    private static final int[] DAILY_BY_STREAK = {5, 10, 15, 20, 25, 25, 25};
+    private final CoinEconomyProperties config;
+
+    public CoinFaucet(CoinEconomyProperties config) {
+        this.config = config;
+    }
 
     /**
-     * How long after a claim the next one becomes available.
+     * What the next daily claim would pay, given the streak it would extend to.
      *
-     * <p>A full twenty-four hours, so "daily" means what everybody assumes it means. This
-     * was twenty for a real reason — on a strict day boundary somebody who plays at 9pm and
-     * then at 8pm the next day has "missed a day" and loses a streak they were keeping
-     * perfectly well — but a tester read the shorter window as a bug rather than as
-     * generosity, and a reward rule nobody can predict is worse than a slightly strict one.
-     *
-     * <p>{@link #STREAK_GRACE} is what now absorbs that drift: it stays at 48 hours, so
-     * claiming a few hours later each day costs nothing, and only a genuinely absent day
-     * resets the run.
+     * <p><strong>The ladder cycles; it does not plateau.</strong> It used to clamp at the
+     * last entry, so day 8, day 80 and day 800 all paid the top rate — which meant the
+     * streak stopped rewarding consecutiveness after the first week and became an
+     * unconditional payment for opening the app. Cycling instead means the best days only
+     * ever come at the end of an unbroken run, and breaking one costs them.
      */
-    public static final Duration DAILY_COOLDOWN = Duration.ofHours(24);
+    public int dailyReward(int streakAfterClaim) {
+        List<Integer> ladder = config.getDailyLadder();
+        int index = Math.floorMod(Math.max(1, streakAfterClaim) - 1, ladder.size());
+        return ladder.get(index);
+    }
 
-    /**
-     * How long before a streak is considered broken.
-     *
-     * <p>Deliberately much longer than the cooldown: 48 hours means missing one evening
-     * costs nothing, and only a genuinely absent day resets it.
-     */
-    public static final Duration STREAK_GRACE = Duration.ofHours(48);
-
-    /** What the next daily claim would pay, given the streak it would extend to. */
-    public static int dailyReward(int streakAfterClaim) {
-        int index = Math.max(0, Math.min(streakAfterClaim - 1, DAILY_BY_STREAK.length - 1));
-        return DAILY_BY_STREAK[index];
+    /** The whole cycle, for a client that draws it. */
+    public List<Integer> dailyLadder() {
+        return config.getDailyLadder();
     }
 
     /** Whether the daily claim is available yet. */
-    public static boolean dailyAvailable(Instant lastClaim, Instant now) {
-        return lastClaim == null || !lastClaim.plus(DAILY_COOLDOWN).isAfter(now);
+    public boolean dailyAvailable(Instant lastClaim, Instant now) {
+        return lastClaim == null || !lastClaim.plus(config.getDailyCooldown()).isAfter(now);
+    }
+
+    public Duration dailyCooldown() {
+        return config.getDailyCooldown();
     }
 
     /**
@@ -73,8 +71,9 @@ public final class CoinFaucet {
      * <p>Continues an unbroken run, otherwise starts again at one. Never returns zero: a
      * claim always counts as a day, including the first one.
      */
-    public static int streakAfterClaim(int currentStreak, Instant lastClaim, Instant now) {
-        boolean unbroken = lastClaim != null && lastClaim.plus(STREAK_GRACE).isAfter(now);
+    public int streakAfterClaim(int currentStreak, Instant lastClaim, Instant now) {
+        boolean unbroken =
+                lastClaim != null && lastClaim.plus(config.getStreakGrace()).isAfter(now);
         return unbroken ? currentStreak + 1 : 1;
     }
 
@@ -149,32 +148,6 @@ public final class CoinFaucet {
     // -- Rewarded video ------------------------------------------------------
 
     /**
-     * What one finished ad pays.
-     *
-     * <p>Twenty, against a daily streak that starts at five. An ad is the only faucet that
-     * costs the gamer something real — thirty seconds they did not want to spend — so
-     * paying less than the free daily claim would make it an insult rather than an option.
-     *
-     * <p>It is also the only faucet that earns us money, and the rate has to stay below
-     * what that is worth. A rewarded impression is worth roughly one to three cents; five a
-     * day at twenty coins is 100 coins for perhaps five to fifteen cents of revenue, which
-     * keeps the cheapest 150-coin frame about two days of watching away and leaves the coin
-     * packs a real shortcut rather than a formality.
-     */
-    public static final int REWARDED_AD_COINS = 20;
-
-    /**
-     * How many may be watched per day.
-     *
-     * <p>Capped for the gamer's sake before ours. Uncapped, the fastest way to afford
-     * anything becomes watching thirty adverts in a row, which is a worse game than the one
-     * we are trying to make and burns out the ad inventory that pays for it. Five is enough
-     * to be a real alternative to buying and short enough that nobody organises their
-     * evening around it.
-     */
-    public static final int REWARDED_AD_DAILY_CAP = 5;
-
-    /**
      * The UTC day an instant falls in, as the key the daily cap counts against.
      *
      * <p>A calendar day rather than a rolling window, unlike {@link #DAILY_COOLDOWN} above.
@@ -187,9 +160,34 @@ public final class CoinFaucet {
     }
 
     /** How many more ads this gamer may be paid for today. */
-    public static int rewardedAdsLeft(int watchedToday, Instant lastAdDay, Instant now) {
+    /**
+     * What one finished advert pays.
+     *
+     * <p>The only faucet that costs the gamer something real — half a minute they did not
+     * want to spend — so it has to beat the free daily claim, and the only one that earns
+     * us anything, so it must stay under what an impression is worth. A rewarded view
+     * clears roughly one to two cents; the cap below is what keeps the day's total near
+     * that rather than several times it.
+     */
+    public int rewardedAdCoins() {
+        return config.getAdCoins();
+    }
+
+    /**
+     * How many may be watched per day.
+     *
+     * <p>Capped for the gamer before us: uncapped, the fastest route to anything is
+     * watching adverts in a row, which is a worse product than the one being paid for.
+     */
+    public int rewardedAdDailyCap() {
+        return config.getAdDailyCap();
+    }
+
+    /** How many more ads this gamer may be paid for today. */
+    public int rewardedAdsLeft(int watchedToday, Instant lastAdDay, Instant now) {
         boolean sameDay = lastAdDay != null && lastAdDay.equals(adDay(now));
-        return sameDay ? Math.max(0, REWARDED_AD_DAILY_CAP - watchedToday) : REWARDED_AD_DAILY_CAP;
+        int cap = config.getAdDailyCap();
+        return sameDay ? Math.max(0, cap - watchedToday) : cap;
     }
 
     // -- Gold stipend --------------------------------------------------------
@@ -197,25 +195,24 @@ public final class CoinFaucet {
     /**
      * What a Gold member is paid a month, on top of everything above.
      *
-     * <p>Enough to matter — four cheap frames, or most of a flagship — because a
-     * subscription that only removes limits gives somebody nothing to look forward to. It
-     * is also the cheapest retention we have: it costs us nothing real and it is forfeited
-     * by cancelling.
+     * <p>Enough to matter, because a subscription that only removes limits gives nobody
+     * anything to look forward to. It is also the cheapest retention there is: it costs
+     * nothing real and it is forfeited by cancelling.
      */
-    public static final int STIPEND = 600;
+    public int stipend() {
+        return config.getStipend();
+    }
 
-    public static final Duration STIPEND_INTERVAL = Duration.ofDays(30);
-
-    public static boolean stipendAvailable(Instant lastClaim, Instant now) {
-        return lastClaim == null || !lastClaim.plus(STIPEND_INTERVAL).isAfter(now);
+    public boolean stipendAvailable(Instant lastClaim, Instant now) {
+        return lastClaim == null || !lastClaim.plus(config.getStipendInterval()).isAfter(now);
     }
 
     /** When the next stipend is due, or null when one is available now. */
-    public static Instant nextStipendAt(Instant lastClaim, Instant now) {
+    public Instant nextStipendAt(Instant lastClaim, Instant now) {
         if (lastClaim == null) {
             return null;
         }
-        Instant next = lastClaim.plus(STIPEND_INTERVAL);
+        Instant next = lastClaim.plus(config.getStipendInterval());
         return next.isAfter(now) ? next : null;
     }
 }

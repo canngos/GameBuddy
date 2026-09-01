@@ -440,6 +440,17 @@ export const sv: Dictionary = {
       free: 'Gratis',
       coinsPrice: (n: number) => `${n} mynt`,
       animatedSuffix: ', animerad',
+      previewOn: { FRAME: 'På din avatar', BANNER: 'På din profil', THEME: 'På ditt kort' },
+      themes: 'Teman',
+      bundles: 'Paket',
+      bundlesBlurb: 'Ett matchande set, billigare än delarna var för sig.',
+      bundleParts: (n: number) => `${n} mynt separat`,
+      bundleSaving: (n: number) => `Spara ${n}`,
+      bundleTogether: 'Burna ihop',
+      bundleOwned: 'Du äger det här setet',
+      bundleA11y: (name: string, price: number, saving: number) =>
+        `Paketet ${name}, ${price} mynt, sparar ${saving}`,
+      previewA11y: (name: string) => `Förhandsvisa ${name}`,
       ownedA11y: (name: string) => `${name}, ägd. Ta på den från ditt Förråd.`,
       buyA11y: (name: string, price: number) => `Köp ${name}, ${price} mynt`,
       cantAffordA11y: (name: string, price: number) =>
@@ -521,13 +532,6 @@ export const sv: Dictionary = {
       onTheWayBody: 'De kan dröja en stund. Du behöver inte köpa igen.',
     },
 
-    season: {
-      header: 'Säsongspass',
-      coming: 'Kommer snart',
-      blurb: 'Nya belöningar varje säsong.',
-      a11y: 'Säsongspass. Kommer snart — nya belöningar varje säsong.',
-    },
-
     gold: {
       done: 'Klar',
       continuePrice: (price: string) => `Fortsätt — ${price}`,
@@ -573,14 +577,19 @@ export const sv: Dictionary = {
     inventory: {
       title: 'Förråd',
       subtitle: 'Vad du äger, och vad du har på dig',
-      noFramesYet: 'Inga ramar än',
-      noBannersYet: 'Inga banners än',
-      emptyBlurbFrames:
-        'Allt du köper i Butiken hamnar här. Gratisramarna är redan dina.',
-      emptyBlurbBanners: 'Allt du köper i Butiken hamnar här. Gratisbanners är redan dina.',
+      nothingYet: { FRAME: 'Inga ramar än', BANNER: 'Inga banners än', THEME: 'Inga teman än' },
+      emptyBlurb: {
+        FRAME: 'Allt du köper i Marknaden hamnar här. Gratis ramar är redan dina.',
+        BANNER: 'Allt du köper i Marknaden hamnar här. Gratis banners är redan dina.',
+        THEME: 'Allt du köper i Marknaden hamnar här.',
+      },
+      kindLabel: { FRAME: 'Ram', BANNER: 'Banner', THEME: 'Kortstema' },
       goToMarket: 'Gå till Butiken',
-      takeOffFrame: 'Ta av min ram',
-      takeOffBanner: 'Ta av min banner',
+      takeOff: {
+        FRAME: 'Ta av min ram',
+        BANNER: 'Ta av min banner',
+        THEME: 'Ta av mitt tema',
+      },
     },
 
     badges: {
@@ -731,6 +740,27 @@ export const sv: Dictionary = {
     passwordHint: 'Loggar ut dig överallt',
     blocked: 'Blockerade',
     blockedHint: 'Vilka du har blockerat',
+    promo: 'Kampanjkoder',
+    promoHint: 'Lös in en kod mot mynt eller Gold',
+    promoScreen: {
+      title: 'Kampanjkoder',
+      subtitle: 'Koder som skickas till dig dyker upp här. Du kan också skriva in en.',
+      waiting: 'Väntar på dig',
+      waitingEmpty: 'Inget väntar just nu.',
+      enterTitle: 'Skriv in en kod',
+      codeLabel: 'Kod',
+      codeHint: 'Bokstäver och siffror, hur den än är skriven.',
+      redeem: 'Lös in',
+      validUntil: (date: string) => `Gäller till ${date}`,
+      rewardCoins: (n: number) => `${n} mynt`,
+      rewardGold: (days: number) => `${days} ${days === 1 ? 'dag' : 'dagar'} Gold`,
+      successCoinsTitle: 'Mynt tillagda',
+      successCoinsBody: (balance: number) => `Du har nu ${balance} mynt.`,
+      successGoldTitle: 'Gold är ditt',
+      successGoldBody: (date: string) => `Gold gäller till ${date}.`,
+      history: 'Redan använda',
+      done: 'Klart',
+    },
     gamesScreen: {
       title: 'Spel du spelar',
       subtitle: (n: number) => `Minst ${n}. Ändrar du dessa ändras vem du visas för.`,
@@ -890,6 +920,13 @@ export const sv: Dictionary = {
       '183': 'Avsluta eller avbryt din nuvarande lobby först.',
       '185': 'Ägaren har redan svarat på din förfrågan.',
       '187': 'Det användarnamnet är inte tillåtet. Välj ett annat.',
+      '190': 'Koden är inte giltig.',
+      '191': 'Koden har gått ut.',
+      '192': 'Koden är redan helt använd.',
+      '193': 'Du har redan använt den här koden.',
+      '194': 'Koden skickades till ett annat konto.',
+      '195': 'Det finns redan en kod med det namnet.',
+      '196': 'Det kontot kan inte ta emot en kod.',
     },
   },
 

@@ -236,28 +236,76 @@ COMMIT;
 -- The migration that added it supplies `DEFAULT false`; the entity does not declare
 -- one, so a schema built by Hibernate from the entities has the column NOT NULL with
 -- no default and this insert fails on it. Being explicit works on both paths.
+-- Sort order is the shelf order, and it runs by price within each kind. It is not derived
+-- from price, because Orbit and Toxic are both 900 and something has to break the tie —
+-- upgrade-2026-35-shelf-expansion.sql renumbers an existing database to exactly this, row
+-- for row, and the two files have to be changed together.
 INSERT INTO cosmetic (id, kind, name, asset_key, animated, price, sort_order, membership_only, created_date) VALUES
   ('948fe89b-b161-5324-8fe3-d54014739e97', 'FRAME', 'Steel', 'frames/frame-steel.png', false, 0, 0, false, now()),
   ('c65bd3d8-6b59-546a-ac85-8f9bd080b279', 'FRAME', 'Signature', 'frames/frame-brand.png', false, 100, 1, false, now()),
   ('202e2cb8-5e54-577e-8ea1-2a56d4aa6a5d', 'FRAME', 'Reticle', 'frames/frame-reticle.png', false, 150, 2, false, now()),
   ('772595df-1b8a-5c40-b18a-fafa83de3297', 'FRAME', 'Bronze', 'frames/frame-bronze.png', false, 200, 3, false, now()),
-  ('7767adda-3c57-5bb8-9c19-66e3668d961c', 'FRAME', 'Gold', 'frames/frame-gold.png', false, 0, 4, true, now()),
-  ('5111d8c6-c0e3-5320-8a22-e06fe89883c1', 'FRAME', 'Pulse', 'frames/frame-pulse.webp', true, 600, 5, false, now()),
-  ('df6369a3-e370-5c22-9fa5-4e51bab9cdec', 'FRAME', 'Sweep', 'frames/frame-sweep.webp', true, 750, 6, false, now()),
-  ('089fed4f-abc2-5193-ac25-5aa437fd52a0', 'FRAME', 'Orbit', 'frames/frame-orbit.webp', true, 900, 7, false, now()),
-  ('0473126d-f42e-5971-8e64-d6e2a26bed08', 'FRAME', 'Toxic', 'frames/frame-toxic.webp', true, 900, 8, false, now()),
-  ('90f6a11b-fa77-561b-9722-6c5b0ee79d09', 'FRAME', 'Rotor', 'frames/frame-rotor.webp', true, 1200, 9, false, now()),
-  ('32fa7c71-9011-59d9-9155-4e5e710e974c', 'FRAME', 'Ember', 'frames/frame-ember.webp', true, 1500, 10, false, now()),
-  ('1f0c9f4e-2b6a-4d3e-9c47-5a8b1e7d6c20', 'BANNER', 'Gold', 'banners/banner-gold.jpg', false, 0, 0, true, now()),
+  ('1b92c03c-e367-509a-96bf-eae0b7eb9c86', 'FRAME', 'Ticker', 'frames/frame-ticker.png', false, 250, 4, false, now()),
+  ('05f5e4a3-c9b8-5dd0-8432-f55ce3a9fee5', 'FRAME', 'Scope', 'frames/frame-scope.png', false, 300, 5, false, now()),
+  ('62e2927e-9e17-5cc3-b0ed-a61363fecc34', 'FRAME', 'Hazard', 'frames/frame-hazard.png', false, 350, 6, false, now()),
+  ('0773088f-2bbe-5674-b8b9-12ee13d4b4ab', 'FRAME', 'Hive', 'frames/frame-hive.png', false, 400, 7, false, now()),
+  ('5111d8c6-c0e3-5320-8a22-e06fe89883c1', 'FRAME', 'Pulse', 'frames/frame-pulse.webp', true, 600, 8, false, now()),
+  ('5cca8449-895c-5fec-aadd-6d78ff66d797', 'FRAME', 'Frost', 'frames/frame-frost.webp', true, 700, 9, false, now()),
+  ('df6369a3-e370-5c22-9fa5-4e51bab9cdec', 'FRAME', 'Sweep', 'frames/frame-sweep.webp', true, 750, 10, false, now()),
+  ('28b357fc-34c8-515d-b0b5-d4b1b6364d2f', 'FRAME', 'Radar', 'frames/frame-radar.webp', true, 850, 11, false, now()),
+  ('089fed4f-abc2-5193-ac25-5aa437fd52a0', 'FRAME', 'Orbit', 'frames/frame-orbit.webp', true, 900, 12, false, now()),
+  ('0473126d-f42e-5971-8e64-d6e2a26bed08', 'FRAME', 'Toxic', 'frames/frame-toxic.webp', true, 900, 13, false, now()),
+  ('b60b497f-4675-5431-80db-73ee6fad0109', 'FRAME', 'Pulsar', 'frames/frame-pulsar.webp', true, 900, 14, false, now()),
+  ('57ebafa3-efdd-5d4a-97ec-abab3c0c8ff7', 'FRAME', 'Comet', 'frames/frame-comet.webp', true, 1000, 15, false, now()),
+  ('4b5d091f-1563-5e06-b9f0-3771c537484b', 'FRAME', 'Reactor', 'frames/frame-reactor.webp', true, 1100, 16, false, now()),
+  ('90f6a11b-fa77-561b-9722-6c5b0ee79d09', 'FRAME', 'Rotor', 'frames/frame-rotor.webp', true, 1200, 17, false, now()),
+  ('06cc2ed3-c81a-545f-8326-08ad8b1f56fa', 'FRAME', 'Glitch', 'frames/frame-glitch.webp', true, 1300, 18, false, now()),
+  ('32fa7c71-9011-59d9-9155-4e5e710e974c', 'FRAME', 'Ember', 'frames/frame-ember.webp', true, 1500, 19, false, now()),
+  ('7767adda-3c57-5bb8-9c19-66e3668d961c', 'FRAME', 'Gold', 'frames/frame-gold.png', false, 0, 99, true, now()),
   ('5c03c249-15e3-5e97-98e7-e2b659e3c444', 'BANNER', 'Hex', 'banners/banner-hex.jpg', false, 100, 0, false, now()),
   ('c4793a6f-b11f-544e-8fb5-50070bc6e7c3', 'BANNER', 'CRT', 'banners/banner-crt.jpg', false, 100, 1, false, now()),
-  ('40fe7f85-d3e0-5def-942e-4be7d6c36fc3', 'BANNER', 'Bokeh', 'banners/banner-bokeh.jpg', false, 200, 2, false, now()),
-  ('23a03605-0cbe-5abf-80d3-59a1fcea2397', 'BANNER', 'Circuit', 'banners/banner-circuit.jpg', false, 300, 3, false, now()),
-  ('c637135f-3d1c-58b9-84ed-a7d2c3bad9c1', 'BANNER', 'Void', 'banners/banner-void.jpg', false, 400, 4, false, now()),
-  ('a217b933-c1e1-5a13-aa29-e36321cd1cbd', 'BANNER', 'Arena', 'banners/banner-arena.jpg', false, 500, 5, false, now()),
-  ('0fe0e4e0-9c3b-5526-87af-46b192ca596d', 'BANNER', 'Dusk', 'banners/banner-dusk.jpg', false, 600, 6, false, now()),
-  ('10db4e23-1579-5f41-83f9-e4db8f75d93a', 'BANNER', 'Synthwave', 'banners/banner-synthwave.jpg', false, 800, 7, false, now())
+  ('68211f9e-a59d-542f-a84a-069c06ebc4e5', 'BANNER', 'Overworld', 'banners/banner-overworld.jpg', false, 150, 2, false, now()),
+  ('40fe7f85-d3e0-5def-942e-4be7d6c36fc3', 'BANNER', 'Bokeh', 'banners/banner-bokeh.jpg', false, 200, 3, false, now()),
+  ('f5bde1b9-bf9f-5267-a345-20a47766df23', 'BANNER', 'Dungeon', 'banners/banner-dungeon.jpg', false, 250, 4, false, now()),
+  ('23a03605-0cbe-5abf-80d3-59a1fcea2397', 'BANNER', 'Circuit', 'banners/banner-circuit.jpg', false, 300, 5, false, now()),
+  ('06ef4e5a-f087-55d4-9fe4-4021317773f5', 'BANNER', 'WASD', 'banners/banner-wasd.jpg', false, 350, 6, false, now()),
+  ('c637135f-3d1c-58b9-84ed-a7d2c3bad9c1', 'BANNER', 'Void', 'banners/banner-void.jpg', false, 400, 7, false, now()),
+  ('611ccbc1-0023-5034-8bbc-d001e50d5ca8', 'BANNER', 'Gamepad', 'banners/banner-gamepad.jpg', false, 450, 8, false, now()),
+  ('a217b933-c1e1-5a13-aa29-e36321cd1cbd', 'BANNER', 'Arena', 'banners/banner-arena.jpg', false, 500, 9, false, now()),
+  ('049eebbd-ed44-5b0e-b020-5cfe0981c153', 'BANNER', 'Chicane', 'banners/banner-chicane.jpg', false, 550, 10, false, now()),
+  ('0fe0e4e0-9c3b-5526-87af-46b192ca596d', 'BANNER', 'Dusk', 'banners/banner-dusk.jpg', false, 600, 11, false, now()),
+  ('62f866ae-4469-518f-b559-8de5665e68b4', 'BANNER', 'Minimap', 'banners/banner-minimap.jpg', false, 650, 12, false, now()),
+  ('8061631c-015e-520f-bafb-38fef6f1924d', 'BANNER', 'Tabletop', 'banners/banner-tabletop.jpg', false, 700, 13, false, now()),
+  ('10db4e23-1579-5f41-83f9-e4db8f75d93a', 'BANNER', 'Synthwave', 'banners/banner-synthwave.jpg', false, 800, 14, false, now()),
+  ('ab747ebe-46af-5103-8d42-e5396041b1eb', 'BANNER', 'Zone', 'banners/banner-zone.jpg', false, 900, 15, false, now()),
+  ('0a03c68f-90d1-535e-8ee8-ac3a3a0cdbe0', 'BANNER', 'Signal', 'banners/banner-signal.webp', true, 1000, 16, false, now()),
+  ('13b630c2-67f9-5771-91e6-5b0cd5e23c0b', 'BANNER', 'Nebula', 'banners/banner-nebula.webp', true, 1100, 17, false, now()),
+  ('b80de761-d961-5ec0-854a-587ae2b03839', 'BANNER', 'Core', 'banners/banner-core.webp', true, 1300, 18, false, now()),
+  ('1f0c9f4e-2b6a-4d3e-9c47-5a8b1e7d6c20', 'BANNER', 'Gold', 'banners/banner-gold.jpg', false, 0, 99, true, now()),
+  -- Themes carry a slug where the others carry a file: the colours live in the app, in
+  -- src/theme/cardThemes.js. See upgrade-2026-37 for why.
+  ('9851c503-c432-5da5-8901-a4be534fdf7b', 'THEME', 'Viridian', 'themes/viridian', false, 400, 0, false, now()),
+  ('440b494f-4d46-55b6-a4b4-14ecdc5df2a6', 'THEME', 'Glacier', 'themes/glacier', false, 500, 1, false, now()),
+  ('6881863d-b621-509d-ab32-ad50b8fcebcb', 'THEME', 'Midnight', 'themes/midnight', false, 600, 2, false, now()),
+  ('b92b2dee-2e69-50e0-8401-c49d0adcc8a1', 'THEME', 'Cinder', 'themes/cinder', false, 750, 3, false, now()),
+  ('a639fa37-2e66-509d-9f17-a5086ad01088', 'THEME', 'Royal', 'themes/royal', true, 900, 4, false, now()),
+  ('fafea371-1ac5-54ad-bca2-715478f149a5', 'THEME', 'Nova', 'themes/nova', true, 1200, 5, false, now())
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name, asset_key = EXCLUDED.asset_key, animated = EXCLUDED.animated,
   price = EXCLUDED.price, sort_order = EXCLUDED.sort_order,
   membership_only = EXCLUDED.membership_only;
+
+-- Bundles: a price on a set, not a thing to own. Buying one writes the same ownership
+-- rows two separate purchases would -- see upgrade-2026-36 and CosmeticBundle.
+INSERT INTO cosmetic_bundle (id, name, price, sort_order, created_date) VALUES
+  ('3956f857-1381-56a6-aabd-11795ec8d26e', 'Deep Space', 1600, 0, now()),
+  ('bf79fbbb-191e-59cc-b24f-3c145740aa5d', 'Meltdown', 1900, 1, now())
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name, price = EXCLUDED.price, sort_order = EXCLUDED.sort_order;
+
+INSERT INTO cosmetic_bundle_item (bundle_id, cosmetic_id) VALUES
+  ('3956f857-1381-56a6-aabd-11795ec8d26e', 'b60b497f-4675-5431-80db-73ee6fad0109'),
+  ('3956f857-1381-56a6-aabd-11795ec8d26e', '13b630c2-67f9-5771-91e6-5b0cd5e23c0b'),
+  ('bf79fbbb-191e-59cc-b24f-3c145740aa5d', '4b5d091f-1563-5e06-b9f0-3771c537484b'),
+  ('bf79fbbb-191e-59cc-b24f-3c145740aa5d', 'b80de761-d961-5ec0-854a-587ae2b03839')
+ON CONFLICT DO NOTHING;

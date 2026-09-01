@@ -5,20 +5,25 @@ import { Sparkles } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { billingApi } from '../../src/api/billing';
+import { profileApi } from '../../src/api/catalogue';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import { ApiError, Code } from '../../src/api/envelope';
-import type { Cosmetic, CosmeticStore } from '../../src/api/types';
+import type { Bundle, Cosmetic, CosmeticKind, CosmeticStore } from '../../src/api/types';
 import { useUpper } from '../../src/i18n/case';
 import { useT } from '../../src/i18n/useT';
 import { CoinBalance } from '../../src/market/CoinBalance';
 import { CoinShop } from '../../src/market/CoinShop';
+import { BundlePreview } from '../../src/market/BundlePreview';
+import { BundleShelf } from '../../src/market/BundleShelf';
 import { ConsumableShelf } from '../../src/market/ConsumableShelf';
-import { SeasonPassTeaser } from '../../src/market/SeasonPassTeaser';
+import { CosmeticPreview } from '../../src/market/CosmeticPreview';
 import { EarnCoins } from '../../src/market/EarnCoins';
-import { useThemeColors } from '../../src/theme';
+import { useGamerGradient, useThemeColors } from '../../src/theme';
+import { ThemeSwatch } from '../../src/market/ThemeSwatch';
 import {
   Card,
   ErrorNotice,
+  GradientView,
   Screen,
   Segment,
   SegmentRow,
@@ -48,19 +53,29 @@ export default function Market() {
   const upper = useUpper();
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<'EARN' | 'SHOP'>('EARN');
-  const [kind, setKind] = useState<'FRAME' | 'BANNER'>('FRAME');
+  const [kind, setKind] = useState<CosmeticKind>('FRAME');
   const [failure, setFailure] = useState<string | null>(null);
   /** Set when a purchase was refused for want of coins, which has its own way out. */
   const [shortOfCoins, setShortOfCoins] = useState(false);
+  /**
+   * The item being looked at up close, or null.
+   *
+   * Holds the item rather than its id so the sheet keeps rendering the thing that was
+   * tapped even as the store refetches underneath it — an id would have to be looked up
+   * again on every render, and a purchase rewrites that list.
+   */
+  const [preview, setPreview] = useState<Cosmetic | null>(null);
+  /** The set being looked at up close. Its own state: a bundle is not one of the items. */
+  const [bundlePreview, setBundlePreview] = useState<Bundle | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const coinShopY = useRef(0);
 
   const store = useQuery({ queryKey: STORE_KEY, queryFn: cosmeticsApi.store });
 
-  // Same key as GoldCard's own query, so react-query serves both from one request. Read
-  // here only for the Season Pass flag — the card itself knows nothing about tiers.
-  const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
+  // The shopper's own face, for the preview sheet. Same key the profile and the deck's
+  // filters already use, so this is served from cache rather than being a new request.
+  const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
 
   /**
    * Buying answers with the whole refreshed store, so the response is written straight into
@@ -88,6 +103,11 @@ export default function Market() {
    * scrolls to the packs, and that is all.
    */
   const onError = (error: unknown) => {
+    // Both answers below are rendered on the shelf, behind the preview. Closing it is what
+    // lets the refusal actually be read — and what puts the "see coin packs" way out within
+    // reach of the tap that follows.
+    setPreview(null);
+    setBundlePreview(null);
     if (error instanceof ApiError && error.is(Code.COIN_NOT_ENOUGH)) {
       setShortOfCoins(true);
       setFailure(null);
@@ -120,8 +140,11 @@ export default function Market() {
     mutationFn: cosmeticsApi.buy,
     onSuccess: (next: CosmeticStore, id: string) => {
       applyStore(next);
+      // The preview exists to help decide, and the decision has now been made. Leaving it
+      // up would show a "Buy" button for something already bought.
+      setPreview(null);
 
-      const bought = [...next.frames, ...next.banners].find((item) => item.id === id);
+      const bought = [...next.frames, ...next.banners, ...next.themes].find((item) => item.id === id);
 
       feedback.purchase();
       showToast({
@@ -138,11 +161,43 @@ export default function Market() {
     onError,
   });
 
-  const busy = buy.isPending;
+  /**
+   * Buying a set. Its own mutation because it hits its own endpoint, but it lives here
+   * rather than in the shelf so the shelf and the preview sheet share one — two would mean
+   * two toasts and two in-flight flags for the same purchase.
+   */
+  const buyBundle = useMutation({
+    mutationFn: cosmeticsApi.buyBundle,
+    onSuccess: (next: CosmeticStore, id: string) => {
+      applyStore(next);
+      setBundlePreview(null);
+
+      const bought = next.bundles.find((b) => b.id === id);
+      feedback.purchase();
+      showToast({
+        id: `bundle:${id}`,
+        title: bought ? t.market.shop.boughtTitle(bought.name) : t.market.shop.bought,
+        body: t.market.shop.boughtBody,
+        icon: Sparkles,
+        tone: 'gold',
+        onPress: () => router.push('/inventory'),
+      });
+    },
+    onError,
+  });
+
+  const busy = buy.isPending || buyBundle.isPending;
   // Memoised so it is a stable input to the memo below; the `?? []` fallback minted a
   // fresh array every render while the store was still loading.
   const all = useMemo(
-    () => (kind === 'FRAME' ? (store.data?.frames ?? []) : (store.data?.banners ?? [])),
+    () => {
+      const shelves: Record<CosmeticKind, Cosmetic[] | undefined> = {
+        FRAME: store.data?.frames,
+        BANNER: store.data?.banners,
+        THEME: store.data?.themes,
+      };
+      return shelves[kind] ?? [];
+    },
     [kind, store.data],
   );
 
@@ -164,6 +219,8 @@ export default function Market() {
   // these rows are .map()ed into a ScrollView, so all of them re-rendered together.
   const { mutate: buyMutate } = buy;
   const onBuy = useCallback((id: string) => buyMutate(id), [buyMutate]);
+  const onPreview = useCallback((item: Cosmetic) => setPreview(item), []);
+  const onBundlePreview = useCallback((bundle: Bundle) => setBundlePreview(bundle), []);
 
   return (
     <Screen scroll edges={['top']} scrollRef={scrollRef}>
@@ -211,6 +268,16 @@ export default function Market() {
 
           <ConsumableShelf balance={store.data?.coins ?? 0} />
 
+          {/* Sets, above the individual shelves: a bundle is an offer about rows further
+              down, and mixing it in with them would make those look priced twice. */}
+          <BundleShelf
+            bundles={store.data?.bundles ?? []}
+            balance={store.data?.coins ?? 0}
+            busy={busy}
+            onBuy={buyBundle.mutate}
+            onPreview={onBundlePreview}
+          />
+
           {/* Cosmetics are what everything else is spent on, and the one section that
               keeps working with an empty balance — the free frames are here. */}
           <View className="gap-1 pb-3">
@@ -229,6 +296,11 @@ export default function Market() {
                 label={t.market.shop.banners}
                 active={kind === 'BANNER'}
                 onPress={() => setKind('BANNER')}
+              />
+              <Segment
+                label={t.market.shop.themes}
+                active={kind === 'THEME'}
+                onPress={() => setKind('THEME')}
               />
             </SegmentRow>
           </View>
@@ -273,6 +345,7 @@ export default function Market() {
                 balance={store.data?.coins ?? 0}
                 busy={busy}
                 onBuy={onBuy}
+                onPreview={onPreview}
               />
             ))}
 
@@ -288,14 +361,39 @@ export default function Market() {
                 {t.market.shop.equipInInventory}
               </Text>
             </Pressable>
-
-            {/* Last, not second. It says "Coming soon", and a placeholder above the things
-                that actually work was the single biggest waste of space on this screen.
-                Server-switchable: absent, not empty, when the flag is off. */}
-            {subscription.data?.seasonPassTeaser && <SeasonPassTeaser />}
           </View>
         </>
       )}
+
+      {/* A `Modal`, so it is unaffected by sitting inside this screen's ScrollView — see the
+          component for why that rules out the app's usual sheet pattern here. */}
+      {/* Buying from the sheet closes it — the decision has been made, and leaving it up
+          would offer a Buy button for something already owned. */}
+      <BundlePreview
+        bundle={bundlePreview}
+        avatar={me.data?.avatar}
+        username={me.data?.username}
+        userId={me.data?.userId}
+        affordable={(bundlePreview?.price ?? 0) <= (store.data?.coins ?? 0)}
+        busy={busy}
+        onBuy={(id) => {
+          setBundlePreview(null);
+          buyBundle.mutate(id);
+        }}
+        onClose={() => setBundlePreview(null)}
+      />
+
+      <CosmeticPreview
+        item={preview}
+        avatar={me.data?.avatar}
+        username={me.data?.username}
+        userId={me.data?.userId}
+        wornFrame={me.data?.frame}
+        affordable={(preview?.price ?? 0) <= (store.data?.coins ?? 0)}
+        busy={busy}
+        onBuy={onBuy}
+        onClose={() => setPreview(null)}
+      />
     </Screen>
   );
 }
@@ -323,15 +421,20 @@ const Row = memo(function Row({
   balance,
   busy,
   onBuy,
+  onPreview,
 }: {
   item: Cosmetic;
   balance: number;
   busy: boolean;
   onBuy: (id: string) => void;
+  onPreview: (item: Cosmetic) => void;
 }) {
   const t = useT();
   const isBanner = item.kind === 'BANNER';
+  const isTheme = item.kind === 'THEME';
+  const themeStops = useGamerGradient(item.id, item.theme);
   const press = useCallback(() => onBuy(item.id), [onBuy, item.id]);
+  const preview = useCallback(() => onPreview(item), [onPreview, item]);
 
   /*
    * Affordability only decides between Buy and "Not enough coins" — owned items never reach
@@ -372,51 +475,92 @@ const Row = memo(function Row({
    */
   const costClass = free ? 'text-muted' : 'font-medium text-gold';
 
+  /*
+   * The artwork and the name open a closer look; the button beside them still buys.
+   *
+   * Two targets in one row rather than one, because they answer different questions — "what
+   * is this" and "I'll take it" — and a single tap that did both would put a purchase one
+   * mis-tap away from a glance. It is also why the pressable stops short of the control:
+   * nesting one button inside another leaves a screen reader announcing a button within a
+   * button, and the row's own label would swallow the price the buy control has to say.
+   *
+   * Owned items are not pressable at all. There is nothing left to decide about something
+   * already bought, and it lives in the Inventory now — an affordance here would lead to a
+   * sheet whose only offer is a button that cannot be pressed.
+   */
+  const canPreview = !item.owned;
+
+  const artwork = (
+    <>
+      {/* A frame is shown against a plain disc so the ring reads as a ring rather
+          than as a picture with a hole punched in it. A theme has no picture at all — it
+          is drawn as a swatch of the two colours it would paint a card in. */}
+      <View
+        className={
+          isTheme
+            ? ''
+            : isBanner
+              ? 'h-16 w-24 overflow-hidden rounded-xl bg-raised'
+              : 'h-16 w-16 items-center justify-center rounded-full bg-raised'
+        }
+      >
+        {isTheme ? (
+          <ThemeSwatch stops={themeStops} />
+        ) : (
+        <Image
+          source={{ uri: item.image ?? undefined }}
+          style={FILL}
+          contentFit={isBanner ? 'cover' : 'contain'}
+          autoplay
+          transition={150}
+          // The catalogue does not change between visits, and these are animated WebPs
+          // — the most expensive thing to decode in the app. A disk cache means the
+          // second visit to the shop costs nothing, and `recyclingKey` keeps the
+          // previous item's art out of a reused cell.
+          cachePolicy="memory-disk"
+          recyclingKey={item.id}
+        />
+        )}
+      </View>
+
+      {/*
+        Both lines truncate rather than wrap, which they now can afford to do: this column
+        is about 105dp when the control reads "Not enough coins", and a bare price fits
+        in that on one line where "Animated · 600 coins" did not.
+
+        The "Animated" tag is gone from here on purpose — the preview to the left is
+        *playing*, so the word was captioning something already on screen, and it was
+        crowding the one thing that does need reading. It survives in the control's
+        accessibility label below, where the animation cannot be seen.
+      */}
+      <View className="min-w-0 flex-1 gap-0.5">
+        <Text variant="bodyStrong" numberOfLines={1}>
+          {item.name}
+        </Text>
+        <Text variant="caption" numberOfLines={1} className={costClass}>
+          {cost}
+        </Text>
+      </View>
+    </>
+  );
+
   return (
     <Card>
       <View className="flex-row items-center gap-4">
-        {/* A frame is shown against a plain disc so the ring reads as a ring rather
-            than as a picture with a hole punched in it. */}
-        <View
-          className={
-            isBanner
-              ? 'h-16 w-24 overflow-hidden rounded-xl bg-raised'
-              : 'h-16 w-16 items-center justify-center rounded-full bg-raised'
-          }
-        >
-          <Image
-            source={{ uri: item.image }}
-            style={FILL}
-            contentFit={isBanner ? 'cover' : 'contain'}
-            autoplay
-            transition={150}
-            // The catalogue does not change between visits, and these are animated WebPs
-            // — the most expensive thing to decode in the app. A disk cache means the
-            // second visit to the shop costs nothing, and `recyclingKey` keeps the
-            // previous item's art out of a reused cell.
-            cachePolicy="memory-disk"
-            recyclingKey={item.id}
-          />
-        </View>
-
-        {/*
-          Both lines truncate rather than wrap, which they now can afford to do: this column
-          is about 105dp when the control reads "Not enough coins", and a bare price fits
-          in that on one line where "Animated · 600 coins" did not.
-
-          The "Animated" tag is gone from here on purpose — the preview to the left is
-          *playing*, so the word was captioning something already on screen, and it was
-          crowding the one thing that does need reading. It survives in the control's
-          accessibility label below, where the animation cannot be seen.
-        */}
-        <View className="min-w-0 flex-1 gap-0.5">
-          <Text variant="bodyStrong" numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text variant="caption" numberOfLines={1} className={costClass}>
-            {cost}
-          </Text>
-        </View>
+        {canPreview ? (
+          <Pressable
+            onPress={preview}
+            accessibilityRole="button"
+            accessibilityLabel={t.market.shop.previewA11y(
+              `${item.name}${item.animated ? t.market.shop.animatedSuffix : ''}`,
+            )}
+            className="min-w-0 flex-1 flex-row items-center gap-4 active:opacity-70"
+          >
+            {artwork}
+          </Pressable>
+        ) : (
+          <View className="min-w-0 flex-1 flex-row items-center gap-4">{artwork}</View>
+        )}
 
         <Pressable
           // Owned is as disabled as unaffordable, and for a better reason: there is simply

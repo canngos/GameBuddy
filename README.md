@@ -247,6 +247,16 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-26-column-bounds.sql` | fcm_token widened; a warning on subscription_tier. |
 | `db/upgrade-2026-27-lobby.sql` | Game lobbies: lobby, lobby_member, lobby_message. |
 | `db/upgrade-2026-28-retire-community.sql` | Community tables dropped; lobby quest baseline. |
+| `db/upgrade-2026-29-game-platforms.sql` | What each game is played on.                  |
+| `db/upgrade-2026-30-claimable-steel.sql` | One free item, and it has to be claimed.     |
+| `db/upgrade-2026-31-retire-deck-boost.sql` | The deck boost is gone.                    |
+| `db/upgrade-2026-32-lobby-boost.sql` | 300 coins to sit at the top of the lobby list.   |
+| `db/upgrade-2026-33-password-reset.sql` | Purpose-scoped codes, hashed, and reset tickets. |
+| `db/upgrade-2026-34-super-likes.sql` | Remembers which likes were super likes.          |
+| `db/upgrade-2026-35-shelf-expansion.sql` | Eight more frames and banners; shelf renumbered. |
+| `db/upgrade-2026-36-market-wave-2.sql` | Animated banners, two animated frames, and bundles. |
+| `db/upgrade-2026-37-profile-themes.sql` | Card themes: a third cosmetic kind, and its slot. |
+| `db/upgrade-2026-38-promo-codes.sql` | Promotion codes: the code, who it was addressed to, and who redeemed it. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 | `db/delete-seed.sql`              | Removes the synthetic accounts. Not a migration — see above. |
 

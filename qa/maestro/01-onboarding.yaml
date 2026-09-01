@@ -34,6 +34,11 @@ name: 01 onboarding
     visible: "I already have one"
     timeout: 60000
 - tapOn: "I already have one"
+
+# This flow signs in inline rather than through `_login.yaml`, so it needs the consent
+# form answered here too. See `_consent.yaml`.
+- runFlow: _consent.yaml
+
 - assertVisible: "Welcome back"
 
 - tapOn:
@@ -183,17 +188,39 @@ name: 01 onboarding
 # seeded data whose titles are not guaranteed — a flow that depends on "Valorant" being
 # present breaks the day the catalogue changes.
 #
-# Two per screenful, then scroll — **not** three taps at three heights. The grid rows are
-# about 775px tall on this device, so only the first row is properly on screen: a third tap
-# aimed at "the row below" at 58% landed back on the first row and *deselected* the card the
-# first tap had just selected. One game ended up chosen, Continue stayed disabled saying
-# "2 more to go", and the flow failed on the next screen's title with nothing to suggest the
-# cause was here.
+# Scrolled *before* the first taps, and that is what was actually wrong. The title above
+# comes from the step header, which is the FlatList's own list header — it and the genre
+# filter row take up the top half of the first screenful, so a tap at 45% lands on chrome
+# rather than on a card. Every run selected two games instead of four, the counter read
+# "1 more to go", and the blame fell on the scroll in between.
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# An explicit swipe rather than `- scroll`: `scroll` travels a fixed fraction of the
+# viewport that is not tied to the row height, so whether a later pair of taps lands on new
+# cards or back on the same two is a coincidence of geometry. A drag from 85% to 15% covers
+# about 1680px against rows about 775px tall — better than two rows — so each pair is
+# always looking at cards no earlier pair touched. Slow, because a fast flick adds momentum
+# and makes the distance travelled a property of the physics rather than of the gesture.
+- swipe:
+    start: "50%,85%"
+    end: "50%,15%"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 5000
+
 - tapOn:
     point: "25%,45%"
 - tapOn:
     point: "75%,45%"
-- scroll
+
+- swipe:
+    start: "50%,85%"
+    end: "50%,15%"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 5000
+
 - tapOn:
     point: "25%,45%"
 - tapOn:
@@ -234,20 +261,36 @@ name: 01 onboarding
     visible: "How do you play?"
     timeout: 20000
 # Five keywords is the minimum, and unlike the games grid this is a **full-width vertical
-# list** — one keyword per row, each about 6.5% of the screen tall. The x coordinate
+# list** — one keyword per row, each about 7.5% of the screen tall. The x coordinate
 # therefore carries no information: the pairs at 25% and 70% that used to be here hit the
 # same row twice and toggled it straight back off, leaving one keyword picked out of five.
 # One column, five row centres.
+#
+# Scrolled past the step header first, exactly as the games grid above is, and here getting
+# it wrong is louder than a missed tap: the header ends in a **search field**, so the first
+# tap at 35% focused it and raised the keyboard, which then covered the rows the remaining
+# four taps were aimed at. Two keywords picked, "3 more to go", and a screenshot full of
+# Gboard.
+- waitForAnimationToEnd:
+    timeout: 10000
+- swipe:
+    start: "50%,85%"
+    end: "50%,15%"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# 10% apart against rows about 7.5% tall, so no two taps can share a row.
 - tapOn:
-    point: "50%,35%"
+    point: "50%,20%"
 - tapOn:
-    point: "50%,43%"
+    point: "50%,30%"
+- tapOn:
+    point: "50%,40%"
 - tapOn:
     point: "50%,50%"
 - tapOn:
-    point: "50%,58%"
-- tapOn:
-    point: "50%,65%"
+    point: "50%,60%"
 - takeScreenshot: artifacts/01-10-keywords
 - assertVisible: ".*selected"
 - scrollUntilVisible:

@@ -196,16 +196,13 @@ class DefaultLobbyServiceTest {
         @Test
         @DisplayName("without the now filter, the start bound is far enough away to mean 'no bound'")
         void testBrowse_whenUnfiltered_AppliesNoEffectiveStartBound() {
-            when(lobbyRepository.browse(
-                            eq(LobbyStatus.OPEN), any(), eq(page)))
+            when(lobbyRepository.browse(eq(LobbyStatus.OPEN), any(), eq(page)))
                     .thenReturn(new PageImpl<>(List.of(lobby)));
 
             lobbyService.browse(owner, null, null, false, page);
 
             ArgumentCaptor<Instant> bound = ArgumentCaptor.forClass(Instant.class);
-            verify(lobbyRepository)
-                    .browse(
-                            eq(LobbyStatus.OPEN), bound.capture(), eq(page));
+            verify(lobbyRepository).browse(eq(LobbyStatus.OPEN), bound.capture(), eq(page));
             // Beyond any startsAt creation will accept, so every open lobby is included.
             assertTrue(bound.getValue().isAfter(NOW.plus(DefaultLobbyService.STARTS_AT_HORIZON)));
         }
@@ -213,32 +210,27 @@ class DefaultLobbyServiceTest {
         @Test
         @DisplayName("the now filter bounds the query at a quarter of an hour from now")
         void testBrowse_whenStartingSoon_BoundsAtFifteenMinutes() {
-            when(lobbyRepository.browse(
-                            eq(LobbyStatus.OPEN), any(), eq(page)))
+            when(lobbyRepository.browse(eq(LobbyStatus.OPEN), any(), eq(page)))
                     .thenReturn(new PageImpl<>(List.of(lobby)));
 
             lobbyService.browse(owner, null, null, true, page);
 
             ArgumentCaptor<Instant> bound = ArgumentCaptor.forClass(Instant.class);
-            verify(lobbyRepository)
-                    .browse(
-                            eq(LobbyStatus.OPEN), bound.capture(), eq(page));
+            verify(lobbyRepository).browse(eq(LobbyStatus.OPEN), bound.capture(), eq(page));
             assertEquals(NOW.plus(DefaultLobbyService.STARTING_SOON), bound.getValue());
         }
 
         @Test
         @DisplayName("the now filter narrows alongside tone rather than replacing it")
         void testBrowse_whenStartingSoonAndTone_CombinesBoth() {
-            when(lobbyRepository.browseByTone(
-                            eq(LobbyStatus.OPEN), any(), eq(LobbyTone.COMPETITIVE), eq(page)))
+            when(lobbyRepository.browseByTone(eq(LobbyStatus.OPEN), any(), eq(LobbyTone.COMPETITIVE), eq(page)))
                     .thenReturn(new PageImpl<>(List.of(lobby)));
 
             lobbyService.browse(owner, null, LobbyTone.COMPETITIVE, true, page);
 
             ArgumentCaptor<Instant> bound = ArgumentCaptor.forClass(Instant.class);
             verify(lobbyRepository)
-                    .browseByTone(
-                            eq(LobbyStatus.OPEN), bound.capture(), eq(LobbyTone.COMPETITIVE), eq(page));
+                    .browseByTone(eq(LobbyStatus.OPEN), bound.capture(), eq(LobbyTone.COMPETITIVE), eq(page));
             assertEquals(NOW.plus(DefaultLobbyService.STARTING_SOON), bound.getValue());
         }
 
@@ -248,8 +240,7 @@ class DefaultLobbyServiceTest {
             // The bound is an upper one only: somebody is sitting in that lobby waiting,
             // which is the most "about to start" a lobby gets.
             lobby.setStartsAt(NOW.minus(Duration.ofMinutes(20)));
-            when(lobbyRepository.browse(
-                            eq(LobbyStatus.OPEN), any(), eq(page)))
+            when(lobbyRepository.browse(eq(LobbyStatus.OPEN), any(), eq(page)))
                     .thenReturn(new PageImpl<>(List.of(lobby)));
 
             var response = lobbyService.browse(owner, null, null, true, page);
@@ -261,8 +252,7 @@ class DefaultLobbyServiceTest {
         @DisplayName("a blocked pair's lobby is left out of the feed entirely")
         void testBrowse_whenOwnerBlocked_OmitsTheLobby() {
             owner.getBlockedFriends().add(requester);
-            when(lobbyRepository.browse(
-                            eq(LobbyStatus.OPEN), any(), eq(page)))
+            when(lobbyRepository.browse(eq(LobbyStatus.OPEN), any(), eq(page)))
                     .thenReturn(new PageImpl<>(List.of(lobby)));
 
             var response = lobbyService.browse(requester, null, null, false, page);
@@ -280,7 +270,8 @@ class DefaultLobbyServiceTest {
             Gamer basic = newGamer("basic@example.com", "basic");
             when(gamerRepository.findById(basic.getUserId())).thenReturn(Optional.of(basic));
 
-            assertEquals(TransactionCode.SUBSCRIPTION_REQUIRED, codeOf(() -> lobbyService.create(basic, createRequest())));
+            assertEquals(
+                    TransactionCode.SUBSCRIPTION_REQUIRED, codeOf(() -> lobbyService.create(basic, createRequest())));
             verify(lobbyRepository, never()).save(any());
         }
 
@@ -289,7 +280,8 @@ class DefaultLobbyServiceTest {
         void testCreate_whenGoldExpired_RefusesWithSubscriptionRequired() {
             owner.setSubscriptionExpiresAt(NOW.minus(Duration.ofDays(1)));
 
-            assertEquals(TransactionCode.SUBSCRIPTION_REQUIRED, codeOf(() -> lobbyService.create(owner, createRequest())));
+            assertEquals(
+                    TransactionCode.SUBSCRIPTION_REQUIRED, codeOf(() -> lobbyService.create(owner, createRequest())));
         }
 
         @Test
@@ -313,7 +305,8 @@ class DefaultLobbyServiceTest {
             when(lobbyRepository.existsByOwnerIdAndStatusIn(eq(owner.getUserId()), any()))
                     .thenReturn(true);
 
-            assertEquals(TransactionCode.LOBBY_LIMIT_REACHED, codeOf(() -> lobbyService.create(owner, createRequest())));
+            assertEquals(
+                    TransactionCode.LOBBY_LIMIT_REACHED, codeOf(() -> lobbyService.create(owner, createRequest())));
         }
 
         @Test
@@ -467,9 +460,7 @@ class DefaultLobbyServiceTest {
             when(memberRepository.countByLobbyIdAndStatusIn(eq(lobby.getId()), any()))
                     .thenReturn(1L);
             when(memberRepository.findAllByLobbyId(lobby.getId()))
-                    .thenReturn(List.of(
-                            member(owner.getUserId(), LobbyMemberStatus.OWNER),
-                            row));
+                    .thenReturn(List.of(member(owner.getUserId(), LobbyMemberStatus.OWNER), row));
 
             lobbyService.accept(owner, lobby.getId(), requester.getUserId());
 
@@ -481,7 +472,8 @@ class DefaultLobbyServiceTest {
             ArgumentCaptor<NotificationRequestedEvent> event =
                     ArgumentCaptor.forClass(NotificationRequestedEvent.class);
             verify(events).publishEvent(event.capture());
-            assertEquals(NotificationKind.LOBBY_REQUEST_ACCEPTED, event.getValue().kind());
+            assertEquals(
+                    NotificationKind.LOBBY_REQUEST_ACCEPTED, event.getValue().kind());
         }
 
         @Test
@@ -558,8 +550,7 @@ class DefaultLobbyServiceTest {
             owner.setCoin(500);
             lobby.setBoostedAt(NOW.minus(Duration.ofHours(1)));
 
-            assertEquals(
-                    TransactionCode.LOBBY_ALREADY_BOOSTED, codeOf(() -> lobbyService.boost(owner, lobby.getId())));
+            assertEquals(TransactionCode.LOBBY_ALREADY_BOOSTED, codeOf(() -> lobbyService.boost(owner, lobby.getId())));
             assertEquals(500, owner.getCoin());
         }
 

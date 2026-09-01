@@ -32,11 +32,8 @@ public class LobbyBadgeMetrics implements BadgeMetricSource {
         // Teams this gamer has been part of: lobbies they opened and lobbies they were
         // accepted into. A pending or rejected request achieved nothing yet; a LEFT or
         // KICKED row no longer counts — the metric is standing, not history.
-        counts.put(
-                BadgeMetric.LOBBIES_JOINED,
-                (int) memberRepository.countByUserIdAndStatusIn(
-                        gamer.getUserId(),
-                        EnumSet.of(LobbyMemberStatus.OWNER, LobbyMemberStatus.ACCEPTED)));
+        counts.put(BadgeMetric.LOBBIES_JOINED, (int) memberRepository.countByUserIdAndStatusIn(
+                gamer.getUserId(), EnumSet.of(LobbyMemberStatus.OWNER, LobbyMemberStatus.ACCEPTED)));
         return counts;
     }
 }

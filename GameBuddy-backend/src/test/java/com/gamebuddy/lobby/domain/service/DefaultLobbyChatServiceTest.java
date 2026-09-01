@@ -164,8 +164,10 @@ class DefaultLobbyChatServiceTest {
                 "who has a fifth?", new String(saved.getValue().getBody(), java.nio.charset.StandardCharsets.UTF_8));
         assertEquals(
                 "who has a fifth?",
-                cipher.decrypt(saved.getValue().getBody(), saved.getValue().getNonce(), saved.getValue()
-                        .getKeyVersion()));
+                cipher.decrypt(
+                        saved.getValue().getBody(),
+                        saved.getValue().getNonce(),
+                        saved.getValue().getKeyVersion()));
 
         // Fan-out to the owner's email — the STOMP principal — and not back to the author.
         verify(messaging).sendToUser(eq("owner@example.com"), eq("/queue/lobby"), any());
@@ -178,7 +180,8 @@ class DefaultLobbyChatServiceTest {
         assertEquals(owner.getUserId(), event.getValue().recipientId());
 
         // The author gets the screened text back.
-        assertEquals("who has a fifth?", response.getBody().getData().getMessage().getMessage());
+        assertEquals(
+                "who has a fifth?", response.getBody().getData().getMessage().getMessage());
     }
 
     @Test
@@ -225,7 +228,8 @@ class DefaultLobbyChatServiceTest {
         stored.setNonce(encrypted.nonce());
         stored.setKeyVersion(MessageCipher.CURRENT_KEY_VERSION);
         stored.setCreatedAt(NOW.minus(Duration.ofMinutes(5)));
-        when(messageRepository.findAllByLobbyIdOrderByCreatedAtAsc(lobby.getId())).thenReturn(List.of(stored));
+        when(messageRepository.findAllByLobbyIdOrderByCreatedAtAsc(lobby.getId()))
+                .thenReturn(List.of(stored));
 
         var response = chatService.messages(member, lobby.getId());
 
@@ -238,7 +242,8 @@ class DefaultLobbyChatServiceTest {
     @DisplayName("an ended lobby's history stays readable — what was that guy's Discord again?")
     void testMessages_whenEnded_StillReadable() {
         lobby.setStatus(LobbyStatus.ENDED);
-        when(messageRepository.findAllByLobbyIdOrderByCreatedAtAsc(lobby.getId())).thenReturn(List.of());
+        when(messageRepository.findAllByLobbyIdOrderByCreatedAtAsc(lobby.getId()))
+                .thenReturn(List.of());
 
         assertDoesNotThrow(() -> chatService.messages(member, lobby.getId()));
     }

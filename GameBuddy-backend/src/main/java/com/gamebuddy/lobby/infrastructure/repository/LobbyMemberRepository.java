@@ -26,6 +26,5 @@ public interface LobbyMemberRepository extends JpaRepository<LobbyMember, LobbyM
     List<LobbyMember> findAllByLobbyIdAndStatus(UUID lobbyId, LobbyMemberStatus status);
 
     /** Sweeper: everyone to notify across a batch of lobbies being cancelled. */
-    List<LobbyMember> findAllByLobbyIdInAndStatusIn(
-            Collection<UUID> lobbyIds, Collection<LobbyMemberStatus> statuses);
+    List<LobbyMember> findAllByLobbyIdInAndStatusIn(Collection<UUID> lobbyIds, Collection<LobbyMemberStatus> statuses);
 }

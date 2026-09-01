@@ -18,6 +18,14 @@ public interface CosmeticService {
      */
     CosmeticsResponse buy(Gamer principal, String cosmeticId);
 
+    /**
+     * Spends coins on a whole set at the set's price.
+     *
+     * <p>Refuses outright if any part is already owned — see the implementation for why
+     * that is better than a partial grant or a prorated price.
+     */
+    CosmeticsResponse buyBundle(Gamer principal, String bundleId);
+
     /** Wears one. Replaces whatever occupied that slot. */
     CosmeticsResponse equip(Gamer principal, String cosmeticId);
 

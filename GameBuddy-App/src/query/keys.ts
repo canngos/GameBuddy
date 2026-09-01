@@ -37,6 +37,7 @@ export const QUERY_KEYS = [
   'my-lobbies',
   'notificationPreferences',
   'presence',
+  'promo',
   'recommendations',
   'sentRequests',
   'subscription',

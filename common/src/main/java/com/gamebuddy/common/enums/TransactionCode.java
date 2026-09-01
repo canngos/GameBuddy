@@ -233,6 +233,58 @@ public enum TransactionCode {
      */
     USERNAME_NOT_ALLOWED(187, "Pick a different username — that one is not allowed", HttpStatus.BAD_REQUEST),
 
+    BUNDLE_NOT_FOUND(188, "Bundle not found", HttpStatus.NOT_FOUND),
+
+    /**
+     * A bundle is all-or-nothing: it refuses rather than charging for the half you lack.
+     *
+     * <p>Its own code rather than {@link #COSMETIC_ALREADY_OWNED} because the remedy is
+     * different — that one means "you have this", this one means "buy the other piece on
+     * its own" — and the client says so.
+     */
+    BUNDLE_PARTLY_OWNED(189, "You already own part of this bundle", HttpStatus.CONFLICT),
+
+    /**
+     * A promotion code that does not exist — mistyped, or one an administrator has since
+     * disabled or deleted.
+     *
+     * <p>Disabled and deleted deliberately answer the same thing as a typo. The person
+     * holding the code can do nothing about either, and "this code was switched off" is a
+     * statement about staff activity that a redemption screen has no business making.
+     */
+    PROMO_CODE_INVALID(190, "That code is not valid", HttpStatus.NOT_FOUND),
+
+    /** The validity window closed. Separate from invalid: the code was real, and late. */
+    PROMO_CODE_EXPIRED(191, "That code has expired", HttpStatus.GONE),
+
+    /** The code has been redeemed as many times as it was allowed to be. */
+    PROMO_CODE_EXHAUSTED(192, "That code has been fully used", HttpStatus.CONFLICT),
+
+    /**
+     * This account has already redeemed this code.
+     *
+     * <p>Its own code rather than {@link #PROMO_CODE_EXHAUSTED} because the remedy differs:
+     * that one means "you were too late", this one means "you already have it", and a
+     * second tap on a slow-looking button is the ordinary way to arrive here.
+     */
+    PROMO_CODE_ALREADY_REDEEMED(193, "You have already used this code", HttpStatus.CONFLICT),
+
+    /**
+     * A code issued to specific accounts, redeemed by somebody else.
+     *
+     * <p>Told honestly rather than folded into {@link #PROMO_CODE_INVALID}: the usual way
+     * to reach this is a friend passing on a code that was addressed to them, and "that
+     * code is not valid" would send them hunting for a typo that does not exist. Nothing
+     * is disclosed — the code was already in their hands.
+     */
+    PROMO_CODE_NOT_YOURS(194, "That code belongs to another account", HttpStatus.FORBIDDEN),
+
+    /** An administrator asked for a code string that is already taken. */
+    PROMO_CODE_EXISTS(195, "A code with that name already exists", HttpStatus.CONFLICT),
+
+    /** An administrator assigned a code to an account that is gone, banned, or staff. */
+    PROMO_USER_NOT_FOUND(196, "That account cannot receive a code", HttpStatus.NOT_FOUND),
+
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);
 
