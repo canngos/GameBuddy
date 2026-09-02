@@ -12,6 +12,8 @@ import {
 } from "react-native";
 import { badgesApi } from "../../src/api/badges";
 import type { Badge, BadgeBoard, UserInfo } from "../../src/api/types";
+import { useReducedMotion } from 'react-native-reanimated';
+import { BadgeAura } from '../../src/ui/BadgeAura';
 import { useT } from "../../src/i18n/useT";
 import { useThemeColors } from "../../src/theme";
 import {
@@ -37,6 +39,8 @@ const grid = StyleSheet.create({
 const TILE = grid.tile;
 const COLUMN = grid.column;
 const ICON = grid.icon;
+/** The tile art's side, which the aura has to be sized against. */
+const GRID_ICON = 82;
 
 /**
  * Badges: what there is to do, and what has been done.
@@ -238,6 +242,7 @@ const Tile = memo(function Tile({
   onPress: (code: string) => void;
 }) {
   const t = useT();
+  const reduceMotion = useReducedMotion();
   const press = useCallback(() => onPress(badge.code), [onPress, badge.code]);
 
   return (
@@ -254,11 +259,23 @@ const Tile = memo(function Tile({
       className="mb-5 items-center active:opacity-70"
     >
       <View className={badge.earned ? "opacity-100" : "opacity-35"}>
+        {/* Only on a hard badge somebody actually holds. An aura behind a locked one
+            would advertise it as theirs, and the dimming above is what says it is not. */}
+        <BadgeAura size={GRID_ICON} active={badge.tier === "PRISMATIC" && badge.earned} />
         <Image
           source={{ uri: badge.icon }}
           style={ICON}
           contentFit="contain"
           transition={150}
+          // Two badges have animated WebP artwork. Without this they would sit still,
+          // because nothing here ever needed to move before — every animated *cosmetic*
+          // site in the app already passes it.
+          //
+          // Gated on the same two conditions as the aura, and for the same reasons: a
+          // locked badge is a dimmed picture rather than a prize being advertised, and
+          // somebody who asked for less motion meant the artwork too. `expo-image` shows
+          // the first frame when this is false, so it degrades to a still.
+          autoplay={badge.animated && badge.earned && !reduceMotion}
           // A disk cache and a recycling key: the catalogue is fixed, so the second visit
           // to this screen should paint from disk, and a recycled cell must not show the
           // previous badge's art while the new one decodes.
@@ -285,7 +302,11 @@ const Tile = memo(function Tile({
             badge.collected ? "text-center text-muted" : "text-center text-gold"
           }
         >
-          {badge.collected ? t.market.badges.earned : `+${badge.reward}`}
+          {badge.collected
+            ? t.market.badges.earned
+            : badge.cosmeticName
+              ? t.market.badges.rewardFrame
+              : `+${badge.reward}`}
         </Text>
       ) : (
         <Text variant="caption" className="text-center text-muted">
@@ -323,6 +344,7 @@ function Detail({
   // The art is the sheet's largest single element, so it is the first thing to give.
   const badgeArt = useScreenScale().pick(96, 116, 132);
   const t = useT();
+  const reduceMotion = useReducedMotion();
   return (
     <Modal
       visible={!!badge}
@@ -356,11 +378,16 @@ function Detail({
               showsVerticalScrollIndicator={false}
             >
               <View className={badge.earned ? "opacity-100" : "opacity-35"}>
+                {/* A `withRepeat` loop started in an effect is fine inside a Modal; it is
+                    Reanimated *entering* animations that do not run there on Android — see
+                    the note in `CosmeticPreview.tsx`. */}
+                <BadgeAura size={badgeArt} active={badge.tier === "PRISMATIC" && badge.earned} />
                 <Image
                   source={{ uri: badge.icon }}
                   style={{ width: badgeArt, height: badgeArt }}
                   contentFit="contain"
                   transition={150}
+                  autoplay={badge.animated && badge.earned && !reduceMotion}
                   cachePolicy="memory-disk"
                 />
               </View>
@@ -382,7 +409,11 @@ function Detail({
             <View className="w-full gap-2 px-6 pb-10 pt-3">
               {badge.earned && !badge.collected && (
                 <Button
-                  label={t.market.badges.claimCoins(badge.reward)}
+                  label={
+                    badge.cosmeticName
+                      ? t.market.badges.claimFrame(badge.cosmeticName)
+                      : t.market.badges.claimCoins(badge.reward)
+                  }
                   onPress={onCollect}
                   loading={busy}
                 />

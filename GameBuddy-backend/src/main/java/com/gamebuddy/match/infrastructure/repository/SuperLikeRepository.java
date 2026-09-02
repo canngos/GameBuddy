@@ -34,4 +34,13 @@ public interface SuperLikeRepository extends JpaRepository<SuperLike, SuperLike.
     @Modifying
     @Query("DELETE FROM SuperLike s WHERE s.userId = :userId AND s.targetId = :targetId")
     int clear(@Param("userId") String userId, @Param("targetId") String targetId);
+
+    /**
+     * Super likes this gamer has sent — the {@code SUPER_LIKES_SENT} metric.
+     *
+     * <p>The primary key is (userId, targetId), so this counts people rather than taps: a
+     * second super like at the same person was never a second row. That is the honest
+     * reading of the mission too — "super like five gamers", not "press it five times".
+     */
+    long countByUserId(String userId);
 }

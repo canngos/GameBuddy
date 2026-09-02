@@ -1546,6 +1546,21 @@ ANIMATED_FRAMES = {
     # to match it — Pulsar with Nebula, Reactor with Core.
     "frame-pulsar": lambda: anim_pulsar(ICE, CYAN),
     "frame-reactor": lambda: anim_reactor(GRAPHITE, LIME),
+    # --- trophies: earned, never sold --------------------------------------
+    #
+    # One per PRISMATIC badge that pays in a cosmetic rather than in coins. The `cosmetic`
+    # row carries `unlocked_by_badge`, which is what keeps them off the shelf; nothing here
+    # knows about that, and nothing here needs to.
+    #
+    # Each takes its badge's accent from badges/generate.py, so the pair reads as one award
+    # — the two generators already share a palette for exactly this kind of reason. They
+    # reuse existing loops rather than inventing four more: the colour and the count are
+    # what make a trophy recognisable next to its badge, and a fifth animation style would
+    # be four more things to get subtly wrong.
+    "frame-magnetic": lambda: anim_orbit(BRAND, (255, 190, 200), dots=5),
+    "frame-unbroken": lambda: anim_sweep(CYAN, (200, 250, 255)),
+    "frame-collector": lambda: anim_spin_segments(GOLD, (255, 236, 178), count=9),
+    "frame-trailblazer": lambda: anim_comet((255, 255, 255), (200, 255, 180), LIME),
 }
 
 #: Animated banners. Separate from BANNERS because they save as looping WebP rather than

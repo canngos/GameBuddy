@@ -89,6 +89,7 @@ public class DefaultAuthService implements AuthService {
     private final AvatarsRepository avatarsRepository;
     private final GamerCosmeticRepository gamerCosmeticRepository;
     private final GamerBadgeRepository gamerBadgeRepository;
+    private final GamerMissionRepository gamerMissionRepository;
     private final ObjectStorage objectStorage;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -693,6 +694,11 @@ public class DefaultAuthService implements AuthService {
         // Badges too. What somebody achieved is a record of what they did here, and the
         // showcase is the part of it other people could see.
         gamerBadgeRepository.deleteAllByUserId(gamer.getUserId());
+
+        // And the missions they were dealt. The rows carry a snapshot of how much they had
+        // talked and matched at the moment each set was handed out, which is a sketch of
+        // somebody's activity over months — exactly the kind of thing a deletion is for.
+        gamerMissionRepository.deleteAllByUserId(gamer.getUserId());
 
         gamer.setDeletedAt(Instant.now());
         gamer.revokeIssuedTokens();

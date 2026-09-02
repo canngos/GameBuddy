@@ -51,6 +51,8 @@ export type ShowcasedBadge = {
   title: string;
   description: string;
   icon: string;
+  /** True when the artwork is animated WebP and the image needs `autoplay`. */
+  animated: boolean;
 };
 
 export type GamerSummary = {
@@ -203,14 +205,24 @@ export type Rewind = {
   coinBalance: number;
 };
 
-/** One weekly quest, with this week's progress. */
-export type Quest = {
-  /** The enum name, which is what a claim is addressed to. */
+/** Which pool a mission set was drawn from. Rises across the campaign, then stays HARD. */
+export type MissionBand = 'EASY' | 'MEDIUM' | 'HARD';
+
+/** One dealt mission, with progress made since it was dealt. */
+export type Mission = {
+  /**
+   * The stable kebab-case code. Both what a claim is addressed to and the key the title is
+   * translated by — see `t.market.earn.missionTitles`.
+   */
   code: string;
+  /** English, from the server. A fallback for a mission this build has no key for yet. */
   title: string;
+  /** 0, 1 or 2. Sent so the three keep their order rather than the list's. */
+  slot: number;
   /** Capped at `target` by the server, so a progress bar needs no guard. */
   progress: number;
   target: number;
+  /** Frozen when this was dealt: retuning the rates cannot move it under the gamer. */
   reward: number;
   claimed: boolean;
 };
@@ -223,7 +235,15 @@ export type Earn = {
   streak: number;
   /** ISO instant, or null when available now or never claimed. */
   dailyReadyAt: string | null;
-  quests: Quest[];
+  /** The three on screen. Never more, never fewer — finishing all three deals the next. */
+  missions: Mission[];
+  /** Which deal this is, counting from the gamer's first. 1-based. */
+  missionSet: number;
+  /** How long the campaign is, so the header can say "set 5 of 8" rather than a bare number. */
+  missionSetsTotal: number;
+  missionBand: MissionBand;
+  /** True once the campaign is done and the pool has started repeating at the opening rate. */
+  missionVeteran: boolean;
   stipendAvailable: boolean;
   stipendAmount: number;
   /** ISO instant, or null when available now or not a member. */
@@ -467,6 +487,8 @@ export type Bundle = {
  * `progress` is capped at `target` by the server, so a bar can be drawn straight from
  * the two without guarding against 47/10 on a badge whose counter has moved on.
  */
+export type BadgeTier = 'BRONZE' | 'SILVER' | 'GOLD' | 'PRISMATIC';
+
 export type Badge = {
   code: string;
   title: string;
@@ -475,8 +497,19 @@ export type Badge = {
   icon: string;
   progress: number;
   target: number;
-  /** Coins credited on collection. */
+  /**
+   * Coins credited on collection.
+   *
+   * Zero exactly when `cosmeticName` is set — the four hardest badges hand over a frame
+   * instead of coins, so the two are never both present and never both absent.
+   */
   reward: number;
+  /** How hard it was. PRISMATIC is the hard tier, and the only one the app animates. */
+  tier: BadgeTier;
+  /** True when the artwork is animated WebP and the image needs `autoplay`. */
+  animated: boolean;
+  /** The frame this unlocks, for the badges that pay in cosmetics. Null for the rest. */
+  cosmeticName: string | null;
   earned: boolean;
   /** Earned and the coins already claimed. Always false on an unearned badge. */
   collected: boolean;

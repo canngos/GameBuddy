@@ -3,11 +3,14 @@ package com.gamebuddy.profile.domain.badge;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.profile.infrastructure.repository.RewardedAdGrantRepository;
 import com.gamebuddy.shared.badge.BadgeMetric;
+import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.entity.Cosmetic;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.Games;
 import com.gamebuddy.shared.entity.Keywords;
+import com.gamebuddy.shared.repository.GamerBadgeRepository;
 import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import java.util.Map;
 import java.util.Set;
@@ -32,12 +35,27 @@ class ProfileBadgeMetricsTest {
     @Mock
     private GamerCosmeticRepository ownershipRepository;
 
+    @Mock
+    private GamerBadgeRepository badgeRepository;
+
+    @Mock
+    private RewardedAdGrantRepository adGrantRepository;
+
+    @Mock
+    private CoinLedgerRepository ledgerRepository;
+
     private Gamer gamer;
 
     @BeforeEach
     void setUp() {
         gamer = newGamer("me");
         when(ownershipRepository.findOwnedIds(anyString())).thenReturn(Set.of());
+        // The three counting repositories default to a fresh account. Every test that
+        // cares about one of them says so; the rest would otherwise NPE on a metric they
+        // are not about.
+        when(badgeRepository.countByUserId(anyString())).thenReturn(0L);
+        when(adGrantRepository.countByUserId(anyString())).thenReturn(0L);
+        when(ledgerRepository.sumSpent(anyString())).thenReturn(0L);
     }
 
     private static Gamer newGamer(String name) {
@@ -126,5 +144,61 @@ class ProfileBadgeMetricsTest {
         }
 
         assertEquals(0, measure().get(BadgeMetric.PROFILE_COMPLETENESS));
+    }
+
+    // --- the metrics the mission campaign added -----------------------------
+
+    @Test
+    @DisplayName("likes sent counts everyone swiped at, where matches counts only the mutual ones")
+    void likesAreNotMatches() {
+        Gamer other = newGamer("other");
+        // One-sided: this gamer said yes, the other never answered.
+        gamer.getApprovedMatches().add(other);
+
+        Map<BadgeMetric, Integer> out = measure();
+
+        assertEquals(1, out.get(BadgeMetric.LIKES_SENT));
+        assertEquals(0, out.get(BadgeMetric.MATCHES));
+    }
+
+    @Test
+    @DisplayName("the streak is what it is now; the claim total remembers every day")
+    void streakAndTotalAreDifferentQuestions() {
+        gamer.setDailyStreak(3);
+        gamer.setDailyClaimsTotal(58);
+
+        Map<BadgeMetric, Integer> out = measure();
+
+        assertEquals(3, out.get(BadgeMetric.DAILY_STREAK));
+        assertEquals(58, out.get(BadgeMetric.DAILY_CLAIMS));
+    }
+
+    @Test
+    @DisplayName("coins spent comes off the ledger, not off the balance")
+    void spendIsLedgerNotBalance() {
+        // A gamer who earned 5,000 and spent 5,000 has nothing left and has spent a lot.
+        gamer.setCoin(0);
+        when(ledgerRepository.sumSpent(gamer.getUserId())).thenReturn(5000L);
+
+        assertEquals(5000, measure().get(BadgeMetric.COINS_SPENT));
+    }
+
+    @Test
+    @DisplayName("the campaign badge counts sets finished, not the set in play")
+    void missionSetsDoneExcludesTheCurrentOne() {
+        // Dealt set 1 and playing it: nothing is finished yet.
+        gamer.setMissionSetIndex(1);
+        assertEquals(0, measure().get(BadgeMetric.MISSION_SETS_DONE));
+
+        // Set 9 is only ever dealt once set 8 has been claimed out, so eight are done.
+        gamer.setMissionSetIndex(9);
+        assertEquals(8, measure().get(BadgeMetric.MISSION_SETS_DONE));
+    }
+
+    @Test
+    @DisplayName("a gamer who has never opened the earn screen is at zero, not at minus one")
+    void missionSetsDoneIsClamped() {
+        gamer.setMissionSetIndex(0);
+        assertEquals(0, measure().get(BadgeMetric.MISSION_SETS_DONE));
     }
 }

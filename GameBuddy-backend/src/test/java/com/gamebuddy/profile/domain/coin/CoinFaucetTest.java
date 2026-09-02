@@ -2,11 +2,10 @@ package com.gamebuddy.profile.domain.coin;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import com.gamebuddy.profile.domain.coin.CoinFaucet.Quest;
+import com.gamebuddy.profile.domain.mission.Mission;
+import com.gamebuddy.profile.domain.mission.MissionBand;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -120,64 +119,95 @@ class CoinFaucetTest {
     }
 
     @Nested
-    @DisplayName("the quest week")
-    class Weeks {
+    @DisplayName("the mission campaign")
+    class Missions {
+
+        private final CoinEconomyProperties.MissionRewards rates = new CoinEconomyProperties().getMissionRewards();
 
         @Test
-        @DisplayName("the week starts on Monday, UTC")
-        void mondayStart() {
-            Instant start = CoinFaucet.weekStart(NOW);
-            ZonedDateTime utc = start.atZone(ZoneOffset.UTC);
-
-            assertEquals(java.time.DayOfWeek.MONDAY, utc.getDayOfWeek());
-            assertEquals(0, utc.getHour());
-            assertEquals(0, utc.getMinute());
-            // The Monday before Tuesday 11 August 2026.
-            assertEquals(Instant.parse("2026-08-10T00:00:00Z"), start);
-        }
-
-        @Test
-        @DisplayName("every instant in one week gives the same start")
-        void stableWithinAWeek() {
-            Instant monday = Instant.parse("2026-08-10T00:00:00Z");
-            Instant sundayNight = Instant.parse("2026-08-16T23:59:59Z");
-
-            assertEquals(monday, CoinFaucet.weekStart(monday));
-            assertEquals(monday, CoinFaucet.weekStart(sundayNight));
-            // One second later is the next week.
-            assertNotEquals(monday, CoinFaucet.weekStart(sundayNight.plusSeconds(1)));
-        }
-
-        @Test
-        @DisplayName("a Monday is its own week start, not the one before")
-        void mondayIsNotWoundBackAWeek() {
-            Instant monday = Instant.parse("2026-08-10T09:30:00Z");
-            assertEquals(Instant.parse("2026-08-10T00:00:00Z"), CoinFaucet.weekStart(monday));
-        }
-    }
-
-    @Nested
-    @DisplayName("quests")
-    class Quests {
-
-        @Test
-        @DisplayName("all three finished is 75 coins")
-        void weeklyQuestTotal() {
-            int total = 0;
-            for (Quest quest : Quest.values()) {
-                total += quest.reward();
+        @DisplayName("every band divides exactly into sets of three")
+        void bandsFillWholeSets() {
+            for (MissionBand band : MissionBand.values()) {
+                assertEquals(
+                        0,
+                        Mission.inBand(band).size() % Mission.PER_SET,
+                        band + " holds " + Mission.inBand(band).size()
+                                + " missions, which is not a whole number of sets - the dealer would run out"
+                                + " mid-set and fall back to repeats");
             }
-            assertEquals(75, total);
         }
 
         @Test
-        @DisplayName("each quest owns a distinct bit, so claiming one does not claim another")
-        void distinctBits() {
-            int mask = 0;
-            for (Quest quest : Quest.values()) {
-                assertEquals(0, mask & quest.bit(), quest + " shares a bit with another quest");
-                mask |= quest.bit();
+        @DisplayName("the campaign deals every mission exactly once")
+        void campaignUsesTheWholePool() {
+            assertEquals(Mission.values().length, Mission.SETS * Mission.PER_SET);
+            assertEquals(8, Mission.SETS);
+        }
+
+        @Test
+        @DisplayName("the bands run easy, then medium, then hard - and stay hard forever")
+        void bandsEscalateThenPlateau() {
+            assertEquals(MissionBand.EASY, Mission.bandForSet(1));
+            assertEquals(MissionBand.EASY, Mission.bandForSet(3));
+            assertEquals(MissionBand.MEDIUM, Mission.bandForSet(4));
+            assertEquals(MissionBand.MEDIUM, Mission.bandForSet(6));
+            assertEquals(MissionBand.HARD, Mission.bandForSet(7));
+            assertEquals(MissionBand.HARD, Mission.bandForSet(Mission.SETS));
+            // Past the campaign the work stays hard; only the pay drops.
+            assertEquals(MissionBand.HARD, Mission.bandForSet(Mission.SETS + 1));
+            assertEquals(MissionBand.HARD, Mission.bandForSet(500));
+        }
+
+        @Test
+        @DisplayName("the campaign ends, and everything after it is the veteran loop")
+        void campaignIsFinite() {
+            assertFalse(Mission.isVeteranSet(Mission.SETS));
+            assertTrue(Mission.isVeteranSet(Mission.SETS + 1));
+        }
+
+        @Test
+        @DisplayName("rewards rise with difficulty, and the veteran rate is the opening one")
+        void rewardsEscalateAndThenReset() {
+            assertTrue(rates.getEasy() < rates.getMedium(), "an easier set must not pay more");
+            assertTrue(rates.getMedium() < rates.getHard(), "a harder set must pay more");
+            // The whole reason the ladder is bounded. A veteran grinding HARD missions
+            // forever must earn less per set than they did finishing the campaign, or a
+            // ladder of rising rewards that never terminates is a faucet with extra steps.
+            assertEquals(
+                    rates.getEasy(),
+                    rates.getVeteran(),
+                    "the veteran rate must fall back to the opening rate, not stay at the peak");
+            assertTrue(rates.getVeteran() < rates.getHard());
+        }
+
+        @Test
+        @DisplayName("missions only ever measure something that cannot go down")
+        void missionsUseCumulativeMetricsOnly() {
+            // A standing metric can fall below the baseline its set was dealt at, which
+            // leaves the mission stuck at zero through no fault of the player and looks
+            // exactly like a bug. Badges may use these; missions may not.
+            var standing = java.util.EnumSet.of(
+                    com.gamebuddy.shared.badge.BadgeMetric.FRIENDS,
+                    com.gamebuddy.shared.badge.BadgeMetric.COSMETICS_WORN,
+                    com.gamebuddy.shared.badge.BadgeMetric.PROFILE_COMPLETENESS,
+                    com.gamebuddy.shared.badge.BadgeMetric.DAILY_STREAK,
+                    com.gamebuddy.shared.badge.BadgeMetric.LOBBIES_JOINED);
+
+            for (Mission mission : Mission.values()) {
+                assertFalse(
+                        standing.contains(mission.getMetric()),
+                        mission + " measures " + mission.getMetric() + ", which can go down");
             }
+        }
+
+        @Test
+        @DisplayName("codes are unique, because a dealt row outlives the catalogue entry")
+        void codesAreDistinct() {
+            long distinct = java.util.Arrays.stream(Mission.values())
+                    .map(Mission::getCode)
+                    .distinct()
+                    .count();
+            assertEquals(Mission.values().length, distinct);
         }
     }
 
@@ -215,39 +245,65 @@ class CoinFaucetTest {
             for (int day = 1; day <= 7; day++) {
                 daily += faucet.dailyReward(day);
             }
-            int quests = java.util.Arrays.stream(Quest.values())
-                    .mapToInt(Quest::reward)
-                    .sum();
-
             assertEquals(140, daily);
-            assertEquals(75, quests);
 
-            // What arrives without doing anything but turning up and finishing quests.
-            int passive = daily + quests;
-            assertEquals(215, passive);
+            CoinEconomyProperties.MissionRewards rates = new CoinEconomyProperties().getMissionRewards();
 
-            // Adverts are the rest, and they are the half that has to be earned: a full
-            // cap every day is 315 a week, and a realistic two-thirds of it is ~210.
+            // One set a week is what the HARD targets are sized for, so this is the steady
+            // state a long-lived account settles at: the campaign is behind them and the
+            // pool deals at the veteran rate.
+            int veteranWeek = rates.getVeteran() * Mission.PER_SET;
+            assertEquals(45, veteranWeek);
+
+            int passive = daily + veteranWeek;
+            assertEquals(185, passive);
+
+            // Adverts are the rest, and they are the half that has to be earned: the full
+            // cap every day is 315 a week.
             int adCeiling = faucet.rewardedAdCoins() * faucet.rewardedAdDailyCap() * 7;
             assertEquals(315, adCeiling);
+            assertEquals(500, passive + adCeiling);
 
-            // The ceiling, for somebody who claims everything every day and watches every
-            // advert. Worth stating because it is what the shop has to be priced against.
-            assertEquals(530, passive + adCeiling);
-
-            // The property the tuning exists for: adverts are the bigger half of what is
-            // available, so the fastest way to coins is doing something rather than
-            // waiting. Before this change the ratio was far more lopsided still (700 of
-            // 950 a week), which is what made coins accrue instead of being earned.
             assertTrue(adCeiling > passive, "adverts must out-earn passive income, or nothing rewards activity");
 
-            // And the realistic middle: somebody who claims their day and watches about one
-            // advert lands in the 300-350 band the economy is designed around. Watching the
-            // full cap every day reaches 530, which is the ceiling above and is meant to
-            // feel like effort rather than like the default.
+            // The realistic middle for a veteran: claims their day, watches about one
+            // advert. Below the 320 the old fixed quests produced, which is the direction
+            // the economy was deliberately tuned in on 31 August.
             int typical = passive + (faucet.rewardedAdCoins() * 7);
-            assertEquals(320, typical);
-            assertTrue(typical >= 300 && typical <= 350, "typical income out of band: " + typical);
+            assertEquals(290, typical);
+            assertTrue(typical >= 250 && typical <= 350, "veteran income out of band: " + typical);
+        }
+
+        @Test
+        @DisplayName("the campaign is a one-off, and its best week stays inside the band")
+        void campaignIncome() {
+            CoinEconomyProperties.MissionRewards rates = new CoinEconomyProperties().getMissionRewards();
+
+            int campaign = 0;
+            for (int set = 1; set <= Mission.SETS; set++) {
+                campaign += Mission.PER_SET
+                        * switch (Mission.bandForSet(set)) {
+                            case EASY -> rates.getEasy();
+                            case MEDIUM -> rates.getMedium();
+                            case HARD -> rates.getHard();
+                        };
+            }
+            // 3x45 + 3x75 + 2x105. Paid once, ever - the same shape as the badge catalogue
+            // rather than a faucet, and the reason the escalating ladder is safe.
+            assertEquals(570, campaign);
+
+            int daily = 0;
+            for (int day = 1; day <= 7; day++) {
+                daily += faucet.dailyReward(day);
+            }
+
+            // The most a week can be worth while the campaign is still running: a HARD set
+            // finished, the streak kept, one advert a day. It touches the top of the
+            // 300-350 band for a couple of weeks once in an account's life, then falls back
+            // to the 290 above.
+            int peak = daily + (rates.getHard() * Mission.PER_SET) + (faucet.rewardedAdCoins() * 7);
+            assertEquals(350, peak);
+            assertTrue(peak <= 350, "the campaign peak must not leave the band: " + peak);
         }
 
         @Test

@@ -32,7 +32,32 @@ public class EarnResponseBody implements BaseModel {
     /** When the daily becomes available, or null when it is available now or never taken. */
     private Instant dailyReadyAt;
 
-    private List<QuestDto> quests;
+    /**
+     * The three missions on screen. Never more, never fewer.
+     *
+     * <p>Replaced by the next three the moment all of them are claimed, in the same
+     * response as the claim that finished them — so this list is never empty and the client
+     * never has to ask what comes next.
+     */
+    private List<MissionDto> missions;
+
+    /** Which deal this is, counting from the gamer's first. 1-based. */
+    private int missionSet;
+
+    /** How long the campaign is. The app shows "set 5 of 8" rather than a number alone. */
+    private int missionSetsTotal;
+
+    /** EASY, MEDIUM or HARD — what the three above were drawn from. */
+    private String missionBand;
+
+    /**
+     * True once the campaign is finished and the pool has started repeating.
+     *
+     * <p>The app says so rather than hiding it. Missions stay hard and the pay drops to the
+     * opening rate, and a screen that quietly paid less without explaining why would be the
+     * worse of the two options.
+     */
+    private boolean missionVeteran;
 
     private boolean stipendAvailable;
     private int stipendAmount;

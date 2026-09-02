@@ -8,6 +8,7 @@ import { profileApi } from "../../src/api/catalogue";
 import { socialApi } from "../../src/api/social";
 import { useUpper } from "../../src/i18n/case";
 import { useCountryName } from "../../src/i18n/countryNames";
+import type { ShowcasedBadge } from '../../src/api/types';
 import { useT } from "../../src/i18n/useT";
 import { useThemeColors } from "../../src/theme";
 import { ThemedCardFrame } from "../../src/ui/ThemedCardFrame";
@@ -257,7 +258,9 @@ function Showcase({
   badges,
   onPress,
 }: {
-  badges: { code: string; title: string; icon: string }[];
+  // The shared type rather than a structural copy of three of its fields: the copy
+  // silently stopped matching the moment the wire type grew an `animated` flag.
+  badges: ShowcasedBadge[];
   onPress: () => void;
 }) {
   const t = useT();
@@ -285,6 +288,10 @@ function Showcase({
               style={{ width: 48, height: 48 }}
               contentFit="contain"
               transition={150}
+              // The two hardest badges have animated artwork. Without this the
+              // showcase — the one surface where a badge is shown to somebody
+              // else — would freeze them on their first frame.
+              autoplay={badge.animated}
               cachePolicy="memory-disk"
               recyclingKey={badge.code}
             />

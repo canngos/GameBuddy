@@ -537,20 +537,45 @@ export const en = {
       stipendTitle: 'Gold monthly bonus',
       stipendReady: 'Yours this month',
       stipendBack: (when: string) => `Back ${when}`,
-      questDone: 'Done this week',
-      questProgress: (progress: number, target: number) => `${progress} of ${target}`,
+      missionDone: 'Done',
+      missionProgress: (progress: number, target: number) => `${progress} of ${target}`,
+      missionSetOf: (n: number, total: number) => `Set ${n} of ${total}`,
+      missionSetVeteran: (n: number) => `Veteran set ${n}`,
+      missionBand: { EASY: 'Easy', MEDIUM: 'Medium', HARD: 'Hard' },
       /**
-       * The weekly quests, by the code the backend sends alongside its own English title.
+       * The missions, by the code the backend sends alongside its own English title.
        *
        * Keyed by code rather than translated from that title, because the code is the
-       * quest's name and the title is prose somebody will reword. `CoinFaucet.Quest` on
-       * the backend is the list these must match; a code missing here falls back to the
-       * server's English rather than rendering blank.
+       * mission's name and the title is prose somebody will reword. `Mission` on the
+       * backend is the list these must match; a code missing here falls back to the
+       * server's English rather than rendering blank, which is what lets a mission be
+       * added server-side without six languages going empty until the next release.
        */
-      questTitles: {
-        TALK: 'Send 10 messages',
-        MEET: 'Match with 2 gamers',
-        SQUAD: 'Join a lobby',
+      missionTitles: {
+        'talk-10': 'Send 10 messages',
+        'meet-2': 'Match with 2 gamers',
+        'lobby-1': 'Join a lobby',
+        'like-10': 'Like 10 profiles',
+        'daily-2': 'Claim your daily reward twice',
+        'advert-1': 'Watch a short video',
+        'lobby-chat-5': 'Send 5 messages in a lobby',
+        'super-like-1': 'Send a super like',
+        'spend-100': 'Spend 100 coins',
+        'talk-50': 'Send 50 messages',
+        'meet-5': 'Match with 5 gamers',
+        'lobby-3': 'Join 3 lobbies',
+        'host-1': 'Open a lobby',
+        'lobby-chat-15': 'Send 15 messages in lobbies',
+        'like-40': 'Like 40 profiles',
+        'advert-5': 'Watch 5 short videos',
+        'buy-1': 'Buy something from the Market',
+        'daily-5': 'Claim your daily reward 5 times',
+        'talk-200': 'Send 200 messages',
+        'meet-15': 'Match with 15 gamers',
+        'host-3': 'Open 3 lobbies',
+        'lobby-chat-50': 'Send 50 messages in lobbies',
+        'super-like-5': 'Send 5 super likes',
+        'spend-1000': 'Spend 1,000 coins',
       },
       claimA11y: (reward: number, title: string) => `Claim ${reward} coins: ${title}`,
       rowA11y: (title: string, detail: string) => `${title}, ${detail}`,
@@ -664,6 +689,13 @@ export const en = {
       tileA11y: (title: string, status: string) => `${title}. ${status}`,
       progressOf: (value: number, target: number) => `${value} of ${target}`,
       claimCoins: (n: number) => `Claim ${n} coins`,
+      /**
+       * The four hardest badges hand over a frame instead of coins, so the tile cannot
+       * print `+125` and the button cannot say "claim 125 coins". Both have to name the
+       * thing on offer — "a reward" is not something anybody can want.
+       */
+      rewardFrame: 'Frame',
+      claimFrame: (name: string) => `Claim the ${name} frame`,
       removeFromProfile: 'Remove from profile',
       showOnProfile: 'Show on profile',
     },

@@ -35,7 +35,11 @@ const AUTHENTICATED_GETS = [
   `${P.notif}/pending`,
   `${P.notif}/preferences`,
   `${P.billing}/subscription`,
-  `${P.badges}/showall`,
+  // `${P.badges}` itself, not `/showall` — that path does not exist, and because
+  // Spring Security rejects before routing it returned 401 either way. The
+  // assertion passed while testing nothing about the real endpoint.
+  P.badges,
+  `${P.coins}/earn`,
   `${P.cosmetics}/showall`,
 ];
 

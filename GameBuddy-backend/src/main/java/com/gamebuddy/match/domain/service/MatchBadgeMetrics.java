@@ -1,6 +1,7 @@
 package com.gamebuddy.match.domain.service;
 
 import com.gamebuddy.match.infrastructure.repository.ChatMessageRepository;
+import com.gamebuddy.match.infrastructure.repository.SuperLikeRepository;
 import com.gamebuddy.shared.badge.BadgeMetric;
 import com.gamebuddy.shared.badge.BadgeMetricSource;
 import com.gamebuddy.shared.entity.Gamer;
@@ -23,12 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class MatchBadgeMetrics implements BadgeMetricSource {
 
     private final ChatMessageRepository chatMessageRepository;
+    private final SuperLikeRepository superLikeRepository;
 
     @Override
     @Transactional(readOnly = true)
     public Map<BadgeMetric, Integer> measure(Gamer gamer) {
         Map<BadgeMetric, Integer> counts = new EnumMap<>(BadgeMetric.class);
         counts.put(BadgeMetric.MESSAGES_SENT, (int) chatMessageRepository.countBySenderId(gamer.getUserId()));
+        counts.put(BadgeMetric.SUPER_LIKES_SENT, (int) superLikeRepository.countByUserId(gamer.getUserId()));
         return counts;
     }
 }

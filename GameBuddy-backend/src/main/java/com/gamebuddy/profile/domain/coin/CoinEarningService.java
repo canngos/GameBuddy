@@ -3,18 +3,14 @@ package com.gamebuddy.profile.domain.coin;
 import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
-import com.gamebuddy.profile.domain.coin.CoinFaucet.Quest;
-import com.gamebuddy.shared.badge.BadgeMetric;
-import com.gamebuddy.shared.badge.BadgeMetricSource;
+import com.gamebuddy.profile.domain.mission.MissionService;
 import com.gamebuddy.shared.coin.CoinLedger;
 import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,10 +26,14 @@ import org.springframework.transaction.annotation.Transactional;
  * both pass the check, and pay twice for one day. A double-charge is a support ticket; a
  * double-payout is an exploit somebody will find and repeat.
  *
- * <p>The week's quest baselines are also written by claims and by reads. That is why
- * {@link #state} is not read-only: the first look at the screen in a new week is what
- * records where the week started from, and it has to be recorded before any progress is
- * measured against it.
+ * <p>Missions are not here. They were — three of them, as an enum nested in
+ * {@link CoinFaucet} with their baselines spread across five columns on the gamer — and
+ * they outgrew it: {@code MissionService} owns dealing, progress and claiming now, and this
+ * class only asks it what to show and forwards a claim. Four faucets in one class was
+ * already one too many.
+ *
+ * <p>{@link #state} is still not read-only, because asking for the earn screen can deal a
+ * gamer their first set of missions, and a deal is a write.
  */
 @Slf4j
 @Service
@@ -42,7 +42,7 @@ public class CoinEarningService {
 
     private final GamerRepository gamers;
     private final CoinFaucet faucet;
-    private final List<BadgeMetricSource> metricSources;
+    private final MissionService missionService;
     private final Clock clock;
     private final CoinLedger coins;
 
@@ -52,7 +52,7 @@ public class CoinEarningService {
             int dailyReward,
             int streak,
             Instant dailyReadyAt,
-            List<QuestProgress> quests,
+            MissionService.ActiveSet missions,
             boolean stipendAvailable,
             int stipendAmount,
             Instant stipendReadyAt,
@@ -71,20 +71,18 @@ public class CoinEarningService {
             List<Integer> dailyLadder,
             int adCoins) {}
 
-    public record QuestProgress(Quest quest, int progress, boolean claimed) {}
-
     /**
      * The whole earn screen in one read.
      *
-     * <p>Not {@code readOnly}: starting a new week has to persist the baselines, and doing
-     * that lazily on read is what keeps a gamer who never opens this screen from
-     * accumulating a "week" that began whenever they last claimed something.
+     * <p>Not {@code readOnly}: a gamer who has never been here has no missions, and the
+     * first look is what deals them. Dealing lazily on read rather than from a job is what
+     * keeps the mission table proportional to the people playing rather than to the people
+     * registered.
      */
     @Transactional
     public Earnings state(Gamer principal) {
         Gamer gamer = reload(principal);
         Instant now = clock.instant();
-        rollWeek(gamer, now);
         return snapshot(gamer, now);
     }
 
@@ -103,35 +101,31 @@ public class CoinEarningService {
 
         gamer.setDailyStreak(streak);
         gamer.setDailyClaimedAt(now);
+        // The streak forgets a broken run; this does not. It is the only counter in the
+        // app incremented on a write rather than derived on read, and it is here because
+        // there is no row anywhere that says "this gamer turned up on this day".
+        gamer.setDailyClaimsTotal(gamer.getDailyClaimsTotal() + 1);
         coins.earn(gamer, reward, CoinReason.DAILY_STREAK);
 
-        rollWeek(gamer, now);
         gamers.save(gamer);
 
         log.info("Daily {} coins to {} (streak {})", reward, gamer.getUserId(), streak);
         return snapshot(gamer, now);
     }
 
-    /** Takes a finished quest's reward. */
+    /**
+     * Takes a finished mission's coins.
+     *
+     * <p>A pass-through: the rule about what is finished, what it pays and what comes next
+     * belongs to {@code MissionService}, and this method exists so that every faucet still
+     * answers with the same whole-screen snapshot.
+     */
     @Transactional
-    public Earnings claimQuest(Gamer principal, Quest quest) {
+    public Earnings claimMission(Gamer principal, String code) {
         Gamer gamer = reload(principal);
-        Instant now = clock.instant();
-        rollWeek(gamer, now);
-
-        if ((gamer.getQuestClaimedMask() & quest.bit()) != 0) {
-            throw new BusinessException(TransactionCode.REWARD_NOT_READY);
-        }
-        if (progress(gamer, quest, measure(gamer)) < quest.target()) {
-            throw new BusinessException(TransactionCode.QUEST_UNFINISHED);
-        }
-
-        gamer.setQuestClaimedMask(gamer.getQuestClaimedMask() | quest.bit());
-        coins.earn(gamer, quest.reward(), CoinReason.WEEKLY_QUEST);
+        missionService.claim(gamer, code);
         gamers.save(gamer);
-
-        log.info("Quest {} paid {} coins to {}", quest, quest.reward(), gamer.getUserId());
-        return snapshot(gamer, now);
+        return snapshot(gamer, clock.instant());
     }
 
     /** Takes the monthly Gold stipend. */
@@ -150,7 +144,6 @@ public class CoinEarningService {
         gamer.setStipendClaimedAt(now);
         coins.earn(gamer, faucet.stipend(), CoinReason.GOLD_STIPEND);
 
-        rollWeek(gamer, now);
         gamers.save(gamer);
 
         log.info("Stipend {} coins to {}", faucet.stipend(), gamer.getUserId());
@@ -159,56 +152,7 @@ public class CoinEarningService {
 
     // -----------------------------------------------------------------------
 
-    /**
-     * Starts a new quest week if the old one has ended.
-     *
-     * <p>Records where the lifetime counters stood, so this week's progress can be measured
-     * as a difference, and clears what was claimed. Called from every entry point rather
-     * than a scheduled job: a job would have to walk every account weekly to reset counters
-     * that only matter to gamers who actually turn up.
-     */
-    private void rollWeek(Gamer gamer, Instant now) {
-        Instant weekStart = CoinFaucet.weekStart(now);
-        if (weekStart.equals(gamer.getQuestWeekStartedAt())) {
-            return;
-        }
-
-        Map<BadgeMetric, Integer> metrics = measure(gamer);
-        gamer.setQuestWeekStartedAt(weekStart);
-        gamer.setQuestBaseMessages(metrics.getOrDefault(BadgeMetric.MESSAGES_SENT, 0));
-        gamer.setQuestBaseMatches(metrics.getOrDefault(BadgeMetric.MATCHES, 0));
-        gamer.setQuestBaseLobbies(metrics.getOrDefault(BadgeMetric.LOBBIES_JOINED, 0));
-        gamer.setQuestClaimedMask(0);
-    }
-
-    /**
-     * How far into a quest this gamer is.
-     *
-     * <p>Clamped at zero. A lifetime total can fall below its baseline — a deleted post,
-     * a match lost when the other account is removed — and a negative progress bar reads
-     * as a bug rather than as the truth it is.
-     */
-    private int progress(Gamer gamer, Quest quest, Map<BadgeMetric, Integer> metrics) {
-        int current = metrics.getOrDefault(quest.metric(), 0);
-        int base =
-                switch (quest) {
-                    case TALK -> gamer.getQuestBaseMessages();
-                    case MEET -> gamer.getQuestBaseMatches();
-                    case SQUAD -> gamer.getQuestBaseLobbies();
-                };
-        return Math.max(0, current - base);
-    }
-
     private Earnings snapshot(Gamer gamer, Instant now) {
-        Map<BadgeMetric, Integer> metrics = measure(gamer);
-
-        List<QuestProgress> quests = java.util.Arrays.stream(Quest.values())
-                .map(q -> new QuestProgress(
-                        q,
-                        Math.min(progress(gamer, q, metrics), q.target()),
-                        (gamer.getQuestClaimedMask() & q.bit()) != 0))
-                .toList();
-
         boolean gold = effectiveTier(gamer, now) == SubscriptionTier.GOLD;
         int streakIfClaimed = faucet.streakAfterClaim(gamer.getDailyStreak(), gamer.getDailyClaimedAt(), now);
 
@@ -219,7 +163,7 @@ public class CoinEarningService {
                 gamer.getDailyClaimedAt() == null
                         ? null
                         : gamer.getDailyClaimedAt().plus(faucet.dailyCooldown()),
-                quests,
+                missionService.current(gamer),
                 gold && faucet.stipendAvailable(gamer.getStipendClaimedAt(), now),
                 faucet.stipend(),
                 gold ? faucet.nextStipendAt(gamer.getStipendClaimedAt(), now) : null,
@@ -227,14 +171,6 @@ public class CoinEarningService {
                 faucet.rewardedAdsLeft(gamer.getRewardedAdsToday(), gamer.getRewardedAdDay(), now),
                 faucet.dailyLadder(),
                 faucet.rewardedAdCoins());
-    }
-
-    private Map<BadgeMetric, Integer> measure(Gamer gamer) {
-        Map<BadgeMetric, Integer> merged = new EnumMap<>(BadgeMetric.class);
-        for (BadgeMetricSource source : metricSources) {
-            source.measure(gamer).forEach((metric, value) -> merged.merge(metric, value, Integer::max));
-        }
-        return merged;
     }
 
     private SubscriptionTier effectiveTier(Gamer gamer, Instant now) {

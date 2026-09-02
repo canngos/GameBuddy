@@ -71,6 +71,22 @@ WHITE = (255, 255, 255)
 
 TIERS = {"bronze": BRONZE, "silver": SILVER, "gold": GOLD}
 
+# The hard tier has no single rim colour, which is the point of it: where the other three
+# rims name a metal, this one runs the whole palette around the hexagon. It reads as "not
+# one of those" at thumbnail size, which is the only size that matters on the badge wall.
+#
+# The order is a loop — the last colour blends back into the first — so the animated plates
+# below can rotate the phase and come back to where they started without a jump.
+PRISM = [CYAN, MINT, LIME, GOLD, EMBER, BRAND, VIOLET, SKY]
+
+
+def prism_at(t: float):
+    """The prismatic ramp at position t, wrapping at 1.0."""
+    t = t % 1.0
+    span = 1.0 / len(PRISM)
+    i = int(t / span)
+    return mix(PRISM[i], PRISM[(i + 1) % len(PRISM)], (t - i * span) / span)
+
 
 # =========================================================================
 # The plate
@@ -98,14 +114,18 @@ def vertical_gradient(width: int, height: int, top, bottom) -> Image.Image:
     return strip.resize((width, height), Image.BILINEAR).convert("RGBA")
 
 
-def plate(accent, tier: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:
+def plate(accent, tier: str, phase: float = 0.0) -> tuple[Image.Image, ImageDraw.ImageDraw]:
     """The hexagon every badge is drawn on.
 
     Returns the plate and a draw handle onto it. The glyph goes on top and is *not*
     clipped to the hexagon — a glyph that overflows the plate would be a design mistake
     rather than something to guard against, and clipping would hide it.
+
+    `phase` only means anything for the prismatic tier, where it turns the rim's colours
+    around the hexagon. Every other tier ignores it, so a still badge and frame zero of an
+    animated one are the same picture.
     """
-    rim = TIERS[tier]
+    rim = TIERS.get(tier, WHITE)
     c = CANVAS / 2
     r = CANVAS * 0.46
 
@@ -122,9 +142,34 @@ def plate(accent, tier: str) -> tuple[Image.Image, ImageDraw.ImageDraw]:
     d = ImageDraw.Draw(face)
     # Rim, then a hairline inside it. Two thin lines read as a machined edge where one
     # thick line just reads as a border.
-    d.line(hexagon(c, c, r) + [hexagon(c, c, r)[0]], fill=rgba(rim, 0.95), width=px(3.5))
-    inner = hexagon(c, c, r * 0.87)
-    d.line(inner + [inner[0]], fill=rgba(rim, 0.30), width=px(1.5))
+    if tier == "prismatic":
+        # Each edge its own colour, subdivided so the change along an edge is a gradient
+        # rather than six flat facets. Drawn edge-first and then capped, because Pillow
+        # butts its line ends and a ring of butted segments has a notch at every corner.
+        points = hexagon(c, c, r)
+        steps = 9
+        for i in range(len(points)):
+            a = points[i]
+            b = points[(i + 1) % len(points)]
+            for k in range(steps):
+                t0, t1 = k / steps, (k + 1) / steps
+                p0 = (a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0)
+                p1 = (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1)
+                colour = prism_at(phase + (i + t0) / len(points))
+                d.line([p0, p1], fill=rgba(colour, 0.95), width=px(3.5))
+        for i, point in enumerate(points):
+            colour = prism_at(phase + i / len(points))
+            rad = px(3.5) / 2
+            d.ellipse(
+                [point[0] - rad, point[1] - rad, point[0] + rad, point[1] + rad],
+                fill=rgba(colour, 0.95),
+            )
+        inner = hexagon(c, c, r * 0.87)
+        d.line(inner + [inner[0]], fill=rgba(WHITE, 0.22), width=px(1.5))
+    else:
+        d.line(hexagon(c, c, r) + [hexagon(c, c, r)[0]], fill=rgba(rim, 0.95), width=px(3.5))
+        inner = hexagon(c, c, r * 0.87)
+        d.line(inner + [inner[0]], fill=rgba(rim, 0.30), width=px(1.5))
 
     # A soft pool of accent behind where the glyph lands, so the middle is not flat.
     pool = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
@@ -396,6 +441,247 @@ def glyph_drip(d, cx, cy, s, colour):
     circle(d, cx, cy + s * 0.16, s * 0.60, colour, 1.0, width=STROKE * 1.15)
 
 
+# --- added with the mission campaign and the hard tier ----------------------
+
+
+def glyph_door(d, cx, cy, s, colour):
+    """Signed Up: a way in, standing open."""
+    w, h = s * 0.62, s * 1.05
+    d.rounded_rectangle(
+        [cx - w, cy - h, cx + w, cy + h], radius=px(10), outline=rgba(colour), width=px(STROKE)
+    )
+    circle(d, cx + w * 0.45, cy + s * 0.12, s * 0.11, colour)
+
+
+def glyph_beacon(d, cx, cy, s, colour):
+    """Host Mode: opening a room, and putting out the call.
+
+    Not a flag on a pole, which is what this was first — `trailblazer` is a flag on a pole
+    too, and at 82px two of those are one badge. A signal going out says "I opened this"
+    without borrowing anybody else's outline.
+    """
+    circle(d, cx, cy + s * 0.22, s * 0.26, colour)
+    for i, r in enumerate((0.52, 0.82)):
+        d.arc(
+            [cx - s * r, cy + s * 0.22 - s * r, cx + s * r, cy + s * 0.22 + s * r],
+            start=200,
+            end=340,
+            fill=rgba(colour, 0.95 - i * 0.25),
+            width=px(STROKE * 0.85),
+        )
+    stroke(d, (cx, cy + s * 0.48), (cx, cy + s * 0.95), colour, STROKE * 0.8)
+
+
+def glyph_spark(d, cx, cy, s, colour):
+    """Standing Ovation: the four-point spark a super like already uses."""
+    for dx, dy in ((0, -1), (1, 0), (0, 1), (-1, 0)):
+        d.polygon(
+            [
+                (cx + dx * s, cy + dy * s),
+                (cx + dy * s * 0.30, cy - dx * s * 0.30),
+                (cx - dy * s * 0.30, cy + dx * s * 0.30),
+            ],
+            fill=rgba(colour),
+        )
+    circle(d, cx, cy, s * 0.22, colour)
+
+
+def glyph_seats(d, cx, cy, s, colour):
+    """Regular: back in the same room again."""
+    for i, dx in enumerate((-0.62, 0.0, 0.62)):
+        circle(d, cx + dx * s, cy - s * 0.32, s * 0.24, colour, 1.0 if i != 1 else 0.55)
+    d.rounded_rectangle(
+        [cx - s * 0.95, cy + s * 0.10, cx + s * 0.95, cy + s * 0.60],
+        radius=px(8),
+        fill=rgba(colour, 0.85),
+    )
+
+
+def glyph_table(d, cx, cy, s, colour):
+    """War Room: a plan, and people around it."""
+    d.polygon(
+        [
+            (cx, cy - s * 0.55),
+            (cx + s * 0.95, cy),
+            (cx, cy + s * 0.55),
+            (cx - s * 0.95, cy),
+        ],
+        outline=rgba(colour),
+        width=px(STROKE * 0.85),
+    )
+    for dx, dy in ((-0.52, -0.62), (0.52, -0.62), (0.0, 0.78)):
+        circle(d, cx + dx * s, cy + dy * s, s * 0.18, colour)
+
+
+def glyph_wallet(d, cx, cy, s, colour):
+    """Big Spender: the purse, lighter than it was."""
+    d.rounded_rectangle(
+        [cx - s * 0.95, cy - s * 0.62, cx + s * 0.95, cy + s * 0.68],
+        radius=px(10),
+        outline=rgba(colour),
+        width=px(STROKE * 0.9),
+    )
+    d.rounded_rectangle(
+        [cx + s * 0.15, cy - s * 0.10, cx + s * 1.02, cy + s * 0.30],
+        radius=px(7),
+        fill=rgba(colour),
+    )
+
+
+def glyph_play(d, cx, cy, s, colour):
+    """Sponsored: the triangle everybody already reads as a video."""
+    circle(d, cx, cy, s * 0.92, colour, 1.0, width=STROKE * 0.85)
+    d.polygon(
+        [
+            (cx - s * 0.26, cy - s * 0.42),
+            (cx + s * 0.46, cy),
+            (cx - s * 0.26, cy + s * 0.42),
+        ],
+        fill=rgba(colour),
+    )
+
+
+def glyph_calendar(d, cx, cy, s, colour):
+    """Seven Days: a week, kept."""
+    d.rounded_rectangle(
+        [cx - s * 0.92, cy - s * 0.72, cx + s * 0.92, cy + s * 0.82],
+        radius=px(9),
+        outline=rgba(colour),
+        width=px(STROKE * 0.8),
+    )
+    stroke(d, (cx - s * 0.92, cy - s * 0.30), (cx + s * 0.92, cy - s * 0.30), colour, STROKE * 0.6)
+    for i in range(3):
+        for j in range(2):
+            circle(d, cx + (i - 1) * s * 0.52, cy + s * 0.10 + j * s * 0.42, s * 0.11, colour)
+
+
+def glyph_chevrons(d, cx, cy, s, colour):
+    """Centurion: rank, three deep."""
+    for i, dy in enumerate((-0.62, 0.0, 0.62)):
+        alpha = 1.0 - i * 0.18
+        stroke(d, (cx - s * 0.72, cy + dy * s + s * 0.24), (cx, cy + dy * s - s * 0.18), colour, STROKE, alpha)
+        stroke(d, (cx, cy + dy * s - s * 0.18), (cx + s * 0.72, cy + dy * s + s * 0.24), colour, STROKE, alpha)
+
+
+def glyph_anvil(d, cx, cy, s, colour):
+    """Iron Will: turning up, and turning up, and turning up."""
+    # Wide top, narrow waist, wide base — an I-beam silhouette. The first version tapered
+    # all the way down, which is a funnel.
+    d.rounded_rectangle(
+        [cx - s * 0.95, cy - s * 0.72, cx + s * 0.95, cy - s * 0.30],
+        radius=px(6),
+        fill=rgba(colour),
+    )
+    # The horn, which is what makes an I-beam an anvil.
+    d.polygon(
+        [
+            (cx + s * 0.95, cy - s * 0.72),
+            (cx + s * 1.28, cy - s * 0.54),
+            (cx + s * 0.95, cy - s * 0.30),
+        ],
+        fill=rgba(colour),
+    )
+    d.rectangle(
+        [cx - s * 0.34, cy - s * 0.30, cx + s * 0.34, cy + s * 0.36],
+        fill=rgba(colour, 0.85),
+    )
+    d.rounded_rectangle(
+        [cx - s * 0.80, cy + s * 0.36, cx + s * 0.80, cy + s * 0.78],
+        radius=px(6),
+        fill=rgba(colour),
+    )
+
+
+def glyph_magnet(d, cx, cy, s, colour):
+    """Magnetic: fifty people said yes back."""
+    # The poles have to be visibly fatter than the arc, or a U with two thin legs is a
+    # pair of headphones — which is what the first version of this was.
+    arm = s * 0.30
+    d.arc(
+        [cx - s * 0.80, cy - s * 0.78, cx + s * 0.80, cy + s * 0.62],
+        start=180,
+        end=360,
+        fill=rgba(colour),
+        width=px(STROKE * 2.2),
+    )
+    for dx in (-0.80, 0.80):
+        d.rectangle(
+            [cx + dx * s - arm * 0.55, cy - s * 0.08, cx + dx * s + arm * 0.55, cy + s * 0.58],
+            fill=rgba(colour),
+        )
+        d.rectangle(
+            [cx + dx * s - arm * 0.55, cy + s * 0.30, cx + dx * s + arm * 0.55, cy + s * 0.58],
+            fill=rgba(mix(colour, INK, 0.45)),
+        )
+
+
+def glyph_chain(d, cx, cy, s, colour):
+    """Unbroken: thirty days, and not one missed."""
+    # Overlapping, and the second drawn over the first: two rings side by side read as
+    # spectacles. A chain is only a chain where the links pass through each other.
+    for dx in (-0.34, 0.34):
+        d.rounded_rectangle(
+            [cx + dx * s - s * 0.46, cy - s * 0.34, cx + dx * s + s * 0.46, cy + s * 0.34],
+            radius=px(13),
+            outline=rgba(colour),
+            width=px(STROKE * 1.05),
+        )
+    # Clears a notch where the left link passes behind the right one, so the overlap reads
+    # as depth rather than as a blob.
+    d.rectangle(
+        [cx - s * 0.02, cy - s * 0.16, cx + s * 0.10, cy + s * 0.16],
+        fill=rgba(mix(INK, colour, 0.10)),
+    )
+
+
+def glyph_grid(d, cx, cy, s, colour):
+    """Collector: the shelf, filled."""
+    for i in range(3):
+        for j in range(3):
+            faded = (i + j) % 2 == 1
+            d.rounded_rectangle(
+                [
+                    cx + (i - 1.5) * s * 0.62,
+                    cy + (j - 1.5) * s * 0.62,
+                    cx + (i - 0.6) * s * 0.62,
+                    cy + (j - 0.6) * s * 0.62,
+                ],
+                radius=px(4),
+                fill=rgba(colour, 0.55 if faded else 1.0),
+            )
+
+
+def glyph_flag(d, cx, cy, s, colour):
+    """Trailblazer: first up the hill, and the whole campaign behind them."""
+    stroke(d, (cx - s * 0.52, cy - s * 0.95), (cx - s * 0.52, cy + s * 0.92), colour)
+    d.polygon(
+        [
+            (cx - s * 0.52, cy - s * 0.88),
+            (cx + s * 0.88, cy - s * 0.52),
+            (cx - s * 0.52, cy - s * 0.10),
+        ],
+        fill=rgba(colour),
+    )
+
+
+def glyph_crown(d, cx, cy, s, colour):
+    """Completionist: every other badge in the game."""
+    d.polygon(
+        [
+            (cx - s * 0.95, cy + s * 0.42),
+            (cx - s * 0.72, cy - s * 0.55),
+            (cx - s * 0.30, cy + s * 0.02),
+            (cx, cy - s * 0.78),
+            (cx + s * 0.30, cy + s * 0.02),
+            (cx + s * 0.72, cy - s * 0.55),
+            (cx + s * 0.95, cy + s * 0.42),
+        ],
+        fill=rgba(colour),
+    )
+    stroke(d, (cx - s * 0.95, cy + s * 0.72), (cx + s * 0.95, cy + s * 0.72), colour)
+
+
+
 # =========================================================================
 # The catalogue
 # =========================================================================
@@ -419,11 +705,53 @@ BADGES = [
     ("fully-kitted",      SKY,     "bronze", glyph_kit),
     ("rich-in-the-hood",  GOLD,    "silver", glyph_coins),
     ("drip-check",        EMBER,   "silver", glyph_drip),
+
+    # --- added with the mission campaign -----------------------------------
+    ("first-lobby",       VIOLET,  "bronze", glyph_door),
+    ("host-mode",         VIOLET,  "bronze", glyph_beacon),
+    ("standing-ovation",  BRAND,   "bronze", glyph_spark),
+    ("lobby-regular",     VIOLET,  "silver", glyph_seats),
+    ("war-room",          SKY,     "silver", glyph_table),
+    ("big-spender",       GOLD,    "silver", glyph_wallet),
+    ("sponsored",         LIME,    "silver", glyph_play),
+    ("week-one",          EMBER,   "gold",   glyph_calendar),
+
+    # --- the hard tier -----------------------------------------------------
+    # No rim colour of their own: prismatic runs the whole palette round the hexagon, so
+    # the accent here only tints the plate and the glyph.
+    ("centurion",         MINT,    "prismatic", glyph_chevrons),
+    ("iron-will",         SILVER,  "prismatic", glyph_anvil),
+    ("magnetic",          BRAND,   "prismatic", glyph_magnet),
+    ("unbroken",          CYAN,    "prismatic", glyph_chain),
+    ("collector",         GOLD,    "prismatic", glyph_grid),
+    ("trailblazer",       LIME,    "prismatic", glyph_flag),
+    ("completionist",     VIOLET,  "prismatic", glyph_crown),
 ]
 
+# The two whose artwork actually moves.
+#
+# Not every prismatic badge: the app draws a turning aura over all seven for nothing, and
+# animated WebP is the most expensive thing it decodes — three columns of them on the badge
+# wall would be a real cost for a difference the aura already makes. These two are the only
+# ones that cannot be earned until everything else has been, so they are where the extra is
+# worth spending. Must match `Badge.isAnimated()` on the backend.
+ANIMATED = {"trailblazer", "completionist"}
 
-def build(accent, tier: str, glyph) -> Image.Image:
-    image, d = plate(accent, tier)
+# The same encoder settings cosmetics/generate.py uses for animated frames, and for the
+# same reasons — see the note there about lossy-with-alpha beating lossless on thin bright
+# arcs over transparency.
+#
+# The frame count and rate are its own, though. A frame's ring is a fast effect; a badge's
+# rim is meant to read as slowly turning light, so this is a 2.7-second loop rather than a
+# 1.1-second one. Fewer frames is also what brings the file under budget — at 22 frames
+# these came out at 160KB each, which is a lot to download to decorate an 82px tile, and
+# the hue shifts so gradually that nothing is lost by dropping six of them.
+FPS = 6
+LOOP_FRAMES = 16
+
+
+def build(accent, tier: str, glyph, phase: float = 0.0) -> Image.Image:
+    image, d = plate(accent, tier, phase)
     c = CANVAS / 2
     # The glyph is drawn in a brightened accent rather than the accent itself: against a
     # plate tinted with the same colour, the pure hue does not separate.
@@ -434,9 +762,34 @@ def build(accent, tier: str, glyph) -> Image.Image:
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     for code, accent, tier, glyph in BADGES:
-        path = OUT / f"badge-{code}.png"
-        build(accent, tier, glyph).save(path, optimize=True)
-        print(f"  badge-{code}.png  ({path.stat().st_size // 1024}KB, {tier})")
+        if code in ANIMATED:
+            # One full turn of the rim over the loop, so the last frame leads back into the
+            # first and there is no jump at the seam.
+            frames = [
+                build(accent, tier, glyph, phase=i / LOOP_FRAMES) for i in range(LOOP_FRAMES)
+            ]
+            path = OUT / f"badge-{code}.webp"
+            frames[0].save(
+                path,
+                format="WEBP",
+                save_all=True,
+                append_images=frames[1:],
+                duration=int(1000 / FPS),
+                loop=0,
+                quality=82,
+                method=6,
+                disposal=2,
+            )
+            size = path.stat().st_size
+            print(f"  badge-{code}.webp  ({size // 1024}KB, {tier}, animated)")
+            # Roughly a third of a frame's budget. A badge is a quarter of a frame's area
+            # and there are three of them across the wall at once.
+            if size > 140_000:
+                print(f"    WARNING: {size // 1024}KB is large for a badge tile")
+        else:
+            path = OUT / f"badge-{code}.png"
+            build(accent, tier, glyph).save(path, optimize=True)
+            print(f"  badge-{code}.png  ({path.stat().st_size // 1024}KB, {tier})")
     contact_sheet()
 
 
@@ -446,7 +799,8 @@ def contact_sheet() -> None:
     rows = (len(BADGES) + cols - 1) // cols
     sheet = Image.new("RGB", (SIZE * cols, SIZE * rows), (32, 33, 40))
     for i, (code, *_) in enumerate(BADGES):
-        icon = Image.open(OUT / f"badge-{code}.png").convert("RGBA")
+        suffix = "webp" if code in ANIMATED else "png"
+        icon = Image.open(OUT / f"badge-{code}.{suffix}").convert("RGBA")
         sheet.paste(icon, ((i % cols) * SIZE, (i // cols) * SIZE), icon)
     sheet.save(Path(__file__).parent / "contact-sheet.png")
     print("  contact-sheet.png")

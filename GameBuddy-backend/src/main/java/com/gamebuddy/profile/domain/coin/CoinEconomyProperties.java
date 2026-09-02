@@ -73,4 +73,44 @@ public class CoinEconomyProperties {
     private int stipend = 600;
 
     private Duration stipendInterval = Duration.ofDays(30);
+
+    /**
+     * What one mission pays, by the band it was dealt from.
+     *
+     * <p>The last rate to move in here, and the one most likely to need moving. Mission pay
+     * used to be {@code 25} written into an enum constructor, which is why the three weekly
+     * quests were still paying their launch rate a year later — there was nothing in a
+     * config file to notice.
+     *
+     * <p><strong>The curve rises and then stops.</strong> Set one is the easiest so it pays
+     * the least; sets seven and eight are weeks of work and pay accordingly. Past the end of
+     * the campaign the pool keeps dealing HARD missions at {@link #getVeteran()}, which is
+     * the EASY rate — because a ladder of rising rewards that never terminates is a faucet
+     * with extra steps, and difficulty alone does not cap anything for somebody determined.
+     */
+    private MissionRewards missionRewards = new MissionRewards();
+
+    @Getter
+    @Setter
+    public static class MissionRewards {
+
+        /** Sets 1-3. An evening each. */
+        private int easy = 15;
+
+        /** Sets 4-6. A few days each. */
+        private int medium = 25;
+
+        /** Sets 7-8. The end of the campaign. */
+        private int hard = 35;
+
+        /**
+         * Every set after the campaign, forever.
+         *
+         * <p>Equal to {@link #easy} by default and deliberately not higher: the reward was
+         * for the progression, and the progression is over. A veteran who keeps grinding
+         * earns less per hour than they did in set eight, which is the asymmetry that makes
+         * this bounded rather than exponential.
+         */
+        private int veteran = 15;
+    }
 }

@@ -85,6 +85,25 @@ public class Cosmetic implements Serializable {
     @Column(name = "membership_only", nullable = false)
     private boolean membershipOnly;
 
+    /**
+     * The {@code Badge.code} that grants this, or null for anything on sale.
+     *
+     * <p>A third way to not be for sale, and the only one that is permanent: {@link #isFree()}
+     * means everybody has it, {@link #membershipOnly} means it comes and goes with a
+     * subscription, and this means it was earned once and is kept forever.
+     *
+     * <p>The pointer runs this way — cosmetic names badge, not badge names cosmetic — so
+     * there is exactly one place that says which frame goes with which award. {@code Badge}
+     * only knows that it pays no coins; a slug there as well would be a second copy of the
+     * same fact, and two copies is how a badge ends up granting the wrong thing.
+     *
+     * <p>These rows are priced zero. That is never visible as "Free" because the shop
+     * filters them out before pricing anything, on the same path that already hides
+     * membership items.
+     */
+    @Column(name = "unlocked_by_badge", length = 48)
+    private String unlockedByBadge;
+
     @Column(name = "created_date", nullable = false)
     private Instant createdDate = Instant.now();
 
