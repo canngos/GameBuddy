@@ -24,4 +24,14 @@ public interface LobbyMessageRepository extends JpaRepository<LobbyMessage, UUID
     @Modifying
     @Query("DELETE FROM LobbyMessage m WHERE m.lobbyId IN :lobbyIds")
     void deleteAllByLobbyIdIn(@Param("lobbyIds") Collection<UUID> lobbyIds);
+
+    /**
+     * Lobby messages this gamer has sent — the {@code LOBBY_MESSAGES_SENT} metric.
+     *
+     * <p>Not cumulative in the strictest sense: the archive sweep above deletes the chat of
+     * a filed-away lobby, so this can fall. It is used by missions anyway because the sweep
+     * only reaches lobbies that ended long ago, well outside the life of a mission set, and
+     * the baseline subtraction is clamped at zero either way.
+     */
+    long countBySenderId(String senderId);
 }

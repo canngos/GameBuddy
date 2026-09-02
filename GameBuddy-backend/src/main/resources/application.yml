@@ -257,6 +257,18 @@ gamebuddy:
     ad-daily-cap: ${COINS_AD_DAILY_CAP:3}
     stipend: ${COINS_STIPEND:600}
     stipend-interval: ${COINS_STIPEND_INTERVAL:30d}
+    # What one mission pays, by the band its set was dealt from. The curve rises across the
+    # eight-set campaign and then falls back to the opening rate forever, because a ladder
+    # of rising rewards that never ends is a faucet with extra steps -- the campaign is what
+    # bounds it, and `veteran` is what keeps grinding from out-earning finishing.
+    #
+    # Frozen onto each row when it is dealt, so changing these does not move the price of a
+    # mission already on somebody's screen.
+    mission-rewards:
+      easy: ${COINS_MISSION_EASY:15}
+      medium: ${COINS_MISSION_MEDIUM:25}
+      hard: ${COINS_MISSION_HARD:35}
+      veteran: ${COINS_MISSION_VETERAN:15}
 
   billing:
     revenuecat:

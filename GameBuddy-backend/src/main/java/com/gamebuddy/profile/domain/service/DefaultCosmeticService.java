@@ -91,6 +91,12 @@ public class DefaultCosmeticService implements CosmeticService {
         if (cosmetic.isMembershipOnly()) {
             throw new BusinessException(TransactionCode.SUBSCRIPTION_REQUIRED);
         }
+        // Same reasoning one step further: a trophy is priced at zero too, and the store
+        // does not list it, so reaching here means somebody sent the id by hand. Hiding it
+        // from the shelf is presentation; this is the rule.
+        if (cosmetic.getUnlockedByBadge() != null) {
+            throw new BusinessException(TransactionCode.BADGE_NOT_EARNED);
+        }
         if (gamer.getCoin() < cosmetic.getPrice()) {
             throw new BusinessException(TransactionCode.COIN_NOT_ENOUGH);
         }
@@ -256,6 +262,15 @@ public class DefaultCosmeticService implements CosmeticService {
     private List<CosmeticDto> toDtos(List<Cosmetic> all, CosmeticKind kind, Set<UUID> owned, UUID equippedId) {
         return all.stream()
                 .filter(c -> c.getKind() == kind)
+                // A badge's trophy is never on the shelf. It is priced at zero like a
+                // membership item and is just as emphatically not free — leaving it here
+                // would put "Free" under a frame that four months of play is the only way
+                // to get, which is the worst possible thing to say about it.
+                //
+                // Filtered here rather than in the query so the Inventory, which maps the
+                // same rows through `toDtos(items, owned)` below, still shows one to the
+                // gamer who earned it.
+                .filter(c -> c.getUnlockedByBadge() == null)
                 .map(c -> toDto(c, owned, equippedId))
                 .toList();
     }

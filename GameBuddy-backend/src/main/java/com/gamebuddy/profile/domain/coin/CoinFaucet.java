@@ -1,6 +1,5 @@
 package com.gamebuddy.profile.domain.coin;
 
-import com.gamebuddy.shared.badge.BadgeMetric;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -77,73 +76,14 @@ public class CoinFaucet {
         return unbroken ? currentStreak + 1 : 1;
     }
 
-    // -- Weekly quests -------------------------------------------------------
-
-    /**
-     * The three weekly quests. 75 coins a week if all are finished.
-     *
-     * <p>Each one is a metric the badge system already counts, on purpose: a quest over an
-     * existing metric costs one entry here, and nothing new has to be measured, stored or
-     * kept in step. They ask for the three things the product actually wants people doing —
-     * talking, matching, and posting — rather than whatever is easiest to count.
-     */
-    public enum Quest {
-        TALK("Send 10 messages", BadgeMetric.MESSAGES_SENT, 10, 25),
-        MEET("Match with 2 gamers", BadgeMetric.MATCHES, 2, 25),
-        // Took the retired POST quest's slot — same ordinal, so a mid-week claim of the
-        // old quest carries over harmlessly until the weekly rollover resets the mask.
-        SQUAD("Join a lobby", BadgeMetric.LOBBIES_JOINED, 1, 25);
-
-        private final String title;
-        private final BadgeMetric metric;
-        private final int target;
-        private final int reward;
-
-        Quest(String title, BadgeMetric metric, int target, int reward) {
-            this.title = title;
-            this.metric = metric;
-            this.target = target;
-            this.reward = reward;
-        }
-
-        public String title() {
-            return title;
-        }
-
-        public BadgeMetric metric() {
-            return metric;
-        }
-
-        public int target() {
-            return target;
-        }
-
-        public int reward() {
-            return reward;
-        }
-
-        /** This quest's place in {@code quest_claimed_mask}. */
-        public int bit() {
-            return 1 << ordinal();
-        }
-    }
-
-    /**
-     * The start of the week a given instant falls in.
-     *
-     * <p>Truncated to a day and then wound back to Monday, in UTC. One boundary for
-     * everybody rather than a per-gamer rolling week: a shared reset is something the whole
-     * population feels at once, which is what makes "new quests" worth coming back for, and
-     * it means two gamers comparing notes are talking about the same week.
-     */
-    public static Instant weekStart(Instant now) {
-        Instant midnight = now.truncatedTo(ChronoUnit.DAYS);
-        // Thursday 1 January 1970 was day 0, so day-of-week is (days + 3) mod 7 with
-        // Monday as zero.
-        long days = midnight.getEpochSecond() / 86400L;
-        long sinceMonday = Math.floorMod(days + 3, 7);
-        return midnight.minus(Duration.ofDays(sinceMonday));
-    }
+    // -- Missions ------------------------------------------------------------
+    //
+    // Nothing here any more. The three weekly quests were an enum in this file, priced at a
+    // literal 25 and reset against a Monday-UTC week boundary that also lived here. Both
+    // went with them: the catalogue is `profile/domain/mission/Mission`, the rates are
+    // config under `gamebuddy.coins.mission-rewards`, and a mission set now ends when it is
+    // finished rather than when the week does — so there is no shared boundary left to
+    // compute. See `MissionService`.
 
     // -- Rewarded video ------------------------------------------------------
 
@@ -159,7 +99,6 @@ public class CoinFaucet {
         return now.truncatedTo(ChronoUnit.DAYS);
     }
 
-    /** How many more ads this gamer may be paid for today. */
     /**
      * What one finished advert pays.
      *

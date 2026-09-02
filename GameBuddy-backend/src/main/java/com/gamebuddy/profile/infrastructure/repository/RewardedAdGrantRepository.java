@@ -44,4 +44,12 @@ public interface RewardedAdGrantRepository extends JpaRepository<RewardedAdGrant
             @Param("userId") String userId,
             @Param("coins") int coins,
             @Param("createdAt") Instant createdAt);
+
+    /**
+     * Rewarded videos this gamer has been paid for — the {@code ADS_WATCHED} metric.
+     *
+     * <p>One row per AdMob transaction id, written only after server-side verification, so
+     * this counts views that actually earned rather than views that started.
+     */
+    long countByUserId(String userId);
 }

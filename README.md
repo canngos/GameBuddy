@@ -257,6 +257,7 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-36-market-wave-2.sql` | Animated banners, two animated frames, and bundles. |
 | `db/upgrade-2026-37-profile-themes.sql` | Card themes: a third cosmetic kind, and its slot. |
 | `db/upgrade-2026-38-promo-codes.sql` | Promotion codes: the code, who it was addressed to, and who redeemed it. |
+| `db/upgrade-2026-39-missions-and-badges.sql` | Missions become a dealt campaign; badges gain a hard tier that pays in frames. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 | `db/delete-seed.sql`              | Removes the synthetic accounts. Not a migration — see above. |
 

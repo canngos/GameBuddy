@@ -472,8 +472,13 @@ const Row = memo(function Row({
    *
    * "Free" stays muted. Gold means coins here, and a free frame costs none — colouring it
    * like a price would be the same mistake in the other direction.
+   *
+   * A price you cannot meet is muted too, and that is now the row's whole way of saying so
+   * — see the control below for why the sentence left it. `ConsumableShelf` has always
+   * spoken this way: a gold cost is one you can pay, a grey one is not.
    */
-  const costClass = free ? 'text-muted' : 'font-medium text-gold';
+  const costClass =
+    free || (!item.owned && !affordable) ? 'text-muted' : 'font-medium text-gold';
 
   /*
    * The artwork and the name open a closer look; the button beside them still buys.
@@ -524,9 +529,12 @@ const Row = memo(function Row({
       </View>
 
       {/*
-        Both lines truncate rather than wrap, which they now can afford to do: this column
-        is about 105dp when the control reads "Not enough coins", and a bare price fits
-        in that on one line where "Animated · 600 coins" did not.
+        Both lines truncate rather than wrap, which they can afford to do only because the
+        two columns beside them are now predictable. The artwork is 96dp wide on the banner
+        and theme shelves against the frame's 64, and the control used to swing from 58dp
+        ("Buy") to 150dp ("Not enough coins") — together that left this column about 10dp on
+        a 360dp phone, which is why the banner and theme names were unreadable while the
+        frames looked fine. The control is a short word in every state now; see it below.
 
         The "Animated" tag is gone from here on purpose — the preview to the left is
         *playing*, so the word was captioning something already on screen, and it was
@@ -610,13 +618,26 @@ const Row = memo(function Row({
             {/* "Claim", not "Buy", for the one free item. It is the same request and the
                 same zero charge, but the word is the instruction: a free frame that says
                 Buy reads as a price that failed to load. */}
+            {/*
+              A word, never a sentence — including when the answer is no.
+
+              This said "Not enough coins", which is 150dp of a 256dp row in English and
+              "No tienes monedas suficientes" in Spanish. The control does not shrink, so
+              that width came straight out of the name and the price beside it, and on the
+              banner and theme shelves — whose artwork is half again as wide as a frame's —
+              there was nothing left of them to read. It is the one label here that was not
+              a word, and it was the one breaking the row.
+
+              What it said is not lost. The price above turns from gold to grey, which is
+              already how `ConsumableShelf` says the same thing, the control is visibly
+              spent, and the accessibility label below still spells the refusal out for a
+              screen reader, which cannot see either signal.
+            */}
             {item.owned
               ? t.market.shop.owned
               : free
                 ? t.market.shop.claim
-                : affordable
-                  ? t.market.shop.buy
-                  : t.market.shop.notEnoughCoins}
+                : t.market.shop.buy}
           </Text>
         </Pressable>
       </View>

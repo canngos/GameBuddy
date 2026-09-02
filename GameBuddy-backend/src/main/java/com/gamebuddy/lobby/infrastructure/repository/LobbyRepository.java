@@ -78,4 +78,14 @@ public interface LobbyRepository extends JpaRepository<Lobby, UUID> {
 
     /** Sweeper: terminal lobbies old enough to file away. {@code endedAt} is set on end and cancel both. */
     List<Lobby> findAllByStatusInAndEndedAtBefore(Collection<LobbyStatus> statuses, Instant cutoff);
+
+    /**
+     * Lobbies this gamer has opened, ever — the {@code LOBBIES_CREATED} badge metric.
+     *
+     * <p>Every status, cancelled and archived included. Opening a lobby is the act being
+     * measured, and it happened whether or not anybody turned up; a metric that only
+     * counted the successful ones would quietly punish the gamer for other people's
+     * no-shows.
+     */
+    long countByOwnerId(String ownerId);
 }

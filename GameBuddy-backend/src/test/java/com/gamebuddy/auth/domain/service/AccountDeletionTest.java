@@ -88,6 +88,9 @@ class AccountDeletionTest {
     @Mock
     private ObjectStorage objectStorage;
 
+    @Mock
+    private GamerMissionRepository gamerMissionRepository;
+
     /** The production bean rather than a copy of its numbers; see DefaultAuthServiceTest. */
     @Spy
     private AuthRateLimiters rateLimiters = new AuthRateLimitConfig().authRateLimiters();
@@ -242,6 +245,17 @@ class AccountDeletionTest {
             // What somebody achieved is a record of what they did here, and the showcase is
             // the part of it other people could see.
             verify(gamerBadgeRepository).deleteAllByUserId(gamer.getUserId());
+        }
+
+        @Test
+        @DisplayName("dealt missions go too, baselines and all")
+        void testDeleteAccount_whenValid_ClearsMissions() {
+            authService.deleteAccount(gamer, request("correct"));
+
+            // Each row carries a snapshot of how much this account had talked, matched and
+            // spent at the moment a set was dealt. Across a campaign that is a sketch of
+            // somebody's activity over months, which is exactly what a deletion is for.
+            verify(gamerMissionRepository).deleteAllByUserId(gamer.getUserId());
         }
 
         @Test

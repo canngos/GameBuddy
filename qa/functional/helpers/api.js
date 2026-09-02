@@ -12,6 +12,8 @@ const BASE = process.env.GB_BASE_URL || 'http://localhost:8080';
 /** Transaction codes, from common/src/main/java/com/gamebuddy/common/enums/TransactionCode.java */
 const CODE = {
   SUCCESS: '100',
+  REWARD_NOT_READY: '174',
+  QUEST_UNFINISHED: '175',
   EMAIL_EXISTS: '101',
   EMAIL_SEND_FAILED: '102',
   USER_NOT_FOUND: '103',

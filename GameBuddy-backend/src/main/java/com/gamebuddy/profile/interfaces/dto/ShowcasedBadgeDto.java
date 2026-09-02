@@ -20,4 +20,14 @@ public class ShowcasedBadgeDto {
 
     /** A resolved URL, not the stored object key. */
     private String icon;
+
+    /**
+     * True when the artwork is animated WebP.
+     *
+     * <p>Worth the extra field on the smaller DTO: a showcase is the one place a badge is
+     * shown to other people, and the two animated ones are the two hardest in the game. A
+     * still first frame on somebody else's profile would waste the only surface where
+     * showing off is the entire point.
+     */
+    private boolean animated;
 }

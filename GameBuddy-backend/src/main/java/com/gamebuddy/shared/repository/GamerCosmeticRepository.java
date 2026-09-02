@@ -8,6 +8,7 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /** Who bought what. */
@@ -121,4 +122,23 @@ public interface GamerCosmeticRepository extends JpaRepository<GamerCosmetic, Ga
                                WHERE gc.user_id = g.user_id AND gc.cosmetic_id = g.equipped_theme_id))
                     """, nativeQuery = true)
     int unequipUnownedCosmetics();
+
+    /**
+     * Gives one gamer one cosmetic, for free, because they earned it.
+     *
+     * <p>{@code paid = 0}, like the membership grant above — nothing changed hands, and the
+     * {@code COSMETICS_OWNED} metric counts paid rows only, so a trophy frame does not
+     * carry anybody towards "Rich in the Hood".
+     *
+     * <p>{@code ON CONFLICT DO NOTHING} so granting twice is harmless. The conditional
+     * collect in {@code DefaultBadgeService} should already make that impossible; this is
+     * the backstop that means a mistake there costs nothing.
+     */
+    @Modifying
+    @Query(value = """
+                    INSERT INTO gamer_cosmetic (user_id, cosmetic_id, paid, acquired_at)
+                    VALUES (:userId, :cosmeticId, 0, :now)
+                    ON CONFLICT (user_id, cosmetic_id) DO NOTHING
+                    """, nativeQuery = true)
+    int grant(@Param("userId") String userId, @Param("cosmeticId") UUID cosmeticId, @Param("now") Instant now);
 }

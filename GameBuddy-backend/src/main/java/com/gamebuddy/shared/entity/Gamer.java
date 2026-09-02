@@ -339,6 +339,19 @@ public class Gamer implements RevocableUser {
     @Column(name = "daily_streak", nullable = false)
     private int dailyStreak = 0;
 
+    /**
+     * Daily rewards claimed over the life of the account, which {@link #dailyStreak} cannot
+     * answer because it forgets everything the moment somebody misses a day.
+     *
+     * <p>A counter rather than a count of rows, because there are no rows — a claim moves
+     * two fields on this entity and writes one ledger entry, and filtering the ledger by
+     * reason to answer "how many times" would make the meaning of this number depend on
+     * the ledger's retention policy. Incremented in {@code CoinEarningService.claimDaily},
+     * in the same write that was already happening.
+     */
+    @Column(name = "daily_claims_total", nullable = false)
+    private int dailyClaimsTotal = 0;
+
     @Column(name = "stipend_claimed_at")
     private Instant stipendClaimedAt;
 
@@ -385,28 +398,20 @@ public class Gamer implements RevocableUser {
     private Instant upgradePromptShownAt;
 
     /**
-     * Start of the week the quest baselines below were taken at.
+     * How many sets of three missions this gamer has been dealt. Zero means never played.
      *
-     * <p>The baselines exist because {@code BadgeMetric} counts are lifetime totals, and a
-     * weekly quest asks about a week. Progress is the current total minus the baseline,
-     * which reuses one counting system instead of building a second.
+     * <p>Replaced the five {@code quest_*} columns, which held one baseline per metric and
+     * a bitmask keyed on enum ordinal. That shape could describe exactly three missions and
+     * no others: a fourth needed a column, and reordering the enum silently reassigned
+     * everybody's claimed bits. Per-assignment state moved to {@code gamer_mission}, where
+     * a row can say which mission it is; all that is left here is the cursor.
+     *
+     * <p>Denormalised — it is {@code max(set_index)} in that table — because the earn screen
+     * needs it on every load and the alternative is an aggregate to find out whether there
+     * is anything to draw.
      */
-    @Column(name = "quest_week_started_at")
-    private Instant questWeekStartedAt;
-
-    @Column(name = "quest_base_messages", nullable = false)
-    private int questBaseMessages = 0;
-
-    @Column(name = "quest_base_matches", nullable = false)
-    private int questBaseMatches = 0;
-
-    /** Baseline for the weekly lobby quest. Replaced quest_base_posts when Communities retired. */
-    @Column(name = "quest_base_lobbies", nullable = false)
-    private int questBaseLobbies = 0;
-
-    /** Bitmask of quests already paid this week; cleared when the week rolls over. */
-    @Column(name = "quest_claimed_mask", nullable = false)
-    private int questClaimedMask = 0;
+    @Column(name = "mission_set_index", nullable = false)
+    private int missionSetIndex = 0;
 
     // --- Taste -------------------------------------------------------------
     // Batch-fetched: rendering a profile touches friends, games, keywords and

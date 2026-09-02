@@ -7,16 +7,17 @@ import {
   Target,
   type LucideIcon,
 } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { REWARDED_AD_COINS, adsAvailable, showRewardedAd } from '../ads/rewarded';
 import { earnApi } from '../api/coins';
-import type { Earn, Quest } from '../api/types';
+import type { Earn, Mission } from '../api/types';
 import { useUpper } from '../i18n/case';
 import type { Dictionary } from '../i18n/dictionaries/en';
 import { useT } from '../i18n/useT';
 import { useSession } from '../session/store';
-import { Icon, Text, feedback, messageOf, showToast } from '../ui';
+import { useThemeColors } from '../theme';
+import { Burst, Icon, Text, feedback, messageOf, showToast } from '../ui';
 import { StreakStrip } from './StreakStrip';
 
 const EARN_KEY = ['earn'];
@@ -67,6 +68,7 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
   const queryClient = useQueryClient();
   const t = useT();
   const upper = useUpper();
+  const colors = useThemeColors();
 
   const earn = useQuery({
     queryKey: EARN_KEY,
@@ -114,7 +116,7 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
   };
 
   const daily = useMutation({ mutationFn: earnApi.claimDaily, onSuccess: applyEarn });
-  const quest = useMutation({ mutationFn: earnApi.claimQuest, onSuccess: applyEarn });
+  const mission = useMutation({ mutationFn: earnApi.claimMission, onSuccess: applyEarn });
   const stipend = useMutation({ mutationFn: earnApi.claimStipend, onSuccess: applyEarn });
 
   // Watching an advert is not a mutation of ours: nothing is claimed and no endpoint is
@@ -202,9 +204,34 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
     }
   }
 
-  const busy = daily.isPending || quest.isPending || stipend.isPending || watching;
-  const failure = daily.error ?? quest.error ?? stipend.error;
+  /*
+   * One flag disabled every row on the screen.
+   *
+   * Fine when the three missions were fixed and finishing two at once was a coincidence.
+   * Not fine now: a set is dealt together and tends to complete together, so the common
+   * case is three ready rows and a gamer tapping them in a row. Each row now only blocks
+   * itself, and `busy` is kept for the ones that genuinely share the screen's state.
+   */
+  const claimingMission = mission.isPending ? mission.variables : undefined;
+  const busy = daily.isPending || stipend.isPending || watching;
+  const failure = daily.error ?? mission.error ?? stipend.error;
   const state = earn.data;
+
+  /*
+   * Finishing the third of three deals the next three in the same response, so the screen
+   * changes under the gamer with nothing to mark it. The set number is what actually moved,
+   * so that is what this watches — a burst on a claim would fire three times a set.
+   */
+  const [celebrate, setCelebrate] = useState(0);
+  const lastSet = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const set = earn.data?.missionSet;
+    if (set === undefined) return;
+    if (lastSet.current !== undefined && set > lastSet.current) {
+      setCelebrate((n) => n + 1);
+    }
+    lastSet.current = set;
+  }, [earn.data?.missionSet]);
 
   if (!state) return null;
 
@@ -257,9 +284,43 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
         />
       )}
 
-      {state.quests.map((q) => (
-        <QuestRow key={q.code} quest={q} busy={busy} onPress={() => quest.mutate(q.code)} />
-      ))}
+      {/* The header exists because the campaign has an end, and a gamer who cannot see
+          that is on a treadmill rather than a journey. It also has to say when the end has
+          been passed: after the last set the pool repeats at the opening rate, and a screen
+          that quietly started paying less would be the worse of the two options. */}
+      <View className="flex-row items-baseline justify-between pt-1">
+        <Text variant="overline">
+          {state.missionVeteran
+            ? upper(t.market.earn.missionSetVeteran(state.missionSet - state.missionSetsTotal))
+            : upper(t.market.earn.missionSetOf(state.missionSet, state.missionSetsTotal))}
+        </Text>
+        <Text variant="caption" className="text-muted">
+          {t.market.earn.missionBand[state.missionBand]}
+        </Text>
+      </View>
+
+      <View>
+        {state.missions.map((m) => (
+          <MissionRow
+            key={`${state.missionSet}:${m.slot}`}
+            mission={m}
+            busy={busy || claimingMission === m.code}
+            onPress={() => mission.mutate(m.code)}
+          />
+        ))}
+
+        {/* Over the three, not on one of them: what is being marked is the set turning
+            over, and it is the whole block that was replaced. `pointerEvents` off so the
+            particles never eat a tap on the new rows underneath.
+
+            Mounted only once a set has actually turned over, because mounting counts as a
+            play — left mounted it would fire every time somebody opened the Market. */}
+        {celebrate > 0 && (
+          <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
+            <Burst play={celebrate} color={colors.gold} radius={130} />
+          </View>
+        )}
+      </View>
 
       {/* Only shown to members. Advertising a reward that cannot be taken is a worse
           paywall than not mentioning it: it reads as broken rather than as an offer. */}
@@ -282,43 +343,50 @@ export function EarnCoins({ onBalanceChange }: { onBalanceChange?: (coins: numbe
   );
 }
 
-function QuestRow({
-  quest,
+/**
+ * One of the three missions on screen.
+ *
+ * Keyed on set and slot rather than on the code, so replacing a finished set remounts the
+ * rows instead of animating a progress bar from the old mission's numbers to the new one's.
+ */
+function MissionRow({
+  mission,
   busy,
   onPress,
 }: {
-  quest: Quest;
+  mission: Mission;
   busy: boolean;
   onPress: () => void;
 }) {
   const t = useT();
-  const done = quest.progress >= quest.target;
+  const done = mission.progress >= mission.target;
 
-  // The backend sends the title in English — it is a string on a Java enum, one per quest,
-  // with no notion of a locale — so a gamer reading the app in Turkish met three English
+  // The backend sends the title in English — it is a string on a Java enum, one per
+  // mission, with no notion of a locale — so a gamer reading the app in Turkish met English
   // rows among localised ones. Translated by `code`, which is on the payload and is the
-  // stable name of the quest rather than prose that can be reworded.
+  // stable name of the mission rather than prose that can be reworded.
   //
   // Falls back to what the server sent when this build has never heard of the code. A
-  // quest added after it shipped then reads in English, which is worse than the dictionary
-  // and much better than an empty row.
+  // mission added after it shipped then reads in English, which is worse than the
+  // dictionary and much better than an empty row.
   const title =
-    (t.market.earn.questTitles as Record<string, string | undefined>)[quest.code] ?? quest.title;
+    (t.market.earn.missionTitles as Record<string, string | undefined>)[mission.code] ??
+    mission.title;
 
   return (
     <ClaimRow
-      icon={quest.claimed ? Check : Target}
+      icon={mission.claimed ? Check : Target}
       title={title}
       detail={
-        quest.claimed
-          ? t.market.earn.questDone
-          : t.market.earn.questProgress(quest.progress, quest.target)
+        mission.claimed
+          ? t.market.earn.missionDone
+          : t.market.earn.missionProgress(mission.progress, mission.target)
       }
-      reward={quest.reward}
-      ready={done && !quest.claimed}
+      reward={mission.reward}
+      ready={done && !mission.claimed}
       busy={busy}
-      dimmed={quest.claimed}
-      progress={quest.claimed ? 1 : quest.progress / quest.target}
+      dimmed={mission.claimed}
+      progress={mission.claimed ? 1 : mission.progress / mission.target}
       onPress={onPress}
     />
   );
