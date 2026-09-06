@@ -242,6 +242,80 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
     boolean hasMutualMatch(@Param("userId") String userId);
 
     /**
+     * Whether this gamer has at least {@code atLeast} mutual matches.
+     *
+     * <p>The same mirror-row join as {@link #hasMutualMatch}, stopped as soon as the answer
+     * is settled. {@code LIMIT} inside the subquery is what makes that true: counting every
+     * match and comparing afterwards would read four hundred rows to learn something the
+     * second row already decided.
+     *
+     * <p>Asked by the review prompt, which wants "has this worked more than once" rather
+     * than "has this worked" — one match can be luck, and a review is a question about the
+     * product rather than about a moment.
+     */
+    @Query(value = """
+                    SELECT (SELECT COUNT(*) FROM (
+                              SELECT 1
+                                FROM approved_matches a
+                                JOIN approved_matches b
+                                  ON b.user_id = a.matched_id AND b.matched_id = a.user_id
+                               WHERE a.user_id = :userId
+                               LIMIT :atLeast) m) >= :atLeast
+                    """, nativeQuery = true)
+    boolean hasMutualMatches(@Param("userId") String userId, @Param("atLeast") int atLeast);
+
+    /**
+     * Whether this gamer has ever sent a chat message.
+     *
+     * <p>A native query on {@code chat_message} rather than a call into the match module's
+     * {@code ChatMessageRepository}: {@code shared} may not depend on a feature module, and
+     * this is the same seam {@link #hasMutualMatch} already crosses for {@code
+     * approved_matches}.
+     *
+     * <p>What it stands in for is "did the match turn into anything". Matching is the
+     * product's promise; saying something to the person is the evidence it was kept.
+     */
+    @Query(value = "SELECT EXISTS (SELECT 1 FROM chat_message WHERE sender_id = :userId)", nativeQuery = true)
+    boolean hasSentMessage(@Param("userId") String userId);
+
+    /**
+     * Which external identities can sign in as this gamer.
+     *
+     * <p>A native query on {@code gamer_auth_identity} rather than a call into the auth
+     * module's repository: the identity table is auth-private, and {@code profile} may not
+     * depend on it. The same seam {@link #hasMutualMatch} already crosses for
+     * {@code approved_matches}.
+     *
+     * <p>Read only for a gamer's own profile. These are credentials, and a list of them on
+     * somebody else's profile would be a list of doors to try.
+     */
+    @Query(value = "SELECT provider FROM gamer_auth_identity WHERE user_id = :userId ORDER BY provider",
+            nativeQuery = true)
+    List<String> findAuthProviders(@Param("userId") String userId);
+
+    /**
+     * Takes the right to ask this gamer for a Play review, if it is available.
+     *
+     * <p>One conditional update rather than a read and a write. Two devices dismissing the
+     * same match at the same moment would both pass a read-then-write check and both ask;
+     * here exactly one of them sees a row count of 1, which is the same argument as
+     * {@code AccountLinkTicketRepository#spend}.
+     *
+     * <p>{@code cutoff} is "now minus the cooldown": a null column has never been asked, and
+     * an older one has served its time.
+     *
+     * @return 1 when the claim succeeded, 0 when it was too soon
+     */
+    @Modifying
+    @Query("""
+            update Gamer g set g.reviewPromptShownAt = :now
+             where g.userId = :userId
+               and (g.reviewPromptShownAt is null or g.reviewPromptShownAt < :cutoff)
+            """)
+    int claimReviewPrompt(
+            @Param("userId") String userId, @Param("now") Instant now, @Param("cutoff") Instant cutoff);
+
+    /**
      * Gamers this one has sent a friend request to, still unanswered.
      *
      * <p>The mirror of {@code Gamer.waitingFriends}, which holds requests *received*. The

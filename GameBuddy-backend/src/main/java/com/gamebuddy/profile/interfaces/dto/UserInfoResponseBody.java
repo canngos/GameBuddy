@@ -99,4 +99,38 @@ public class UserInfoResponseBody implements BaseModel {
 
     /** Own profile only. */
     private List<GamerDto> friends;
+
+    /**
+     * Verified Discord accounts, filtered to what this viewer may see.
+     *
+     * <p>Filtered rather than sent-and-hidden. Each link carries its own visibility, and a
+     * client that received a restricted handle and was trusted to not draw it would be one
+     * response inspection away from publishing it — the field is simply absent for a viewer
+     * who has not matched with the owner.
+     *
+     * <p>Empty for the overwhelming majority of accounts, and the profile leaves the section
+     * out entirely rather than rendering a heading over nothing.
+     */
+    private List<LinkedAccountDto> linkedAccounts;
+
+    /**
+     * Whether this account can sign in with an email and a password. Own profile only.
+     *
+     * <p>The settings screen needs it to choose between "Change password" and "Set a
+     * password", and the delete-account card needs it to know whether to ask for one. An
+     * account created through Google has no password at all — see
+     * {@code DefaultSocialAuthService} for why that is stored honestly rather than as a
+     * random hash nobody holds.
+     */
+    private Boolean hasPassword;
+
+    /**
+     * Which external identities can sign in as this account. Own profile only.
+     *
+     * <p>Enum names, {@code GOOGLE} and {@code DISCORD}. Deliberately unrelated to
+     * {@link #linkedAccounts} above, which is a profile decoration other people can see:
+     * these are credentials, they are never shown to anybody else, and the two lists can
+     * legitimately disagree.
+     */
+    private List<String> authProviders;
 }

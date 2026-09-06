@@ -317,6 +317,7 @@ CREATE TABLE gamebuddy.gamer (
     bonus_accepts integer DEFAULT 0 NOT NULL,
     like_cap_cohort character varying(16),
     upgrade_prompt_shown_at timestamp with time zone,
+    review_prompt_shown_at timestamp with time zone,
     rewarded_ads_today integer DEFAULT 0 NOT NULL,
     rewarded_ad_day timestamp with time zone,
     CONSTRAINT gamer_avatar_status_check CHECK (((avatar_status IS NULL) OR ((avatar_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text])))),
@@ -414,6 +415,8 @@ COMMENT ON COLUMN gamebuddy.gamer.like_cap_cohort IS 'Stable A/B bucket for the 
 --
 
 COMMENT ON COLUMN gamebuddy.gamer.upgrade_prompt_shown_at IS 'When the one-time day-3 Gold prompt was shown. Null means never; set once, never cleared.';
+
+COMMENT ON COLUMN gamebuddy.gamer.review_prompt_shown_at IS 'When the Play review card was last requested. Null means never. Not proof it appeared -- Play never says.';
 
 
 --
@@ -827,6 +830,81 @@ CREATE TABLE gamebuddy.password_reset_ticket (
 
 
 --
+-- Name: account_link_ticket; Type: TABLE; Schema: gamebuddy
+--
+
+CREATE TABLE gamebuddy.account_link_ticket (
+    id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    provider character varying(16) NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    used boolean DEFAULT false NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    expires_at timestamp(6) with time zone NOT NULL
+);
+
+
+--
+-- Name: gamer_auth_identity; Type: TABLE; Schema: gamebuddy
+--
+
+CREATE TABLE gamebuddy.gamer_auth_identity (
+    user_id character varying(255) NOT NULL,
+    provider character varying(16) NOT NULL,
+    subject character varying(255) NOT NULL,
+    email_at_link character varying(255),
+    created_at timestamp(6) with time zone NOT NULL,
+    last_used_at timestamp(6) with time zone
+);
+
+
+COMMENT ON TABLE gamebuddy.gamer_auth_identity IS 'Credentials: which external identities may sign in as this gamer. Never displayed.';
+
+
+--
+-- Name: social_login_ticket; Type: TABLE; Schema: gamebuddy
+--
+
+CREATE TABLE gamebuddy.social_login_ticket (
+    id uuid NOT NULL,
+    provider character varying(16) NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    subject character varying(255),
+    email character varying(255),
+    email_verified boolean,
+    display_name character varying(255),
+    used boolean DEFAULT false NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    expires_at timestamp(6) with time zone NOT NULL
+);
+
+
+COMMENT ON TABLE gamebuddy.social_login_ticket IS 'Short-lived, single-use tickets carrying a Discord sign-in across the browser round trip.';
+
+
+--
+-- Name: gamer_linked_account; Type: TABLE; Schema: gamebuddy
+--
+
+CREATE TABLE gamebuddy.gamer_linked_account (
+    user_id character varying(255) NOT NULL,
+    provider character varying(16) NOT NULL,
+    external_id character varying(64) NOT NULL,
+    handle character varying(255),
+    visibility character varying(16) DEFAULT 'MATCHES'::character varying NOT NULL,
+    linked_at timestamp(6) with time zone NOT NULL,
+    handle_refreshed_at timestamp(6) with time zone
+);
+
+
+--
+-- Name: TABLE gamer_linked_account; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.gamer_linked_account IS 'Provider-verified Discord identities. The handle is fetched, never typed.';
+
+
+--
 -- Name: waiting_friends; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -1182,6 +1260,60 @@ ALTER TABLE ONLY gamebuddy.password_reset_ticket
 
 
 --
+-- Name: account_link_ticket account_link_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.account_link_ticket
+    ADD CONSTRAINT account_link_ticket_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: gamer_linked_account gamer_linked_account_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_linked_account
+    ADD CONSTRAINT gamer_linked_account_pkey PRIMARY KEY (user_id, provider);
+
+
+--
+-- Name: gamer_auth_identity gamer_auth_identity_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_auth_identity
+    ADD CONSTRAINT gamer_auth_identity_pkey PRIMARY KEY (user_id, provider);
+
+
+--
+-- Name: social_login_ticket social_login_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.social_login_ticket
+    ADD CONSTRAINT social_login_ticket_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: social_login_ticket social_login_ticket_token_hash_key; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.social_login_ticket
+    ADD CONSTRAINT social_login_ticket_token_hash_key UNIQUE (token_hash);
+
+
+--
+-- Name: idx_gamer_auth_identity_subject; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_gamer_auth_identity_subject ON gamebuddy.gamer_auth_identity USING btree (provider, subject);
+
+
+--
+-- Name: idx_social_login_ticket_expires; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_social_login_ticket_expires ON gamebuddy.social_login_ticket USING btree (expires_at);
+
+
+--
 -- Name: verification_code verification_code_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1447,6 +1579,27 @@ CREATE INDEX idx_password_reset_ticket_email ON gamebuddy.password_reset_ticket 
 --
 
 CREATE UNIQUE INDEX idx_password_reset_ticket_hash ON gamebuddy.password_reset_ticket USING btree (token_hash);
+
+
+--
+-- Name: idx_account_link_ticket_hash; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_account_link_ticket_hash ON gamebuddy.account_link_ticket USING btree (token_hash);
+
+
+--
+-- Name: idx_account_link_ticket_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_account_link_ticket_user ON gamebuddy.account_link_ticket USING btree (user_id, provider);
+
+
+--
+-- Name: idx_gamer_linked_account_external; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_gamer_linked_account_external ON gamebuddy.gamer_linked_account USING btree (provider, external_id);
 
 
 --
@@ -1773,6 +1926,30 @@ ALTER TABLE ONLY gamebuddy.lobby_message
 
 ALTER TABLE ONLY gamebuddy.lobby
     ADD CONSTRAINT lobby_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES gamebuddy.gamer(user_id);
+
+
+--
+-- Name: account_link_ticket fk_account_link_ticket_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.account_link_ticket
+    ADD CONSTRAINT fk_account_link_ticket_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: gamer_linked_account fk_gamer_linked_account_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_linked_account
+    ADD CONSTRAINT fk_gamer_linked_account_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: gamer_auth_identity fk_gamer_auth_identity_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_auth_identity
+    ADD CONSTRAINT fk_gamer_auth_identity_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
 
 
 --

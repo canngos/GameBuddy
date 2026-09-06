@@ -3,6 +3,7 @@ package com.gamebuddy.match.domain.service;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.AgeBand;
+import com.gamebuddy.common.enums.LinkVisibility;
 import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
@@ -23,6 +24,7 @@ import com.gamebuddy.match.interfaces.dto.AcceptResponseBody;
 import com.gamebuddy.match.interfaces.dto.ConsumableResponseBody;
 import com.gamebuddy.match.interfaces.dto.GamerDto;
 import com.gamebuddy.match.interfaces.dto.LikedYouResponseBody;
+import com.gamebuddy.match.interfaces.dto.LinkedAccountDto;
 import com.gamebuddy.match.interfaces.dto.RecommendationResponseBody;
 import com.gamebuddy.match.interfaces.dto.RewindResponseBody;
 import com.gamebuddy.match.interfaces.dto.SwipeAllowanceResponseBody;
@@ -41,6 +43,7 @@ import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
 import com.gamebuddy.shared.repository.AvatarsRepository;
+import com.gamebuddy.shared.repository.GamerLinkedAccountRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.repository.GamesRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
@@ -87,6 +90,7 @@ public class DefaultMatchService implements MatchService {
     private final GamerRepository gamerRepository;
     private final GamesRepository gamesRepository;
     private final AvatarsRepository avatarsRepository;
+    private final GamerLinkedAccountRepository linkedAccountRepository;
     private final AvatarUrls avatarUrls;
     private final CosmeticUrls cosmeticUrls;
     private final ChatMapper chatMapper;
@@ -1017,9 +1021,22 @@ public class DefaultMatchService implements MatchService {
     private List<GamerDto> toDtos(List<Gamer> gamers) {
         Map<String, String> avatars = avatarUrls.visibleTo(gamers);
 
+        // One query for the whole page, keyed by gamer, rather than one per card. PUBLIC
+        // only: see GamerDto#linkedAccounts for why the viewer is not consulted.
+        Map<String, List<LinkedAccountDto>> links = linkedAccountRepository
+                .findByGamer_UserIdInAndVisibility(
+                        gamers.stream().map(Gamer::getUserId).toList(), LinkVisibility.PUBLIC)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        link -> link.getGamer().getUserId(),
+                        Collectors.mapping(
+                                link -> new LinkedAccountDto(link.getProvider().name(), link.getHandle()),
+                                Collectors.toList())));
+
         return gamers.stream()
                 .map(g -> {
                     GamerDto dto = chatMapper.toDto(g);
+                    dto.setLinkedAccounts(links.getOrDefault(g.getUserId(), List.of()));
                     dto.setAvatar(avatars.get(g.getUserId()));
                     // No map needed: Cosmetic is @BatchSize(50), so touching the lazy
                     // reference across a page of gamers costs one extra query, not one

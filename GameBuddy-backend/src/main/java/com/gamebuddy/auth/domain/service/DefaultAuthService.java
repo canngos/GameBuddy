@@ -13,6 +13,7 @@ import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.security.JwtService;
+import com.gamebuddy.common.security.TokenHashing;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
@@ -23,9 +24,6 @@ import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
@@ -46,6 +44,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class DefaultAuthService implements AuthService {
+
+    /**
+     * How recently a session must have begun for it to stand in for a password.
+     *
+     * <p>Measured from the JWT's {@code sst} claim, which a refresh preserves — so this is
+     * "when did you last actually sign in", not "when did this token appear".
+     */
+    private static final Duration REAUTH_WINDOW = Duration.ofMinutes(10);
 
     /** How long a verification code stays usable. Previously: forever. */
     private static final Duration CODE_TTL = Duration.ofMinutes(15);
@@ -90,6 +96,10 @@ public class DefaultAuthService implements AuthService {
     private final GamerCosmeticRepository gamerCosmeticRepository;
     private final GamerBadgeRepository gamerBadgeRepository;
     private final GamerMissionRepository gamerMissionRepository;
+    private final GamerLinkedAccountRepository linkedAccountRepository;
+    private final AccountLinkTicketRepository accountLinkTicketRepository;
+    private final GamerAuthIdentityRepository authIdentityRepository;
+    private final SessionIssuer sessionIssuer;
     private final ObjectStorage objectStorage;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -123,6 +133,16 @@ public class DefaultAuthService implements AuthService {
         // wrong. The previous code threw USER_NOT_FOUND first, which turned the login
         // endpoint into an account-enumeration oracle.
         Gamer gamer = gamerOptional.orElseThrow(() -> new BusinessException(TransactionCode.WRONG_PASSWORD));
+
+        // An account created through Google or Discord has no password at all. The same
+        // error as a wrong one, deliberately: "this account uses Google" would be an
+        // enumeration oracle, and the app's text for this code already says to try the
+        // social buttons. Short-circuited rather than left to the encoder, which logs a
+        // warning about a null hash on every attempt.
+        if (gamer.getPwd() == null) {
+            log.info("Password login attempted on a social-only account");
+            throw new BusinessException(TransactionCode.WRONG_PASSWORD);
+        }
 
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(gamer.getEmail(), password));
@@ -379,7 +399,11 @@ public class DefaultAuthService implements AuthService {
                 .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
 
         String newPassword = request.getPassword();
-        if (passwordEncoder.matches(newPassword, gamer.getPwd())) {
+        // Guarded, because a social-only account legitimately arrives here with no
+        // password: the forgotten-password flow is exactly how somebody who has lost
+        // access to their Google account gets a way back in, and it *sets* one. The
+        // mailbox proof it rests on is the same either way.
+        if (gamer.getPwd() != null && passwordEncoder.matches(newPassword, gamer.getPwd())) {
             throw new BusinessException(TransactionCode.PASSWORD_SAME);
         }
         PasswordPolicy.validate(newPassword);
@@ -531,6 +555,13 @@ public class DefaultAuthService implements AuthService {
     public DefaultMessageResponse changePwd(Gamer principal, ChangePwdRequest changePwdRequest) {
         Gamer gamer = reload(principal);
 
+        // Nothing to change, and nothing to check the current password against. The app
+        // reads `hasPassword` off the profile and offers "Set a password" instead, so this
+        // is the case where the two have drifted.
+        if (gamer.getPwd() == null) {
+            throw new BusinessException(TransactionCode.PASSWORD_NOT_SET);
+        }
+
         // The old endpoint changed the password on the strength of the bearer token
         // alone, so a leaked token meant permanent account takeover.
         if (!passwordEncoder.matches(changePwdRequest.getCurrentPassword(), gamer.getPwd())) {
@@ -636,7 +667,7 @@ public class DefaultAuthService implements AuthService {
      */
     @Override
     @Transactional
-    public DefaultMessageResponse deleteAccount(Gamer principal, DeleteAccountRequest request) {
+    public DefaultMessageResponse deleteAccount(Gamer principal, DeleteAccountRequest request, String bearerToken) {
         Gamer gamer = reload(principal);
 
         // Ordered before the password check: the caller is already authenticated as this
@@ -645,7 +676,14 @@ public class DefaultAuthService implements AuthService {
         if (gamer.getDeletedAt() != null) {
             throw new BusinessException(TransactionCode.ACCOUNT_DELETED);
         }
-        if (!passwordEncoder.matches(request.getCurrentPassword(), gamer.getPwd())) {
+        if (gamer.getPwd() == null) {
+            // No password to ask for, so freshness stands in for it: sign in again, then
+            // delete. That is the same property the password was providing — proof that
+            // whoever is holding this token has just satisfied the provider — and a stolen
+            // token cannot manufacture it, because a refresh preserves the original
+            // session start rather than moving it. See JwtService's `sst` claim.
+            requireFreshSession(bearerToken);
+        } else if (!passwordEncoder.matches(request.getCurrentPassword(), gamer.getPwd())) {
             throw new BusinessException(TransactionCode.CURRENT_PASSWORD_WRONG);
         }
 
@@ -699,6 +737,26 @@ public class DefaultAuthService implements AuthService {
         // talked and matched at the moment each set was handed out, which is a sketch of
         // somebody's activity over months — exactly the kind of thing a deletion is for.
         gamerMissionRepository.deleteAllByUserId(gamer.getUserId());
+
+        // Linked Discord accounts. The schema cascades on delete, but nothing here
+        // deletes — the row is anonymised — so without this the rows survive, and they are
+        // the two most identifying things left: a Discord snowflake and a display name that
+        // resolve to a real person on a service we do not control.
+        //
+        // Leaving them also bricks the external account permanently. `provider, external_id`
+        // is unique, so a returning user signing up fresh and linking the same Discord is
+        // told it belongs to another account and to unlink it there first — which is
+        // impossible, because that account can no longer authenticate.
+        linkedAccountRepository.deleteAllByGamer_UserId(gamer.getUserId());
+
+        // Any half-finished link, too. A ticket is single-use and short-lived, but it names
+        // the account it was minted for and there is no longer an account to name.
+        accountLinkTicketRepository.deleteAllByUserId(gamer.getUserId());
+
+        // And every way of signing in. Leaving these would let the same Google account walk
+        // straight back into a deleted account — the identity is keyed on the provider's
+        // subject, which does not change when the email column is anonymised above.
+        authIdentityRepository.deleteAllByUserId(gamer.getUserId());
 
         gamer.setDeletedAt(Instant.now());
         gamer.revokeIssuedTokens();
@@ -856,30 +914,19 @@ public class DefaultAuthService implements AuthService {
         return response;
     }
 
-    /** Starts a new session: the token's clock, and the ceiling's, both begin now. */
+    /**
+     * Starts a new session.
+     *
+     * <p>Both overloads now delegate to {@link SessionIssuer}, which social sign-in shares:
+     * the one-row-per-account rule and the login-versus-refresh distinction that the 30-day
+     * ceiling rests on are worth having in exactly one place.
+     */
     private String issueSession(Gamer gamer) {
-        return issueSession(gamer, Instant.now());
+        return sessionIssuer.issue(gamer);
     }
 
-    /**
-     * Records a token against the account, replacing whatever was there.
-     *
-     * <p>{@code sessionStart} is what separates a login from a refresh: a login passes
-     * now, a refresh passes the moment the session originally began, so extending a
-     * session never resets its age.
-     */
     private String issueSession(Gamer gamer, Instant sessionStart) {
-        String token = jwtService.generateToken(gamer, sessionStart);
-        // One row per account, as before — a refresh replaces its predecessor rather
-        // than piling up a row a week for every gamer who keeps playing.
-        sessionRepository.deleteAllByEmail(gamer.getEmail());
-
-        Session session = new Session();
-        session.setTokenHash(hashToken(token));
-        session.setEmail(gamer.getEmail());
-        session.setExpiresAt(jwtService.extractExpiration(token));
-        sessionRepository.save(session);
-        return token;
+        return sessionIssuer.issue(gamer, sessionStart);
     }
 
     /**
@@ -1071,12 +1118,55 @@ public class DefaultAuthService implements AuthService {
         events.publishEvent(new ProfileChangedEvent(gamer.getUserId()));
     }
 
-    private static String hashToken(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
+    /**
+     * Sets a first password on an account that has never had one.
+     *
+     * <p>Deliberately does <em>not</em> revoke sessions, unlike {@link #changePwd}. A change
+     * is what somebody does when they believe they have been compromised, so ending every
+     * session is the point of it. This is somebody adding a second way in, having proved
+     * nothing was wrong with the first — signing them out of every device to celebrate would
+     * be punishing the safe behaviour.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse setPassword(Gamer principal, SetPasswordRequest request) {
+        Gamer gamer = reload(principal);
+        if (gamer.getPwd() != null) {
+            throw new BusinessException(TransactionCode.PASSWORD_ALREADY_SET);
         }
+        PasswordPolicy.validate(request.getPassword());
+
+        gamer.setPwd(passwordEncoder.encode(request.getPassword()));
+        gamerRepository.save(gamer);
+        log.info("Password set for {}", gamer.getUserId());
+        return DefaultMessageResponse.of("Password set.");
+    }
+
+    /**
+     * Refuses a destructive action on a session that is not minutes old.
+     *
+     * <p>The window is short on purpose: this is standing in for typing a password, and the
+     * honest flow is sign in, come back, confirm. Ten minutes covers a slow consent screen and
+     * a moment's hesitation, and nothing else.
+     */
+    private void requireFreshSession(String bearerToken) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new BusinessException(TransactionCode.REAUTH_REQUIRED);
+        }
+        Instant sessionStart;
+        try {
+            sessionStart = jwtService.extractSessionStart(bearerToken);
+        } catch (RuntimeException e) {
+            // A token this filter already accepted should always parse, so this is a
+            // malformed one arriving some other way.
+            throw new BusinessException(TransactionCode.REAUTH_REQUIRED);
+        }
+        if (sessionStart == null || sessionStart.isBefore(clock.instant().minus(REAUTH_WINDOW))) {
+            throw new BusinessException(TransactionCode.REAUTH_REQUIRED);
+        }
+    }
+
+    private static String hashToken(String token) {
+        return TokenHashing.sha256Hex(token);
     }
 }

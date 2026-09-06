@@ -26,6 +26,7 @@ dependencies {
 
     // Push notifications. The only remaining outbound integration besides the model.
     implementation libs.firebase.admin
+    implementation libs.spring.security.oauth2.jose
 
     runtimeOnly libs.postgresql
 

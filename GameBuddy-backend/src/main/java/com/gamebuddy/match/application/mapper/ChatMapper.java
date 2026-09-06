@@ -44,5 +44,8 @@ public interface ChatMapper {
     @Mapping(target = "theme", ignore = true)
     @Mapping(target = "selectedKeywords", ignore = true)
     @Mapping(target = "platforms", ignore = true)
+    // Filled in by the service from one batched query for the whole page, so there is
+    // nothing here to map from — see DefaultMatchService#toDtos.
+    @Mapping(target = "linkedAccounts", ignore = true)
     GamerDto toDto(Gamer gamer);
 }
