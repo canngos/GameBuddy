@@ -103,7 +103,7 @@ export default function Inventory() {
 
   return (
     <Screen scroll edges={['top']}>
-      <BackHeader title={t.market.inventory.title} subtitle={t.market.inventory.subtitle} />
+      <BackHeader title={t.market.inventory.title} />
 
       <SegmentRow>
         <Segment

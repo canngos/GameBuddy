@@ -19,6 +19,7 @@ import {
 } from "lucide-react-native";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { LinkedAccounts } from "./LinkedAccounts";
 import { profileApi } from "../api/catalogue";
 import { matchApi } from "../api/match";
 import { moderationApi } from "../api/moderation";
@@ -332,7 +333,16 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
             <Card className={header.cardGap}>
               <ProfileBanner source={gamer.data.banner} />
 
-              <View className={`${header.overlap} flex-row items-end gap-4`}>
+              <View
+                className={`${
+                  // The pills add a row to the bottom-aligned name column, which
+                  // grows it upward — so the overlap gives way rather than the
+                  // username climbing onto the banner.
+                  gamer.data.linkedAccounts?.length
+                    ? header.overlapWithExtraRow
+                    : header.overlap
+                } flex-row items-end gap-4`}
+              >
                 <FramedAvatar
                   frame={gamer.data.frame}
                   source={gamer.data.avatar}
@@ -344,6 +354,10 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
                   <Text variant="heading" numberOfLines={1}>
                     {gamer.data.username}
                   </Text>
+                  {/* Only what this viewer is allowed to see reaches here — the server has
+                      already dropped any handle kept back for matches, so an empty row and
+                      "linked, but not for you" look identical, which is the point. */}
+                  <LinkedAccounts accounts={gamer.data.linkedAccounts} />
                   <Text variant="caption">
                     {[gamer.data.age, localize(gamer.data.country)]
                       .filter(Boolean)

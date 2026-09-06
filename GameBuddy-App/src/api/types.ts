@@ -117,6 +117,79 @@ export type UserInfo = {
   badgeCount: number;
   /** Own profile only. */
   friends?: GamerSummary[];
+  /**
+   * Verified Discord accounts, already filtered to what this viewer may see.
+   *
+   * The server does the filtering, so a restricted handle is simply absent rather than
+   * present-and-not-drawn — a client trusted to hide it would be one response inspection
+   * away from publishing it.
+   *
+   * Optional for the same reason `platforms` is optional-chained on the settings screen: a
+   * profile cached before this shipped has no such key, and reading `.length` off it is a
+   * render error for everyone upgrading.
+   */
+  linkedAccounts?: LinkedAccount[];
+
+  /**
+   * Whether this account can sign in with an email and a password. Own profile only.
+   *
+   * Decides between "Change password" and "Set a password" in Settings, and whether the
+   * delete-account card asks for one. Optional because a profile cached before this shipped
+   * has no such key.
+   */
+  hasPassword?: boolean;
+
+  /**
+   * Which external identities can sign in as this account. Own profile only.
+   *
+   * Unrelated to `linkedAccounts` above, which is a profile decoration other people see:
+   * these are credentials, nobody else is shown them, and the two lists can disagree.
+   */
+  authProviders?: AuthProvider[];
+};
+
+/**
+ * Which external platforms a profile can carry.
+ *
+ * Steam was removed in September 2026 (no Web API key), but this stays a union rather than
+ * a bare string: the server still sends an enum name, and a second provider should be a
+ * compile error at every switch that reads one.
+ */
+export type LinkedProvider = 'DISCORD';
+
+/** Which external identities can sign in. Distinct from `LinkedProvider` on purpose. */
+export type AuthProvider = 'GOOGLE' | 'DISCORD';
+
+/**
+ * A session minted by a social sign-in.
+ *
+ * `newAccount` is the one thing the client cannot work out for itself: an account created a
+ * second ago and one that never finished onboarding look identical on the wire afterwards.
+ */
+export type SocialSession = Session & { newAccount: boolean };
+
+
+/**
+ * One verified external account.
+ *
+ * The provider's own id is never sent — the profile shows what somebody is called, not the
+ * key the link is built on.
+ */
+export type LinkedAccount = {
+  provider: LinkedProvider;
+  /**
+   * The display name, or null when it did not survive screening.
+   *
+   * Null is drawn rather than hidden: the badge still says the account was verified,
+   * without putting a name on it. It is never a masked string — that would be a name the
+   * person is not actually called.
+   */
+  handle: string | null;
+  /**
+   * Who can see it. Own profile only; undefined when viewing someone else, because a
+   * setting made to keep strangers out is not something to describe to a stranger.
+   */
+  visibility?: 'PUBLIC' | 'MATCHES';
 };
 
 /**
@@ -157,6 +230,13 @@ export type Candidate = {
    * because a client on an older build talks to a server that never sends it.
    */
   superLike?: boolean;
+  /**
+   * Verified handles shown under the name on the card.
+   *
+   * Public ones only — the backend never sends a matches-only handle to the deck, because a
+   * card is by definition somebody you have not matched with yet.
+   */
+  linkedAccounts?: LinkedAccount[];
 };
 
 /** Today's swipe budget. One budget with a sub-cap, not two. */

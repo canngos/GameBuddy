@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { Clock, Users } from "lucide-react-native";
 import { memo, useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native";
+import { useCoachmarkTarget } from "../../../src/hints/coachmark";
 import { LIVE_QUERY } from "../../../src/lobby/live";
 import { lobbyApi, PAGE_SIZE } from "../../../src/api/lobby";
 import type { Lobby, LobbyTone } from "../../../src/api/types";
@@ -84,6 +85,11 @@ export default function LobbyHome() {
   const { refetch: refetchFeed } = feed;
   const { refetch: refetchMine } = mine;
   const onCreate = useCallback(() => router.push("/lobby/create" as never), [router]);
+
+  // Pointed at the Open button the first time somebody reaches this tab. Not while the
+  // feed is still loading: the header is on screen before the list is, and a spotlight
+  // over a half-drawn screen is one nobody reads.
+  const { attach: attachCreateHint } = useCoachmarkTarget("lobby.create", !feed.isPending && !feed.error);
   const onToggleStartingSoon = useCallback(() => setStartingSoon((value) => !value), []);
   // Tapping the active chip clears the filter - four chips and an implicit "all" beats
   // a fifth chip saying so.
@@ -132,6 +138,7 @@ export default function LobbyHome() {
             feedError={feed.error}
             mineError={mine.error}
             onCreate={onCreate}
+            createRef={attachCreateHint}
             onToggleStartingSoon={onToggleStartingSoon}
             onSelectTone={onSelectTone}
             onRetryFeed={onRetryFeed}
@@ -175,6 +182,7 @@ const FeedHeader = memo(function FeedHeader({
   feedError,
   mineError,
   onCreate,
+  createRef,
   onToggleStartingSoon,
   onSelectTone,
   onRetryFeed,
@@ -188,6 +196,8 @@ const FeedHeader = memo(function FeedHeader({
   feedError: Error | null;
   mineError: Error | null;
   onCreate: () => void;
+  /** Lets the first-use coach mark measure the Open button. See `src/hints/`. */
+  createRef?: (node: View | null) => void;
   onToggleStartingSoon: () => void;
   onSelectTone: (value: LobbyTone) => void;
   onRetryFeed: () => void;
@@ -207,7 +217,11 @@ const FeedHeader = memo(function FeedHeader({
       </View>
 
       <View className="gap-2">
-        <Button label={t.lobby.list.open} disabled={ownsLive} onPress={onCreate} />
+        {/* `collapsable={false}`: an unstyled wrapper is flattened away on Android, and a
+            flattened view cannot be measured. */}
+        <View ref={createRef} collapsable={false}>
+          <Button label={t.lobby.list.open} disabled={ownsLive} onPress={onCreate} />
+        </View>
         {ownsLive && (
           <Text variant="caption" className="text-center">
             {t.lobby.list.ownsLive}

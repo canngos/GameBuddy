@@ -61,6 +61,19 @@ export const sv: Dictionary = {
       forgot: 'Glömt lösenordet?',
     },
 
+    social: {
+      or: 'eller',
+      google: 'Logga in med Google',
+      discord: 'Logga in med Discord',
+      consentTitle: 'En sak först',
+      consentBody: 'Vi behöver det här innan vi kan skapa ditt konto.',
+      continue: 'Skapa mitt konto',
+      finishing: 'Avslutar inloggningen',
+      googleUnavailable: 'Google-inloggning finns inte på den här enheten',
+      emailUnverified: 'Bekräfta kontots e-post först och försök igen',
+      failed: 'Inloggningen blev inte klar. Försök igen',
+    },
+
     register: {
       title: 'Skapa ditt konto',
       subtitle: 'Vi mejlar en sexsiffrig kod för att bekräfta adressen.',
@@ -93,7 +106,7 @@ export const sv: Dictionary = {
 
     forgot: {
       title: 'Återställ ditt lösenord',
-      subtitle: 'Ange e-postadressen du registrerade dig med, så skickar vi en sexsiffrig kod.',
+      subtitle: 'Vi skickar en sexsiffrig kod till din e-post.',
       email: 'E-post',
       submit: 'Skicka koden',
       sentCodeBefore: 'Om det finns ett konto för den är en sexsiffrig kod på väg till',
@@ -102,8 +115,7 @@ export const sv: Dictionary = {
       resetSubtitle: 'Alla som är inloggade med det gamla lösenordet loggas ut.',
       resetSubmit: 'Spara lösenordet',
       doneTitle: 'Logga in med ditt nya lösenord',
-      doneBody:
-        'Alla sessioner som använde det gamla lösenordet har avslutats, på den här enheten och alla andra.',
+      doneBody: 'Du har loggats ut överallt.',
       signIn: 'Logga in',
     },
   },
@@ -114,8 +126,7 @@ export const sv: Dictionary = {
 
     profile: {
       title: 'Om dig',
-      subtitle:
-        'GameBuddy är för vuxna. Ditt födelsedatum bekräftar att du är 18 eller äldre — det visas aldrig för någon.',
+      subtitle: 'GameBuddy är 18+. Ditt födelsedatum visas aldrig för någon.',
       ageHint: (n: number) => `Du måste vara ${n} eller äldre.`,
       countryRequired: 'Välj ditt land',
       gender: 'Kön',
@@ -136,8 +147,7 @@ export const sv: Dictionary = {
 
     avatar: {
       title: 'Välj din look',
-      subtitle:
-        'Det här är det första folk ser. Du kan ladda upp ett riktigt foto senare, från din profil.',
+      subtitle: 'Det här ser andra först. Du kan byta senare.',
       pickOne: 'Välj en för att fortsätta.',
     },
 
@@ -149,7 +159,7 @@ export const sv: Dictionary = {
 
     platforms: {
       title: 'Vad spelar du på?',
-      subtitle: 'Välj allt du använder. Andra spelare filtrerar på detta, så fler är bättre än färre.',
+      subtitle: 'Välj allt du använder. Andra filtrerar på det.',
     },
 
     keywords: {
@@ -211,10 +221,9 @@ export const sv: Dictionary = {
       soon: 'Nu',
       soonA11y: 'Startar inom 15 minuter',
       emptySoonTitle: 'Inget startar just nu',
-      emptySoonBlurb:
-        'Inget drar igång de närmaste 15 minuterna. Stäng av Nu för att se vad som är planerat senare.',
+      emptySoonBlurb: 'Inget de närmaste 15 minuterna. Stäng av Nu för att se senare.',
       emptyToneTitle: 'Inget med den stämningen',
-      emptyToneBlurb: 'Inget med den stämningen just nu. Prova ett annat filter, eller öppna en egen.',
+      emptyToneBlurb: 'Inget med den stämningen. Testa ett annat filter, eller öppna eget.',
       emptyTitle: 'Inga öppna lobbys just nu',
       emptyBlurb: 'Öppna en, sätt en tid och välj vilka som får vara med.',
     },
@@ -334,7 +343,7 @@ export const sv: Dictionary = {
 
     limit: {
       likesTitle: 'Det var dagens likes',
-      likesBody: 'Du kan fortsätta titta och passa. Gold lyfter taket.',
+      likesBody: 'Du kan fortsätta titta och passa. Gold tar bort dagsgränsen.',
       swipesTitle: 'Det var dagens svep',
       swipesBody: 'Kortleken kommer tillbaka i morgon. Gold tar bort dagsgränsen.',
       goldTitle: 'GameBuddy Gold',
@@ -348,7 +357,7 @@ export const sv: Dictionary = {
             noCoinsTitle: 'Inte tillräckligt med mynt',
       noCoinsBody: 'Ångra kostar mynt. Du kan tjäna fler i butiken.',
       nothingToRewindTitle: 'Inget att ångra',
-      nothingToRewindBody: 'Du har inte svept på någon än — eller så blev det en match, och den står kvar.',
+      nothingToRewindBody: 'Inget att ta tillbaka, eller så blev det en matchning.',
       somethingWrongTitle: 'Det gick inte igenom',
       somethingWrongBody: 'Inget ändrades. Försök igen om en stund.',
       getCoins: 'Skaffa fler mynt',
@@ -357,19 +366,15 @@ export const sv: Dictionary = {
 
     filters: {
       title: 'Filter',
-      subtitle: 'Smalna av kortleken till dem du faktiskt vill spela med.',
       subtitleLocked: 'Ingår i Gold. Ta en titt på vad det gör.',
       game: 'Spel',
-      gameHint: 'Bara folk som spelar det här.',
       gameHintEmpty: 'Lägg till spel i din profil för att filtrera på dem.',
       anyGame: 'Alla spel',
       region: 'Region',
-      regionHint: 'Samma tidszon, samma servrar, samma kväll.',
       regionHintEmpty: 'Ange ditt land i din profil för att filtrera på det.',
       onlyIn: (country: string) => `Bara spelare i ${country}`,
       onlyNearMe: 'Bara spelare nära mig',
       platform: 'Plattform',
-      platformHint: 'De du faktiskt får in i en lobby.',
       anyPlatform: 'Alla plattformar',
       availability: 'Tillgänglighet',
       availabilityHint: 'Aktiva de senaste 15 minuterna.',
@@ -383,7 +388,7 @@ export const sv: Dictionary = {
 
     locked: {
       title: 'Filter ingår i Gold',
-      blurb: 'Smalna av kortleken till ett spel, din region eller folk som är online just nu.',
+      blurb: 'Filtrera på spel, region eller vilka som är online.',
       getGold: 'Skaffa Gold',
       showEveryone: 'Visa alla i stället',
     },
@@ -392,14 +397,14 @@ export const sv: Dictionary = {
       filteredTitle: 'Det var alla som matchar dina filter',
       title: 'Det var alla för nu',
       filteredBlurb: 'Bredare filter tar tillbaka fler i kortleken.',
-      blurb: 'Nya spelare ansluter hela tiden, och de du passade dyker upp igen efter ett tag.',
+      blurb: 'Nya spelare tillkommer hela tiden. Titta in snart igen.',
       lookAgain: 'Titta igen',
     },
   },
 
   billing: {
     promptTitle: 'Det funkar',
-    promptBody: 'Du har matchat med någon. Gold är för när du vill ha mer av det.',
+    promptBody: 'Gold tar bort dagsgränsen och visar vem som gillat dig.',
     benefitNoLimit: 'Ingen daglig like-gräns',
     benefitSeeLikes: 'Se alla som gillat dig',
     benefitFilters: 'Filtrera kortleken på spel, region och vem som är online',
@@ -409,16 +414,15 @@ export const sv: Dictionary = {
     coinsAddedBody: 'De finns i ditt saldo nu.',
     goldYours: 'Gold är ditt',
     goldYoursBody: 'Ingen dagsgräns, avancerade filter och Gold-ramen.',
-    storeUnavailable: 'Köp är inte tillgängliga i den här versionen än.',
-    storeNotInBuild:
-      'Den här versionen kan inte göra köp. Den installerades innan köp i appen lades till.',
+    storeUnavailable: 'Köp är inte tillgängliga just nu.',
+    storeNotInBuild: 'Uppdatera GameBuddy i Google Play för att kunna köpa.',
     storePlanMissing: 'Det abonnemanget är inte tillgängligt just nu.',
   },
 
   market: {
     shop: {
       header: 'Butik',
-      title: 'Visa upp dig',
+      title: 'Mynt och extra',
       earnTab: 'Tjäna',
       shopTab: 'Köp',
       framesAndBanners: 'Ramar och banners',
@@ -443,7 +447,6 @@ export const sv: Dictionary = {
       previewOn: { FRAME: 'På din avatar', BANNER: 'På din profil', THEME: 'På ditt kort' },
       themes: 'Teman',
       bundles: 'Paket',
-      bundlesBlurb: 'Ett matchande set, billigare än delarna var för sig.',
       bundleParts: (n: number) => `${n} mynt separat`,
       bundleSaving: (n: number) => `Spara ${n}`,
       bundleTogether: 'Burna ihop',
@@ -465,19 +468,18 @@ export const sv: Dictionary = {
 
     earn: {
       header: 'Tjäna',
-      blurb: 'Mynten kommer tillbaka varje dag. Inget här kostar pengar.',
       earnedTitle: (n: number) => `+${n} mynt`,
       earnedBody: 'Lägg dem på ramar, banners eller likes.',
       watchedBody: 'Tack för att du tittade.',
       rewardPendingTitle: 'Mynten är på väg',
       rewardPendingBody: 'Kolla ditt saldo igen om en stund.',
-      consentTitle: 'Videor kräver annonssamtycke',
-      consentBody: 'Ändra det i Inställningar → Annonsintegritet.',
+      consentTitle: 'Annonser är avstängda',
+      consentBody: 'Slå på dem i Inställningar → Annonsintegritet.',
       adFailedTitle: 'Ingen video just nu',
       adFailedBody: 'Det fanns inget att visa. Försök igen om en stund.',
       watchVideo: 'Titta på en kort video',
       videosLeft: (n: number) => `${n} kvar i dag`,
-      videosDone: 'Det var dagens videor — åter i morgon',
+      videosDone: 'Det var allt för i dag. Kom tillbaka i morgon.',
       stipendTitle: 'Golds månadsbonus',
       stipendReady: 'Din den här månaden',
       stipendBack: (when: string) => `Åter ${when}`,
@@ -531,11 +533,10 @@ export const sv: Dictionary = {
 
     consumables: {
       header: 'Använd dina mynt',
-      blurb: 'Förbrukas när du använder dem, ägs inte för alltid.',
       superLike: 'Super-like',
       superLikeDetail: 'Personen får veta det direkt, och det sticker ut.',
       extraLikes: '5 likes till i dag',
-      extraLikesDetail: 'Utöver ditt dagliga tak. Bara i dag.',
+      extraLikesDetail: 'Utöver dina dagliga likes. Bara i dag.',
       itemA11y: (title: string, cost: number) => `${title}, ${cost} mynt`,
       addedTitle: (title: string) => `${title} tillagd`,
       added: 'Tillagd',
@@ -545,21 +546,18 @@ export const sv: Dictionary = {
 
     coins: {
       header: 'Mynt',
-      blurbBuy:
-        'Fyll på nu, eller tjäna dem gratis under Tjäna — daglig svit, uppdrag och utmärkelser.',
-      blurbNoBuy:
-        'Tjäna dem under Tjäna: daglig svit, uppdrag och utmärkelser. Köp är inte tillgängligt i den här versionen än.',
+      blurbNoBuy: 'Köp är inte tillgängliga just nu. Du kan fortfarande tjäna mynt under Tjäna.',
       packCoins: (n: string) => `${n} mynt`,
-      takesYouTo: (n: string) => `Tar dig till ${n}`,
+      takesYouTo: (n: string) => `Nytt saldo: ${n}`,
       packA11y: (coins: number, price: string) => `Köp ${coins} mynt för ${price}`,
       onTheWay: 'Dina mynt är på väg',
-      onTheWayBody: 'De kan dröja en stund. Du behöver inte köpa igen.',
+      onTheWayBody: 'Det kan ta en stund. Du behöver inte köpa igen.',
     },
 
     gold: {
       done: 'Klar',
       continuePrice: (price: string) => `Fortsätt — ${price}`,
-      unavailable: 'Köp inte tillgängliga än',
+      unavailable: 'Köp är inte tillgängliga just nu',
       notNow: 'Inte nu',
       heroThanks: 'Tack för att du stöttar GameBuddy.',
       heroPitch: 'Hela appen, utan något i vägen.',
@@ -580,10 +578,9 @@ export const sv: Dictionary = {
       noteYearly: 'Spara 58 %',
       billedEvery: (period: string) => `Faktureras varje ${period}`,
       purchasePending: 'Ditt köp är på väg',
-      purchasePendingBody:
-        'Det kan dröja en stund. Gold slås på av sig självt — du behöver inte köpa igen.',
+      purchasePendingBody: 'Det kan ta en stund. Du behöver inte köpa igen.',
       cancelNote:
-        'Avsluta när du vill från ditt butikskonto. Ett abonnemang förnyas tills du avslutar det.',
+      'Avsluta när du vill i Google Play. Ett abonnemang förnyas tills du avslutar det.',
       member: 'Du är medlem',
       runsUntil: (date: string) => `Ditt medlemskap gäller till ${date}.`,
       active: 'Ditt medlemskap är aktivt.',
@@ -600,12 +597,11 @@ export const sv: Dictionary = {
 
     inventory: {
       title: 'Förråd',
-      subtitle: 'Vad du äger, och vad du har på dig',
       nothingYet: { FRAME: 'Inga ramar än', BANNER: 'Inga banners än', THEME: 'Inga teman än' },
       emptyBlurb: {
-        FRAME: 'Allt du köper i Marknaden hamnar här. Gratis ramar är redan dina.',
-        BANNER: 'Allt du köper i Marknaden hamnar här. Gratis banners är redan dina.',
-        THEME: 'Allt du köper i Marknaden hamnar här.',
+        FRAME: 'Allt du köper hamnar här.',
+        BANNER: 'Allt du köper hamnar här.',
+        THEME: 'Allt du köper hamnar här.',
       },
       kindLabel: { FRAME: 'Ram', BANNER: 'Banner', THEME: 'Kortstema' },
       goToMarket: 'Gå till Butiken',
@@ -618,7 +614,6 @@ export const sv: Dictionary = {
 
     badges: {
       title: 'Utmärkelser',
-      subtitle: 'Klara uppdrag, hämta mynt, visa upp tre',
       showcaseFull: (slots: number) => `Du kan visa ${slots} utmärkelser. Ta av en först.`,
       earned: 'Upplåst',
       tileA11y: (title: string, status: string) => `${title}. ${status}`,
@@ -680,6 +675,7 @@ export const sv: Dictionary = {
     games: 'Spel',
     playsOn: 'Spelar på',
     keywords: 'Spelstil',
+    linkedVerified: (provider: string) => `${provider} verifierat`,
     friendRequestsShort: 'Vänförfrågningar',
     acceptRequestA11y: (name: string) => `Acceptera förfrågan från ${name}`,
     declineRequestA11y: (name: string) => `Avböj förfrågan från ${name}`,
@@ -688,10 +684,9 @@ export const sv: Dictionary = {
 
     friendsTitle: 'Vänner',
     noFriendsTitle: 'Inga vänner än',
-    noFriendsBody: 'Du kan lägga till någon som vän när ni har matchat.',
+    noFriendsBody: 'Lägg till vänner när ni har matchat.',
     removeConfirmTitle: (name: string) => `Ta bort ${name}?`,
-    removeConfirmBody:
-      'Ni blir en matchning igen — ni kan fortfarande skriva till varandra, och vem som helst av er kan skicka en ny vänförfrågan.',
+    removeConfirmBody: 'Ni förblir matchade och kan fortfarande skriva.',
     thisGamer: 'den här spelaren',
 
     fallbackTitle: 'Profil',
@@ -701,8 +696,7 @@ export const sv: Dictionary = {
     reportProfile: 'Anmäl profil',
     block: 'Blockera',
     blockConfirmTitle: (name: string) => `Blockera ${name}?`,
-    blockConfirmBody:
-      'Ni ser inte varandra någonstans i appen, och ingen av er kan skriva till den andra. Du kan ångra det i Inställningar.',
+    blockConfirmBody: 'Ni ser inte varandra igen. Ångra i inställningarna.',
 
     moreActionsA11y: 'Fler åtgärder',
     matchBack: 'Gilla tillbaka',
@@ -713,14 +707,13 @@ export const sv: Dictionary = {
     acceptRequest: 'Acceptera förfrågan',
     withdrawRequest: 'Dra tillbaka förfrågan',
     withdrawConfirmTitle: (name: string) => `Dra tillbaka din förfrågan till ${name}?`,
-    withdrawConfirmBody: 'Den försvinner för dem. Du kan skicka en ny när du vill.',
+    withdrawConfirmBody: 'De ser den inte längre. Du kan skicka en ny senare.',
 
     admirersTitle: 'Vem som gillat dig',
     peopleLikeYou: (n: number) => (n === 1 ? 'person gillar dig' : 'personer gillar dig'),
     upgradeToSee: ' — uppgradera för att se vilka',
     admirersEmptyTitle: 'Ingen än',
-    admirersEmptyBody:
-      'När någon gillar dig dyker de upp här, oavsett om du gillat dem tillbaka.',
+    admirersEmptyBody: 'De som gillat dig dyker upp här.',
     revealing: 'Avslöjar…',
     revealOne: (cost: number) => `Avslöja en för ${cost} mynt`,
     orGold: 'Eller skaffa Gold: varje ansikte, och ingen daglig like-gräns.',
@@ -744,6 +737,8 @@ export const sv: Dictionary = {
     platforms: 'Plattformar',
     platformsUnset: 'Inte angivet — andra spelare filtrerar på detta',
     keywords: 'Spelstil',
+    linkedAccounts: 'Länkar',
+    linkedAccountsUnset: 'Inte länkat — visa andra var de hittar dig',
     selected: (n: number) => `${n} valda`,
     themeSystem: 'System',
     themeSystemHint: 'Följ din telefon',
@@ -751,11 +746,13 @@ export const sv: Dictionary = {
     themeLightHint: 'Alltid ljust',
     themeDark: 'Mörkt',
     themeDarkHint: 'Alltid mörkt',
-    themeNote: 'Temat gäller direkt och sparas på den här enheten.',
+    themeNote: 'Sparas på den här enheten.',
     notificationsRow: 'Vad vi skickar dig',
     notificationsHint: 'Meddelanden, matchningar, påminnelser',
     tutorial: 'Visa guiden igen',
-    tutorialHint: 'Går igenom de fem flikarna',
+    tutorialHint: 'Går igenom de fem flikarna och tar tillbaka tipsen',
+    rate: 'Betygsätt GameBuddy',
+    rateHint: 'Öppnar Google Play',
     terms: 'Användarvillkor',
     termsHint: 'Inklusive reglerna för innehåll och uppförande',
     privacy: 'Integritetspolicy',
@@ -764,6 +761,9 @@ export const sv: Dictionary = {
     adPrivacyHint: 'Ändra vad annonser får använda om dig',
     password: 'Lösenord',
     passwordHint: 'Loggar ut dig överallt',
+    passwordSet: 'Ange ett lösenord',
+    passwordSetHint: 'Så att du kan logga in utan Google eller Discord',
+    deleteReauth: 'Logga in igen för att bekräfta, och kom sedan tillbaka hit.',
     blocked: 'Blockerade',
     blockedHint: 'Vilka du har blockerat',
     promo: 'Kampanjkoder',
@@ -794,8 +794,7 @@ export const sv: Dictionary = {
     notificationsScreen: {
       title: 'Aviseringar',
       offTitle: 'Aviseringar är avstängda för GameBuddy',
-      offBody:
-        'Android blockerar dem, så inget nedan når dig förrän de slås på igen.',
+      offBody: 'Android blockerar dem. Inget nedan når fram till dig.',
       turnOn: 'Slå på aviseringar',
       openSystem: 'Öppna systeminställningar',
       whatToSend: 'Vad vi skickar',
@@ -804,16 +803,14 @@ export const sv: Dictionary = {
       socialTitle: 'Matchningar och vänner',
       socialBody: 'Nya matchningar, vänförfrågningar och svar, lobbyaktivitet, utmärkelser du får.',
       remindersTitle: 'Påminnelser',
-      remindersBody: 'En knuff då och då när du varit borta och något väntar.',
-      quietNote:
-        'Att stänga av allt här håller appen tyst utan att stänga av dess aviseringar helt — det du slår på igen senare fungerar direkt.',
+      remindersBody: 'En påminnelse när något väntar på dig.',
+      quietNote: 'Du kan slå på dem igen när som helst.',
       onThisPhone: 'På den här telefonen',
       soundsTitle: 'Ljud',
-      soundsBody: 'En kort signal när något händer i appen — en matchning, ett köp, ett meddelande.',
+      soundsBody: 'Ett kort ljud för matchningar, meddelanden och köp.',
       vibrationTitle: 'Vibration',
       vibrationBody: 'Ett kort surr vid ett svep, en matchning eller ett köp.',
-      cuesNote:
-        'Signaler spelas aldrig över ljudlöst läge, och de avbryter aldrig musik du redan lyssnar på.',
+      cuesNote: 'Följer ljudlöst läge. Avbryter aldrig musik.',
     },
 
     avatarScreen: {
@@ -829,31 +826,25 @@ export const sv: Dictionary = {
       cropHint: 'Dra för att flytta, nyp för att zooma.',
       cropConfirm: 'Använd det här fotot',
       cropFailed: 'Bilden kunde inte beskäras. Prova en annan.',
-      privacyNote:
-        'Ditt foto kontrolleras innan någon annan kan se det, och platsdata tas bort automatiskt.',
+      privacyNote: 'Granskas innan någon ser den. Platsdata tas bort.',
       orOurs: 'Eller välj ett av våra',
       cameraDenied:
-        'GameBuddy kan inte öppna kameran utan tillåtelse. Du kan ge den i telefonens inställningar, välja ett befintligt foto, eller ta ett av våra nedan.',
-      photosDenied:
-        'GameBuddy kan inte öppna dina foton utan tillåtelse. Du kan ge den i telefonens inställningar, ta ett foto i stället, eller välja ett av våra nedan.',
+        'Kameraåtkomst är av. Slå på den i telefonens inställningar, eller välj ett foto.',
+      photosDenied: 'Fotoåtkomst är av. Slå på den i telefonens inställningar, eller ta ett foto.',
       tooLarge: (sizeMb: string, limitMb: number) =>
-        `Den filen är ${sizeMb}MB och gränsen är ${limitMb}MB. Allt från din kamerarulle ligger långt under.`,
+        `Filen är ${sizeMb}MB. Gränsen är ${limitMb}MB.`,
       approvedTitle: 'Det är din avatar nu',
       approvedBody: 'Alla kan se den.',
       pendingTitle: 'Väntar på kontroll',
-      pendingBody:
-        'Någon tittar på det inom kort. Tills dess är du den enda som ser det — alla andra ser fortfarande din gamla avatar.',
+      pendingBody: 'Bara du ser den tills den godkänts.',
       rejectedTitle: 'Det fotot godkändes inte',
-      rejectedBody:
-        'Det verkar bryta mot reglerna om sexuellt innehåll. Ingen annan har sett det. Prova ett annat foto, eller välj ett av våra.',
+      rejectedBody: 'Den bryter mot reglerna om sexuellt innehåll. Ingen annan såg den.',
     },
 
     age: {
       title: 'Födelsedatum',
-      subtitle:
-        'Används för att bekräfta att du är gammal nog att vara här. Andra ser din ålder, aldrig datumet.',
-      recordedNote: (min: number) =>
-        `Ändringar av födelsedatum registreras. GameBuddy är bara för vuxna, och ett datum som gör dig yngre än ${min} avvisas.`,
+      subtitle: 'Andra ser din ålder, aldrig datumet.',
+      recordedNote: (min: number) => `Ändringar registreras. Ett datum under ${min} avvisas.`,
     },
 
     keywordsScreen: {
@@ -863,16 +854,40 @@ export const sv: Dictionary = {
 
     platformsScreen: {
       title: 'Vad du spelar på',
-      subtitle: 'Välj allt du använder. Andra spelare filtrerar på detta, så fler är bättre än färre.',
+      subtitle: 'Välj allt du använder. Andra filtrerar på det.',
+    },
+
+    linkedScreen: {
+      title: 'Länkar',
+      subtitle: 'Visa andra var de hittar dig utanför GameBuddy.',
+      notLinked: (provider: string) => `${provider} inte länkat`,
+      notLinkedHint: (provider: string) => `Logga in en gång på ${provider} så visas ditt namn på din profil.`,
+      link: (provider: string) => `Länka ${provider}`,
+      signInWithDiscord: 'Logga in med Discord',
+      unlink: (provider: string) => `Ta bort ${provider}`,
+      linkedAs: (provider: string) => `Verifierat med ${provider}`,
+      verifiedNoHandle: 'Verifierat',
+      handleWithheld: 'Ditt namn där kan inte visas, men kontot är verifierat.',
+      visibilityMatches: 'Matchningar och vänner',
+      visibilityMatchesHint: 'Bara de du har matchat med ser det',
+      visibilityPublic: 'Alla',
+      visibilityPublicHint: 'Alla som öppnar din profil ser det',
+      linkedToast: 'Konto länkat',
+      alreadyLinked: 'Det kontot är redan taget',
+      alreadyLinkedBody: 'Det är länkat till en annan GameBuddy-profil. Ta bort länken där först.',
+      failed: 'Det gick inte. Försök igen.',
     },
 
     passwordScreen: {
+      setTitle: 'Ange ett lösenord',
+      setSubtitle: 'Så att du också kan logga in med din e-postadress.',
+      setDoneTitle: 'Lösenord angett',
+      setDoneBody: 'Nu kan du logga in med din e-postadress.',
       title: 'Byt lösenord',
       subtitle: 'Det loggar ut dig på alla enheter, inklusive den här.',
       changedTitle: 'Lösenordet är bytt',
       signedOutTitle: 'Du har loggats ut överallt',
-      signedOutBody:
-        'Att byta lösenord avslutar varje session, på den här enheten och alla andra. Det är avsiktligt — hade någon annan ditt gamla lösenord är den personen också ute.',
+      signedOutBody: 'Den här och alla andra enheter har loggats ut.',
       signInAgain: 'Logga in igen',
       current: 'Nuvarande lösenord',
       next: 'Nytt lösenord',
@@ -881,7 +896,7 @@ export const sv: Dictionary = {
     },
 
     blockedScreen: {
-      body: 'Blockering gäller åt båda hållen och täcker allt: ni visas inte för varandra någonstans, och ingen av er kan skriva till den andra.',
+      body: 'Ni ser inte varandra och kan inte skicka meddelanden.',
       emptyTitle: 'Ingen är blockerad',
       emptyBody: 'Du kan blockera någon från deras profil om du behöver.',
       unblock: 'Avblockera',
@@ -889,8 +904,7 @@ export const sv: Dictionary = {
     signOut: 'Logga ut',
     deleteAccount: 'Radera mitt konto',
     deleteTitle: 'Detta går inte att ångra',
-    deleteBody:
-      'Din profil, dina matchningar och dina meddelanden tas bort. Ange ditt lösenord för att bekräfta — en stulen telefon ska inte räcka för detta.',
+    deleteBody: 'Din profil, dina matchningar och meddelanden tas bort.',
     keepAccount: 'Behåll mitt konto',
   },
 
@@ -901,7 +915,7 @@ export const sv: Dictionary = {
     hidePasswordA11y: 'Dölj lösenord',
     reportProfileTitle: 'Anmäl den här profilen',
     reportMessageTitle: 'Anmäl det här meddelandet',
-    reportBlurb: 'En moderator tittar på det. Du kan bara anmäla samma sak en gång.',
+    reportBlurb: 'En moderator tittar på det.',
     reportCancelA11y: 'Avbryt anmälan',
     reasonHarassment: 'Trakasserier eller övergrepp',
     reasonSexual: 'Sexuellt innehåll',
@@ -915,15 +929,15 @@ export const sv: Dictionary = {
     network: 'Kunde inte nå GameBuddy. Kontrollera din anslutning och försök igen.',
     sessionExpired: 'Din session har gått ut. Logga in igen.',
     forbidden: 'Du har inte behörighet till detta.',
-    emptyResponse: 'Servern returnerade ett tomt svar.',
-    unexpectedResponse: 'Servern returnerade ett oväntat svar.',
+    emptyResponse: 'Något gick fel. Försök igen.',
+    unexpectedResponse: 'Något gick fel. Försök igen.',
     byCode: {
       '101': 'Den e-postadressen har redan ett konto.',
       '103': 'Hittade inget konto.',
       '105': 'Koden stämmer inte.',
       '106': 'Kontot är inte verifierat än.',
       '107': 'Användarnamnet är upptaget.',
-      '108': 'Fel användarnamn eller lösenord.',
+      '108': 'Fel användarnamn eller lösenord. Om du registrerade dig med Google eller Discord, använd den knappen.',
       '113': 'Kontot är blockerat.',
       '121': 'Spelaren har blockerat dig.',
       '186': 'Du har blockerat spelaren och kan därför inte skicka meddelanden.',
@@ -953,6 +967,12 @@ export const sv: Dictionary = {
       '194': 'Koden skickades till ett annat konto.',
       '195': 'Det finns redan en kod med det namnet.',
       '196': 'Det kontot kan inte ta emot en kod.',
+      '200': 'Inloggningen kunde inte bekräftas. Försök igen.',
+      '201': 'Bekräfta kontots e-post först och försök igen.',
+      '202': 'Det här kontot har inget lösenord än. Ange ett i inställningarna.',
+      '203': 'Det här kontot har redan ett lösenord.',
+      '204': 'Ange ett lösenord innan du tar bort ditt enda sätt att logga in.',
+      '205': 'Logga in igen för att bekräfta det här.',
     },
   },
 
@@ -1043,8 +1063,7 @@ export const sv: Dictionary = {
   notifications: {
     header: 'Aviseringar',
     primerTitle: 'Missa inte det bästa',
-    primerBody:
-      'GameBuddy är andra människor. Det mesta som händer här händer medan appen är stängd.',
+    primerBody: 'Det mesta händer medan appen är stängd.',
     reasonMatchTitle: 'När du matchar',
     reasonMatchBody: 'Ni sa båda ja — det är då en konversation kan börja.',
     reasonMessageTitle: 'När någon skriver till dig',
@@ -1056,27 +1075,52 @@ export const sv: Dictionary = {
     changeLater: 'Du kan ändra det när som helst i Inställningar och välja vilka slag du vill ha.',
   },
 
+  hints: {
+    gotIt: 'Uppfattat',
+    swipe: {
+      right: 'Svep höger för att spela ihop',
+      left: 'Svep vänster för att hoppa över',
+      up: 'Svep upp för Super-like',
+    },
+    filter: {
+      title: 'Smälna av kortleken',
+      body: 'Filtrera på spel, plattform eller land. Vissa filter ingår i Gold.',
+    },
+    superLike: {
+      title: 'Super-like',
+      body: 'Personen får veta direkt.',
+    },
+    lobbyCreate: {
+      title: 'Öppna en lobby',
+      body: 'Säg vilket spel och när, och välj vilka som får vara med. Att öppna ingår i Gold.',
+    },
+    chatComposer: {
+      title: 'Säg vilket spel, och när',
+      body: 'Föreslå ett spel och en tid.',
+    },
+  },
+
   tutorial: {
     steps: {
       home: {
         title: 'Hitta någon att spela med',
-        body: 'Svep bland spelare som spelar det du spelar. Höger om du vill spela ihop, vänster om inte. När ni båda sveper höger matchar ni. Svep uppåt för att skicka en Super-like — personen får veta det direkt.',
+        body: 'Svep höger för att spela ihop, vänster för att hoppa över. Upp för Super-like.',
       },
       messages: {
         title: 'Prata med dina matchningar',
-        body: 'En matchning öppnar en privat chatt. Ingen kan skriva till dig utan att ni båda gått med på det, och du kan blockera eller anmäla vem som helst inifrån en konversation.',
+        body: 'En matchning öppnar en privat chatt. Blockera eller anmäl därifrån.',
       },
       lobby: {
         title: 'Bilda lag i en lobby',
-        body: 'Öppna lobbys är matcher som söker spelare — spelet, tiden och stämningen står på kortet. Be att få gå med, så väljer ägaren laget. Att öppna en egen ingår i Gold.',
+        body: 'Lobbyer är spel som söker spelare. Be att få gå med, eller öppna eget med Gold.',
       },
       market: {
         title: 'Gör profilen till din',
-        body: 'Ramar och banners till din profil, plus extra dagliga likes om de tar slut. Allt här är frivilligt — appen funkar utan att du spenderar något.',
+        body: 'Ramar och banners till profilen, och extra likes. Allt är valfritt.',
       },
       profile: {
         title: 'Din profil, och allt annat',
-        body: 'Dina spel, din spelstil, dina vänner och dina utmärkelser. Inställningarna finns bakom kugghjulet, inklusive den här guiden om du vill se den igen.',
+        body: 'Dina spel, utmärkelser och vänner. Inställningar finns bakom kugghjulet.',
       },
     },
     stepOf: (n: number, total: number) => `${n} av ${total}`,
@@ -1091,7 +1135,7 @@ export const sv: Dictionary = {
 
   errorScreen: {
     title: 'GameBuddy stötte på ett problem',
-    blurb: 'Det här är en bugg, inget du har gjort. Detaljerna nedan är precis vad vi behöver för att fixa den.',
+    blurb: 'Det här är ett fel i appen, inte ditt.',
     copyHint: 'Texten ovan kan markeras och kopieras.',
   },
 };

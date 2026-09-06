@@ -1,5 +1,11 @@
 import { api } from './client';
-import type { ProfileDetails, Session } from './types';
+import type {
+  AuthProvider,
+  LinkedProvider,
+  ProfileDetails,
+  Session,
+  SocialSession,
+} from './types';
 
 export const authApi = {
   /**
@@ -122,7 +128,82 @@ export const authApi = {
   changePlatforms: (platformIds: string[]) =>
     api.put<void>('/auth/change/platforms', { gamesOrKeywordsList: platformIds }),
 
-  /** Requires the password: a stolen token must not be enough to delete an account. */
-  deleteAccount: (currentPassword: string) =>
+  /**
+   * Requires the password: a stolen token must not be enough to delete an account.
+   *
+   * Optional, because an account created through Google has no password. The server then
+   * requires the session to be minutes old instead — sign in again, come back, confirm —
+   * and answers `REAUTH_REQUIRED` when it is not.
+   */
+  deleteAccount: (currentPassword?: string) =>
     api.delete<void>('/auth/account', { currentPassword }),
+
+  /** Sets a first password on an account that has none. No current password to prove. */
+  setPassword: (password: string) => api.post<void>('/auth/password', { password }),
+
+  /**
+   * Which social providers this deployment can offer.
+   *
+   * Read before the welcome screen draws its buttons, and cached hard: it is deployment
+   * configuration and cannot change without a redeploy.
+   */
+  socialProviders: () =>
+    api.get<{ providers: AuthProvider[] }>('/auth/social/providers', { anonymous: true }),
+
+  /**
+   * Signs in with a Google ID token from the device's account sheet.
+   *
+   * `acceptedTerms` is sent only on a retry: the server refuses a brand-new account with
+   * `TERMS_NOT_ACCEPTED`, the app shows the consent sheet, and the same token comes back
+   * with the tick. Google ID tokens are valid for about an hour, so the retry is safe.
+   */
+  socialGoogle: (idToken: string, acceptedTerms?: boolean) =>
+    api.post<SocialSession>('/auth/social/google', { idToken, acceptedTerms }, { anonymous: true }),
+
+  /** Starts a Discord sign-in and returns the URL to open in the system browser. */
+  socialDiscordStart: () =>
+    api.post<{ authorizeUrl: string }>('/auth/social/discord/start', undefined, { anonymous: true }),
+
+  /**
+   * Trades the ticket the callback deep-linked back for a session.
+   *
+   * Not the ticket that travelled through Discord — that one is already spent. See
+   * `app/social.tsx`.
+   */
+  socialExchange: (ticket: string, acceptedTerms?: boolean) =>
+    api.post<SocialSession>('/auth/social/exchange', { ticket, acceptedTerms }, { anonymous: true }),
+
+
+  /**
+   * Which providers this deployment actually has credentials for.
+   *
+   * <p>Configuration rather than account data, but the app has no other way to know it: the
+   * credentials are per-deployment and optional by design, so a build that always drew the
+   * row would offer a button that could only ever fail — which reads as a broken app rather
+   * than an unconfigured one.
+   */
+  linkProviders: () => api.get<{ providers: LinkedProvider[] }>('/auth/link/providers'),
+
+  /**
+   * Starts a Discord link and returns the URL to open.
+   *
+   * The app does not do OAuth itself. It asks for a URL, opens it in the **system
+   * browser**, and the backend handles the rest — the code exchange needs a client secret
+   * that must never ship inside an app, and a password typed into a WebView we control is
+   * a password we could have read.
+   *
+   * The URL carries a single-use ticket, not the session token. What comes back is a
+   * `gamebuddy://settings/linked` deep link, which is why the screen that starts this is
+   * also the screen that reports the result.
+   */
+  linkStart: (provider: LinkedProvider) =>
+    api.post<{ authorizeUrl: string }>(`/auth/link/${lower(provider)}/start`),
+
+  unlink: (provider: LinkedProvider) => api.delete<void>(`/auth/link/${lower(provider)}`),
+
+  setLinkVisibility: (provider: LinkedProvider, visibility: 'PUBLIC' | 'MATCHES') =>
+    api.put<void>(`/auth/link/${lower(provider)}/visibility`, { visibility }),
+
 };
+
+const lower = (provider: LinkedProvider) => provider.toLowerCase();

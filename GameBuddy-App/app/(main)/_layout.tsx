@@ -4,6 +4,8 @@ import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { identify } from '../../src/billing/purchases';
 import { ChatSocketProvider } from '../../src/chat/ChatSocketProvider';
+import { CoachmarkHost } from '../../src/hints/CoachmarkHost';
+import { useHints } from '../../src/hints/store';
 import { MatchCelebration } from '../../src/match/MatchCelebration';
 import { NotificationPrimer } from '../../src/notifications/NotificationPrimer';
 import { useInAppNotifications } from '../../src/notifications/useInAppNotifications';
@@ -110,6 +112,7 @@ export default function MainLayout() {
   const tutorialSeen = useTutorial((s) => s.seen);
   const tutorialStep = useTutorial((s) => s.step);
   const loadTutorial = useTutorial((s) => s.load);
+  const loadHints = useHints((s) => s.load);
   const startTutorial = useTutorial((s) => s.start);
   useEffect(() => {
     if (!tutorialHydrated) {
@@ -118,6 +121,13 @@ export default function MainLayout() {
     }
     if (!tutorialSeen && tutorialStep === null && !shouldPrime) startTutorial();
   }, [tutorialHydrated, tutorialSeen, tutorialStep, loadTutorial, startTutorial, shouldPrime]);
+
+  // The first-use hints read their own "already seen" list. Loaded here rather than on the
+  // deck because two of them live on other tabs, and a hint that has to wait for its screen
+  // to mount before it can find out it was already dismissed is a hint that flashes.
+  useEffect(() => {
+    void loadHints();
+  }, [loadHints]);
 
   // Shown once, over the app, before the operating system's own prompt — see
   // NotificationPrimer. Rendered instead of the tabs rather than on top of them: it asks
@@ -310,6 +320,11 @@ export default function MainLayout() {
           never cover a match. Fed by `useInAppNotifications` above and, for purchases, by
           the Market — see `src/ui/toast.ts`. */}
       <ToastHost />
+
+      {/* After the toasts and before the celebration. A first-use hint may cover the tab
+          bar it is pointing at, and a match must cover the hint — see CoachmarkHost for
+          why this one is an ordinary sibling rather than a Modal. */}
+      <CoachmarkHost />
 
       {/* Last, so it draws over everything including the tutorial. A match is the best
           thing that happens in this app and nothing should cover it. Mounted here rather

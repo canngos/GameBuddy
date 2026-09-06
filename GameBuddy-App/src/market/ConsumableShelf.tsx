@@ -80,10 +80,7 @@ export function ConsumableShelf({ balance }: { balance: number }) {
 
   return (
     <View className="gap-3 pb-6">
-      <View className="gap-1">
-        <Text variant="overline">{upper(t.market.consumables.header)}</Text>
-        <Text variant="caption">{t.market.consumables.blurb}</Text>
-      </View>
+      <Text variant="overline">{upper(t.market.consumables.header)}</Text>
 
       {buy.error && (
         <View className="rounded-card border border-danger/40 bg-danger/10 p-3">

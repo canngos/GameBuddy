@@ -50,9 +50,10 @@ export function BundleShelf({ bundles, balance, busy, onBuy, onPreview }: Bundle
 
   return (
     <>
-      <View className="gap-1 pb-3">
+      {/* No caption: every card already prints what the pieces cost separately and what
+          the set saves, which is the whole of what a sentence here could have said. */}
+      <View className="pb-3">
         <Text variant="overline">{upper(t.market.shop.bundles)}</Text>
-        <Text variant="caption">{t.market.shop.bundlesBlurb}</Text>
       </View>
 
       <View className="gap-3 pb-6">

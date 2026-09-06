@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect } from 'react';
+import { maybeRequestReview } from '../engagement/reviewPrompt';
 import type { QueryKeyRoot } from '../query/keys';
 import { useCelebration, type MatchedGamer } from './celebration';
 import { MatchOverlay } from './MatchOverlay';
@@ -71,10 +72,19 @@ export function MatchCelebration() {
     [dismiss, queryClient, router],
   );
 
+  // Closing the celebration without going to the chat is the one genuinely idle moment in
+  // this app: something good just happened and nothing else is waiting. That is where the
+  // review card is asked for — never on the way into a conversation, which is the thing the
+  // match was for. See `src/engagement/reviewPrompt.ts`.
+  const onClose = useCallback(() => {
+    dismiss();
+    void maybeRequestReview(queryClient);
+  }, [dismiss, queryClient]);
+
   return (
     <>
       <PathnameRecorder />
-      <MatchOverlay candidate={matched} onDismiss={dismiss} onMessage={onMessage} />
+      <MatchOverlay candidate={matched} onDismiss={onClose} onMessage={onMessage} />
     </>
   );
 }

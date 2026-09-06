@@ -69,6 +69,25 @@ export const Code = {
   LOBBY_LIMIT_REACHED: '183',
   /** The owner already said no, and that answer is final for this lobby. */
   LOBBY_REJECTED: '185',
+  /**
+   * A social sign-in would create an account and the terms have not been agreed to.
+   *
+   * Not an error to show. It is how the server asks for the tick: the app opens the consent
+   * sheet and sends the same credential again with `acceptedTerms`.
+   */
+  TERMS_NOT_ACCEPTED: '169',
+  /** The Google or Discord credential did not verify. Start again. */
+  SOCIAL_TOKEN_INVALID: '200',
+  /** The provider vouched for the account but not for the address on it. */
+  SOCIAL_EMAIL_UNVERIFIED: '201',
+  /** Changing a password on an account that has none. Offer to set one instead. */
+  PASSWORD_NOT_SET: '202',
+  /** Setting a first password on an account that already has one. */
+  PASSWORD_ALREADY_SET: '203',
+  /** Removing the only way into an account. A password has to be set first. */
+  AUTH_IDENTITY_LAST: '204',
+  /** A destructive action on a session that is no longer fresh. Sign in again. */
+  REAUTH_REQUIRED: '205',
 } as const;
 
 export type CodeValue = (typeof Code)[keyof typeof Code];

@@ -96,6 +96,15 @@ export function useProfileHeaderLayout() {
     avatar: pick(56, 64, 72),
     /** Pull up over the banner's lower edge — half the avatar, per tier. */
     overlap: pick("-mt-7", "-mt-8", "-mt-9"),
+    /**
+     * The same pull, less the height of one extra row.
+     *
+     * The name column is bottom-aligned to the avatar, so every row added to it grows the
+     * block *upwards*. At the full overlap a third row (the linked-account pills) lifts the
+     * username off the card and onto the banner, where dark text lands on the gradient. This
+     * trades a little of the overlap back to keep the name on the card.
+     */
+    overlapWithExtraRow: pick("-mt-2", "-mt-3", "-mt-4"),
     /** Space between the header's rows inside the card. */
     cardGap: pick("gap-4", "gap-4", "gap-5"),
   };

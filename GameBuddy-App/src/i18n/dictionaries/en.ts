@@ -104,6 +104,25 @@ export const en = {
       forgot: 'Forgot password?',
     },
 
+    /**
+     * Signing in with Google or Discord.
+     *
+     * The provider names are never translated — they are how the companies spell
+     * themselves, and Google's guidelines fix the button wording besides.
+     */
+    social: {
+      or: 'or',
+      google: 'Sign in with Google',
+      discord: 'Sign in with Discord',
+      consentTitle: 'One thing first',
+      consentBody: 'We need this before we can make your account.',
+      continue: 'Create my account',
+      finishing: 'Finishing your sign-in',
+      googleUnavailable: 'Google sign-in is not available on this device',
+      emailUnverified: 'Verify the email on that account first, then try again',
+      failed: 'That sign-in did not finish. Please try again',
+    },
+
     register: {
       title: 'Create your account',
       subtitle: 'We will email a six-digit code to confirm the address.',
@@ -137,7 +156,7 @@ export const en = {
 
     forgot: {
       title: 'Reset your password',
-      subtitle: 'Give us the email you signed up with and we will send you a six-digit code.',
+      subtitle: 'We will send a six-digit code to your email.',
       email: 'Email',
       submit: 'Send the code',
       /**
@@ -151,8 +170,7 @@ export const en = {
       resetSubtitle: 'Anyone signed in with the old password will be signed out.',
       resetSubmit: 'Set new password',
       doneTitle: 'Sign in with your new password',
-      doneBody:
-        'Every session that used the old password has ended, on this device and any other.',
+      doneBody: 'You have been signed out everywhere.',
       signIn: 'Sign in',
     },
   },
@@ -164,8 +182,7 @@ export const en = {
 
     profile: {
       title: 'About you',
-      subtitle:
-        'GameBuddy is for adults. We use your date of birth to confirm you are 18 or over — it is never shown to anyone.',
+      subtitle: 'GameBuddy is 18+. Your date of birth is never shown to anyone.',
       ageHint: (n: number) => `You must be ${n} or over.`,
       countryRequired: 'Choose your country',
       gender: 'Gender',
@@ -186,7 +203,7 @@ export const en = {
 
     avatar: {
       title: 'Pick your look',
-      subtitle: 'This is what people see first. You can upload a real photo later, from your profile.',
+      subtitle: 'This is what people see first. You can change it later.',
       pickOne: 'Pick one to carry on.',
     },
 
@@ -199,7 +216,7 @@ export const en = {
 
     platforms: {
       title: 'What do you play on?',
-      subtitle: 'Pick everything you use. Other players filter by this, so more is better than fewer.',
+      subtitle: 'Pick everything you use. Others filter by this.',
     },
 
     keywords: {
@@ -262,10 +279,9 @@ export const en = {
       soon: 'Now',
       soonA11y: 'Starting within 15 minutes',
       emptySoonTitle: 'Nothing starting right now',
-      emptySoonBlurb:
-        'Nothing kicking off in the next 15 minutes. Turn off Now to see what is planned later.',
+      emptySoonBlurb: 'Nothing in the next 15 minutes. Turn off Now to see later ones.',
       emptyToneTitle: 'Nothing with that vibe',
-      emptyToneBlurb: 'Nothing with that vibe at the moment. Try another filter, or open your own.',
+      emptyToneBlurb: 'Nothing with that vibe. Try another filter, or open your own.',
       emptyTitle: 'No open lobbies right now',
       emptyBlurb: 'Open one, set a time, and choose who joins you.',
     },
@@ -387,7 +403,7 @@ export const en = {
 
     limit: {
       likesTitle: "That's today's likes",
-      likesBody: 'You can keep looking and passing. Gold lifts the cap.',
+      likesBody: 'You can keep looking and passing. Gold removes the daily limit.',
       swipesTitle: "That's today's swipes",
       swipesBody: 'The deck comes back tomorrow. Gold removes the daily limit.',
       goldTitle: 'GameBuddy Gold',
@@ -401,7 +417,7 @@ export const en = {
             noCoinsTitle: 'Not enough coins',
       noCoinsBody: 'A rewind costs coins. You can earn more in the Market.',
       nothingToRewindTitle: 'Nothing to take back',
-      nothingToRewindBody: 'You have not swiped anyone yet — or that one turned into a match, which stands.',
+      nothingToRewindBody: 'Nothing to take back, or that one became a match.',
       somethingWrongTitle: 'That did not go through',
       somethingWrongBody: 'Nothing was changed. Try again in a moment.',
       getCoins: 'Get more coins',
@@ -410,19 +426,15 @@ export const en = {
 
     filters: {
       title: 'Filters',
-      subtitle: 'Narrow the deck to the people you actually want to play with.',
       subtitleLocked: 'Part of Gold. Have a look at what it does.',
       game: 'Game',
-      gameHint: 'Only people who play this one.',
       gameHintEmpty: 'Add games to your profile to filter by them.',
       anyGame: 'Any game',
       region: 'Region',
-      regionHint: 'Same timezone, same servers, same evening.',
       regionHintEmpty: 'Set your country on your profile to filter by it.',
       onlyIn: (country: string) => `Only players in ${country}`,
       onlyNearMe: 'Only players near me',
       platform: 'Platform',
-      platformHint: 'Whoever you can actually get in a lobby with.',
       anyPlatform: 'Any platform',
       availability: 'Availability',
       availabilityHint: 'Active in the last 15 minutes.',
@@ -436,7 +448,7 @@ export const en = {
 
     locked: {
       title: 'Filters are part of Gold',
-      blurb: 'Narrow the deck to one game, your region, or people who are online right now.',
+      blurb: 'Filter by game, region, or who is online now.',
       getGold: 'Get Gold',
       showEveryone: 'Show everyone instead',
     },
@@ -445,15 +457,14 @@ export const en = {
       filteredTitle: "That's everyone matching your filters",
       title: "That's everyone for now",
       filteredBlurb: 'Widening them brings more people back into the deck.',
-      blurb:
-        'New players join all the time, and people you passed on come back around after a while.',
+      blurb: 'New players join all the time. Check back soon.',
       lookAgain: 'Look again',
     },
   },
 
   billing: {
     promptTitle: "It's working",
-    promptBody: "You've matched with someone. Gold is for when you want to do more of it.",
+    promptBody: 'Gold removes the daily limit and shows who liked you.',
     benefitNoLimit: 'No daily like limit',
     benefitSeeLikes: 'See everyone who liked you',
     benefitFilters: "Filter the deck by game, region and who's online",
@@ -464,16 +475,15 @@ export const en = {
     goldYours: 'Gold is yours',
     goldYoursBody: 'No daily limit, advanced filters, and the Gold frame.',
     /** `StoreUnavailableError` reasons, matched by name in `useErrorText`. */
-    storeUnavailable: 'Purchases are not available in this build yet.',
-    storeNotInBuild:
-      'This build cannot make purchases. It was installed before in-app purchases were added.',
+    storeUnavailable: 'Purchases are not available right now.',
+    storeNotInBuild: 'Update GameBuddy on Google Play to make purchases.',
     storePlanMissing: 'That plan is not available right now.',
   },
 
   market: {
     shop: {
       header: 'Market',
-      title: 'Show off',
+      title: 'Coins and extras',
       earnTab: 'Earn',
       shopTab: 'Shop',
       framesAndBanners: 'Frames and banners',
@@ -500,7 +510,6 @@ export const en = {
       previewOn: { FRAME: 'On your avatar', BANNER: 'On your profile', THEME: 'On your card' },
       themes: 'Themes',
       bundles: 'Bundles',
-      bundlesBlurb: 'A matching set, cheaper than buying the pieces.',
       bundleParts: (n: number) => `${n} coins separately`,
       bundleSaving: (n: number) => `Save ${n}`,
       bundleTogether: 'Worn together',
@@ -521,19 +530,18 @@ export const en = {
 
     earn: {
       header: 'Earn',
-      blurb: 'Coins come back every day. Nothing here costs money.',
       earnedTitle: (n: number) => `+${n} coins`,
       earnedBody: 'Spend them on frames, banners or likes.',
       watchedBody: 'Thanks for watching.',
       rewardPendingTitle: 'Coins are on their way',
       rewardPendingBody: 'Check your balance again in a moment.',
-      consentTitle: 'Videos need advert consent',
-      consentBody: 'Change it in Settings → Advert privacy.',
+      consentTitle: 'Adverts are turned off',
+      consentBody: 'Turn them on in Settings → Advert privacy.',
       adFailedTitle: 'No video right now',
       adFailedBody: 'Nothing was available to show. Try again in a moment.',
       watchVideo: 'Watch a short video',
       videosLeft: (n: number) => `${n} left today`,
-      videosDone: 'That is today’s videos — back tomorrow',
+      videosDone: 'That is all for today. Come back tomorrow.',
       stipendTitle: 'Gold monthly bonus',
       stipendReady: 'Yours this month',
       stipendBack: (when: string) => `Back ${when}`,
@@ -596,11 +604,10 @@ export const en = {
 
     consumables: {
       header: 'Use your coins',
-      blurb: 'Spent when you use them, not owned forever.',
       superLike: 'Super Like',
       superLikeDetail: 'They are told straight away, and it stands out.',
       extraLikes: '5 more likes today',
-      extraLikesDetail: 'On top of your daily cap. Today only.',
+      extraLikesDetail: 'On top of your daily likes. Today only.',
       itemA11y: (title: string, cost: number) => `${title}, ${cost} coins`,
       addedTitle: (title: string) => `${title} added`,
       added: 'Added',
@@ -610,20 +617,18 @@ export const en = {
 
     coins: {
       header: 'Coins',
-      blurbBuy: 'Top up now, or earn them free under Earn — a daily streak, quests and badges.',
-      blurbNoBuy:
-        'Earn them under Earn: a daily streak, quests and badges. Buying is not available in this build yet.',
+      blurbNoBuy: 'Buying is unavailable right now. You can still earn coins in the Earn tab.',
       packCoins: (n: string) => `${n} coins`,
-      takesYouTo: (n: string) => `Takes you to ${n}`,
+      takesYouTo: (n: string) => `New balance: ${n}`,
       packA11y: (coins: number, price: string) => `Buy ${coins} coins for ${price}`,
       onTheWay: 'Your coins are on the way',
-      onTheWayBody: 'They can take a moment to arrive. There is no need to buy again.',
+      onTheWayBody: 'This can take a moment. No need to buy again.',
     },
 
     gold: {
       done: 'Done',
       continuePrice: (price: string) => `Continue — ${price}`,
-      unavailable: 'Purchases not available yet',
+      unavailable: 'Purchases are not available right now',
       notNow: 'Not now',
       heroThanks: 'Thanks for backing GameBuddy.',
       heroPitch: 'The whole app, with nothing in the way.',
@@ -645,9 +650,8 @@ export const en = {
       noteYearly: 'Save 58%',
       billedEvery: (period: string) => `Billed every ${period}`,
       purchasePending: 'Your purchase is going through',
-      purchasePendingBody:
-        'It can take a moment to arrive. Gold will switch on by itself — there is no need to buy again.',
-      cancelNote: 'Cancel any time from your store account. A subscription renews until you cancel it.',
+      purchasePendingBody: 'This can take a moment. No need to buy again.',
+      cancelNote: 'Cancel any time in Google Play. A subscription renews until you cancel it.',
       member: 'You are a member',
       runsUntil: (date: string) => `Your membership runs until ${date}.`,
       active: 'Your membership is active.',
@@ -664,12 +668,11 @@ export const en = {
 
     inventory: {
       title: 'Inventory',
-      subtitle: 'What you own, and what you are wearing',
       nothingYet: { FRAME: 'No frames yet', BANNER: 'No banners yet', THEME: 'No themes yet' },
       emptyBlurb: {
-        FRAME: 'Anything you buy in the Market lands here. Free frames are already yours.',
-        BANNER: 'Anything you buy in the Market lands here. Free banners are already yours.',
-        THEME: 'Anything you buy in the Market lands here.',
+        FRAME: 'Anything you buy lands here.',
+        BANNER: 'Anything you buy lands here.',
+        THEME: 'Anything you buy lands here.',
       },
       /** What an owned item is, said once per kind. */
       kindLabel: { FRAME: 'Frame', BANNER: 'Banner', THEME: 'Card theme' },
@@ -683,7 +686,6 @@ export const en = {
 
     badges: {
       title: 'Badges',
-      subtitle: 'Finish missions, claim coins, show off three',
       showcaseFull: (slots: number) => `You can show ${slots} badges. Take one off first.`,
       earned: 'Earned',
       tileA11y: (title: string, status: string) => `${title}. ${status}`,
@@ -750,6 +752,8 @@ export const en = {
     games: 'Games',
     playsOn: 'Plays on',
     keywords: 'Play style',
+    /** When the handle could not be shown. The badge still means the account was checked. */
+    linkedVerified: (provider: string) => `${provider} verified`,
     friendRequestsShort: 'Friend requests',
     acceptRequestA11y: (name: string) => `Accept ${name}'s friend request`,
     declineRequestA11y: (name: string) => `Decline ${name}'s friend request`,
@@ -758,10 +762,9 @@ export const en = {
 
     friendsTitle: 'Friends',
     noFriendsTitle: 'No friends yet',
-    noFriendsBody: 'You can add someone as a friend once you have matched with them.',
+    noFriendsBody: 'Add friends once you have matched.',
     removeConfirmTitle: (name: string) => `Remove ${name}?`,
-    removeConfirmBody:
-      'They go back to being a match — you can still message each other, and either of you can send a new friend request.',
+    removeConfirmBody: 'You stay matched and can still message each other.',
     thisGamer: 'this gamer',
 
     fallbackTitle: 'Profile',
@@ -771,8 +774,7 @@ export const en = {
     reportProfile: 'Report profile',
     block: 'Block',
     blockConfirmTitle: (name: string) => `Block ${name}?`,
-    blockConfirmBody:
-      'You will not see each other anywhere in the app, and neither of you can message the other. You can undo this in Settings.',
+    blockConfirmBody: 'You will not see each other again. Undo it in Settings.',
 
     moreActionsA11y: 'More actions',
     matchBack: 'Match',
@@ -783,14 +785,13 @@ export const en = {
     acceptRequest: 'Accept friend request',
     withdrawRequest: 'Withdraw request',
     withdrawConfirmTitle: (name: string) => `Withdraw your request to ${name}?`,
-    withdrawConfirmBody: 'They stop seeing it. You can send another one whenever you like.',
+    withdrawConfirmBody: 'They stop seeing it. You can send another later.',
 
     admirersTitle: 'Who liked you',
     peopleLikeYou: (n: number): string => (n === 1 ? 'person likes you' : 'people like you'),
     upgradeToSee: ' — upgrade to see who',
     admirersEmptyTitle: 'Nobody yet',
-    admirersEmptyBody:
-      'When somebody likes you they show up here, whether or not you have liked them back.',
+    admirersEmptyBody: 'People who liked you show up here.',
     revealing: 'Revealing…',
     revealOne: (cost: number) => `Reveal one for ${cost} coins`,
     orGold: 'Or get Gold: every face, and no daily like limit.',
@@ -814,6 +815,8 @@ export const en = {
     platforms: 'Platforms',
     platformsUnset: 'Not set — other players filter by this',
     keywords: 'Play style',
+    linkedAccounts: 'Links',
+    linkedAccountsUnset: 'Not linked — show people where to find you',
     selected: (n: number) => `${n} selected`,
     themeSystem: 'System',
     themeSystemHint: 'Match your phone',
@@ -821,11 +824,13 @@ export const en = {
     themeLightHint: 'Always light',
     themeDark: 'Dark',
     themeDarkHint: 'Always dark',
-    themeNote: 'The theme applies immediately and is remembered on this device.',
+    themeNote: 'Remembered on this device.',
     notificationsRow: 'What we send you',
     notificationsHint: 'Messages, matches, reminders',
     tutorial: 'Show the tutorial again',
-    tutorialHint: 'Walks you through the five tabs',
+    tutorialHint: 'Walks you through the five tabs, and brings the tips back',
+    rate: 'Rate GameBuddy',
+    rateHint: 'Opens Google Play',
     terms: 'Terms of Service',
     termsHint: 'Including the rules on content and conduct',
     privacy: 'Privacy Policy',
@@ -834,6 +839,9 @@ export const en = {
     adPrivacyHint: 'Change what adverts may use about you',
     password: 'Password',
     passwordHint: 'Signs you out everywhere',
+    passwordSet: 'Set a password',
+    passwordSetHint: 'So you can sign in without Google or Discord',
+    deleteReauth: 'Sign in again to confirm this, then come back here.',
     blocked: 'Blocked',
     blockedHint: 'Who you have blocked',
     promo: 'Promotion codes',
@@ -864,8 +872,7 @@ export const en = {
     notificationsScreen: {
       title: 'Notifications',
       offTitle: 'Notifications are off for GameBuddy',
-      offBody:
-        'Android is blocking them, so nothing below can reach you until they are turned back on.',
+      offBody: 'Android is blocking them. Nothing below can reach you.',
       turnOn: 'Turn on notifications',
       openSystem: 'Open system settings',
       whatToSend: 'What to send',
@@ -874,16 +881,14 @@ export const en = {
       socialTitle: 'Matches and friends',
       socialBody: 'New matches, friend requests and answers, lobby activity, badges you earn.',
       remindersTitle: 'Reminders',
-      remindersBody: 'The occasional nudge when you have been away and something is waiting.',
-      quietNote:
-        'Turning everything off here keeps the app quiet without switching notifications off for it entirely — so anything you turn back on later still works.',
+      remindersBody: 'A nudge when something is waiting for you.',
+      quietNote: 'You can turn any of these back on later.',
       onThisPhone: 'On this phone',
       soundsTitle: 'Sounds',
-      soundsBody: 'A short cue when something happens in the app — a match, a purchase, a message.',
+      soundsBody: 'A short cue for matches, messages and purchases.',
       vibrationTitle: 'Vibration',
       vibrationBody: 'A short buzz on a swipe, a match, or a purchase.',
-      cuesNote:
-        'Cues never play over the silent switch, and they never interrupt music you are already listening to.',
+      cuesNote: 'Follows your silent switch. Never interrupts music.',
     },
 
     avatarScreen: {
@@ -899,31 +904,24 @@ export const en = {
       cropHint: 'Drag to move, pinch to zoom.',
       cropConfirm: 'Use this photo',
       cropFailed: 'That image could not be cropped. Try another one.',
-      privacyNote:
-        'Your photo is checked before anyone else can see it, and location data is removed from it automatically.',
+      privacyNote: 'Checked before anyone sees it. Location data is removed.',
       orOurs: 'Or pick one of ours',
-      cameraDenied:
-        "GameBuddy cannot open the camera without permission. You can grant it in your phone's settings, choose an existing photo, or pick one of ours below.",
-      photosDenied:
-        "GameBuddy cannot open your photos without permission. You can grant it in your phone's settings, take a photo instead, or pick one of ours below.",
+      cameraDenied: "Camera access is off. Turn it on in your phone's settings, or pick a photo.",
+      photosDenied: "Photo access is off. Turn it on in your phone's settings, or take a photo.",
       tooLarge: (sizeMb: string, limitMb: number) =>
-        `That file is ${sizeMb}MB and the limit is ${limitMb}MB. Anything from your camera roll will be well under it.`,
+        `That file is ${sizeMb}MB. The limit is ${limitMb}MB.`,
       approvedTitle: "That's your avatar now",
       approvedBody: 'Everyone can see it.',
       pendingTitle: 'Waiting to be checked',
-      pendingBody:
-        'Someone will look at it shortly. Until then you are the only one who can see it — everyone else still sees your old avatar.',
+      pendingBody: 'Only you can see it until it is approved.',
       rejectedTitle: 'That photo was not accepted',
-      rejectedBody:
-        'It looks like it breaks the rules on sexual content. Nobody else has seen it. Try another photo, or pick one of ours.',
+      rejectedBody: 'It breaks the rules on sexual content. Nobody else saw it.',
     },
 
     age: {
       title: 'Date of birth',
-      subtitle:
-        'Used to confirm you are old enough to be here. Other people see your age, never the date.',
-      recordedNote: (min: number) =>
-        `Changes to your date of birth are recorded. GameBuddy is for adults only, and a date that puts you under ${min} will be refused.`,
+      subtitle: 'People see your age, never the date.',
+      recordedNote: (min: number) => `Changes are recorded. A date under ${min} is refused.`,
     },
 
     keywordsScreen: {
@@ -933,16 +931,40 @@ export const en = {
 
     platformsScreen: {
       title: 'What you play on',
-      subtitle: 'Pick everything you use. Other players filter by this, so more is better than fewer.',
+      subtitle: 'Pick everything you use. Others filter by this.',
+    },
+
+    linkedScreen: {
+      title: 'Links',
+      subtitle: 'Show people where to find you outside GameBuddy.',
+      notLinked: (provider: string) => `${provider} not linked`,
+      notLinkedHint: (provider: string) => `Sign in to ${provider} once and your name appears on your profile.`,
+      link: (provider: string) => `Link ${provider}`,
+      signInWithDiscord: 'Sign in with Discord',
+      unlink: (provider: string) => `Unlink ${provider}`,
+      linkedAs: (provider: string) => `Verified with ${provider}`,
+      verifiedNoHandle: 'Verified',
+      handleWithheld: 'Your name there cannot be shown, but the account is verified.',
+      visibilityMatches: 'Matches and friends',
+      visibilityMatchesHint: 'Only people you have matched with can see it',
+      visibilityPublic: 'Everyone',
+      visibilityPublicHint: 'Anyone who opens your profile can see it',
+      linkedToast: 'Account linked',
+      alreadyLinked: 'That account is already taken',
+      alreadyLinkedBody: 'It is linked to another GameBuddy profile. Unlink it there first.',
+      failed: 'That did not work. Please try again.',
     },
 
     passwordScreen: {
+      setTitle: 'Set a password',
+      setSubtitle: 'So you can sign in with your email address as well.',
+      setDoneTitle: 'Password set',
+      setDoneBody: 'You can now sign in with your email address.',
       title: 'Change password',
       subtitle: 'This signs you out on every device, including this one.',
       changedTitle: 'Password changed',
       signedOutTitle: 'You have been signed out everywhere',
-      signedOutBody:
-        'Changing your password ends every session, on this device and any other. That is deliberate — if someone else had your old password, they are out too.',
+      signedOutBody: 'This device and any others have been signed out.',
       signInAgain: 'Sign in again',
       current: 'Current password',
       next: 'New password',
@@ -951,7 +973,7 @@ export const en = {
     },
 
     blockedScreen: {
-      body: 'Blocking works both ways and covers everything: they are not shown to you, you are not shown to them, and neither of you can message the other.',
+      body: 'You will not see each other, and neither of you can message.',
       emptyTitle: 'Nobody is blocked',
       emptyBody: 'You can block someone from their profile if you need to.',
       unblock: 'Unblock',
@@ -959,8 +981,7 @@ export const en = {
     signOut: 'Sign out',
     deleteAccount: 'Delete my account',
     deleteTitle: 'This cannot be undone',
-    deleteBody:
-      'Your profile, matches and messages are removed. Enter your password to confirm — a stolen phone should not be enough to do this.',
+    deleteBody: 'Your profile, matches and messages are removed.',
     keepAccount: 'Keep my account',
   },
 
@@ -971,7 +992,7 @@ export const en = {
     hidePasswordA11y: 'Hide password',
     reportProfileTitle: 'Report this profile',
     reportMessageTitle: 'Report this message',
-    reportBlurb: 'A moderator will look at it. You can only report something once.',
+    reportBlurb: 'A moderator will look at it.',
     reportCancelA11y: 'Cancel report',
     reasonHarassment: 'Harassment or abuse',
     reasonSexual: 'Sexual content',
@@ -985,15 +1006,15 @@ export const en = {
     network: 'Could not reach GameBuddy. Check your connection and try again.',
     sessionExpired: 'Your session has expired. Please sign in again.',
     forbidden: 'You do not have access to this.',
-    emptyResponse: 'The server returned an empty response.',
-    unexpectedResponse: 'The server returned an unexpected response.',
+    emptyResponse: 'Something went wrong. Please try again.',
+    unexpectedResponse: 'Something went wrong. Please try again.',
     byCode: {
       '101': 'That email already has an account.',
       '103': 'No account found.',
       '105': 'That code is not right.',
       '106': 'This account has not been verified yet.',
       '107': 'That username is taken.',
-      '108': 'Wrong username or password.',
+      '108': 'Wrong username or password. If you signed up with Google or Discord, use that button.',
       '113': 'This account is blocked.',
       '121': 'This gamer has blocked you.',
       '186': 'You blocked this gamer, so you cannot message them.',
@@ -1023,6 +1044,12 @@ export const en = {
       '194': 'That code was sent to another account.',
       '195': 'A code with that name already exists.',
       '196': 'That account cannot receive a code.',
+      '200': 'That sign-in could not be verified. Please try again.',
+      '201': 'Verify the email on that account first, then try again.',
+      '202': 'This account has no password yet. Set one in Settings.',
+      '203': 'This account already has a password.',
+      '204': 'Set a password before removing your only way to sign in.',
+      '205': 'Sign in again to confirm this.',
     },
   },
 
@@ -1135,8 +1162,7 @@ export const en = {
   notifications: {
     header: 'Notifications',
     primerTitle: "Don't miss the good part",
-    primerBody:
-      'GameBuddy is other people. Most of what happens here happens while the app is closed.',
+    primerBody: 'Most of what happens here happens while the app is closed.',
     reasonMatchTitle: 'When you match',
     reasonMatchBody: 'Both of you said yes — that is when a conversation can start.',
     reasonMessageTitle: 'When someone messages you',
@@ -1148,27 +1174,58 @@ export const en = {
     changeLater: 'You can change this any time in Settings, and choose which kinds you want.',
   },
 
+  /**
+   * The first-use hints: the swipe demo on the deck, and the four coach marks.
+   *
+   * Short on purpose. These are read while somebody is looking at the control, so a
+   * sentence and a half is the whole budget.
+   */
+  hints: {
+    gotIt: 'Got it',
+    swipe: {
+      right: 'Swipe right to play together',
+      left: 'Swipe left to pass',
+      up: 'Swipe up to Super Like',
+    },
+    filter: {
+      title: 'Narrow the deck',
+      body: 'Filter by game, platform or country. Some filters come with Gold.',
+    },
+    superLike: {
+      title: 'Super Like',
+      body: 'They hear about it straight away.',
+    },
+    lobbyCreate: {
+      title: 'Open a lobby',
+      body: 'Say the game and the time, and pick who joins. Opening one comes with Gold.',
+    },
+    chatComposer: {
+      title: 'Say which game, and when',
+      body: 'Suggest a game and a time.',
+    },
+  },
+
   tutorial: {
     steps: {
       home: {
         title: 'Find someone to play with',
-        body: 'Swipe through gamers who play what you play. Right if you want to play together, left if not. When you both swipe right, you match. Swipe up to send a Super Like — they hear about it straight away.',
+        body: 'Swipe right to play together, left to pass. Swipe up for a Super Like.',
       },
       messages: {
         title: 'Talk to your matches',
-        body: 'Matching opens a private chat. Nobody can message you unless you both agreed to it, and you can block or report anyone from inside a conversation.',
+        body: 'Matching opens a private chat. Block or report anyone from inside it.',
       },
       lobby: {
         title: 'Team up in a lobby',
-        body: 'Open lobbies are games looking for players — the game, the time, and the vibe are on the card. Ask to join, and the owner picks the team. Opening your own comes with Gold.',
+        body: 'Lobbies are games looking for players. Ask to join, or open your own with Gold.',
       },
       market: {
         title: 'Make your profile yours',
-        body: 'Frames and banners for your profile, plus extra daily likes if you run out. Everything here is optional — the app works without spending anything.',
+        body: 'Frames and banners for your profile, and extra likes. All optional.',
       },
       profile: {
         title: 'Your profile, and everything else',
-        body: 'Your games, your play style, your friends and your badges. Settings live behind the gear, including this tutorial if you want it again.',
+        body: 'Your games, badges and friends. Settings live behind the gear.',
       },
     },
     stepOf: (n: number, total: number) => `${n} of ${total}`,
@@ -1190,7 +1247,7 @@ export const en = {
    */
   errorScreen: {
     title: 'GameBuddy hit a problem',
-    blurb: 'This is a bug, not something you did. The details below are what we need to fix it.',
+    blurb: 'This is a bug, not something you did.',
     copyHint: 'The text above can be selected and copied.',
   },
 };

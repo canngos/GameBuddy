@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { openAdPrivacyOptions, useAdConsent } from '../../../src/ads/consent';
 import { authApi } from '../../../src/api/auth';
+import { ApiError, Code } from '../../../src/api/envelope';
 import { profileApi } from '../../../src/api/catalogue';
 import { LanguagePicker } from '../../../src/i18n/LanguagePicker';
 import { Flag } from '../../../src/i18n/Flag';
@@ -11,7 +12,11 @@ import { LANG_NAMES } from '../../../src/i18n/languages';
 import { useLangStore } from '../../../src/i18n/store';
 import { useUpper } from '../../../src/i18n/case';
 import { useT } from '../../../src/i18n/useT';
-import { openPrivacy, openTerms } from '../../../src/legal';
+import { openPlayListing, openPrivacy, openTerms } from '../../../src/legal';
+import { PROVIDER_LABELS } from '../../../src/profile/ProviderMark';
+import { useHints } from '../../../src/hints/store';
+import { SocialButtons } from '../../../src/session/SocialButtons';
+import { useSocialSignIn } from '../../../src/session/social';
 import { useTutorial } from '../../../src/tutorial/store';
 import { useSession } from '../../../src/session/store';
 import { useScheme } from '../../../src/theme';
@@ -47,17 +52,39 @@ export default function Settings() {
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const startTutorial = useTutorial((s) => s.start);
+  // Only used by the delete card's re-auth path, where a passwordless account has to
+  // prove itself again before the account can be destroyed.
+  const social = useSocialSignIn();
+  const resetHints = useHints((s) => s.resetAll);
   const [password, setPassword] = useState('');
 
   // Only for the row hints ("3 selected"). Already cached by the Profile tab, so this
   // is a read from the cache rather than a second request in the common case.
   const me = useQuery({ queryKey: ['me'], queryFn: profileApi.me });
 
+  /**
+   * Whether this account can be deleted by typing a password.
+   *
+   * An account created through Google or Discord has none, and the server asks for a fresh
+   * session instead: sign in again, come back, confirm. Undefined while the profile loads,
+   * and the password field is the safe default — every account that predates social sign-in
+   * has one.
+   */
+  const hasPassword = me.data?.hasPassword !== false;
+
   const deleteAccount = useMutation({
-    mutationFn: () => authApi.deleteAccount(password),
+    // Undefined rather than an empty string when there is no password: the field is not
+    // drawn, and sending "" would look like a wrong password rather than an absent one.
+    mutationFn: () => authApi.deleteAccount(hasPassword ? password : undefined),
     // The account is gone; there is nothing left to be signed in to.
     onSuccess: () => void signOut(),
   });
+
+  // The server refuses a passwordless deletion on a session that is not minutes old. That
+  // is not a failure to report so much as a step to take: sign in again, and the confirm
+  // card is still here when the deep link lands back on Settings.
+  const needsReauth =
+    deleteAccount.error instanceof ApiError && deleteAccount.error.is(Code.REAUTH_REQUIRED);
 
   return (
     <Screen scroll edges={['top', 'bottom']}>
@@ -107,6 +134,18 @@ export default function Settings() {
               label={t.settings.keywords}
               hint={t.settings.selected(me.data?.keywords.length ?? 0)}
               href="/settings/keywords"
+              position="middle"
+            />
+            <LinkRow
+              label={t.settings.linkedAccounts}
+              // Optional-chained for the same reason `platforms` is: a profile cached
+              // before this shipped has no such key.
+              hint={
+                me.data?.linkedAccounts?.length
+                  ? me.data.linkedAccounts.map((account) => PROVIDER_LABELS[account.provider]).join(', ')
+                  : t.settings.linkedAccountsUnset
+              }
+              href="/settings/linked"
               position="last"
             />
           </RowGroup>
@@ -167,7 +206,15 @@ export default function Settings() {
               label={t.settings.notificationsRow}
               hint={t.settings.notificationsHint}
               href="/settings/notifications"
-              position="single"
+              position="first"
+            />
+            {/* Beside the tutorial rather than with the legal links: both rows are things
+                somebody chooses to do about the app, and neither is a document. */}
+            <LinkRow
+              label={t.settings.rate}
+              hint={t.settings.rateHint}
+              onPress={() => void openPlayListing()}
+              position="last"
             />
           </RowGroup>
         </View>
@@ -188,6 +235,10 @@ export default function Settings() {
                 // open underneath the whole tour.
                 router.replace('/home');
                 startTutorial();
+                // The first-use tips go back with it. Somebody asking to be shown the app
+                // again means all of it, and leaving them dismissed would make this row do
+                // less than its label says.
+                resetHints();
               }}
               position="single"
             />
@@ -238,8 +289,8 @@ export default function Settings() {
 
           <RowGroup>
             <LinkRow
-              label={t.settings.password}
-              hint={t.settings.passwordHint}
+              label={hasPassword ? t.settings.password : t.settings.passwordSet}
+              hint={hasPassword ? t.settings.passwordHint : t.settings.passwordSetHint}
               href="/settings/password"
               position="first"
             />
@@ -278,22 +329,35 @@ export default function Settings() {
                 </Text>
               </View>
 
-              <TextField
-                label={t.settings.password}
-                value={password}
-                onChangeText={setPassword}
-                secure
-                textContentType="password"
-                autoComplete="current-password"
-              />
+              {/* Absent rather than disabled when the account has no password: a field
+                  asking for something that does not exist is a puzzle, not a form. */}
+              {hasPassword && (
+                <TextField
+                  label={t.settings.password}
+                  value={password}
+                  onChangeText={setPassword}
+                  secure
+                  textContentType="password"
+                  autoComplete="current-password"
+                />
+              )}
 
-              {deleteAccount.error && <ErrorNotice error={deleteAccount.error} />}
+              {needsReauth ? (
+                <View className="gap-2">
+                  <Text variant="caption">{t.settings.deleteReauth}</Text>
+                  {/* Signing in again is the whole of it: a fresh session is what the
+                      server is asking for, and coming back here to confirm is one tap. */}
+                  <SocialButtons social={social} />
+                </View>
+              ) : (
+                deleteAccount.error && <ErrorNotice error={deleteAccount.error} />
+              )}
 
               <Button
                 label={t.settings.deleteAccount}
                 variant="danger"
                 loading={deleteAccount.isPending}
-                disabled={password.length === 0}
+                disabled={hasPassword && password.length === 0}
                 onPress={() => deleteAccount.mutate()}
               />
               <Button

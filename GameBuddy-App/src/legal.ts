@@ -27,6 +27,26 @@ export const PRIVACY_URL =
 
 export const TERMS_VERSION = '2026-08-20';
 
+/**
+ * The Play listing, for the "Rate GameBuddy" row in Settings.
+ *
+ * A plain link rather than the in-app review card, and that is deliberate: Play's review API
+ * decides for itself whether to show anything, so a button wired to it would do nothing at
+ * all much of the time — and a control that silently does nothing is worse than no control.
+ * The card is asked for at a moment nobody chose, after a match; this is for somebody who
+ * went looking.
+ *
+ * `market://` would open the Play app directly, but it fails on a device without Play
+ * Services and there is no way to find that out before trying. The https address opens the
+ * Play app when it is installed and a browser otherwise.
+ */
+export const PLAY_LISTING_URL =
+  'https://play.google.com/store/apps/details?id=com.findgamebuddy.app';
+
+export function openPlayListing() {
+  return Linking.openURL(PLAY_LISTING_URL);
+}
+
 export function openTerms() {
   return Linking.openURL(TERMS_URL);
 }

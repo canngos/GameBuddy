@@ -171,7 +171,6 @@ export default function Badges() {
     <Screen edges={["top"]}>
       <BackHeader
         title={t.market.badges.title}
-        subtitle={t.market.badges.subtitle}
         right={
           board.data ? (
             <Text variant="label" className="text-muted">

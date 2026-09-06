@@ -23,6 +23,14 @@ type DeckActionsProps = {
   rewindCost?: number;
   /** Super Likes in hand. The button is shown either way; this decides what it does. */
   superLikes?: number;
+  /**
+   * Lets the first-use coach mark measure the Super Like button.
+   *
+   * A ref rather than the hint drawing itself here: the spotlight has to be above the
+   * tab bar, so it is mounted once in the tabs layout and only needs to know where this
+   * button ended up. See `src/hints/coachmark.ts`.
+   */
+  superLikeRef?: (node: View | null) => void;
 };
 
 /**
@@ -40,6 +48,7 @@ export function DeckActions({
   canRewind = false,
   rewindCost = 0,
   superLikes = 0,
+  superLikeRef,
 }: DeckActionsProps) {
   const t = useT();
   const colors = useThemeColors();
@@ -126,6 +135,10 @@ export function DeckActions({
           because the balance arrives on a separate query and any hiccup fetching it looks
           identical to owning none. A control that vanishes cannot be debugged by the person
           holding the phone. At zero it says so and offers the fix, which is one tap. */}
+      {/* `collapsable={false}` so Android keeps the host view: a plain wrapper with no
+          style of its own is otherwise flattened away, and a flattened view cannot be
+          measured. */}
+      <View ref={superLikeRef} collapsable={false}>
       <CircleButton
         label={t.deck.actions.superLike}
         hint={hasSuperLikes ? t.deck.actions.superLikeHint : t.deck.actions.superLikeGetHint}
@@ -158,6 +171,7 @@ export function DeckActions({
           strokeWidth={hasSuperLikes ? 0 : 2}
         />
       </CircleButton>
+      </View>
     </View>
   );
 }
