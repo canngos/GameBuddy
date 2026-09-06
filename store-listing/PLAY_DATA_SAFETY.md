@@ -91,11 +91,19 @@ list `check-sdk-inventory.mjs` enforces; adding an SDK means updating both.
 | `expo-notifications` | FCM device token — straight to Firebase, no Expo push service | Device or other IDs |
 | `expo-updates` | IP address and app/runtime version, to `u.expo.dev` | **None.** IP alone is not a declarable data type unless location is derived from it, and nothing here does. Disclosed in `PRIVACY.md` §5 regardless |
 | `expo-image-picker`, `expo-image-manipulator`, `expo-file-system` | Nothing on their own — they hand the chosen image to our upload | Photos |
+| `react-native-nitro-google-signin` | The Google account the person picks — email, name, photo URL — inside a signed ID token, exchanged with Google on a tap | Email address, Name. Both already declared (collected, not shared); this adds a producer rather than a row |
+| `expo-store-review` | Nothing. It asks the Play Store app to show its own review card, and is never told whether it appeared | None |
 | `expo-device`, `expo-constants` | Nothing. Read locally, and on-device-only processing is exempt from disclosure | None |
 | Everything else in `package.json` | Nothing. UI, navigation, state, styling, fonts | None |
 
 Server-side processors carry no SDK in the binary and so drive no row here, but they are still
 recipients and are named in `PRIVACY.md` §5: Brevo, Hetzner, Cloudflare R2.
+
+Google and Discord sign-in add no *shared* row. Data flows the other way — they tell us who
+somebody is, we tell them nothing about that person beyond the request itself — and Play's
+"shared" means transferred to a third party, not received from one. Both are named as
+recipients in `PRIVACY.md` §5 regardless, because a person's account there does learn they
+use GameBuddy.
 
 ## 6. Redo this when
 

@@ -40,11 +40,40 @@ keeps in your browser is whether you chose the light or the dark theme.
 | Crash reports | Finding out why the app broke. Carries your account id — see section 4 |
 | Advertising identifier | Only if you choose to watch an advert for coins — see section 4 |
 
+**If you sign in with Google or Discord** — entirely optional; an email address and a
+password work just as well
+
+| Data | Why |
+|---|---|
+| Your account id at Google or Discord | Recognising you the next time you sign in. It is the only thing we match on, so changing the email address on that account does not lock you out |
+| Your email address there | Finding your existing GameBuddy account if you already had one, and reaching you afterwards. We only accept it if the provider has verified it |
+| Your display name there | Suggesting a username. You can change it |
+
+Signing in this way sends you to Google or Discord, so they learn that you have a GameBuddy
+account and when you used it. We never see your password to them, and we keep no access
+token afterwards — so we cannot read anything else about you there or act on your behalf. An
+account made this way has no password until you set one, which you can do at any time in
+Settings; you can also remove a sign-in method there, as long as one way in remains.
+
+**If you link a Discord account** — entirely optional, and nothing here exists unless
+you do
+
+| Data | Why |
+|---|---|
+| Your Discord account id | Proving the account is yours, and making sure nobody else can claim it |
+| Your display name on that service | Shown on your profile, so people know where to find you |
+| Who can see it | Your choice: everyone, or only people you have matched with. It starts on the private setting |
+
+We do not receive your Discord password — you sign in to them, not to us — and we
+keep no access token afterwards, so we cannot read anything else about you there or act on
+your behalf. Unlinking deletes all of the above immediately.
+
 We do **not** collect your location, your contacts, or your browsing outside GameBuddy.
 
 Three third-party services receive data about you as part of features you use: an advert
 network, a crash reporter and the service that processes purchases. Section 4 says which, what
-each one gets, and when.
+each one gets, and when. One more — Discord — is involved only if you choose to link
+that account; see section 5.
 
 Separately, a handful of providers hold data *on our behalf* so that the service can run at
 all — the server it runs on, the storage that holds your photograph, the network that carries
@@ -116,6 +145,13 @@ the technical detail described above, and nothing from inside your profile.
 - **Other account holders** see your username, photograph, age, country, gender, games and
   keywords, and anything you write where other people can read it.
 - **Google AdMob, Google Crashlytics and RevenueCat**, as described in section 4.
+- **Google**, but only if you sign in with it. It learns that you have a GameBuddy account
+  and when you signed in. What comes back to us is your account id there, your email address
+  and your display name.
+- **Discord**, but only if you link it or sign in with it. Linking sends you to their sign-in page, so
+  they learn that you have a GameBuddy account and when you linked it. We send them nothing
+  about you beyond the request itself, and what comes back is your account id and display
+  name. Their handling of your data is theirs, under their own privacy policy.
 - **Apple and Google** process purchases. We never see your payment details.
 - **Authorities**, where the law requires it, or where content involves the sexual
   exploitation of children. See our [Child Safety Standards](https://findgamebuddy.com/child-safety).

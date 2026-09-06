@@ -1,0 +1,66 @@
+# The social sign-in buttons exist, and Discord actually leaves for the browser.
+#
+# **What this can and cannot check.** Google's account sheet is drawn by Credential Manager
+# outside the app's view hierarchy, so Maestro cannot see it or tap in it — and on an
+# emulator with no Google account signed in there is nothing for it to offer anyway. Tapping
+# that button here would assert nothing and would sometimes hang. So Google is asserted as
+# far as it can be: the button is on both screens, in both places, with the wording Google's
+# guidelines require. The rest is an on-device check by hand, and needs this build's SHA-1
+# registered in the Cloud console first.
+#
+# Discord goes further, because it leaves through an ordinary browser intent: the flow taps
+# it and asserts the app went to the background. What comes back is a `gamebuddy://social`
+# deep link, which is exercised on the API side in the functional suite where the ticket can
+# actually be inspected.
+#
+# Nothing here signs in. A flow that created accounts would leave a trail of them behind on
+# whatever backend it happened to point at.
+
+appId: com.findgamebuddy.app
+name: 08 social sign-in
+---
+- launchApp:
+    clearState: true
+
+# 60s: a debug build with no embedded bundle fetches one from Metro on the first launch of
+# a run, and the splash also says "GameBuddy". See `_login.yaml`.
+- extendedWaitUntil:
+    visible: "I already have one"
+    timeout: 60000
+
+# The welcome screen offers both, under the "or" divider below the two account buttons.
+- assertVisible: "or"
+- assertVisible: "Sign in with Google"
+- assertVisible: "Sign in with Discord"
+- takeScreenshot: artifacts/08-01-welcome-social
+
+# And so does the sign-in screen, below the password button rather than above it — somebody
+# who opened that screen came to type a password.
+- tapOn: "I already have one"
+- runFlow: _consent.yaml
+- assertVisible: "Welcome back"
+- scrollUntilVisible:
+    element:
+      text: "Sign in with Discord"
+    direction: DOWN
+    timeout: 15000
+- assertVisible: "Sign in with Google"
+- takeScreenshot: artifacts/08-02-login-social
+
+# Discord hands off to the system browser. The assertion is that GameBuddy is no longer in
+# front — the page that loads belongs to Discord, and asserting on their markup would be a
+# test that breaks when they redesign.
+#
+# Skipped when the backend has no Discord credentials: `startDiscordLogin` then refuses and
+# the app stays put, which is correct behaviour rather than a failure.
+- tapOn: "Sign in with Discord"
+- extendedWaitUntil:
+    notVisible: "Welcome back"
+    timeout: 20000
+- takeScreenshot: artifacts/08-03-discord-handoff
+
+# Back into the app the way a person would, leaving no browser tab behind.
+- pressKey: Back
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 20000

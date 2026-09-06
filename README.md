@@ -258,6 +258,10 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-37-profile-themes.sql` | Card themes: a third cosmetic kind, and its slot. |
 | `db/upgrade-2026-38-promo-codes.sql` | Promotion codes: the code, who it was addressed to, and who redeemed it. |
 | `db/upgrade-2026-39-missions-and-badges.sql` | Missions become a dealt campaign; badges gain a hard tier that pays in frames. |
+| `db/upgrade-2026-40-linked-accounts.sql` | Verified Discord and Steam handles on a profile. |
+| `db/upgrade-2026-41-remove-steam-links.sql` | Steam linking removed; its rows and tickets deleted. |
+| `db/upgrade-2026-42-social-sign-in.sql` | Signing in with Google or Discord: identities, and the Discord round-trip ticket. |
+| `db/upgrade-2026-43-review-prompt.sql` | When the Play review card was last asked for. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 | `db/delete-seed.sql`              | Removes the synthetic accounts. Not a migration — see above. |
 
