@@ -18,6 +18,7 @@ import { queryClient } from '../src/query';
 import { AnimatedSplash } from '../src/ui/AnimatedSplash';
 import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
 import { useLangStore } from '../src/i18n/store';
+import { configureGoogle } from '../src/session/google';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
 import { useSoundEnabled } from '../src/ui/sound';
@@ -38,6 +39,11 @@ installGlobalErrorHandler();
 // The API client is wired to the session store once, at module scope, so it is done
 // before any component can fire a request during its first render.
 connectSessionToApi();
+
+// Google Sign-In is configured once, here rather than at the button: `configure` is
+// synchronous native work and the first tap should not pay for it. A no-op in a build with
+// no client id, which is every clone that has not been given a Google project.
+configureGoogle();
 
 /**
  * Expo Router renders this instead of the tree when a descendant throws.

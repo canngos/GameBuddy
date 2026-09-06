@@ -61,6 +61,19 @@ export const fr: Dictionary = {
       forgot: 'Mot de passe oublié ?',
     },
 
+    social: {
+      or: 'ou',
+      google: 'Se connecter avec Google',
+      discord: 'Se connecter avec Discord',
+      consentTitle: 'Une chose d\'abord',
+      consentBody: 'Il nous faut ça avant de créer ton compte.',
+      continue: 'Créer mon compte',
+      finishing: 'Finalisation de la connexion',
+      googleUnavailable: 'La connexion Google n\'est pas disponible sur cet appareil',
+      emailUnverified: 'Vérifie d\'abord l\'e-mail de ce compte, puis réessaie',
+      failed: 'La connexion n\'a pas abouti. Réessaie',
+    },
+
     register: {
       title: 'Crée ton compte',
       subtitle: "Nous t'enverrons un code à six chiffres pour confirmer l'adresse.",
@@ -94,8 +107,7 @@ export const fr: Dictionary = {
 
     forgot: {
       title: 'Réinitialise ton mot de passe',
-      subtitle:
-        "Indique l'e-mail utilisé à l'inscription et nous t'enverrons un code à six chiffres.",
+      subtitle: 'On envoie un code à six chiffres à ton e-mail.',
       email: 'E-mail',
       submit: 'Envoyer le code',
       sentCodeBefore: "Si un compte existe pour elle, un code à six chiffres part vers",
@@ -104,8 +116,7 @@ export const fr: Dictionary = {
       resetSubtitle: "Toute personne connectée avec l'ancien sera déconnectée.",
       resetSubmit: 'Enregistrer le mot de passe',
       doneTitle: 'Connecte-toi avec ton nouveau mot de passe',
-      doneBody:
-        "Toutes les sessions qui utilisaient l'ancien mot de passe sont terminées, sur cet appareil comme sur les autres.",
+      doneBody: 'Tu as été déconnecté partout.',
       signIn: 'Se connecter',
     },
   },
@@ -116,8 +127,7 @@ export const fr: Dictionary = {
 
     profile: {
       title: 'À propos de toi',
-      subtitle:
-        "GameBuddy est réservé aux adultes. Ta date de naissance confirme que tu as 18 ans ou plus — elle n'est jamais montrée à personne.",
+      subtitle: "GameBuddy est réservé aux 18+. Ta date de naissance n'est jamais affichée.",
       ageHint: (n: number) => `Tu dois avoir ${n} ans ou plus.`,
       countryRequired: 'Choisis ton pays',
       gender: 'Genre',
@@ -138,8 +148,7 @@ export const fr: Dictionary = {
 
     avatar: {
       title: 'Choisis ton look',
-      subtitle:
-        "C'est la première chose que les gens voient. Tu pourras téléverser une vraie photo plus tard, depuis ton profil.",
+      subtitle: "C'est ce que les autres voient en premier. Tu peux la changer plus tard.",
       pickOne: 'Choisis-en un pour continuer.',
     },
 
@@ -152,7 +161,7 @@ export const fr: Dictionary = {
 
     platforms: {
       title: 'Sur quoi joues-tu ?',
-      subtitle: 'Choisis tout ce que tu utilises. Les autres filtrent là-dessus — plus vaut mieux que moins.',
+      subtitle: 'Choisis tout ce que tu utilises. Les autres filtrent là-dessus.',
     },
 
     keywords: {
@@ -216,10 +225,9 @@ export const fr: Dictionary = {
       soonA11y: 'Commence dans moins de 15 minutes',
       emptySoonTitle: 'Rien ne commence maintenant',
       emptySoonBlurb:
-        'Rien ne démarre dans les 15 prochaines minutes. Désactive Maintenant pour voir ce qui est prévu plus tard.',
+        'Rien dans les 15 prochaines minutes. Désactive Maintenant pour voir plus tard.',
       emptyToneTitle: 'Rien dans cette ambiance',
-      emptyToneBlurb:
-        "Rien dans cette ambiance pour l'instant. Essaie un autre filtre, ou ouvre le tien.",
+      emptyToneBlurb: 'Rien avec cette ambiance. Essaie un autre filtre, ou ouvre le tien.',
       emptyTitle: 'Aucun lobby ouvert pour le moment',
       emptyBlurb: 'Ouvre-en un, fixe une heure et choisis qui te rejoint.',
     },
@@ -340,7 +348,7 @@ export const fr: Dictionary = {
 
     limit: {
       likesTitle: "C'étaient les likes du jour",
-      likesBody: 'Tu peux continuer à regarder et à passer. Gold lève le plafond.',
+      likesBody: 'Tu peux continuer à regarder et à passer. Gold supprime la limite quotidienne.',
       swipesTitle: "C'étaient les swipes du jour",
       swipesBody: 'Le deck revient demain. Gold supprime la limite quotidienne.',
       goldTitle: 'GameBuddy Gold',
@@ -354,7 +362,7 @@ export const fr: Dictionary = {
             noCoinsTitle: 'Pas assez de pièces',
       noCoinsBody: 'Annuler coûte des pièces. Tu peux en gagner dans la boutique.',
       nothingToRewindTitle: 'Rien à annuler',
-      nothingToRewindBody: 'Tu n’as encore balayé personne — ou c’est devenu un match, et ça reste.',
+      nothingToRewindBody: "Rien à reprendre, ou c'est devenu un match.",
       somethingWrongTitle: 'Ça n’a pas marché',
       somethingWrongBody: 'Rien n’a changé. Réessaie dans un instant.',
       getCoins: 'Obtenir des pièces',
@@ -363,19 +371,15 @@ export const fr: Dictionary = {
 
     filters: {
       title: 'Filtres',
-      subtitle: 'Réduis le deck aux joueurs avec qui tu veux vraiment jouer.',
       subtitleLocked: 'Ça fait partie de Gold. Regarde ce que ça permet.',
       game: 'Jeu',
-      gameHint: 'Seulement ceux qui jouent à celui-ci.',
       gameHintEmpty: 'Ajoute des jeux à ton profil pour filtrer dessus.',
       anyGame: 'Tous les jeux',
       region: 'Région',
-      regionHint: 'Même fuseau, mêmes serveurs, même soirée.',
       regionHintEmpty: 'Renseigne ton pays sur ton profil pour filtrer dessus.',
       onlyIn: (country: string) => `Uniquement les joueurs (${country})`,
       onlyNearMe: 'Uniquement les joueurs près de moi',
       platform: 'Plateforme',
-      platformHint: 'Ceux que tu peux vraiment avoir dans un lobby.',
       anyPlatform: 'Toutes les plateformes',
       availability: 'Disponibilité',
       availabilityHint: 'Actifs dans les 15 dernières minutes.',
@@ -390,7 +394,7 @@ export const fr: Dictionary = {
 
     locked: {
       title: 'Les filtres font partie de Gold',
-      blurb: 'Réduis le deck à un jeu, à ta région, ou aux joueurs en ligne en ce moment.',
+      blurb: 'Filtre par jeu, région ou qui est en ligne.',
       getGold: 'Passer à Gold',
       showEveryone: 'Afficher tout le monde à la place',
     },
@@ -399,15 +403,14 @@ export const fr: Dictionary = {
       filteredTitle: "C'est tout le monde pour tes filtres",
       title: "C'est tout le monde pour l'instant",
       filteredBlurb: 'Les élargir ramène plus de joueurs dans le deck.',
-      blurb:
-        'De nouveaux joueurs arrivent tout le temps, et ceux que tu as passés finissent par revenir.',
+      blurb: 'De nouveaux joueurs arrivent sans cesse. Reviens bientôt.',
       lookAgain: 'Regarder à nouveau',
     },
   },
 
   billing: {
     promptTitle: 'Ça marche',
-    promptBody: "Tu as matché avec quelqu'un. Gold, c'est pour quand tu en veux plus.",
+    promptBody: "Gold enlève la limite quotidienne et montre qui t'a liké.",
     benefitNoLimit: 'Pas de limite quotidienne de likes',
     benefitSeeLikes: "Vois tous ceux qui t'ont liké",
     benefitFilters: 'Filtre le deck par jeu, région et qui est en ligne',
@@ -417,16 +420,15 @@ export const fr: Dictionary = {
     coinsAddedBody: 'Elles sont dans ton solde.',
     goldYours: 'Gold est à toi',
     goldYoursBody: 'Pas de limite quotidienne, filtres avancés et le cadre Gold.',
-    storeUnavailable: 'Les achats ne sont pas encore disponibles dans cette version.',
-    storeNotInBuild:
-      "Cette version ne peut pas faire d'achats. Elle a été installée avant l'ajout des achats intégrés.",
+    storeUnavailable: 'Les achats ne sont pas disponibles pour le moment.',
+    storeNotInBuild: 'Mets à jour GameBuddy sur Google Play pour acheter.',
     storePlanMissing: "Ce forfait n'est pas disponible pour le moment.",
   },
 
   market: {
     shop: {
       header: 'Boutique',
-      title: 'Fais-toi remarquer',
+      title: 'Pièces et extras',
       earnTab: 'Gagner',
       shopTab: 'Acheter',
       framesAndBanners: 'Cadres et bannières',
@@ -451,7 +453,6 @@ export const fr: Dictionary = {
       previewOn: { FRAME: 'Sur ton avatar', BANNER: 'Sur ton profil', THEME: 'Sur ta carte' },
       themes: 'Thèmes',
       bundles: 'Packs',
-      bundlesBlurb: 'Un ensemble assorti, moins cher que les pièces séparées.',
       bundleParts: (n: number) => `${n} pièces séparément`,
       bundleSaving: (n: number) => `Économise ${n}`,
       bundleTogether: 'Portés ensemble',
@@ -473,19 +474,18 @@ export const fr: Dictionary = {
 
     earn: {
       header: 'Gagner',
-      blurb: "Les pièces reviennent chaque jour. Rien ici ne coûte d'argent.",
       earnedTitle: (n: number) => `+${n} pièces`,
       earnedBody: 'Dépense-les en cadres, bannières ou likes.',
       watchedBody: "Merci d'avoir regardé.",
       rewardPendingTitle: 'Les pièces arrivent',
       rewardPendingBody: 'Regarde ton solde dans un instant.',
-      consentTitle: 'Les vidéos demandent le consentement publicitaire',
-      consentBody: 'Change-le dans Réglages → Confidentialité des publicités.',
+      consentTitle: 'Les publicités sont désactivées',
+      consentBody: 'Active-les dans Réglages → Confidentialité des publicités.',
       adFailedTitle: 'Pas de vidéo pour le moment',
       adFailedBody: 'Rien à afficher pour l’instant. Réessaie dans un instant.',
       watchVideo: 'Regarde une courte vidéo',
       videosLeft: (n: number) => `Encore ${n} aujourd'hui`,
-      videosDone: "C'étaient les vidéos du jour — reviens demain",
+      videosDone: "C'est tout pour aujourd'hui. Reviens demain.",
       stipendTitle: 'Bonus mensuel Gold',
       stipendReady: 'À toi ce mois-ci',
       stipendBack: (when: string) => `De retour ${when}`,
@@ -539,11 +539,10 @@ export const fr: Dictionary = {
 
     consumables: {
       header: 'Utilise tes pièces',
-      blurb: "Dépensées à l'usage, pas possédées pour toujours.",
       superLike: 'Super Like',
       superLikeDetail: 'La personne le sait tout de suite, et ça se remarque.',
       extraLikes: "5 likes de plus aujourd'hui",
-      extraLikesDetail: "En plus de ton plafond quotidien. Aujourd'hui seulement.",
+      extraLikesDetail: "En plus de tes likes du jour. Aujourd'hui seulement.",
       itemA11y: (title: string, cost: number) => `${title}, ${cost} pièces`,
       addedTitle: (title: string) => `${title} ajouté`,
       added: 'Ajouté',
@@ -553,21 +552,18 @@ export const fr: Dictionary = {
 
     coins: {
       header: 'Pièces',
-      blurbBuy:
-        'Recharge maintenant, ou gagne-les gratuitement sous Gagner — série quotidienne, quêtes et badges.',
-      blurbNoBuy:
-        "Gagne-les sous Gagner : série quotidienne, quêtes et badges. L'achat n'est pas encore disponible dans cette version.",
+      blurbNoBuy: 'Les achats sont indisponibles. Tu peux toujours gagner des pièces dans Gagner.',
       packCoins: (n: string) => `${n} pièces`,
-      takesYouTo: (n: string) => `Te porte à ${n}`,
+      takesYouTo: (n: string) => `Nouveau solde : ${n}`,
       packA11y: (coins: number, price: string) => `Acheter ${coins} pièces pour ${price}`,
       onTheWay: 'Tes pièces arrivent',
-      onTheWayBody: "Ça peut prendre un instant. Pas besoin de racheter.",
+      onTheWayBody: 'Cela peut prendre un moment. Pas besoin de racheter.',
     },
 
     gold: {
       done: 'Terminé',
       continuePrice: (price: string) => `Continuer — ${price}`,
-      unavailable: 'Achats pas encore disponibles',
+      unavailable: 'Les achats ne sont pas disponibles pour le moment',
       notNow: 'Pas maintenant',
       heroThanks: 'Merci de soutenir GameBuddy.',
       heroPitch: "Toute l'app, sans rien en travers.",
@@ -588,10 +584,9 @@ export const fr: Dictionary = {
       noteYearly: 'Économise 58 %',
       billedEvery: (period: string) => `Facturé chaque ${period}`,
       purchasePending: 'Ton achat est en cours',
-      purchasePendingBody:
-        "Ça peut prendre un instant. Gold s'activera tout seul — pas besoin de racheter.",
+      purchasePendingBody: 'Cela peut prendre un moment. Pas besoin de racheter.',
       cancelNote:
-        "Annule quand tu veux depuis ton compte de la boutique. Un abonnement se renouvelle jusqu'à son annulation.",
+      "Annule quand tu veux dans Google Play. Un abonnement se renouvelle jusqu'à son annulation.",
       member: 'Tu es membre',
       runsUntil: (date: string) => `Ton abonnement court jusqu'au ${date}.`,
       active: 'Ton abonnement est actif.',
@@ -608,12 +603,11 @@ export const fr: Dictionary = {
 
     inventory: {
       title: 'Inventaire',
-      subtitle: 'Ce que tu possèdes, et ce que tu portes',
       nothingYet: { FRAME: 'Pas encore de cadres', BANNER: 'Pas encore de bannières', THEME: 'Pas encore de thèmes' },
       emptyBlurb: {
-        FRAME: 'Tout ce que tu achètes au Marché arrive ici. Les cadres gratuits sont déjà à toi.',
-        BANNER: 'Tout ce que tu achètes au Marché arrive ici. Les bannières gratuites sont déjà à toi.',
-        THEME: 'Tout ce que tu achètes au Marché arrive ici.',
+        FRAME: 'Tout ce que tu achètes arrive ici.',
+        BANNER: 'Tout ce que tu achètes arrive ici.',
+        THEME: 'Tout ce que tu achètes arrive ici.',
       },
       kindLabel: { FRAME: 'Cadre', BANNER: 'Bannière', THEME: 'Thème de carte' },
       goToMarket: 'Aller à la Boutique',
@@ -626,7 +620,6 @@ export const fr: Dictionary = {
 
     badges: {
       title: 'Badges',
-      subtitle: 'Finis des missions, réclame des pièces, montres-en trois',
       showcaseFull: (slots: number) => `Tu peux montrer ${slots} badges. Retires-en un d'abord.`,
       earned: 'Obtenu',
       tileA11y: (title: string, status: string) => `${title}. ${status}`,
@@ -688,6 +681,7 @@ export const fr: Dictionary = {
     games: 'Jeux',
     playsOn: 'Joue sur',
     keywords: 'Style de jeu',
+    linkedVerified: (provider: string) => `${provider} vérifié`,
     friendRequestsShort: "Demandes d'ami",
     acceptRequestA11y: (name: string) => `Accepter la demande de ${name}`,
     declineRequestA11y: (name: string) => `Refuser la demande de ${name}`,
@@ -696,10 +690,9 @@ export const fr: Dictionary = {
 
     friendsTitle: 'Amis',
     noFriendsTitle: "Pas encore d'amis",
-    noFriendsBody: "Tu peux ajouter quelqu'un en ami une fois que vous avez matché.",
+    noFriendsBody: 'Ajoute des amis une fois que vous avez matché.',
     removeConfirmTitle: (name: string) => `Retirer ${name} ?`,
-    removeConfirmBody:
-      "Vous redevenez un match — vous pouvez toujours vous écrire, et chacun peut renvoyer une demande d'ami.",
+    removeConfirmBody: 'Vous restez matchés et pouvez encore vous écrire.',
     thisGamer: 'cette personne',
 
     fallbackTitle: 'Profil',
@@ -709,8 +702,7 @@ export const fr: Dictionary = {
     reportProfile: 'Signaler le profil',
     block: 'Bloquer',
     blockConfirmTitle: (name: string) => `Bloquer ${name} ?`,
-    blockConfirmBody:
-      "Vous ne vous verrez plus nulle part dans l'app, et aucun de vous ne pourra écrire à l'autre. Tu peux annuler ça dans les Réglages.",
+    blockConfirmBody: 'Vous ne vous verrez plus. Annule dans les réglages.',
 
     moreActionsA11y: "Plus d'actions",
     matchBack: 'Liker en retour',
@@ -721,14 +713,13 @@ export const fr: Dictionary = {
     acceptRequest: 'Accepter la demande',
     withdrawRequest: 'Retirer la demande',
     withdrawConfirmTitle: (name: string) => `Retirer ta demande à ${name} ?`,
-    withdrawConfirmBody: "Elle disparaît de son côté. Tu peux en renvoyer une quand tu veux.",
+    withdrawConfirmBody: 'Elle ne leur est plus visible. Tu peux en renvoyer une plus tard.',
 
     admirersTitle: "Qui t'a liké",
     peopleLikeYou: (n: number) => (n === 1 ? "personne t'aime bien" : "personnes t'aiment bien"),
     upgradeToSee: ' — passe à Gold pour voir qui',
     admirersEmptyTitle: "Personne pour l'instant",
-    admirersEmptyBody:
-      "Quand quelqu'un te like, il apparaît ici — que tu l'aies liké ou non.",
+    admirersEmptyBody: "Ceux qui t'ont liké apparaissent ici.",
     revealing: 'Révélation…',
     revealOne: (cost: number) => `Révéler un visage pour ${cost} pièces`,
     orGold: 'Ou passe à Gold : chaque visage, et pas de limite de likes.',
@@ -752,6 +743,8 @@ export const fr: Dictionary = {
     platforms: 'Plateformes',
     platformsUnset: 'Non renseigné — les autres filtrent là-dessus',
     keywords: 'Style de jeu',
+    linkedAccounts: 'Liens',
+    linkedAccountsUnset: 'Non lié — montre aux autres où te trouver',
     selected: (n: number) => `${n} sélectionné(s)`,
     themeSystem: 'Système',
     themeSystemHint: 'Comme ton téléphone',
@@ -759,11 +752,13 @@ export const fr: Dictionary = {
     themeLightHint: 'Toujours clair',
     themeDark: 'Sombre',
     themeDarkHint: 'Toujours sombre',
-    themeNote: "Le thème s'applique immédiatement et est retenu sur cet appareil.",
+    themeNote: 'Mémorisé sur cet appareil.',
     notificationsRow: 'Ce que nous envoyons',
     notificationsHint: 'Messages, matchs, rappels',
     tutorial: 'Revoir le tutoriel',
-    tutorialHint: 'Parcourt les cinq onglets',
+    tutorialHint: 'Parcourt les cinq onglets et réaffiche les astuces',
+    rate: 'Noter GameBuddy',
+    rateHint: 'Ouvre Google Play',
     terms: "Conditions d'utilisation",
     termsHint: 'Y compris les règles de contenu et de conduite',
     privacy: 'Politique de confidentialité',
@@ -772,6 +767,9 @@ export const fr: Dictionary = {
     adPrivacyHint: 'Modifier ce que les publicités peuvent utiliser sur toi',
     password: 'Mot de passe',
     passwordHint: 'Te déconnecte partout',
+    passwordSet: 'Définir un mot de passe',
+    passwordSetHint: 'Pour te connecter sans Google ni Discord',
+    deleteReauth: 'Reconnecte-toi pour confirmer, puis reviens ici.',
     blocked: 'Bloqués',
     blockedHint: 'Qui tu as bloqué',
     promo: 'Codes promo',
@@ -802,8 +800,7 @@ export const fr: Dictionary = {
     notificationsScreen: {
       title: 'Notifications',
       offTitle: 'Les notifications sont coupées pour GameBuddy',
-      offBody:
-        "Android les bloque, donc rien de ce qui suit ne peut t'atteindre tant qu'elles ne sont pas réactivées.",
+      offBody: 'Android les bloque. Rien ci-dessous ne peut te parvenir.',
       turnOn: 'Activer les notifications',
       openSystem: 'Ouvrir les réglages du système',
       whatToSend: 'Quoi envoyer',
@@ -812,16 +809,14 @@ export const fr: Dictionary = {
       socialTitle: 'Matchs et amis',
       socialBody: "Nouveaux matchs, demandes d'ami et réponses, activité des lobbys, badges obtenus.",
       remindersTitle: 'Rappels',
-      remindersBody: "Un petit signe de temps en temps quand tu t'es absenté et que quelque chose t'attend.",
-      quietNote:
-        "Tout couper ici garde l'app silencieuse sans désactiver complètement ses notifications — ce que tu réactives plus tard fonctionne aussitôt.",
+      remindersBody: "Un rappel quand quelque chose t'attend.",
+      quietNote: 'Tu peux les réactiver quand tu veux.',
       onThisPhone: 'Sur ce téléphone',
       soundsTitle: 'Sons',
-      soundsBody: "Un bref signal quand quelque chose se passe dans l'app — un match, un achat, un message.",
+      soundsBody: 'Un son bref pour les matchs, messages et achats.',
       vibrationTitle: 'Vibration',
       vibrationBody: 'Une brève vibration sur un swipe, un match ou un achat.',
-      cuesNote:
-        'Les signaux ne jouent jamais par-dessus le mode silencieux, et ils n’interrompent jamais la musique que tu écoutes.',
+      cuesNote: "Suit le mode silencieux. N'interrompt jamais la musique.",
     },
 
     avatarScreen: {
@@ -838,30 +833,26 @@ export const fr: Dictionary = {
       cropConfirm: 'Utiliser cette photo',
       cropFailed: 'Cette image n’a pas pu être recadrée. Essaie-en une autre.',
       privacyNote:
-        'Ta photo est vérifiée avant que quiconque puisse la voir, et les données de localisation en sont retirées automatiquement.',
+        'Vérifiée avant que quiconque la voie. Les données de localisation sont retirées.',
       orOurs: 'Ou choisis-en une des nôtres',
       cameraDenied:
-        "GameBuddy ne peut pas ouvrir l'appareil photo sans autorisation. Accorde-la dans les réglages du téléphone, choisis une photo existante, ou prends-en une des nôtres ci-dessous.",
-      photosDenied:
-        "GameBuddy ne peut pas ouvrir tes photos sans autorisation. Accorde-la dans les réglages du téléphone, prends une photo, ou choisis-en une des nôtres ci-dessous.",
+        "Pas d'accès à l'appareil photo. Active-le dans les réglages, ou choisis une photo.",
+      photosDenied: "Pas d'accès aux photos. Active-le dans les réglages, ou prends une photo.",
       tooLarge: (sizeMb: string, limitMb: number) =>
-        `Ce fichier fait ${sizeMb}Mo et la limite est ${limitMb}Mo. Tout ce qui vient de ta galerie est bien en dessous.`,
+        `Ce fichier fait ${sizeMb}Mo. La limite est ${limitMb}Mo.`,
       approvedTitle: "C'est ton avatar maintenant",
       approvedBody: 'Tout le monde peut le voir.',
       pendingTitle: 'En attente de vérification',
-      pendingBody:
-        "Quelqu'un va y jeter un œil sous peu. D'ici là, tu es la seule personne à le voir — les autres voient encore ton ancien avatar.",
+      pendingBody: "Toi seul la vois jusqu'à la validation.",
       rejectedTitle: "Cette photo n'a pas été acceptée",
-      rejectedBody:
-        "Elle semble enfreindre les règles sur le contenu sexuel. Personne d'autre ne l'a vue. Essaie une autre photo, ou choisis-en une des nôtres.",
+      rejectedBody: "Elle enfreint les règles sur le contenu sexuel. Personne d'autre ne l'a vue.",
     },
 
     age: {
       title: 'Date de naissance',
-      subtitle:
-        "Sert à confirmer que tu as l'âge d'être ici. Les autres voient ton âge, jamais la date.",
+      subtitle: 'Les autres voient ton âge, jamais la date.',
       recordedNote: (min: number) =>
-        `Les changements de date de naissance sont enregistrés. GameBuddy est réservé aux adultes, et une date qui te met sous ${min} ans sera refusée.`,
+        `Les changements sont enregistrés. Une date sous ${min} ans est refusée.`,
     },
 
     keywordsScreen: {
@@ -871,16 +862,40 @@ export const fr: Dictionary = {
 
     platformsScreen: {
       title: 'Sur quoi tu joues',
-      subtitle: 'Choisis tout ce que tu utilises. Les autres filtrent là-dessus — plus vaut mieux que moins.',
+      subtitle: 'Choisis tout ce que tu utilises. Les autres filtrent là-dessus.',
+    },
+
+    linkedScreen: {
+      title: 'Liens',
+      subtitle: 'Montre aux autres où te trouver en dehors de GameBuddy.',
+      notLinked: (provider: string) => `${provider} non lié`,
+      notLinkedHint: (provider: string) => `Connecte-toi une fois à ${provider} et ton nom apparaît sur ton profil.`,
+      link: (provider: string) => `Lier ${provider}`,
+      signInWithDiscord: 'Se connecter avec Discord',
+      unlink: (provider: string) => `Délier ${provider}`,
+      linkedAs: (provider: string) => `Vérifié avec ${provider}`,
+      verifiedNoHandle: 'Vérifié',
+      handleWithheld: 'Ton nom là-bas ne peut pas être affiché, mais le compte est vérifié.',
+      visibilityMatches: 'Matchs et amis',
+      visibilityMatchesHint: 'Seules les personnes avec qui tu as matché le voient',
+      visibilityPublic: 'Tout le monde',
+      visibilityPublicHint: 'Toute personne qui ouvre ton profil le voit',
+      linkedToast: 'Compte lié',
+      alreadyLinked: 'Ce compte est déjà pris',
+      alreadyLinkedBody: 'Il est lié à un autre profil GameBuddy. Délie-le là-bas d’abord.',
+      failed: 'Ça n’a pas marché. Réessaie.',
     },
 
     passwordScreen: {
+      setTitle: 'Définir un mot de passe',
+      setSubtitle: 'Pour pouvoir aussi te connecter avec ton adresse e-mail.',
+      setDoneTitle: 'Mot de passe défini',
+      setDoneBody: 'Tu peux maintenant te connecter avec ton e-mail.',
       title: 'Changer le mot de passe',
       subtitle: 'Cela te déconnecte de tous les appareils, y compris celui-ci.',
       changedTitle: 'Mot de passe changé',
       signedOutTitle: 'Tu as été déconnecté partout',
-      signedOutBody:
-        "Changer de mot de passe met fin à toutes les sessions, sur cet appareil et les autres. C'est voulu — si quelqu'un avait ton ancien mot de passe, il est dehors aussi.",
+      signedOutBody: 'Cet appareil et tous les autres ont été déconnectés.',
       signInAgain: 'Se reconnecter',
       current: 'Mot de passe actuel',
       next: 'Nouveau mot de passe',
@@ -889,7 +904,7 @@ export const fr: Dictionary = {
     },
 
     blockedScreen: {
-      body: "Le blocage marche dans les deux sens et couvre tout : vous ne vous voyez plus nulle part dans l'app, et aucun de vous ne peut écrire à l'autre.",
+      body: 'Vous ne vous voyez plus et ne pouvez plus vous écrire.',
       emptyTitle: "Personne n'est bloqué",
       emptyBody: "Si besoin, tu peux bloquer quelqu'un depuis son profil.",
       unblock: 'Débloquer',
@@ -897,8 +912,7 @@ export const fr: Dictionary = {
     signOut: 'Se déconnecter',
     deleteAccount: 'Supprimer mon compte',
     deleteTitle: 'Action irréversible',
-    deleteBody:
-      'Ton profil, tes matchs et tes messages sont supprimés. Saisis ton mot de passe pour confirmer — un téléphone volé ne doit pas suffire.',
+    deleteBody: 'Ton profil, tes matchs et tes messages sont supprimés.',
     keepAccount: 'Garder mon compte',
   },
 
@@ -909,7 +923,7 @@ export const fr: Dictionary = {
     hidePasswordA11y: 'Masquer le mot de passe',
     reportProfileTitle: 'Signaler ce profil',
     reportMessageTitle: 'Signaler ce message',
-    reportBlurb: "Un modérateur va l'examiner. Tu ne peux signaler la même chose qu'une fois.",
+    reportBlurb: "Un modérateur va l'examiner.",
     reportCancelA11y: 'Annuler le signalement',
     reasonHarassment: 'Harcèlement ou abus',
     reasonSexual: 'Contenu sexuel',
@@ -923,15 +937,15 @@ export const fr: Dictionary = {
     network: 'Impossible de joindre GameBuddy. Vérifie ta connexion et réessaie.',
     sessionExpired: 'Ta session a expiré. Reconnecte-toi.',
     forbidden: "Tu n'as pas accès à ceci.",
-    emptyResponse: 'Le serveur a renvoyé une réponse vide.',
-    unexpectedResponse: 'Le serveur a renvoyé une réponse inattendue.',
+    emptyResponse: "Une erreur s'est produite. Réessaie.",
+    unexpectedResponse: "Une erreur s'est produite. Réessaie.",
     byCode: {
       '101': 'Un compte existe déjà pour cet e-mail.',
       '103': 'Aucun compte trouvé.',
       '105': "Ce code n'est pas le bon.",
       '106': "Ce compte n'est pas encore vérifié.",
       '107': "Ce nom d'utilisateur est pris.",
-      '108': "Nom d'utilisateur ou mot de passe incorrect.",
+      '108': 'Identifiant ou mot de passe incorrect. Si tu t\'es inscrit avec Google ou Discord, utilise ce bouton.',
       '113': 'Ce compte est bloqué.',
       '121': "Cette personne t'a bloqué.",
       '186': "Tu as bloqué cette personne, tu ne peux donc pas lui écrire.",
@@ -961,6 +975,12 @@ export const fr: Dictionary = {
       '194': 'Ce code a été envoyé à un autre compte.',
       '195': 'Un code portant ce nom existe déjà.',
       '196': 'Ce compte ne peut pas recevoir de code.',
+      '200': 'Cette connexion n\'a pas pu être vérifiée. Réessaie.',
+      '201': 'Vérifie d\'abord l\'e-mail de ce compte, puis réessaie.',
+      '202': 'Ce compte n\'a pas encore de mot de passe. Définis-en un dans les réglages.',
+      '203': 'Ce compte a déjà un mot de passe.',
+      '204': 'Définis un mot de passe avant de retirer ta seule façon de te connecter.',
+      '205': 'Reconnecte-toi pour confirmer.',
     },
   },
 
@@ -1051,8 +1071,7 @@ export const fr: Dictionary = {
   notifications: {
     header: 'Notifications',
     primerTitle: 'Ne rate pas le meilleur',
-    primerBody:
-      "GameBuddy, c'est les autres. La plupart de ce qui se passe ici arrive quand l'app est fermée.",
+    primerBody: "L'essentiel se passe quand l'appli est fermée.",
     reasonMatchTitle: 'Quand tu matches',
     reasonMatchBody: "Vous avez dit oui tous les deux — c'est là qu'une conversation peut commencer.",
     reasonMessageTitle: "Quand quelqu'un t'écrit",
@@ -1064,27 +1083,52 @@ export const fr: Dictionary = {
     changeLater: 'Tu peux changer ça à tout moment dans les Réglages, et choisir quels types tu veux.',
   },
 
+  hints: {
+    gotIt: 'Compris',
+    swipe: {
+      right: 'Glisse à droite pour jouer ensemble',
+      left: 'Glisse à gauche pour passer',
+      up: 'Glisse vers le haut pour un Super Like',
+    },
+    filter: {
+      title: 'Affine le deck',
+      body: 'Filtre par jeu, plateforme ou pays. Certains filtres sont inclus dans Gold.',
+    },
+    superLike: {
+      title: 'Super Like',
+      body: 'La personne est prévenue tout de suite.',
+    },
+    lobbyCreate: {
+      title: 'Ouvre un lobby',
+      body: 'Indique le jeu et l\'heure, et choisis qui rejoint. Ouvrir est inclus dans Gold.',
+    },
+    chatComposer: {
+      title: 'Dis à quoi, et quand',
+      body: 'Propose un jeu et une heure.',
+    },
+  },
+
   tutorial: {
     steps: {
       home: {
         title: "Trouve quelqu'un avec qui jouer",
-        body: 'Swipe parmi des joueurs qui jouent à ce que tu joues. À droite si tu veux jouer ensemble, à gauche sinon. Quand vous swipez tous les deux à droite, vous matchez. Balaie vers le haut pour envoyer un Super Like — la personne le sait tout de suite.',
+        body: 'Glisse à droite pour jouer ensemble, à gauche pour passer. Vers le haut pour un Super Like.',
       },
       messages: {
         title: 'Parle à tes matchs',
-        body: "Matcher ouvre un chat privé. Personne ne peut t'écrire sans que vous l'ayez accepté tous les deux, et tu peux bloquer ou signaler n'importe qui depuis une conversation.",
+        body: 'Un match ouvre une conversation privée. Bloque ou signale depuis là.',
       },
       lobby: {
         title: 'Fais équipe dans un lobby',
-        body: "Les lobbys ouverts sont des parties qui cherchent des joueurs — le jeu, l'heure et l'ambiance sont sur la carte. Demande à rejoindre, et le propriétaire choisit l'équipe. Ouvrir le tien fait partie de Gold.",
+        body: 'Les lobbys sont des parties qui cherchent des joueurs. Demande à rejoindre, ou ouvre le tien avec Gold.',
       },
       market: {
         title: 'Rends ton profil à ton image',
-        body: "Des cadres et des bannières pour ton profil, plus des likes quotidiens en rab si tu es à court. Tout ici est optionnel — l'app fonctionne sans rien dépenser.",
+        body: 'Des cadres et bannières pour ton profil, et des likes en plus. Tout est optionnel.',
       },
       profile: {
         title: 'Ton profil, et tout le reste',
-        body: "Tes jeux, ton style de jeu, tes amis et tes badges. Les réglages sont derrière l'engrenage, y compris ce tutoriel si tu le veux à nouveau.",
+        body: "Tes jeux, badges et amis. Les réglages sont derrière l'engrenage.",
       },
     },
     stepOf: (n: number, total: number) => `${n} sur ${total}`,
@@ -1099,7 +1143,7 @@ export const fr: Dictionary = {
 
   errorScreen: {
     title: 'GameBuddy a rencontré un problème',
-    blurb: "C'est un bug, pas quelque chose que tu as fait. Les détails ci-dessous sont ce qu'il nous faut pour le corriger.",
+    blurb: "C'est un bug, pas une erreur de ta part.",
     copyHint: 'Le texte ci-dessus peut être sélectionné et copié.',
   },
 };

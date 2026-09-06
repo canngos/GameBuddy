@@ -90,9 +90,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
               <View className="flex-row items-center justify-between gap-4 px-6 pb-3">
                 <View className="flex-1">
                   <Text variant="title">{t.deck.filters.title}</Text>
-                  <Text variant="caption">
-                    {unlocked ? t.deck.filters.subtitle : t.deck.filters.subtitleLocked}
-                  </Text>
+                  {!unlocked && <Text variant="caption">{t.deck.filters.subtitleLocked}</Text>}
                 </View>
                 {!unlocked && <GoldPill />}
               </View>
@@ -100,7 +98,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
               <ScrollView className="px-6" contentContainerClassName="gap-6 pb-4">
                 <Section
                   title={t.deck.filters.game}
-                  hint={myGames.length ? t.deck.filters.gameHint : t.deck.filters.gameHintEmpty}>
+                  hint={myGames.length ? undefined : t.deck.filters.gameHintEmpty}>
                   <View className="flex-row flex-wrap gap-2">
                     <GameChip
                       label={t.deck.filters.anyGame}
@@ -130,7 +128,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
 
                 <Section
                   title={t.deck.filters.region}
-                  hint={myCountry ? t.deck.filters.regionHint : t.deck.filters.regionHintEmpty}>
+                  hint={myCountry ? undefined : t.deck.filters.regionHintEmpty}>
                   <Toggle
                     label={
                       myCountry
@@ -149,7 +147,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
                     the profile: there the question is "what do you own", here it is "who
                     can I play with tonight", and that is one answer. Somebody on PC and
                     Switch shows up under either. */}
-                <Section title={t.deck.filters.platform} hint={t.deck.filters.platformHint}>
+                <Section title={t.deck.filters.platform}>
                   <View className="flex-row flex-wrap gap-2">
                     <GameChip
                       label={t.deck.filters.anyPlatform}
@@ -236,7 +234,7 @@ function Section({
   children,
 }: {
   title: string;
-  hint: string;
+  hint?: string;
   children: React.ReactNode;
 }) {
   const upper = useUpper();
@@ -245,7 +243,7 @@ function Section({
     <View className="gap-3">
       <View className="gap-0.5">
         <Text variant="overline">{upper(title)}</Text>
-        <Text variant="caption">{hint}</Text>
+        {hint && <Text variant="caption">{hint}</Text>}
       </View>
       {children}
     </View>

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { LinkedAccounts } from '../profile/LinkedAccounts';
 import { ChevronUp } from 'lucide-react-native';
 import { useMemo } from 'react';
 import { View } from 'react-native';
@@ -173,6 +174,13 @@ export function CandidateCard({ candidate, muted = false }: CandidateCardProps) 
           >
             {candidate.gamerUsername}
           </Text>
+          {/* Public links only — the backend never sends a matches-only handle to the deck,
+              because a card is by definition somebody you have not matched with. */}
+          {!!candidate.linkedAccounts?.length && (
+            <View style={{ marginTop: 4, marginBottom: 2 }}>
+              <LinkedAccounts accounts={candidate.linkedAccounts} onCard />
+            </View>
+          )}
           <Text className="font-medium text-[14px] leading-[20px] text-white/85">
             {[candidate.age, localize(candidate.country)].filter(Boolean).join(' · ')}
           </Text>

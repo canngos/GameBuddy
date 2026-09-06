@@ -11,6 +11,7 @@ import { useCountryName } from "../../src/i18n/countryNames";
 import type { ShowcasedBadge } from '../../src/api/types';
 import { useT } from "../../src/i18n/useT";
 import { useThemeColors } from "../../src/theme";
+import { LinkedAccounts } from "../../src/profile/LinkedAccounts";
 import { ThemedCardFrame } from "../../src/ui/ThemedCardFrame";
 import {
   Card,
@@ -102,7 +103,16 @@ export default function Profile() {
               {/* Pulled up over the banner's lower edge, which is the arrangement every
                   profile header uses: it ties the two together instead of stacking a
                   picture on top of an unrelated strip of art. */}
-              <View className={`${header.overlap} flex-row items-end gap-4`}>
+              <View
+                className={`${
+                  // The pills add a row to the bottom-aligned name column, which
+                  // grows it upward — so the overlap gives way rather than the
+                  // username climbing onto the banner.
+                  me.data.linkedAccounts?.length
+                    ? header.overlapWithExtraRow
+                    : header.overlap
+                } flex-row items-end gap-4`}
+              >
                 <FramedAvatar
                   frame={me.data.frame}
                   source={me.data.avatar}
@@ -121,6 +131,10 @@ export default function Profile() {
                     </Text>
                     {isGold && <GoldTag />}
                   </View>
+                  {/* Directly under the name and above the age line: it answers "where do I
+                      reach this person", which belongs with who they are rather than in the
+                      list of what they play. */}
+                  <LinkedAccounts accounts={me.data.linkedAccounts} />
                   <Text variant="caption">
                     {[me.data.age, localize(me.data.country)]
                       .filter(Boolean)

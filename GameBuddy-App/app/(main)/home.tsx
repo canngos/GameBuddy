@@ -22,6 +22,10 @@ import {
 } from "../../src/match/filters";
 import { useUpper } from "../../src/i18n/case";
 import { useT } from "../../src/i18n/useT";
+import { useCoachmarkTarget } from "../../src/hints/coachmark";
+import { SwipeDemo } from "../../src/hints/SwipeDemo";
+import { useHints } from "../../src/hints/store";
+import { useHint } from "../../src/hints/useHint";
 import { useCelebration } from "../../src/match/celebration";
 import { useDeckLayout } from "../../src/match/deckLayout";
 import { useDeck } from "../../src/match/useDeck";
@@ -94,7 +98,42 @@ export default function Deck() {
   // All three overlays freeze the gesture. Swiping the card behind a modal would decide
   // someone's fate invisibly — and the profile sheet is the easiest of the three to open by
   // accident, so it is also the one most likely to be dismissed with a stray drag.
-  const frozen = !!deck.block || !!deck.matchedWith || !!profileOf;
+  //
+  // **Kept separate from `frozen` below, and that separation is load-bearing.** A first-use
+  // hint also has to freeze the gesture, so `hintActive` belongs in `frozen` — but a hint
+  // must never be part of its *own* eligibility. It was, once: `enabled` read `frozen`, so
+  // claiming the slot set `hintActive`, which made `enabled` false, which released the slot,
+  // which made `enabled` true again. React caught it as "Maximum update depth exceeded" and
+  // the deck would not render at all. Hints therefore gate on `overlayUp`, which is the
+  // three things that are genuinely somebody else's, and the gesture gates on `frozen`.
+  const overlayUp = !!deck.block || !!deck.matchedWith || !!profileOf;
+
+  const hintActive = useHints((s) => s.active !== null);
+  // Unlike the tutorial a hint is an ordinary sibling rather than a Modal, so
+  // gesture-handler would still find the card underneath the dim — freezing here is what
+  // stops a tap meant for "Got it" from landing as a swipe.
+  const frozen = overlayUp || hintActive;
+
+  // The gesture demo, on the first real card. Waits for a card to actually be there:
+  // a hand miming a swipe over a spinner teaches nothing and spends the one showing.
+  const swipeHint = useHint(
+    "deck.swipe",
+    !!deck.current && !deck.isLoading && !deck.error && !overlayUp,
+  );
+
+  // Filters come second, and only once swiping is understood — the count on the button
+  // means nothing to somebody who has not yet seen the deck run.
+  const { attach: attachFilterHint } = useCoachmarkTarget(
+    "deck.filter",
+    !!deck.current && !deck.isLoading && !overlayUp && !filtersOpen,
+  );
+
+  // Last of the three, and only once there is a Super Like to spend: explaining a control
+  // whose only action today is "go and buy one" is a shop pitch wearing a tip's clothes.
+  const { attach: attachSuperLikeHint } = useCoachmarkTarget(
+    "deck.superLike",
+    !!deck.current && !overlayUp && (deck.allowance?.superLikes ?? 0) > 0,
+  );
 
   // The day-3 prompt waits for a quiet moment. It is the one thing on this screen nobody
   // asked for, so it must not arrive on top of a match they just made or a limit that just
@@ -105,6 +144,7 @@ export default function Deck() {
   // gets both at once, and the tutorial is mounted in the layout above this screen — so it
   // wins the paint and the prompt is spent underneath it, seen by nobody. Deferring costs
   // one app open; not deferring costs the only showing there is.
+
   const tutorialStep = useTutorial((s) => s.step);
   const promptDue =
     (subscription.data?.upgradePromptDue ?? false) &&
@@ -147,10 +187,15 @@ export default function Deck() {
             left, and how many people are waiting for you. The second is the reason to
             come back, so it sits closest to the thumb. */}
         <View className="flex-row items-center gap-4">
-          <FilterButton
-            count={activeCount(filters)}
-            onPress={() => setFiltersOpen(true)}
-          />
+          {/* Wrapped so the coach mark has something to measure: `measureInWindow`
+              needs a host view, and FilterButton's own Pressable is the thing being
+              highlighted rather than a box we may attach a ref to. */}
+          <View ref={attachFilterHint} collapsable={false}>
+            <FilterButton
+              count={activeCount(filters)}
+              onPress={() => setFiltersOpen(true)}
+            />
+          </View>
           <AdmirersBadge />
           <Allowance deck={deck} />
         </View>
@@ -254,10 +299,19 @@ export default function Deck() {
               // and starts halfway off screen.
               key={deck.current.userId}
               candidate={deck.current}
-              onDecide={deck.submit}
+              // The first real decision is proof the demo was not needed, so it puts
+              // it away rather than leaving it up over the next card.
+              onDecide={(decision) => {
+                swipeHint.dismiss();
+                deck.submit(decision);
+              }}
               onOpenProfile={() => setProfileOf(deck.current)}
               frozen={frozen}
             />
+
+            {/* After the card, so it draws over it, and inside the same box so the dim
+                stops at the card's edges. It lets real swipes through. */}
+            {swipeHint.due && <SwipeDemo onDismiss={swipeHint.dismiss} />}
           </View>
         )}
       </View>
@@ -276,6 +330,7 @@ export default function Deck() {
           // Gold gets rewinds as an entitlement; everyone else pays, and sees the price.
           rewindCost={unlocked ? 0 : REWIND_COST_COINS}
           superLikes={deck.allowance?.superLikes ?? 0}
+          superLikeRef={attachSuperLikeHint}
         />
       )}
 

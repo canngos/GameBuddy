@@ -13,10 +13,9 @@ import { Card, ErrorNotice, Icon, Text } from '../ui';
  * Coin packs, bought with real money.
  *
  * First thing under Shop, because the balance is what everything else in that tab is priced
- * in. The copy points at the Earn tab so the order does not read as "pay first" — somebody
- * who would rather not spend money is told, in this section, exactly where to go instead.
- * That mattered more when earning was a section further down the same scroll; now that it
- * is a whole tab of its own, the pointer has to name it.
+ * in. Earning used to be pointed at from here, back when it was a section further down the
+ * same scroll; it is a whole tab of its own now, sitting next to this one, so the sentence
+ * that named it was telling people what they were already looking at.
  *
  * The packs are consumables. There is no entitlement to check afterwards — only a balance
  * that should have gone up — which is why {@link usePurchase} is told this is a `coins`
@@ -54,9 +53,9 @@ export function CoinShop({
     >
       <View className="gap-1">
         <Text variant="overline">{upper(t.market.coins.header)}</Text>
-        <Text variant="caption">
-          {canBuy ? t.market.coins.blurbBuy : t.market.coins.blurbNoBuy}
-        </Text>
+        {/* Only when the packs below are dead. Captioning a working shelf with a sentence
+            about what a coin pack is says nothing the prices do not already say. */}
+        {!canBuy && <Text variant="caption">{t.market.coins.blurbNoBuy}</Text>}
       </View>
 
       {COIN_PACKS.map((pack) => (

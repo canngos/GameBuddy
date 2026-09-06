@@ -4,6 +4,9 @@ import { useState } from "react";
 import { View } from "react-native";
 import { authApi } from "../../src/api/auth";
 import { ApiError, Code } from "../../src/api/envelope";
+import { SocialButtons } from "../../src/session/SocialButtons";
+import { SocialConsentSheet } from "../../src/session/SocialConsentSheet";
+import { useSocialSignIn } from "../../src/session/social";
 import { useSession } from "../../src/session/store";
 import { useT } from "../../src/i18n/useT";
 import {
@@ -22,6 +25,7 @@ export default function Login() {
   const t = useT();
   const router = useRouter();
   const signIn = useSession((s) => s.signIn);
+  const social = useSocialSignIn();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -134,7 +138,21 @@ export default function Login() {
           disabled={!canSubmit}
           onPress={() => login.mutate()}
         />
+
+        {/* Below the password button, not above it: somebody who opened this screen came
+            here to type a password, and moving their target down the screen to advertise
+            something else is the app changing the subject. */}
+        <SocialButtons social={social} />
       </View>
+
+      <SocialConsentSheet
+        visible={social.consentNeeded}
+        busy={social.pending !== null}
+        accepted={social.accepted}
+        onAccepted={social.setAccepted}
+        onContinue={() => void social.confirmConsent()}
+        onDismiss={social.dismissConsent}
+      />
     </Screen>
   );
 }

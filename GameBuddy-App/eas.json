@@ -14,6 +14,7 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://api.findgamebuddy.com",
         "EXPO_PUBLIC_REVENUECAT_API_KEY": "goog_xmTnFlrJPKSREBlIkFfHLFdjzCR",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "656951909603-opej7fmrbns73r27vtaj8uj931ga2vnl.apps.googleusercontent.com",
         "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": "ca-app-pub-1806031824100901/9009681771",
         "ADMOB_ANDROID_APP_ID": "ca-app-pub-1806031824100901~2460074542"
       }

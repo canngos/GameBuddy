@@ -12,7 +12,11 @@ export type FunnelStep =
   | 'PAYWALL_VIEWED'
   | 'CHECKOUT_STARTED'
   | 'COIN_SHOP_VIEWED'
-  | 'PAYWALL_TRIGGERED';
+  | 'PAYWALL_TRIGGERED'
+  // Not a monetisation step, but the same kind of fact: the server granted the ask and
+  // only the device knows whether it followed through. Play's own throttling is invisible
+  // to both sides, so nothing downstream of this is measurable from here.
+  | 'REVIEW_PROMPTED';
 
 /**
  * Reports a step, and never fails.

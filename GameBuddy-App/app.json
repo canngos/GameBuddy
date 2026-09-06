@@ -14,6 +14,7 @@
     },
     "android": {
       "package": "com.findgamebuddy.app",
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.findgamebuddy.app",
       "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#0B0B12",
@@ -31,6 +32,7 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
+      "react-native-nitro-google-signin",
       "expo-font",
       [
         "expo-splash-screen",

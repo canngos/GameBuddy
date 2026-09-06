@@ -61,6 +61,19 @@ export const tr: Dictionary = {
       forgot: 'Parolamı unuttum',
     },
 
+    social: {
+      or: 'veya',
+      google: 'Google ile giriş yap',
+      discord: 'Discord ile giriş yap',
+      consentTitle: 'Önce bir şey',
+      consentBody: 'Hesabını açabilmemiz için buna ihtiyacımız var.',
+      continue: 'Hesabımı oluştur',
+      finishing: 'Giriş tamamlanıyor',
+      googleUnavailable: 'Bu cihazda Google ile giriş kullanılamıyor',
+      emailUnverified: 'Önce o hesabın e-postasını doğrula, sonra tekrar dene',
+      failed: 'Giriş tamamlanmadı. Lütfen tekrar dene',
+    },
+
     register: {
       title: 'Hesabını oluştur',
       subtitle: 'Adresi doğrulamak için sana altı haneli bir kod göndereceğiz.',
@@ -92,7 +105,7 @@ export const tr: Dictionary = {
 
     forgot: {
       title: 'Parolanı sıfırla',
-      subtitle: 'Kaydolurken kullandığın e-postayı yaz, sana altı haneli bir kod gönderelim.',
+      subtitle: 'E-postana altı haneli bir kod göndereceğiz.',
       email: 'E-posta',
       submit: 'Kodu gönder',
       sentCodeBefore: 'Bu adrese ait bir hesap varsa altı haneli kod yolda:',
@@ -101,7 +114,7 @@ export const tr: Dictionary = {
       resetSubtitle: 'Eski parolayla giriş yapmış olan herkesin oturumu kapanır.',
       resetSubmit: 'Yeni parolayı kaydet',
       doneTitle: 'Yeni parolanla giriş yap',
-      doneBody: 'Eski parolayı kullanan bütün oturumlar kapandı; bu cihazda da, diğerlerinde de.',
+      doneBody: 'Her yerde oturumun kapatıldı.',
       signIn: 'Giriş yap',
     },
   },
@@ -112,8 +125,7 @@ export const tr: Dictionary = {
 
     profile: {
       title: 'Senin hakkında',
-      subtitle:
-        'GameBuddy yetişkinlere yöneliktir. Doğum tarihini 18 yaşında veya daha büyük olduğunu doğrulamak için kullanırız — kimseye gösterilmez.',
+      subtitle: 'GameBuddy 18+. Doğum tarihin kimseye gösterilmez.',
       ageHint: (n: number) => `${n} yaşında veya daha büyük olmalısın.`,
       countryRequired: 'Ülkeni seç',
       gender: 'Cinsiyet',
@@ -134,8 +146,7 @@ export const tr: Dictionary = {
 
     avatar: {
       title: 'Görünüşünü seç',
-      subtitle:
-        'İnsanların ilk gördüğü şey bu. Daha sonra profilinden gerçek bir fotoğraf yükleyebilirsin.',
+      subtitle: 'İnsanlar önce bunu görür. Sonra değiştirebilirsin.',
       pickOne: 'Devam etmek için birini seç.',
     },
 
@@ -147,8 +158,7 @@ export const tr: Dictionary = {
 
     platforms: {
       title: 'Nerede oynuyorsun?',
-      subtitle:
-        'Kullandığın her şeyi seç. Diğer oyuncular buna göre filtreliyor; ne kadar çok, o kadar iyi.',
+      subtitle: 'Kullandığın her şeyi seç. Diğerleri buna göre filtreler.',
     },
 
     keywords: {
@@ -211,10 +221,9 @@ export const tr: Dictionary = {
       soon: 'Şimdi',
       soonA11y: '15 dakika içinde başlıyor',
       emptySoonTitle: 'Şu anda başlayan yok',
-      emptySoonBlurb:
-        'Önümüzdeki 15 dakikada başlayan bir şey yok. Sonrası için planlananları görmek istersen Şimdi filtresini kapat.',
+      emptySoonBlurb: "Önümüzdeki 15 dakikada bir şey yok. Sonrakiler için Şimdi'yi kapat.",
       emptyToneTitle: 'Bu havada bir lobi yok',
-      emptyToneBlurb: 'Şu anda bu havada bir şey yok. Başka bir filtre dene veya kendi lobini aç.',
+      emptyToneBlurb: 'O tarzda bir şey yok. Başka filtre dene ya da kendin aç.',
       emptyTitle: 'Şu anda açık lobi yok',
       emptyBlurb: 'Bir tane aç, saatini belirle ve kimlerin katılacağını sen seç.',
     },
@@ -335,7 +344,7 @@ export const tr: Dictionary = {
 
     limit: {
       likesTitle: 'Bugünkü beğeniler bu kadar',
-      likesBody: 'Bakmaya ve geçmeye devam edebilirsin. Gold sınırı kaldırır.',
+      likesBody: 'Bakmaya ve geçmeye devam edebilirsin. Gold günlük sınırı kaldırır.',
       swipesTitle: 'Bugünkü kaydırmalar bu kadar',
       swipesBody: 'Deste yarın geri gelir. Gold günlük sınırı kaldırır.',
       goldTitle: 'GameBuddy Gold',
@@ -349,7 +358,7 @@ export const tr: Dictionary = {
             noCoinsTitle: 'Yeterli altın yok',
       noCoinsBody: 'Geri almak altın harcar. Mağazadan daha fazlasını kazanabilirsin.',
       nothingToRewindTitle: 'Geri alınacak bir şey yok',
-      nothingToRewindBody: 'Henüz kimseyi kaydırmadın — ya da o kart eşleşmeye dönüştü, o da geçerli.',
+      nothingToRewindBody: 'Geri alacak bir şey yok ya da o bir eşleşmeye dönüştü.',
       somethingWrongTitle: 'Bu işlem geçmedi',
       somethingWrongBody: 'Hiçbir şey değişmedi. Birazdan tekrar dene.',
       getCoins: 'Daha fazla altın al',
@@ -358,19 +367,15 @@ export const tr: Dictionary = {
 
     filters: {
       title: 'Filtreler',
-      subtitle: 'Desteyi gerçekten birlikte oynamak istediğin kişilere daralt.',
       subtitleLocked: 'Gold kapsamında. Ne yaptığına bir bak.',
       game: 'Oyun',
-      gameHint: 'Yalnızca bu oyunu oynayanlar.',
       gameHintEmpty: 'Filtrelemek için profiline oyun ekle.',
       anyGame: 'Herhangi bir oyun',
       region: 'Bölge',
-      regionHint: 'Aynı saat dilimi, aynı sunucular, aynı akşam.',
       regionHintEmpty: 'Filtrelemek için profilinde ülkeni belirle.',
       onlyIn: (country: string) => `Yalnızca ${country} oyuncuları`,
       onlyNearMe: 'Yalnızca yakınımdakiler',
       platform: 'Platform',
-      platformHint: 'Gerçekten aynı lobiye girebileceklerin.',
       anyPlatform: 'Herhangi bir platform',
       availability: 'Uygunluk',
       availabilityHint: 'Son 15 dakikada aktif.',
@@ -384,7 +389,7 @@ export const tr: Dictionary = {
 
     locked: {
       title: 'Filtreler Gold kapsamında',
-      blurb: 'Desteyi tek bir oyuna, bölgene veya şu anda çevrimiçi olanlara daralt.',
+      blurb: 'Oyuna, bölgeye veya şu an çevrimiçi olanlara göre süz.',
       getGold: 'Gold al',
       showEveryone: 'Bunun yerine herkesi göster',
     },
@@ -393,15 +398,14 @@ export const tr: Dictionary = {
       filteredTitle: 'Filtrelerine uyan herkes bu kadar',
       title: 'Şimdilik herkes bu kadar',
       filteredBlurb: 'Filtreleri genişletmek desteye daha fazla kişi getirir.',
-      blurb:
-        'Sürekli yeni oyuncular katılıyor; geçtiğin kişiler de bir süre sonra yeniden karşına çıkar.',
+      blurb: 'Sürekli yeni oyuncular katılıyor. Yakında tekrar bak.',
       lookAgain: 'Tekrar bak',
     },
   },
 
   billing: {
     promptTitle: 'İşe yarıyor',
-    promptBody: 'Biriyle eşleştin. Gold, bundan daha fazlasını istediğin zaman için.',
+    promptBody: 'Gold günlük sınırı kaldırır ve seni kimin beğendiğini gösterir.',
     benefitNoLimit: 'Günlük beğeni sınırı yok',
     benefitSeeLikes: 'Seni beğenen herkesi gör',
     benefitFilters: 'Desteyi oyuna, bölgeye ve çevrimiçi olanlara göre filtrele',
@@ -411,16 +415,15 @@ export const tr: Dictionary = {
     coinsAddedBody: 'Artık bakiyende.',
     goldYours: 'Gold senin',
     goldYoursBody: 'Günlük sınır yok, gelişmiş filtreler ve Gold çerçevesi.',
-    storeUnavailable: 'Bu sürümde satın alma henüz kullanılamıyor.',
-    storeNotInBuild:
-      'Bu sürüm satın alma yapamıyor. Uygulama içi satın almalar eklenmeden önce yüklenmiş.',
+    storeUnavailable: 'Satın alma şu anda kullanılamıyor.',
+    storeNotInBuild: "Satın almak için GameBuddy'yi Google Play'den güncelle.",
     storePlanMissing: 'Bu plan şu anda mevcut değil.',
   },
 
   market: {
     shop: {
       header: 'Mağaza',
-      title: 'Kendini göster',
+      title: 'Altın ve ekstralar',
       earnTab: 'Kazan',
       shopTab: 'Mağaza',
       framesAndBanners: 'Çerçeveler ve afişler',
@@ -445,7 +448,6 @@ export const tr: Dictionary = {
       previewOn: { FRAME: 'Avatarında', BANNER: 'Profilinde', THEME: 'Kartında' },
       themes: 'Temalar',
       bundles: 'Setler',
-      bundlesBlurb: 'Uyumlu bir set, parçalarını tek tek almaktan ucuz.',
       bundleParts: (n: number) => `ayrı ayrı ${n} jeton`,
       bundleSaving: (n: number) => `${n} kazan`,
       bundleTogether: 'Birlikte kullanıldığında',
@@ -466,19 +468,18 @@ export const tr: Dictionary = {
 
     earn: {
       header: 'Kazan',
-      blurb: 'Altınlar her gün geri gelir. Buradaki hiçbir şey para istemez.',
       earnedTitle: (n: number) => `+${n} altın`,
       earnedBody: 'Çerçevelere, afişlere veya beğenilere harca.',
       watchedBody: 'İzlediğin için teşekkürler.',
       rewardPendingTitle: 'Altınlar yolda',
       rewardPendingBody: 'Birazdan bakiyene tekrar bak.',
-      consentTitle: 'Videolar için reklam izni gerekiyor',
-      consentBody: 'Ayarlar → Reklam gizliliği bölümünden değiştirebilirsin.',
+      consentTitle: 'Reklamlar kapalı',
+      consentBody: 'Ayarlar → Reklam gizliliği bölümünden aç.',
       adFailedTitle: 'Şu anda video yok',
       adFailedBody: 'Gösterilecek bir şey bulunamadı. Birazdan tekrar dene.',
       watchVideo: 'Kısa bir video izle',
       videosLeft: (n: number) => `Bugün ${n} hakkın kaldı`,
-      videosDone: 'Bugünün videoları bu kadar — yarın yine gel',
+      videosDone: 'Bugünlük bu kadar. Yarın tekrar gel.',
       stipendTitle: 'Gold aylık ikramiyesi',
       stipendReady: 'Bu ay senin',
       stipendBack: (when: string) => `${when} geri gelir`,
@@ -532,11 +533,10 @@ export const tr: Dictionary = {
 
     consumables: {
       header: 'Altınlarını kullan',
-      blurb: 'Kullanınca harcanır; kalıcı olarak sende kalmaz.',
       superLike: 'Süper Beğeni',
       superLikeDetail: 'Karşı tarafa hemen bildirilir ve dikkat çeker.',
       extraLikes: 'Bugün 5 beğeni daha',
-      extraLikesDetail: 'Günlük sınırının üstüne. Yalnızca bugün için.',
+      extraLikesDetail: 'Günlük beğenilerinin üstüne. Yalnızca bugün.',
       itemA11y: (title: string, cost: number) => `${title}, ${cost} altın`,
       addedTitle: (title: string) => `${title} eklendi`,
       added: 'Eklendi',
@@ -546,21 +546,18 @@ export const tr: Dictionary = {
 
     coins: {
       header: 'Altın',
-      blurbBuy:
-        'Şimdi bakiye yükle veya Kazan sekmesinden ücretsiz kazan — günlük seri, görevler ve rozetler.',
-      blurbNoBuy:
-        'Kazan sekmesinden kazan: günlük seri, görevler ve rozetler. Bu sürümde satın alma henüz yok.',
+      blurbNoBuy: 'Satın alma şu anda kullanılamıyor. Kazan bölümünden altın kazanmaya devam edebilirsin.',
       packCoins: (n: string) => `${n} altın`,
-      takesYouTo: (n: string) => `Bakiyeni ${n} yapar`,
+      takesYouTo: (n: string) => `Yeni bakiye: ${n}`,
       packA11y: (coins: number, price: string) => `${coins} altını ${price} karşılığında satın al`,
       onTheWay: 'Altınların yolda',
-      onTheWayBody: 'Gelmesi biraz sürebilir. Tekrar satın almana gerek yok.',
+      onTheWayBody: 'Bu biraz sürebilir. Tekrar satın almana gerek yok.',
     },
 
     gold: {
       done: 'Tamam',
       continuePrice: (price: string) => `Devam — ${price}`,
-      unavailable: 'Satın alma henüz kullanılamıyor',
+      unavailable: 'Satın alma şu anda kullanılamıyor',
       notNow: 'Şimdi değil',
       heroThanks: "GameBuddy'yi desteklediğin için teşekkürler.",
       heroPitch: 'Uygulamanın tamamı, önünde hiçbir engel olmadan.',
@@ -581,10 +578,9 @@ export const tr: Dictionary = {
       noteYearly: '%58 tasarruf',
       billedEvery: (period: string) => `Her ${period} faturalandırılır`,
       purchasePending: 'Satın alman işleniyor',
-      purchasePendingBody:
-        'Gelmesi biraz sürebilir. Gold kendiliğinden açılacak — tekrar satın almana gerek yok.',
+      purchasePendingBody: 'Bu biraz sürebilir. Tekrar satın almana gerek yok.',
       cancelNote:
-        'İstediğin zaman mağaza hesabından iptal edebilirsin. Abonelik, iptal edene kadar yenilenir.',
+      "İstediğin zaman Google Play'den iptal edebilirsin. Abonelik, iptal edene kadar yenilenir.",
       member: 'Üyesin',
       runsUntil: (date: string) => `Üyeliğin ${date} tarihine kadar sürüyor.`,
       active: 'Üyeliğin etkin.',
@@ -601,12 +597,11 @@ export const tr: Dictionary = {
 
     inventory: {
       title: 'Envanter',
-      subtitle: 'Sahip oldukların ve şu an taktıkların',
       nothingYet: { FRAME: 'Henüz çerçeve yok', BANNER: 'Henüz afiş yok', THEME: 'Henüz tema yok' },
       emptyBlurb: {
-        FRAME: 'Mağazadan aldığın her şey buraya gelir. Ücretsiz çerçeveler zaten senin.',
-        BANNER: 'Mağazadan aldığın her şey buraya gelir. Ücretsiz afişler zaten senin.',
-        THEME: 'Mağazadan aldığın her şey buraya gelir.',
+        FRAME: 'Satın aldığın her şey buraya gelir.',
+        BANNER: 'Satın aldığın her şey buraya gelir.',
+        THEME: 'Satın aldığın her şey buraya gelir.',
       },
       kindLabel: { FRAME: 'Çerçeve', BANNER: 'Afiş', THEME: 'Kart teması' },
       goToMarket: 'Mağazaya git',
@@ -619,7 +614,6 @@ export const tr: Dictionary = {
 
     badges: {
       title: 'Rozetler',
-      subtitle: 'Görevleri bitir, altınları al, üçünü sergile',
       showcaseFull: (slots: number) => `${slots} rozet sergileyebilirsin. Önce birini kaldır.`,
       earned: 'Kazanıldı',
       tileA11y: (title: string, status: string) => `${title}. ${status}`,
@@ -681,6 +675,7 @@ export const tr: Dictionary = {
     games: 'Oyunlar',
     playsOn: 'Platformları',
     keywords: 'Oyun tarzı',
+    linkedVerified: (provider: string) => `${provider} doğrulandı`,
     friendRequestsShort: 'Arkadaşlık istekleri',
     acceptRequestA11y: (name: string) => `${name} adlı kişinin isteğini kabul et`,
     declineRequestA11y: (name: string) => `${name} adlı kişinin isteğini reddet`,
@@ -689,10 +684,9 @@ export const tr: Dictionary = {
 
     friendsTitle: 'Arkadaşlar',
     noFriendsTitle: 'Henüz arkadaş yok',
-    noFriendsBody: 'Biriyle eşleştikten sonra onu arkadaş olarak ekleyebilirsin.',
+    noFriendsBody: 'Eşleştikten sonra arkadaş ekleyebilirsin.',
     removeConfirmTitle: (name: string) => `${name} kaldırılsın mı?`,
-    removeConfirmBody:
-      'Yeniden eşleşme durumuna dönerler — hâlâ mesajlaşabilirsiniz ve ikiniz de yeni bir arkadaşlık isteği gönderebilirsiniz.',
+    removeConfirmBody: 'Eşleşmeniz kalır ve mesajlaşmaya devam edebilirsiniz.',
     thisGamer: 'bu oyuncu',
 
     fallbackTitle: 'Profil',
@@ -702,8 +696,7 @@ export const tr: Dictionary = {
     reportProfile: 'Profili bildir',
     block: 'Engelle',
     blockConfirmTitle: (name: string) => `${name} engellensin mi?`,
-    blockConfirmBody:
-      'Uygulamanın hiçbir yerinde birbirinizi görmezsiniz ve ikiniz de birbirinize mesaj gönderemezsiniz. Bunu Ayarlar bölümünden geri alabilirsin.',
+    blockConfirmBody: "Birbirinizi bir daha görmezsiniz. Ayarlar'dan geri alabilirsin.",
 
     moreActionsA11y: 'Diğer işlemler',
     matchBack: 'Sen de beğen',
@@ -714,14 +707,13 @@ export const tr: Dictionary = {
     acceptRequest: 'İsteği kabul et',
     withdrawRequest: 'İsteği geri çek',
     withdrawConfirmTitle: (name: string) => `${name} adlı kişiye gönderdiğin istek geri çekilsin mi?`,
-    withdrawConfirmBody: 'İstek karşı tarafta görünmez olur. İstediğin zaman yenisini gönderebilirsin.',
+    withdrawConfirmBody: 'Artık görmezler. Daha sonra yenisini gönderebilirsin.',
 
     admirersTitle: 'Seni kimler beğendi',
     peopleLikeYou: (n: number) => (n === 1 ? 'kişi seni beğendi' : 'kişi seni beğendi'),
     upgradeToSee: ' — kimler olduğunu görmek için yükselt',
     admirersEmptyTitle: 'Henüz kimse yok',
-    admirersEmptyBody:
-      'Biri seni beğendiğinde, sen onu beğenmiş olsan da olmasan da burada görünür.',
+    admirersEmptyBody: 'Seni beğenenler burada görünür.',
     revealing: 'Açılıyor…',
     revealOne: (cost: number) => `${cost} altına birini aç`,
     orGold: 'Ya da Gold al: her yüz ve günlük beğeni sınırı yok.',
@@ -745,6 +737,8 @@ export const tr: Dictionary = {
     platforms: 'Platformlar',
     platformsUnset: 'Belirlenmedi — diğer oyuncular buna göre filtreliyor',
     keywords: 'Oyun tarzı',
+    linkedAccounts: 'Bağlantılar',
+    linkedAccountsUnset: 'Bağlı değil — sana nereden ulaşacaklarını göster',
     selected: (n: number) => `${n} seçili`,
     themeSystem: 'Sistem',
     themeSystemHint: 'Telefonunu izle',
@@ -752,11 +746,13 @@ export const tr: Dictionary = {
     themeLightHint: 'Her zaman açık',
     themeDark: 'Koyu',
     themeDarkHint: 'Her zaman koyu',
-    themeNote: 'Tema hemen uygulanır ve bu cihazda hatırlanır.',
+    themeNote: 'Bu cihazda hatırlanır.',
     notificationsRow: 'Sana ne gönderiyoruz',
     notificationsHint: 'Mesajlar, eşleşmeler, hatırlatmalar',
     tutorial: 'Tanıtımı tekrar göster',
-    tutorialHint: 'Beş sekmeyi tek tek gezer',
+    tutorialHint: 'Beş sekmeyi gezer ve ipuçlarını geri getirir',
+    rate: 'GameBuddy’yi puanla',
+    rateHint: 'Google Play’i açar',
     terms: 'Kullanım Koşulları',
     termsHint: 'İçerik ve davranış kurallarını da içerir',
     privacy: 'Gizlilik Politikası',
@@ -765,6 +761,9 @@ export const tr: Dictionary = {
     adPrivacyHint: 'Reklamların senin hakkında neleri kullanabileceğini değiştir',
     password: 'Parola',
     passwordHint: 'Seni her yerden çıkış yaptırır',
+    passwordSet: 'Şifre belirle',
+    passwordSetHint: 'Google veya Discord olmadan da girebilmen için',
+    deleteReauth: 'Onaylamak için tekrar giriş yap, sonra buraya dön.',
     blocked: 'Engellenenler',
     blockedHint: 'Kimleri engelledin',
     promo: 'Promosyon kodları',
@@ -795,8 +794,7 @@ export const tr: Dictionary = {
     notificationsScreen: {
       title: 'Bildirimler',
       offTitle: 'GameBuddy bildirimleri kapalı',
-      offBody:
-        'Android bildirimleri engelliyor; yeniden açılana kadar aşağıdakilerin hiçbiri sana ulaşamaz.',
+      offBody: 'Android engelliyor. Aşağıdakilerin hiçbiri sana ulaşamaz.',
       turnOn: 'Bildirimleri aç',
       openSystem: 'Sistem ayarlarını aç',
       whatToSend: 'Neler gönderilsin',
@@ -805,16 +803,14 @@ export const tr: Dictionary = {
       socialTitle: 'Eşleşmeler ve arkadaşlar',
       socialBody: 'Yeni eşleşmeler, arkadaşlık istekleri ve yanıtları, lobi hareketleri, kazandığın rozetler.',
       remindersTitle: 'Hatırlatmalar',
-      remindersBody: 'Uzak kaldığında ve seni bekleyen bir şey olduğunda ara sıra bir dürtme.',
-      quietNote:
-        'Buradaki her şeyi kapatmak, uygulamanın bildirimlerini tamamen kapatmadan sessiz tutar — sonradan açtıkların çalışmaya devam eder.',
+      remindersBody: 'Seni bekleyen bir şey olduğunda hatırlatma.',
+      quietNote: 'Bunları istediğin zaman tekrar açabilirsin.',
       onThisPhone: 'Bu telefonda',
       soundsTitle: 'Sesler',
-      soundsBody: 'Uygulamada bir şey olduğunda kısa bir ses — eşleşme, satın alma, mesaj.',
+      soundsBody: 'Eşleşme, mesaj ve satın alma için kısa bir ses.',
       vibrationTitle: 'Titreşim',
       vibrationBody: 'Kaydırmada, eşleşmede veya satın almada kısa bir titreşim.',
-      cuesNote:
-        'Sesler sessiz moddayken asla çalmaz ve dinlediğin müziği asla kesmez.',
+      cuesNote: 'Sessiz moda uyar. Müziği kesmez.',
     },
 
     avatarScreen: {
@@ -830,31 +826,24 @@ export const tr: Dictionary = {
       cropHint: 'Taşımak için sürükle, yakınlaştırmak için sıkışttır.',
       cropConfirm: 'Bu fotoğrafı kullan',
       cropFailed: 'Bu görsel kırpılamadı. Başka birini dene.',
-      privacyNote:
-        'Fotoğrafın başkaları görmeden önce kontrol edilir ve konum bilgileri otomatik olarak kaldırılır.',
+      privacyNote: 'Kimse görmeden kontrol edilir. Konum verisi silinir.',
       orOurs: 'Ya da bizimkilerden birini seç',
-      cameraDenied:
-        'GameBuddy izin olmadan kamerayı açamıyor. Telefonunun ayarlarından izin verebilir, mevcut bir fotoğraf seçebilir veya aşağıdan bizimkilerden birini seçebilirsin.',
-      photosDenied:
-        'GameBuddy izin olmadan fotoğraflarına erişemiyor. Telefonunun ayarlarından izin verebilir, fotoğraf çekebilir veya aşağıdan bizimkilerden birini seçebilirsin.',
-      tooLarge: (sizeMb: string, limitMb: number) =>
-        `Bu dosya ${sizeMb}MB; sınır ${limitMb}MB. Kamera rulondan gelen her şey bunun epey altındadır.`,
+      cameraDenied: 'Kamera erişimi kapalı. Telefon ayarlarından aç veya bir fotoğraf seç.',
+      photosDenied: 'Fotoğraf erişimi kapalı. Telefon ayarlarından aç veya fotoğraf çek.',
+      tooLarge: (sizeMb: string, limitMb: number) => `Bu dosya ${sizeMb}MB. Sınır ${limitMb}MB.`,
       approvedTitle: 'Artık avatarın bu',
       approvedBody: 'Herkes görebilir.',
       pendingTitle: 'Kontrol edilmeyi bekliyor',
-      pendingBody:
-        'Birazdan biri bakacak. O zamana kadar yalnızca sen görebilirsin — herkes hâlâ eski avatarını görüyor.',
+      pendingBody: 'Onaylanana kadar sadece sen görürsün.',
       rejectedTitle: 'Bu fotoğraf kabul edilmedi',
-      rejectedBody:
-        'Cinsel içerik kurallarını ihlal ediyor gibi görünüyor. Başka kimse görmedi. Başka bir fotoğraf dene veya bizimkilerden birini seç.',
+      rejectedBody: 'Cinsel içerik kurallarını ihlal ediyor. Başka kimse görmedi.',
     },
 
     age: {
       title: 'Doğum tarihi',
-      subtitle:
-        'Burada olacak yaşta olduğunu doğrulamak için kullanılır. Diğerleri yaşını görür, tarihi asla.',
+      subtitle: 'Diğerleri yaşını görür, tarihi değil.',
       recordedNote: (min: number) =>
-        `Doğum tarihi değişiklikleri kaydedilir. GameBuddy yalnızca yetişkinler içindir; seni ${min} yaşının altına düşüren bir tarih reddedilir.`,
+        `Değişiklikler kaydedilir. ${min} yaş altındaki bir tarih reddedilir.`,
     },
 
     keywordsScreen: {
@@ -864,16 +853,40 @@ export const tr: Dictionary = {
 
     platformsScreen: {
       title: 'Nerede oynuyorsun',
-      subtitle: 'Kullandığın her şeyi seç. Diğer oyuncular buna göre filtreliyor; ne kadar çok, o kadar iyi.',
+      subtitle: 'Kullandığın her şeyi seç. Diğerleri buna göre filtreler.',
+    },
+
+    linkedScreen: {
+      title: 'Bağlantılar',
+      subtitle: 'Seni GameBuddy dışında nerede bulacaklarını göster.',
+      notLinked: (provider: string) => `${provider} bağlı değil`,
+      notLinkedHint: (provider: string) => `Bir kez ${provider} ile giriş yap, adın profilinde görünsün.`,
+      link: (provider: string) => `${provider} bağla`,
+      signInWithDiscord: 'Discord ile giriş yap',
+      unlink: (provider: string) => `${provider} bağlantısını kaldır`,
+      linkedAs: (provider: string) => `${provider} ile doğrulandı`,
+      verifiedNoHandle: 'Doğrulandı',
+      handleWithheld: 'Oradaki adın gösterilemiyor ama hesap doğrulandı.',
+      visibilityMatches: 'Eşleşmeler ve arkadaşlar',
+      visibilityMatchesHint: 'Yalnızca eşleştiğin kişiler görebilir',
+      visibilityPublic: 'Herkes',
+      visibilityPublicHint: 'Profilini açan herkes görebilir',
+      linkedToast: 'Hesap bağlandı',
+      alreadyLinked: 'Bu hesap zaten alınmış',
+      alreadyLinkedBody: 'Başka bir GameBuddy profiline bağlı. Önce oradan kaldır.',
+      failed: 'Bu işe yaramadı. Lütfen tekrar dene.',
     },
 
     passwordScreen: {
+      setTitle: 'Şifre belirle',
+      setSubtitle: 'E-posta adresinle de giriş yapabilmen için.',
+      setDoneTitle: 'Şifre belirlendi',
+      setDoneBody: 'Artık e-posta adresinle giriş yapabilirsin.',
       title: 'Parolayı değiştir',
       subtitle: 'Bu, bu cihaz dahil her cihazda oturumunu kapatır.',
       changedTitle: 'Parola değiştirildi',
       signedOutTitle: 'Her yerden çıkış yapıldı',
-      signedOutBody:
-        'Parolanı değiştirmek bu cihazdaki ve diğerlerindeki tüm oturumları sonlandırır. Bu bilinçli bir tercih — eski parolan başkasının elindeyse, o da dışarıda kaldı.',
+      signedOutBody: 'Bu cihaz ve diğer tüm cihazlar oturumdan çıkarıldı.',
       signInAgain: 'Yeniden giriş yap',
       current: 'Mevcut parola',
       next: 'Yeni parola',
@@ -882,7 +895,7 @@ export const tr: Dictionary = {
     },
 
     blockedScreen: {
-      body: 'Engelleme iki yönlü çalışır ve her şeyi kapsar: onlar sana gösterilmez, sen onlara gösterilmezsin ve ikiniz de birbirinize mesaj gönderemezsiniz.',
+      body: 'Birbirinizi görmez ve mesajlaşamazsınız.',
       emptyTitle: 'Kimse engellenmemiş',
       emptyBody: 'Gerekirse birini profilinden engelleyebilirsin.',
       unblock: 'Engeli kaldır',
@@ -890,8 +903,7 @@ export const tr: Dictionary = {
     signOut: 'Çıkış yap',
     deleteAccount: 'Hesabımı sil',
     deleteTitle: 'Bu geri alınamaz',
-    deleteBody:
-      'Profilin, eşleşmelerin ve mesajların kaldırılır. Onaylamak için parolanı gir — çalınmış bir telefon bunun için yeterli olmamalı.',
+    deleteBody: 'Profilin, eşleşmelerin ve mesajların silinir.',
     keepAccount: 'Hesabımı tut',
   },
 
@@ -902,7 +914,7 @@ export const tr: Dictionary = {
     hidePasswordA11y: 'Parolayı gizle',
     reportProfileTitle: 'Bu profili bildir',
     reportMessageTitle: 'Bu mesajı bildir',
-    reportBlurb: 'Bir moderatör inceleyecek. Aynı şeyi yalnızca bir kez bildirebilirsin.',
+    reportBlurb: 'Bir moderatör inceleyecek.',
     reportCancelA11y: 'Bildirimi iptal et',
     reasonHarassment: 'Taciz veya kötü davranış',
     reasonSexual: 'Cinsel içerik',
@@ -916,15 +928,15 @@ export const tr: Dictionary = {
     network: "GameBuddy'ye ulaşılamadı. Bağlantını kontrol edip tekrar dene.",
     sessionExpired: 'Oturumun sona erdi. Lütfen tekrar giriş yap.',
     forbidden: 'Buna erişimin yok.',
-    emptyResponse: 'Sunucu boş bir yanıt döndürdü.',
-    unexpectedResponse: 'Sunucu beklenmedik bir yanıt döndürdü.',
+    emptyResponse: 'Bir şeyler ters gitti. Lütfen tekrar dene.',
+    unexpectedResponse: 'Bir şeyler ters gitti. Lütfen tekrar dene.',
     byCode: {
       '101': 'Bu e-postayla zaten bir hesap var.',
       '103': 'Hesap bulunamadı.',
       '105': 'Bu kod doğru değil.',
       '106': 'Bu hesap henüz doğrulanmadı.',
       '107': 'Bu kullanıcı adı alınmış.',
-      '108': 'Kullanıcı adı veya parola hatalı.',
+      '108': 'Kullanıcı adı veya şifre yanlış. Google ya da Discord ile kaydolduysan o düğmeyi kullan.',
       '113': 'Bu hesap engellenmiş.',
       '121': 'Bu oyuncu seni engellemiş.',
       '186': 'Bu oyuncuyu engelledin, bu yüzden mesaj gönderemezsin.',
@@ -954,6 +966,12 @@ export const tr: Dictionary = {
       '194': 'Bu kod başka bir hesaba gönderildi.',
       '195': 'Bu adda bir kod zaten var.',
       '196': 'Bu hesap kod alamaz.',
+      '200': 'Bu giriş doğrulanamadı. Lütfen tekrar dene.',
+      '201': 'Önce o hesabın e-postasını doğrula, sonra tekrar dene.',
+      '202': 'Bu hesabın henüz şifresi yok. Ayarlar\'dan bir şifre belirle.',
+      '203': 'Bu hesabın zaten bir şifresi var.',
+      '204': 'Tek giriş yöntemini kaldırmadan önce bir şifre belirle.',
+      '205': 'Bunu onaylamak için tekrar giriş yap.',
     },
   },
 
@@ -1044,8 +1062,7 @@ export const tr: Dictionary = {
   notifications: {
     header: 'Bildirimler',
     primerTitle: 'İyi kısmı kaçırma',
-    primerBody:
-      'GameBuddy diğer insanlar demek. Burada olanların çoğu uygulama kapalıyken olur.',
+    primerBody: 'Olanların çoğu uygulama kapalıyken oluyor.',
     reasonMatchTitle: 'Eşleştiğinde',
     reasonMatchBody: 'İkiniz de evet dediniz — konuşma tam o anda başlayabilir.',
     reasonMessageTitle: 'Biri sana mesaj gönderdiğinde',
@@ -1057,27 +1074,52 @@ export const tr: Dictionary = {
     changeLater: 'Bunu istediğin zaman Ayarlar’dan değiştirebilir ve hangi türleri istediğini seçebilirsin.',
   },
 
+  hints: {
+    gotIt: 'Anlaşıldı',
+    swipe: {
+      right: 'Birlikte oynamak için sağa kaydır',
+      left: 'Geçmek için sola kaydır',
+      up: 'Süper Beğeni için yukarı kaydır',
+    },
+    filter: {
+      title: 'Desteyi daralt',
+      body: 'Oyuna, platforma veya ülkeye göre süz. Bazı filtreler Gold ile gelir.',
+    },
+    superLike: {
+      title: 'Süper Beğeni',
+      body: 'Karşı taraf anında haberdar olur.',
+    },
+    lobbyCreate: {
+      title: 'Lobi aç',
+      body: 'Oyunu ve saati yaz, kimlerin katılacağını seç. Lobi açmak Gold ile gelir.',
+    },
+    chatComposer: {
+      title: 'Hangi oyun, ne zaman',
+      body: 'Bir oyun ve saat öner.',
+    },
+  },
+
   tutorial: {
     steps: {
       home: {
         title: 'Birlikte oynayacak birini bul',
-        body: 'Senin oynadıklarını oynayan oyuncular arasında kaydır. Birlikte oynamak istersen sağa, istemezsen sola. İkiniz de sağa kaydırınca eşleşirsiniz. Süper Beğeni göndermek için yukarı kaydır — karşı taraf anında haberdar olur.',
+        body: 'Birlikte oynamak için sağa, geçmek için sola kaydır. Süper Beğeni için yukarı.',
       },
       messages: {
         title: 'Eşleşmelerinle konuş',
-        body: 'Eşleşmek özel bir sohbet açar. İkiniz de kabul etmedikçe kimse sana mesaj gönderemez ve bir konuşmanın içinden herkesi engelleyebilir veya bildirebilirsin.',
+        body: 'Eşleşme özel bir sohbet açar. Oradan engelleyebilir veya bildirebilirsin.',
       },
       lobby: {
         title: 'Bir lobide takım kur',
-        body: 'Açık lobiler oyuncu arayan oyunlardır — oyun, saat ve hava kartın üzerindedir. Katılmak iste; takımı sahibi seçer. Kendi lobini açmak Gold ile gelir.',
+        body: 'Lobiler oyuncu arayan oyunlardır. Katılmak iste ya da Gold ile kendi lobini aç.',
       },
       market: {
         title: 'Profilini kendin yap',
-        body: 'Profilin için çerçeveler ve afişler, bitirirsen ekstra günlük beğeniler. Buradaki her şey isteğe bağlı — uygulama hiçbir şey harcamadan da çalışır.',
+        body: 'Profilin için çerçeveler, bannerlar ve ekstra beğeniler. Hepsi isteğe bağlı.',
       },
       profile: {
         title: 'Profilin ve geri kalan her şey',
-        body: 'Oyunların, oyun tarzın, arkadaşların ve rozetlerin. Ayarlar dişlinin arkasında; istersen bu tanıtım da orada.',
+        body: 'Oyunların, rozetlerin ve arkadaşların. Ayarlar dişli simgesinin arkasında.',
       },
     },
     stepOf: (n: number, total: number) => `${n} / ${total}`,
@@ -1092,7 +1134,7 @@ export const tr: Dictionary = {
 
   errorScreen: {
     title: 'GameBuddy bir sorunla karşılaştı',
-    blurb: 'Bu bir uygulama hatası; senin yaptığın bir şey değil. Aşağıdaki ayrıntılar, düzeltmemiz için gereken bilgiler.',
+    blurb: 'Bu bir uygulama hatası, senin bir hatan değil.',
     copyHint: 'Yukarıdaki metin seçilip kopyalanabilir.',
   },
 };

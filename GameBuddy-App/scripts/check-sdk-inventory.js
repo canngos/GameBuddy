@@ -89,6 +89,20 @@ const CLASSIFIED = {
   'expo-linear-gradient': { collects: false, sends: 'Visual effect' },
   'expo-router': { collects: false, sends: 'Navigation' },
   'expo-splash-screen': { collects: false, sends: 'Launch screen' },
+  // Hands the review card to the Play Store app, which then talks to Google on its own
+  // account. Nothing about the gamer crosses this boundary -- the app cannot even find
+  // out whether the card appeared, let alone what was written on it.
+  'expo-store-review': { collects: false, sends: 'Asks the Play Store app to show its review card' },
+  // Google's own sign-in, through Android's Credential Manager. It sends the account the
+  // person picks -- their Google email, name and profile picture URL, inside a signed ID
+  // token -- to Google, and hands the token back to us. Only on a tap, and only what the
+  // `openid email profile` scopes cover; no contacts, no Drive, nothing continuous.
+  'react-native-nitro-google-signin': {
+    collects: true,
+    sends: 'Google account email, name and photo URL to Google, when the user taps Sign in with Google',
+  },
+  // The bridge the package above is built on. Native plumbing; talks to nothing itself.
+  'react-native-nitro-modules': { collects: false, sends: 'Native module bridge' },
   'expo-status-bar': { collects: false, sends: 'Status bar styling' },
   'expo-system-ui': { collects: false, sends: 'System UI styling' },
   'lucide-react-native': { collects: false, sends: 'Icons' },

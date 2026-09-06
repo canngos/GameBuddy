@@ -11,6 +11,7 @@ import type {
   GamerSummary,
   InboxEntry,
 } from '../../../src/api/types';
+import { useCoachmarkTarget } from '../../../src/hints/coachmark';
 import { useConversation } from '../../../src/chat/useConversation';
 import type { Dictionary } from '../../../src/i18n/dictionaries/en';
 import { useT } from '../../../src/i18n/useT';
@@ -118,6 +119,14 @@ export default function Chat() {
   const report = useMutation({
     mutationFn: (messageId: string) => chatApi.report(messageId),
   });
+
+  // What to actually say, on the first conversation somebody opens. Held back while the
+  // thread is still loading, and once there is a draft: somebody who is already typing
+  // has worked out what the box is for.
+  const { attach: attachComposerHint } = useCoachmarkTarget(
+    'chat.composer',
+    !chat.isLoading && !chat.error && draft.length === 0,
+  );
 
   function submit() {
     const text = draft.trim();
@@ -265,7 +274,11 @@ export default function Chat() {
         </View>
       )}
 
-      <View className="flex-row items-end gap-2 border-t border-line p-3">
+      <View
+        ref={attachComposerHint}
+        collapsable={false}
+        className="flex-row items-end gap-2 border-t border-line p-3"
+      >
         <View className="flex-1">
           <TextField
             value={draft}

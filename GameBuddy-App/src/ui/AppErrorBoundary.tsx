@@ -15,7 +15,7 @@ function boundaryCopy() {
   } catch {
     return {
       title: 'GameBuddy hit a problem',
-      blurb: 'This is a bug, not something you did. The details below are what we need to fix it.',
+      blurb: 'This is a bug, not something you did.',
       copyHint: 'The text above can be selected and copied.',
       retry: 'Try again',
     };
