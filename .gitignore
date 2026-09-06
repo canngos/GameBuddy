@@ -65,3 +65,6 @@ Thumbs.db
 backups/
 
 SECURITY_REVIEW.md
+
+# Scratch output from the Artifact tooling, never part of the project.
+.artifact-build/
