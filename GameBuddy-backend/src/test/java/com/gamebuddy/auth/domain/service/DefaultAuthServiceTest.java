@@ -93,6 +93,19 @@ class DefaultAuthServiceTest {
     @Mock
     private ObjectStorage objectStorage;
 
+    @Mock
+    private GamerAuthIdentityRepository authIdentityRepository;
+
+    /**
+     * The session writer, mocked.
+     *
+     * <p>Every new constructor dependency of {@code DefaultAuthService} has to appear here:
+     * {@code @InjectMocks} silently passes null for anything it has no mock for, and the
+     * failure is an NPE inside the method under test rather than a wiring error.
+     */
+    @Mock
+    private SessionIssuer sessionIssuer;
+
     /**
      * The production bean, built from the real configuration rather than re-declared here.
      * A hand-copied set of budgets drifts from the ones that actually ship the moment
@@ -138,6 +151,10 @@ class DefaultAuthServiceTest {
         // moment it began, a refresh passes the moment the session originally began.
         when(jwtService.generateToken(any(), any())).thenReturn(TOKEN);
         when(jwtService.extractExpiration(anyString())).thenReturn(Instant.now().plus(Duration.ofDays(7)));
+        // Issuing moved into SessionIssuer, which social sign-in shares. What these tests
+        // care about is the token that comes back, not the row it writes.
+        when(sessionIssuer.issue(any())).thenReturn(TOKEN);
+        when(sessionIssuer.issue(any(), any())).thenReturn(TOKEN);
     }
 
     /** The stand-in for bcrypt output in these tests; see {@link #liveCode}. */
@@ -253,18 +270,17 @@ class DefaultAuthServiceTest {
         }
 
         @Test
-        @DisplayName("the session row stores a hash, never the bearer token itself")
-        void testLogin_persistsHashedSessionNotRawToken() {
+        @DisplayName("a successful login issues a session, starting its clock now")
+        void testLogin_issuesASession() {
             when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
 
             authService.login(request(EMAIL, GOOD_PASSWORD));
 
-            ArgumentCaptor<Session> captor = ArgumentCaptor.forClass(Session.class);
-            verify(sessionRepository).save(captor.capture());
-            Session saved = captor.getValue();
-            assertNotEquals(TOKEN, saved.getTokenHash());
-            assertEquals(64, saved.getTokenHash().length(), "SHA-256 hex is 64 chars");
-            verify(sessionRepository).deleteAllByEmail(EMAIL);
+            // What the row looks like — a hash, one per account — is SessionIssuer's
+            // business now, and SessionIssuerTest asserts it there. What matters here is
+            // that a login goes through the one-argument form, which starts a fresh
+            // session rather than extending an old one.
+            verify(sessionIssuer).issue(gamer);
         }
 
         /** What a failed attempt answers with while there is still budget left. */
@@ -1293,6 +1309,71 @@ class DefaultAuthServiceTest {
             ArgumentCaptor<ProfileChangedEvent> captor = ArgumentCaptor.forClass(ProfileChangedEvent.class);
             verify(events).publishEvent(captor.capture());
             assertEquals(gamer.getUserId(), captor.getValue().userId());
+        }
+    }
+
+    @Nested
+    @DisplayName("accounts with no password")
+    class Passwordless {
+
+        @BeforeEach
+        void signedUpWithGoogle() {
+            gamer.setPwd(null);
+            when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+        }
+
+        @Test
+        @DisplayName("a password login is refused exactly like a wrong password")
+        void loginRefusedWithoutAnOracle() {
+            LoginRequest login = new LoginRequest();
+            login.setUsernameOrEmail(EMAIL);
+            login.setPassword(GOOD_PASSWORD);
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.login(login));
+
+            // Not "this account uses Google": that would be an enumeration oracle. The app's
+            // text for 108 already tells people to try the social buttons.
+            assertEquals(108, ex.getTransactionCode().getId());
+            // Short-circuited before the manager, which would log a warning about a null hash.
+            verifyNoInteractions(authenticationManager);
+        }
+
+        @Test
+        @DisplayName("changing a password there is none of says so")
+        void changeRefused() {
+            ChangePwdRequest req = new ChangePwdRequest();
+            req.setCurrentPassword("anything");
+            req.setPassword("N3wPassw0rd");
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.changePwd(gamer, req));
+            assertEquals(202, ex.getTransactionCode().getId(), "PASSWORD_NOT_SET");
+        }
+
+        @Test
+        @DisplayName("setting a first one works, and does not sign every device out")
+        void setPassword() {
+            when(passwordEncoder.encode(anyString())).thenReturn("encoded-new");
+            SetPasswordRequest req = new SetPasswordRequest();
+            req.setPassword("N3wPassw0rd");
+
+            authService.setPassword(gamer, req);
+
+            assertEquals("encoded-new", gamer.getPwd());
+            // Unlike a change: this is somebody adding a way in, not reacting to a
+            // compromise, and ending every session would punish the safe behaviour.
+            verify(sessionRepository, never()).deleteAllByEmail(anyString());
+        }
+
+        @Test
+        @DisplayName("setting one twice is refused")
+        void setPasswordTwice() {
+            gamer.setPwd("encoded");
+            SetPasswordRequest req = new SetPasswordRequest();
+            req.setPassword("N3wPassw0rd");
+
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.setPassword(gamer, req));
+            assertEquals(203, ex.getTransactionCode().getId(), "PASSWORD_ALREADY_SET");
         }
     }
 

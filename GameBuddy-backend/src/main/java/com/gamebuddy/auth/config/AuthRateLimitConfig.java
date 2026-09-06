@@ -107,9 +107,43 @@ public class AuthRateLimitConfig {
      */
     private Budget resetPassword = Budget.of(20, Duration.ofMinutes(15));
 
+    /**
+     * Link attempts against Discord, per account.
+     *
+     * <p>The only budget here on an authenticated endpoint, so it is not standing between
+     * anybody and a credential — the JWT already did that. What it stops is one account
+     * minting link tickets in a loop, each of which is a database row and an outbound request
+     * to somebody else's service.
+     *
+     * <p>Generous, because linking is genuinely fiddly the first time: a consent screen
+     * abandoned, a wrong Discord account signed in, then the right one. Ten in a
+     * quarter of an hour is well past that and nowhere near worth scripting.
+     */
+    private Budget link = Budget.of(10, Duration.ofMinutes(15));
+
+    /**
+     * Social sign-in attempts, keyed by a hash of the credential presented.
+     *
+     * <p>Unauthenticated, like the four above it, but guarding something different: a
+     * Google ID token is not guessable, so this is not standing between anybody and a
+     * credential. What it stops is a client stuck in a retry loop calling Google's key
+     * endpoint and this database through us.
+     *
+     * <p>Generous for that reason, and because one honest sign-in can legitimately be two
+     * calls: a brand-new account is refused the first time for the terms, and the app
+     * retries the same token once the box is ticked. Thirty is fifteen of those.
+     */
+    private Budget social = Budget.of(30, Duration.ofMinutes(15));
+
     @Bean
     public AuthRateLimiters authRateLimiters() {
-        return new AuthRateLimiters(verify.limiter(), sendCode.limiter(), login.limiter(), resetPassword.limiter());
+        return new AuthRateLimiters(
+                verify.limiter(),
+                sendCode.limiter(),
+                login.limiter(),
+                resetPassword.limiter(),
+                link.limiter(),
+                social.limiter());
     }
 
     @Component

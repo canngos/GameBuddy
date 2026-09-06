@@ -285,6 +285,77 @@ public enum TransactionCode {
     /** An administrator assigned a code to an account that is gone, banned, or staff. */
     PROMO_USER_NOT_FOUND(196, "That account cannot receive a code", HttpStatus.NOT_FOUND),
 
+    /**
+     * The Discord account presented is already linked to a different gamer.
+     *
+     * <p>Refused rather than moved, and this is the constraint that makes verification mean
+     * anything: without it one proof of ownership could be replayed onto every account
+     * somebody controls, which is the impersonation the whole flow exists to prevent.
+     *
+     * <p>Its own code because the remedy is specific and the user can act on it — unlink it
+     * from the other account, or sign in to the right one. "Something went wrong" would send
+     * them round the consent screen again to fail identically.
+     */
+    ACCOUNT_ALREADY_LINKED(197, "That account is already linked to another gamer", HttpStatus.CONFLICT),
+
+    /** Unlinking or changing visibility on a provider that was never linked. */
+    ACCOUNT_NOT_LINKED(198, "No linked account for that provider", HttpStatus.NOT_FOUND),
+
+    /**
+     * The provider round-trip did not complete.
+     *
+     * <p>Deliberately one code for every way it can fail — an expired ticket, a refused
+     * exchange, a provider that would not vouch for the assertion, Discord being down. The user's next
+     * move is the same in all of them (start again), none of the distinctions are actionable,
+     * and describing which check failed to whoever is holding a forged callback is free help
+     * for them. The specifics are logged.
+     */
+    ACCOUNT_LINK_FAILED(199, "That link could not be completed. Please try again", HttpStatus.BAD_REQUEST),
+
+    /**
+     * The Google or Discord identity presented could not be verified.
+     *
+     * <p>One code for a malformed token, an expired one, a signature that does not check out
+     * against the provider's keys, and an audience meant for a different application. The
+     * caller's move is the same in every case, and telling somebody holding a forged token
+     * which check refused them is free help for them.
+     */
+    SOCIAL_TOKEN_INVALID(200, "That sign-in could not be verified. Please try again", HttpStatus.UNAUTHORIZED),
+
+    /**
+     * The provider vouched for the identity but not for the email address on it.
+     *
+     * <p>Refused rather than worked around, because an unverified address is precisely the
+     * takeover vector: attaching a new identity to an existing GameBuddy account by matching
+     * emails is safe only when somebody else has already proved the mailbox.
+     */
+    SOCIAL_EMAIL_UNVERIFIED(
+            201, "Verify the email on your Google or Discord account first", HttpStatus.FORBIDDEN),
+
+    /** Changing a password on an account that has never had one. It has to be set instead. */
+    PASSWORD_NOT_SET(202, "This account has no password yet", HttpStatus.CONFLICT),
+
+    /** Setting a first password on an account that already has one. Change it instead. */
+    PASSWORD_ALREADY_SET(203, "This account already has a password", HttpStatus.CONFLICT),
+
+    /**
+     * Removing the only remaining way into an account.
+     *
+     * <p>The last sign-in method may not be unlinked while no password is set. Doing it would
+     * not be a lockout the user chose; it would be one they had no reason to expect.
+     */
+    AUTH_IDENTITY_LAST(204, "Set a password before removing your only way to sign in", HttpStatus.CONFLICT),
+
+    /**
+     * A destructive action on a session that is no longer fresh.
+     *
+     * <p>Deleting an account normally costs the current password. An account signed in with
+     * Google has none, so freshness stands in for it: sign in again, then delete. A stolen
+     * token cannot manufacture that, because refreshing preserves the original session start
+     * rather than moving it.
+     */
+    REAUTH_REQUIRED(205, "Sign in again to confirm this", HttpStatus.FORBIDDEN),
+
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);
 

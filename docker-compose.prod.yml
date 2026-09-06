@@ -231,6 +231,17 @@ services:
 
       REVENUECAT_WEBHOOK_TOKEN: ${REVENUECAT_WEBHOOK_TOKEN:?set REVENUECAT_WEBHOOK_TOKEN in .env}
 
+      # Discord account linking. Optional, unlike everything above it: an unset
+      # credential disables the provider rather than breaking the deployment, so these use
+      # `:-` and not `:?`. A production deployment that wants the feature must also add
+      # https://${DOMAIN}/auth/link/discord/callback to the Discord application's redirect
+      # URIs -- Discord refuses any redirect it has not been told about.
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      # Google sign-in. Optional in the same way: unset means the button is not offered.
+      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID:-}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-https://${DOMAIN}}
+
       # The coin economy is deliberately NOT forwarded bare here, unlike the rate limits
       # below. Those bind into a nested object, where Spring skips an empty value; these
       # are plain numbers on the properties class, and an empty string is not an int -- a

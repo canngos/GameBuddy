@@ -82,7 +82,27 @@ public class SecurityConfig {
         // published verifier keys. This is the only path that can mint coins without a
         // session, so that signature check is the whole security boundary for the ad
         // economy; see RewardedAdController and RewardedAdVerifier.
-        "/ads/reward"
+        "/ads/reward",
+        // Where Discord sends the browser back after somebody proves they own an
+        // account. Public for the same reason as the two above — the caller is a browser
+        // mid-redirect, with no session here and no token to present — and authenticated the
+        // same way in spirit: it carries a single-use link ticket, minted for one gamer and
+        // one provider, hashed at rest and burned on arrival. That ticket is the whole
+        // security boundary for linking, and it is deliberately not the JWT: a redirect URL
+        // ends up in browser history and in the provider's logs. See AccountLinkController
+        // and DefaultAccountLinkService.
+        "/auth/link/discord/callback",
+        // Signing in, as opposed to linking. Necessarily anonymous: somebody who has no
+        // account yet, or who has one and cannot get into it, is the only person who needs
+        // these. Listed one by one rather than as /auth/social/** because this is where
+        // accounts are created, and a wildcard is one refactor away from exposing something
+        // nobody meant to. Each is throttled by the `social` budget; see
+        // DefaultSocialAuthService for what the tokens they carry actually prove.
+        "/auth/social/providers",
+        "/auth/social/google",
+        "/auth/social/discord/start",
+        "/auth/social/discord/callback",
+        "/auth/social/exchange"
     };
 
     private final JwtAuthenticationFilter jwtAuthFilter;

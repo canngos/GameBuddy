@@ -74,6 +74,9 @@ class DefaultMatchServiceTest {
     @Mock
     private AvatarsRepository avatarsRepository;
 
+    @Mock
+    private GamerLinkedAccountRepository linkedAccountRepository;
+
     // The one place that decides which picture a gamer shows. Mocked rather than
     // real because it reaches object storage, which these tests have no business
     // standing up.

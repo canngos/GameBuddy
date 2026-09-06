@@ -176,6 +176,21 @@ class RateLimitBudgetsTest {
         void resetPasswordSurvivesAnAbandonedAttempt() {
             allowsRunOf(limiters.resetPassword(), 20, "resetting a password, twice over");
         }
+
+        @Test
+        @DisplayName("linking an account is fiddly the first time")
+        void linkSurvivesAFumbledFirstAttempt() {
+            // A consent screen abandoned, the wrong Discord account signed in, then the
+            // right one. That is a realistic first evening with the feature.
+            allowsRunOf(limiters.link(), 10, "linking a Discord account");
+        }
+
+        @Test
+        void socialSurvivesAConsentSheetAndARetry() {
+            // A new account is refused once for the terms and retried with the box ticked,
+            // so an honest sign-in can be two calls. Twelve is six of those.
+            allowsRunOf(limiters.social(), 12, "signing in with Google or Discord");
+        }
     }
 
     @Nested
@@ -246,6 +261,8 @@ class RateLimitBudgetsTest {
             sameInBothPlaces(AUTH, javaDefaults, "auth.verify", AuthRateLimitConfig::getVerify);
             sameInBothPlaces(AUTH, javaDefaults, "auth.send-code", AuthRateLimitConfig::getSendCode);
             sameInBothPlaces(AUTH, javaDefaults, "auth.reset-password", AuthRateLimitConfig::getResetPassword);
+            sameInBothPlaces(AUTH, javaDefaults, "auth.link", AuthRateLimitConfig::getLink);
+            sameInBothPlaces(AUTH, javaDefaults, "auth.social", AuthRateLimitConfig::getSocial);
         }
 
         @Test
@@ -298,11 +315,15 @@ class RateLimitBudgetsTest {
                             "AUTH_LOGIN_PERMITS", "1",
                             "AUTH_VERIFY_PERMITS", "2",
                             "AUTH_SEND_CODE_PERMITS", "3",
-                            "AUTH_RESET_PASSWORD_PERMITS", "4"));
+                            "AUTH_RESET_PASSWORD_PERMITS", "4",
+                            "AUTH_LINK_PERMITS", "6",
+                            "AUTH_SOCIAL_PERMITS", "8"));
             assertEquals(1, auth.getLogin().permits(), "AUTH_LOGIN_PERMITS");
             assertEquals(2, auth.getVerify().permits(), "AUTH_VERIFY_PERMITS");
             assertEquals(3, auth.getSendCode().permits(), "AUTH_SEND_CODE_PERMITS");
             assertEquals(4, auth.getResetPassword().permits(), "AUTH_RESET_PASSWORD_PERMITS");
+            assertEquals(6, auth.getLink().permits(), "AUTH_LINK_PERMITS");
+            assertEquals(8, auth.getSocial().permits(), "AUTH_SOCIAL_PERMITS");
 
             BillingRateLimitConfig billing = fromYaml(
                     "billing",
@@ -422,7 +443,8 @@ class RateLimitBudgetsTest {
                             "gamebuddy.rate-limit.auth.login.permits=1",
                             "gamebuddy.rate-limit.auth.verify.permits=2",
                             "gamebuddy.rate-limit.auth.send-code.permits=3",
-                            "gamebuddy.rate-limit.auth.reset-password.permits=4")
+                            "gamebuddy.rate-limit.auth.reset-password.permits=4",
+                            "gamebuddy.rate-limit.auth.link.permits=6")
                     .run(context -> {
                         assertNull(context.getStartupFailure());
                         AuthRateLimiters limiters = context.getBean(AuthRateLimiters.class);
@@ -430,6 +452,7 @@ class RateLimitBudgetsTest {
                         assertEquals(2, budgetOf(limiters.verify()));
                         assertEquals(3, budgetOf(limiters.sendCode()));
                         assertEquals(4, budgetOf(limiters.resetPassword()));
+                        assertEquals(6, budgetOf(limiters.link()));
                     });
         }
 

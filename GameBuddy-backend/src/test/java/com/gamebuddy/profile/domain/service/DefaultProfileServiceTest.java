@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.common.enums.LinkVisibility;
+import com.gamebuddy.common.enums.LinkedProvider;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.profile.application.mapper.*;
@@ -56,6 +58,9 @@ class DefaultProfileServiceTest {
 
     @Mock
     private CosmeticUrls cosmeticUrls;
+
+    @Mock
+    private GamerLinkedAccountRepository linkedAccountRepository;
 
     @Mock
     private BadgeService badges;
@@ -166,6 +171,80 @@ class DefaultProfileServiceTest {
             assertNull(body.getCoin(), "coin balance must not leak to another user");
             assertNull(body.getFriends(), "friend list must not leak to another user");
             assertEquals("other", body.getUsername());
+        }
+
+        @Test
+        @DisplayName("your own linked accounts come back with the visibility you chose")
+        void linkedAccountsOnOwnProfileCarryTheirVisibility() {
+            when(linkedAccountRepository.findByGamer_UserId(gamer.getUserId()))
+                    .thenReturn(List.of(linkedAccount(gamer, LinkVisibility.MATCHES, "me#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, gamer.getUserId())
+                    .getBody()
+                    .getData();
+
+            assertEquals(1, body.getLinkedAccounts().size());
+            assertEquals("me#1234", body.getLinkedAccounts().get(0).getHandle());
+            assertEquals("MATCHES", body.getLinkedAccounts().get(0).getVisibility());
+        }
+
+        @Test
+        @DisplayName("a matches-only handle is absent for a stranger, not merely flagged")
+        void linkedAccountsAreFilteredForStrangers() {
+            when(linkedAccountRepository.findByGamer_UserId(other.getUserId()))
+                    .thenReturn(List.of(linkedAccount(other, LinkVisibility.MATCHES, "them#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, other.getUserId())
+                    .getBody()
+                    .getData();
+
+            // Absent rather than present-and-hidden: a client trusted not to draw it would
+            // be one response inspection away from publishing it.
+            assertTrue(body.getLinkedAccounts().isEmpty());
+        }
+
+        @Test
+        @DisplayName("a public handle reaches a stranger, but its visibility setting does not")
+        void publicLinkedAccountsReachStrangersWithoutTheSetting() {
+            when(linkedAccountRepository.findByGamer_UserId(other.getUserId()))
+                    .thenReturn(List.of(linkedAccount(other, LinkVisibility.PUBLIC, "them#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, other.getUserId())
+                    .getBody()
+                    .getData();
+
+            assertEquals("them#1234", body.getLinkedAccounts().get(0).getHandle());
+            assertNull(
+                    body.getLinkedAccounts().get(0).getVisibility(),
+                    "a setting made to keep strangers out is not described to a stranger");
+        }
+
+        @Test
+        @DisplayName("a match sees what a stranger cannot")
+        void linkedAccountsReachAMatch() {
+            gamer.getApprovedMatches().add(other);
+            other.getApprovedMatches().add(gamer);
+            when(linkedAccountRepository.findByGamer_UserId(other.getUserId()))
+                    .thenReturn(List.of(linkedAccount(other, LinkVisibility.MATCHES, "them#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, other.getUserId())
+                    .getBody()
+                    .getData();
+
+            assertEquals("them#1234", body.getLinkedAccounts().get(0).getHandle());
+        }
+
+        private GamerLinkedAccount linkedAccount(Gamer owner, LinkVisibility visibility, String handle) {
+            GamerLinkedAccount link = new GamerLinkedAccount();
+            link.setGamer(owner);
+            link.setProvider(LinkedProvider.DISCORD);
+            link.setVisibility(visibility);
+            link.setHandle(handle);
+            return link;
         }
 
         @Test

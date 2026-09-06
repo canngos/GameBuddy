@@ -4,7 +4,7 @@ package com.gamebuddy.shared.funnel;
  * The steps of the monetisation funnel that only the client can see.
  *
  * <p>A closed set, and short on purpose. A generic event store invites the client to log
- * everything and becomes a second database nobody prunes; these are the four moments the
+ * everything and becomes a second database nobody prunes; these are the moments the
  * analysis actually asks about, and the endpoint refuses anything else.
  *
  * <p>All of them are safe to forge. Somebody who fakes paywall views pushes a conversion
@@ -29,5 +29,16 @@ public enum FunnelStep {
     COIN_SHOP_VIEWED,
 
     /** A limit was hit: the daily cap, or a locked admirer. The moment demand appears. */
-    PAYWALL_TRIGGERED
+    PAYWALL_TRIGGERED,
+
+    /**
+     * The Play review card was asked for after a match was dismissed.
+     *
+     * <p>The odd one out here, and recorded anyway: it is not a monetisation step, but it is
+     * the same kind of fact — something only the device can see, worth counting against the
+     * server's own record of who was eligible. The gap between claims granted and this
+     * arriving is the app failing to follow through; Play's own throttling is invisible to
+     * both sides and is not measurable from here at all.
+     */
+    REVIEW_PROMPTED
 }

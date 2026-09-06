@@ -121,12 +121,28 @@ public class AuthController {
     /**
      * Deletes the caller's account.
      *
-     * <p>Requires the password: a stolen token must not be enough to destroy the account.
+     * <p>Requires the password: a stolen token must not be enough to destroy the account. An
+     * account signed up through Google or Discord has none, so the token is passed through as
+     * well and its age stands in — see {@code DefaultAuthService#requireFreshSession}.
      */
     @DeleteMapping("/account")
     public ResponseEntity<DefaultMessageResponse> deleteAccount(
-            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody DeleteAccountRequest request) {
-        return ResponseEntity.ok(authService.deleteAccount(principal, request));
+            @AuthenticationPrincipal Gamer principal,
+            @Valid @RequestBody DeleteAccountRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(authService.deleteAccount(principal, request, BearerToken.require(authorization)));
+    }
+
+    /**
+     * Sets a first password on an account that has none.
+     *
+     * <p>Its own endpoint rather than a mode of {@code PUT /auth/change/pwd}: that one proves
+     * the old password and ends every session, and neither is right here.
+     */
+    @PostMapping("/password")
+    public ResponseEntity<DefaultMessageResponse> setPassword(
+            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody SetPasswordRequest request) {
+        return ResponseEntity.ok(authService.setPassword(principal, request));
     }
 
     /** Called by the client on every start; Firebase rotates device tokens. */

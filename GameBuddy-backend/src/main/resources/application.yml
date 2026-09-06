@@ -207,6 +207,18 @@ gamebuddy:
       reset-password:
         permits: ${AUTH_RESET_PASSWORD_PERMITS:20}
         window: ${AUTH_RESET_PASSWORD_WINDOW:15m}
+      # Discord link attempts, per account. The only budget here on an authenticated
+      # endpoint: the JWT already stopped the anonymous case, so this just prevents one
+      # account minting link tickets in a loop.
+      link:
+        permits: ${AUTH_LINK_PERMITS:10}
+        window: ${AUTH_LINK_WINDOW:15m}
+      # Google and Discord sign-in attempts, keyed by a hash of the credential presented.
+      # One honest sign-in can be two calls -- a new account is refused once for the terms
+      # and retried with the box ticked -- so thirty is fifteen of those.
+      social:
+        permits: ${AUTH_SOCIAL_PERMITS:30}
+        window: ${AUTH_SOCIAL_WINDOW:15m}
 
     billing:
       # Guesses at a promotion code, per account. The code space is what actually holds
@@ -216,6 +228,58 @@ gamebuddy:
       promo-redeem:
         permits: ${BILLING_PROMO_REDEEM_PERMITS:20}
         window: ${BILLING_PROMO_REDEEM_WINDOW:1h}
+
+  link:
+    # Verified Discord accounts on a profile. The integration is free: Discord OAuth2 needs
+    # no partner approval for the `identify` scope. See DefaultAccountLinkService.
+    #
+    # Steam linking was removed in September 2026 -- its Web API key could not be obtained,
+    # and a provider that can only ever fail is worse than one that is absent.
+    #
+    # Leave the credentials empty and linking simply refuses with a clear code -- a clone
+    # with no Discord application registered still starts and still runs every other screen.
+
+    # Where this backend is reachable from the phone's *browser*, which is not the same as
+    # where the app reaches it. On the Android emulator that is 10.0.2.2: inside the
+    # emulator, localhost is the emulator. This value has to match the redirect URI
+    # registered with Discord byte for byte.
+    public-base-url: ${BACKEND_PUBLIC_URL:http://10.0.2.2:8080}
+    # Where the callback sends the browser when it is done. The app's own URL scheme,
+    # registered in app.json.
+    app-return-url: ${APP_LINK_RETURN_URL:gamebuddy://settings/linked}
+
+    discord:
+      client-id: ${DISCORD_CLIENT_ID:}
+      # Proves this server is the application the authorisation code was issued to. Never
+      # leaves the backend, and is why the code exchange cannot happen in the app.
+      client-secret: ${DISCORD_CLIENT_SECRET:}
+      url: ${DISCORD_API_URL:https://discord.com/api/v10}
+      connect-timeout: 5s
+      # The loosest read timeout in the application, and deliberately: this is the only
+      # downstream that is neither on the private network nor under our control, and a
+      # user is watching a "linking..." spinner while it runs.
+      read-timeout: 15s
+
+  social:
+    # Signing in with Google or Discord. Optional, like linking above: leave the client id
+    # empty and Google is simply not offered -- GET /auth/social/providers answers with what
+    # is configured and the app draws only those buttons.
+    #
+    # Discord's credentials are NOT repeated here. It is the same OAuth application as
+    # profile linking, with a second redirect URI registered; two copies of a client secret
+    # is one of them to forget when it rotates.
+    google:
+      # The *web* OAuth client id from the Google Cloud console, which is what an ID token's
+      # `aud` carries -- not the Android one, which appears in `azp` and is not checked.
+      # Public information (it ships inside the app too), so configuration rather than a
+      # secret. Changing it orphans every stored Google subject: `sub` is stable per account
+      # per project.
+      web-client-id: ${GOOGLE_WEB_CLIENT_ID:}
+      # Google's published signing keys. Configurable only so a test can point it at a stub.
+      jwk-set-uri: ${GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}
+    # Where the Discord callback sends the browser. Deliberately not settings/linked: that
+    # screen is for a signed-in gamer, and this flow has no session yet.
+    app-return-url: ${APP_SOCIAL_RETURN_URL:gamebuddy://social}
 
   predict:
     # The only remaining out-of-process dependency: the Python model is a different

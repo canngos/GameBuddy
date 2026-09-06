@@ -40,6 +40,7 @@ public class DefaultProfileService implements ProfileService {
     private final CosmeticUrls cosmeticUrls;
     private final ProfileCatalogueMapper profileCatalogueMapper;
     private final ProfileMapper profileMapper;
+    private final GamerLinkedAccountRepository linkedAccountRepository;
     private final BadgeService badges;
     private final ApplicationEventPublisher events;
 
@@ -113,15 +114,43 @@ public class DefaultProfileService implements ProfileService {
         // pictures would put the badge catalogue on every profile view.
         body.setBadges(badges.showcasedFor(gamer));
         body.setBadgeCount((int) badges.earnedCount(gamer));
+        body.setLinkedAccounts(linkedAccountsVisibleTo(gamer, self, own));
 
         if (own) {
             body.setEmail(gamer.getEmail());
             body.setCoin(gamer.getCoin());
             body.setFriends(toFriendDtos(gamer.getFriends()));
             body.setRole(gamer.getRole().name());
+            // How this account can get in. Own profile only, and for the same reason the
+            // email is: it is a fact about the credential, not about the person other
+            // people are looking at.
+            body.setHasPassword(gamer.getPassword() != null);
+            body.setAuthProviders(gamerRepository.findAuthProviders(gamer.getUserId()));
         }
 
         return respond(new UserInfoResponse(), body);
+    }
+
+    /**
+     * The linked accounts {@code viewer} is allowed to see on {@code owner}'s profile.
+     *
+     * <p>Each link chooses its own audience — see {@code LinkVisibility}. A Discord handle is
+     * a way to contact somebody outside the app, so the default is matches and friends only,
+     * which is the same line {@code TextSurface} draws around typed text: two people who have
+     * agreed to talk swapping handles is the product working, and the same handle broadcast
+     * to the deck is a different thing.
+     *
+     * <p>The visibility itself is returned only on your own profile. Telling a stranger that a
+     * handle exists but is restricted describes a choice made to keep them out.
+     */
+    private List<LinkedAccountDto> linkedAccountsVisibleTo(Gamer owner, Gamer viewer, boolean own) {
+        return linkedAccountRepository.findByGamer_UserId(owner.getUserId()).stream()
+                .filter(link -> link.isVisibleTo(owner, viewer))
+                .map(link -> new LinkedAccountDto(
+                        link.getProvider().name(),
+                        link.getHandle(),
+                        own ? link.getVisibility().name() : null))
+                .toList();
     }
 
     // =======================================================================

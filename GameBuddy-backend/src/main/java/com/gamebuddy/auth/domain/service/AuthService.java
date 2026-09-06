@@ -64,6 +64,16 @@ public interface AuthService {
 
     DefaultMessageResponse changePwd(Gamer principal, ChangePwdRequest changePwdRequest);
 
+    /**
+     * Sets a first password on an account that signed up with Google or Discord.
+     *
+     * <p>Separate from {@link #changePwd} rather than a null-current-password branch of it:
+     * one of them requires proof of the old password and ends every session, the other
+     * requires neither, and collapsing them would put those two behaviours one boolean
+     * apart.
+     */
+    DefaultMessageResponse setPassword(Gamer principal, SetPasswordRequest request);
+
     DefaultMessageResponse changeAvatar(Gamer principal, ChangeAvatarRequest changeAvatarRequest);
 
     DefaultMessageResponse changeAge(Gamer principal, ChangeAgeRequest changeAgeRequest);
@@ -83,7 +93,13 @@ public interface AuthService {
      * age, a country and private messages, erasure on request is an obligation under
      * GDPR and KVKK rather than a feature.
      */
-    DefaultMessageResponse deleteAccount(Gamer principal, DeleteAccountRequest request);
+    /**
+     * Deletes the caller's account.
+     *
+     * @param bearerToken the caller's own token, needed only when the account has no
+     *     password: freshness then stands in for one. See the implementation.
+     */
+    DefaultMessageResponse deleteAccount(Gamer principal, DeleteAccountRequest request, String bearerToken);
 
     DefaultMessageResponse changeGames(Gamer principal, ChangeDetailRequest changeGamesRequest);
 

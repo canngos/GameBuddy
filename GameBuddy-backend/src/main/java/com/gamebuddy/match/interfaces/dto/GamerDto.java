@@ -57,5 +57,17 @@ public class GamerDto {
      * "not applicable". A boolean that is false in the deck costs a word on the wire and
      * spares every caller a null check.
      */
+    /**
+     * Verified Discord handles, shown under the name on the card.
+     *
+     * <p><strong>Public links only.</strong> A deck card is, by definition, somebody the
+     * viewer has not matched with — that is the decision the card exists to support — so the
+     * matches-only setting excludes every one of them. Rather than pass a viewer down here to
+     * compute a relationship that is already known to be "none", this is filtered to
+     * {@code PUBLIC} at the source. The failure direction matters: if a friend ever did
+     * appear in the deck they would see less than they are entitled to, never more.
+     */
+    private List<LinkedAccountDto> linkedAccounts;
+
     private boolean superLike;
 }

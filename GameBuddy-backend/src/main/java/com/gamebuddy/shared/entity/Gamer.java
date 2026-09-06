@@ -398,6 +398,21 @@ public class Gamer implements RevocableUser {
     private Instant upgradePromptShownAt;
 
     /**
+     * When the Play in-app review card was last asked for. Null means never.
+     *
+     * <p>Deliberately not the same shape as the column above it. That one is set once and
+     * never cleared, because there is one Gold pitch and it is either spent or not. A review
+     * ask legitimately repeats: Play runs its own rolling quota, and somebody who declined
+     * three months ago is a fair question again.
+     *
+     * <p>It records the <em>ask</em>, not the showing. Play never reports whether the card
+     * appeared — {@code requestReview()} resolves identically when it was throttled — so
+     * "shown" is not a fact the client could report honestly even if it wanted to.
+     */
+    @Column(name = "review_prompt_shown_at")
+    private Instant reviewPromptShownAt;
+
+    /**
      * How many sets of three missions this gamer has been dealt. Zero means never played.
      *
      * <p>Replaced the five {@code quest_*} columns, which held one baseline per metric and
