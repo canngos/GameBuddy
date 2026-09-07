@@ -4,36 +4,38 @@ import type { MyPromoCodes, PromoRedemption, Subscription } from './types';
 /**
  * Which store product a plan maps to.
  *
- * These ids must match `Product.java` exactly, the products registered in both consoles,
- * and the offering configured in RevenueCat. A mismatch in any of the three is a purchase
- * that takes somebody's money and grants nothing.
+ * These ids must match `Product.java` exactly and the products registered in both consoles
+ * and in RevenueCat. A mismatch in any of the three is a purchase that takes somebody's
+ * money and grants nothing.
  *
- * The prices here are display copy only. RevenueCat reports the real localised price from
- * the store, and once the offering is wired up these strings should be replaced by it —
- * showing "$7.99" to somebody who will be charged €8.99 is a store-review problem as well
- * as a trust one.
+ * **`usd` is not the price.** The store is the authority on price — it owns currency,
+ * regional tiers and tax — and `useStorePrices` reads the real localised figure from it.
+ * These numbers are the last resort, shown only when the store cannot be reached at all,
+ * and they are a plain number rather than a formatted string so that nothing is ever
+ * tempted to parse a currency back out of one. They still have to be kept in step with the
+ * consoles, because they are what a buyer sees when the store is down.
  */
 export const GOLD_PLANS = [
   {
     productId: 'gamebuddy.gold.weekly',
     label: 'Weekly',
     period: '1 week',
-    price: '$3.99',
+    usd: 3.99,
     note: null,
   },
   {
     productId: 'gamebuddy.gold.monthly',
     label: 'Monthly',
     period: '1 month',
-    price: '$7.99',
+    usd: 7.99,
     note: '3-day free trial',
   },
   {
     productId: 'gamebuddy.gold.yearly',
     label: 'Yearly',
     period: '12 months',
-    price: '$39.99',
-    note: 'Save 58%',
+    usd: 39.99,
+    note: null,
   },
 ] as const;
 
@@ -44,33 +46,97 @@ export type GoldPlan = (typeof GOLD_PLANS)[number];
  *
  * `coins` must match `Product.java` — the backend grants from its own table, so a wrong
  * number here does not shortchange anybody, it just advertises the wrong amount, which is
- * worse in its own way. The three ids and amounts are checked against the enum.
+ * worse in its own way.
  *
- * `bonus` is presentation, computed from the per-coin rate against the smallest pack. It
- * is not a second source of truth: change a price or an amount and the badge follows.
+ * The prices doubled on 2026-09-07 and `gamebuddy.coins.7000` was added at the top. The
+ * reasoning is in `upgrade-2026-44-shelf-reprice.sql`: priced against the pack people
+ * actually buy, a coin was worth $0.0030, which put the dearest thing in the shop at $4.50
+ * against a market that charges $5.99–$12.99 for one avatar decoration. The largest pack
+ * exists because the ceiling on what a willing buyer could spend in one go was ours rather
+ * than theirs, and it sits below Gold yearly on purpose — a coin pack costing the same as a
+ * year of Gold invites the comparison and loses it.
  */
 export const COIN_PACKS = [
-  { productId: 'gamebuddy.coins.500', coins: 500, price: '$1.99' },
-  { productId: 'gamebuddy.coins.1200', coins: 1200, price: '$3.99' },
-  { productId: 'gamebuddy.coins.3000', coins: 3000, price: '$8.99' },
+  { productId: 'gamebuddy.coins.500', coins: 500, usd: 3.99 },
+  { productId: 'gamebuddy.coins.1200', coins: 1200, usd: 7.99 },
+  { productId: 'gamebuddy.coins.3000', coins: 3000, usd: 16.99 },
+  { productId: 'gamebuddy.coins.7000', coins: 7000, usd: 34.99 },
 ] as const;
 
 export type CoinPack = (typeof COIN_PACKS)[number];
 
+/** Every id this app can ask the store to price. */
+export type StoreProductId = GoldPlan['productId'] | CoinPack['productId'];
+
+/** A price that is ready to put on screen, and honest about where it came from. */
+export type ResolvedPrice = {
+  /** What to render. Never empty. */
+  text: string;
+  /** The same figure as a number, for arithmetic only. Never render this. */
+  amount: number;
+  /** ISO-4217. Two prices may only be compared when these match. */
+  currency: string;
+  /** Two prices may only be compared when these match, too — see `bonusPercent`. */
+  source: 'store' | 'fallback';
+  /** True while the store has not answered and `text` is not worth showing yet. */
+  pending: boolean;
+};
+
+export type PriceLookup = (productId: StoreProductId) => ResolvedPrice;
+
+/** The currency the `usd` fallbacks are quoted in. */
+export const FALLBACK_CURRENCY = 'USD';
+
+/** Formats a fallback. Only ever reached when the store could not be asked. */
+export const fallbackPriceText = (usd: number) => `$${usd.toFixed(2)}`;
+
 /**
  * How much better value a pack is than the smallest one, as a percentage, or null when it
- * is not meaningfully better.
+ * is not meaningfully better — or when the two prices cannot honestly be compared.
  *
  * Rounded down, and anything under 5% returns null: "2% more coins" is not a reason to
  * spend more money and putting a badge on it only teaches people to ignore the badges.
+ *
+ * **It refuses rather than guesses**, on three counts, because a badge is decoration and a
+ * missing one costs nothing while a wrong one sits next to real money:
+ *
+ *   - different currencies — a ratio across two of them is meaningless;
+ *   - different `source` — this is the one that actually bites. A live store price beside a
+ *     bundled USD fallback yields a confident number computed from two different worlds,
+ *     and when the store's currency happens to also be USD the currency check alone lets it
+ *     through;
+ *   - either side still pending — a badge that appears, changes, then disappears is worse
+ *     than one that arrives a moment late.
  */
-export function bonusPercent(pack: CoinPack): number | null {
-  const base = COIN_PACKS[0];
-  if (pack.productId === base.productId) return null;
+export function bonusPercent(
+  pack: { coins: number; price: ResolvedPrice },
+  base: { coins: number; price: ResolvedPrice },
+): number | null {
+  if (pack.coins === base.coins) return null;
+  if (pack.price.pending || base.price.pending) return null;
+  if (pack.price.source !== base.price.source) return null;
+  if (pack.price.currency !== base.price.currency) return null;
+  if (!(pack.price.amount > 0) || !(base.price.amount > 0)) return null;
 
-  const rate = (p: CoinPack) => p.coins / Number(p.price.replace(/[^0-9.]/g, ''));
-  const better = Math.floor((rate(pack) / rate(base) - 1) * 100);
+  const rate = (coins: number, amount: number) => coins / amount;
+  const better = Math.floor(
+    (rate(pack.coins, pack.price.amount) / rate(base.coins, base.price.amount) - 1) * 100,
+  );
   return better >= 5 ? better : null;
+}
+
+/**
+ * The coin packs with their prices and badges resolved, in shelf order.
+ *
+ * Built here rather than in the screen so that the badge and the price it is derived from
+ * cannot be worked out from two different snapshots of the same query.
+ */
+export function coinPackRows(priceOf: PriceLookup) {
+  const base = { coins: COIN_PACKS[0].coins, price: priceOf(COIN_PACKS[0].productId) };
+  return COIN_PACKS.map((pack) => {
+    const price = priceOf(pack.productId);
+    return { pack, price, bonus: bonusPercent({ coins: pack.coins, price }, base) };
+  });
 }
 
 export const billingApi = {

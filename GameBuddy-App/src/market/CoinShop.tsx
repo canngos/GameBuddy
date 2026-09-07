@@ -1,13 +1,14 @@
-import { Coins } from 'lucide-react-native';
 import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import { trackFunnel } from '../api/funnel';
-import { COIN_PACKS, bonusPercent, type CoinPack } from '../api/billing';
+import { coinPackRows, type CoinPack, type ResolvedPrice } from '../api/billing';
 import { storeAvailable } from '../billing/purchases';
 import { usePurchase } from '../billing/usePurchase';
+import { useStorePrices } from '../billing/useStorePrices';
+import { CoinPackIcon, tierForIndex, type CoinPackTier } from './CoinPackIcon';
 import { useUpper } from '../i18n/case';
 import { useT } from '../i18n/useT';
-import { Card, ErrorNotice, Icon, Text } from '../ui';
+import { Card, ErrorNotice, Text } from '../ui';
 
 /**
  * Coin packs, bought with real money.
@@ -39,6 +40,9 @@ export function CoinShop({
   const upper = useUpper();
   const buy = usePurchase('coins');
   const canBuy = storeAvailable();
+  // Real prices, in the buyer's currency. The rows are built together so a badge and the
+  // price it was derived from cannot come from two different snapshots of the same query.
+  const rows = coinPackRows(useStorePrices());
 
   // Says whether the currency is understood as buyable at all — the Market renders this
   // section on every visit, so it is a view count rather than an intent signal.
@@ -58,10 +62,13 @@ export function CoinShop({
         {!canBuy && <Text variant="caption">{t.market.coins.blurbNoBuy}</Text>}
       </View>
 
-      {COIN_PACKS.map((pack) => (
+      {rows.map(({ pack, price, bonus }, index) => (
         <PackRow
           key={pack.productId}
           pack={pack}
+          tier={tierForIndex(index)}
+          price={price}
+          bonus={bonus}
           balance={balance}
           disabled={!canBuy || buy.isPending}
           onPress={() => buy.buy(pack.productId)}
@@ -87,24 +94,34 @@ export function CoinShop({
 
 function PackRow({
   pack,
+  tier,
+  price,
+  bonus,
   balance,
   disabled,
   onPress,
 }: {
   pack: CoinPack;
+  /** Which of the four pictures this rung gets. See CoinPackIcon. */
+  tier: CoinPackTier;
+  price: ResolvedPrice;
+  bonus: number | null;
   balance: number;
   disabled: boolean;
   onPress: () => void;
 }) {
   const t = useT();
-  const bonus = bonusPercent(pack);
 
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityLabel={t.market.coins.packA11y(pack.coins, pack.price)}
+      accessibilityLabel={
+        price.pending
+          ? t.market.coins.packA11yPending(pack.coins)
+          : t.market.coins.packA11y(pack.coins, price.text)
+      }
       accessibilityState={{ disabled }}
       className={[
         'flex-row items-center justify-between gap-4 rounded-card border border-line bg-raised p-4',
@@ -112,8 +129,10 @@ function PackRow({
       ].join(' ')}
     >
       <View className="flex-1 flex-row items-center gap-3">
+        {/* 40dp well, 26dp mark. Bigger than the 18dp Lucide glyph this replaced, because
+            a heap and a chest carry detail a single coin did not. */}
         <View className="h-10 w-10 items-center justify-center rounded-full bg-gold/15">
-          <Icon as={Coins} size={18} tone="gold" />
+          <CoinPackIcon tier={tier} size={26} />
         </View>
         <View className="gap-0.5">
           <View className="flex-row items-center gap-2">
@@ -136,9 +155,18 @@ function PackRow({
         </View>
       </View>
 
-      <Text variant="bodyStrong" className="text-gold">
-        {pack.price}
-      </Text>
+      {/* A placeholder, not the bundled dollar price: showing "$16.99" and then swapping it
+          for "₺549,99" a moment later re-creates a milder version of the very problem the
+          localised price exists to fix. Bounded by the six second deadline in
+          `fetchStorePrices`, and normally never seen at all because the tab layout prefetches
+          this before anyone can reach the Market. */}
+      {price.pending ? (
+        <View className="h-4 w-14 rounded bg-line" />
+      ) : (
+        <Text variant="bodyStrong" className="text-gold">
+          {price.text}
+        </Text>
+      )}
     </Pressable>
   );
 }

@@ -550,12 +550,14 @@ export const tr: Dictionary = {
       packCoins: (n: string) => `${n} altın`,
       takesYouTo: (n: string) => `Yeni bakiye: ${n}`,
       packA11y: (coins: number, price: string) => `${coins} altını ${price} karşılığında satın al`,
+      packA11yPending: (coins: number) => `${coins} altın satın al, fiyat yükleniyor`,
       onTheWay: 'Altınların yolda',
       onTheWayBody: 'Bu biraz sürebilir. Tekrar satın almana gerek yok.',
     },
 
     gold: {
       done: 'Tamam',
+      continue: 'Devam',
       continuePrice: (price: string) => `Devam — ${price}`,
       unavailable: 'Satın alma şu anda kullanılamıyor',
       notNow: 'Şimdi değil',
@@ -575,7 +577,7 @@ export const tr: Dictionary = {
       periodMonth: '1 ay',
       periodYear: '12 ay',
       noteTrial: '3 gün ücretsiz deneme',
-      noteYearly: '%58 tasarruf',
+      noteYearlySave: (percent: number) => `%${percent} tasarruf`,
       billedEvery: (period: string) => `Her ${period} faturalandırılır`,
       purchasePending: 'Satın alman işleniyor',
       purchasePendingBody: 'Bu biraz sürebilir. Tekrar satın almana gerek yok.',

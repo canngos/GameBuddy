@@ -553,12 +553,14 @@ export const fi: Dictionary = {
       packCoins: (n: string) => `${n} kolikkoa`,
       takesYouTo: (n: string) => `Uusi saldo: ${n}`,
       packA11y: (coins: number, price: string) => `Osta ${coins} kolikkoa hintaan ${price}`,
+      packA11yPending: (coins: number) => `Osta ${coins} kolikkoa, hinta latautuu`,
       onTheWay: 'Kolikkosi ovat tulossa',
       onTheWayBody: 'Tämä voi kestää hetken. Ei tarvitse ostaa uudelleen.',
     },
 
     gold: {
       done: 'Valmis',
+      continue: 'Jatka',
       continuePrice: (price: string) => `Jatka — ${price}`,
       unavailable: 'Ostot eivät ole juuri nyt käytettävissä',
       notNow: 'Ei nyt',
@@ -578,7 +580,7 @@ export const fi: Dictionary = {
       periodMonth: '1 kuukauden',
       periodYear: '12 kuukauden',
       noteTrial: '3 päivän ilmainen kokeilu',
-      noteYearly: 'Säästä 58 %',
+      noteYearlySave: (percent: number) => `Säästä ${percent} %`,
       billedEvery: (period: string) => `Laskutetaan ${period} välein`,
       purchasePending: 'Ostosi on käsittelyssä',
       purchasePendingBody: 'Tämä voi kestää hetken. Ei tarvitse ostaa uudelleen.',

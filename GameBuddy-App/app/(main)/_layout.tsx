@@ -1,8 +1,10 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { identify } from '../../src/billing/purchases';
+import { storePricesQuery } from '../../src/billing/useStorePrices';
 import { ChatSocketProvider } from '../../src/chat/ChatSocketProvider';
 import { CoachmarkHost } from '../../src/hints/CoachmarkHost';
 import { useHints } from '../../src/hints/store';
@@ -91,9 +93,15 @@ export default function MainLayout() {
   // reached us is RevenueCat's to retry, not this app's to remember. That is most of why
   // billing moved there.
   const userId = useSession((s) => s.userId);
+  const queryClient = useQueryClient();
   useEffect(() => {
-    if (userId) void identify(userId);
-  }, [userId]);
+    if (!userId) return;
+    // Prices are fetched straight after, and chained rather than fired alongside because
+    // `getProducts` throws before `configure` has run. Doing it here means the Market and
+    // the Gold screen open with the answer already cached, so the placeholder those screens
+    // render while they wait is, in practice, never seen.
+    void identify(userId).then(() => queryClient.prefetchQuery(storePricesQuery()));
+  }, [userId, queryClient]);
 
   // The walkthrough, once, after onboarding. Started here rather than from the deck so
   // it owns the whole tab bar from the first frame — it navigates between tabs, and a
