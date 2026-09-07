@@ -95,29 +95,48 @@ export function useSocialSignIn() {
     [adopt],
   );
 
+  /**
+   * One place to say a sign-in did not work.
+   *
+   * Every path below ends either signed in or here. That is the point: both providers used to
+   * have exits that returned without a word, and a button that does nothing is indistinguishable
+   * from a button that is broken - which is exactly how an unregistered signing certificate went
+   * unnoticed. `app/social.tsx` has always ended the Discord round trip this way; this is the
+   * same courtesy for every other exit.
+   */
+  const complain = useCallback(
+    (title: string) => showToast({ id: 'social:failed', title, icon: TriangleAlert, tone: 'danger' }),
+    [],
+  );
+
   const google = useCallback(async () => {
     if (pending) return;
     setPending('google');
     try {
-      const idToken = await signInWithGoogle();
-      // Null is a dismissed sheet. Nothing has gone wrong and there is nothing to say.
-      if (!idToken) return;
-      await attempt({ kind: 'google', idToken });
-    } catch (error) {
-      if (error instanceof GoogleUnavailableError) {
-        showToast({
-          id: 'social:google-unavailable',
-          title: t.auth.social.googleUnavailable,
-          icon: TriangleAlert,
-          tone: 'danger',
-        });
+      const outcome = await signInWithGoogle();
+      // A second tap on a sheet that is already open. Nothing happened, nothing to report.
+      if (outcome.status === 'superseded') return;
+      if (outcome.status === 'unfinished') {
+        complain(t.auth.social.failed);
         return;
       }
-      throw error;
+      await attempt({ kind: 'google', idToken: outcome.idToken });
+    } catch (error) {
+      if (error instanceof GoogleUnavailableError) {
+        complain(t.auth.social.googleUnavailable);
+        return;
+      }
+      if (error instanceof ApiError && error.is(Code.SOCIAL_EMAIL_UNVERIFIED)) {
+        complain(t.auth.social.emailUnverified);
+        return;
+      }
+      // Everything else: a dead network, a 500, a bug. Rethrowing reached nobody - this is an
+      // async callback, so the throw became an unhandled rejection and the screen just sat there.
+      complain(t.auth.social.failed);
     } finally {
       setPending(null);
     }
-  }, [attempt, pending, t]);
+  }, [attempt, complain, pending, t]);
 
   const discord = useCallback(async () => {
     if (pending) return;
@@ -128,12 +147,14 @@ export function useSocialSignIn() {
       // is a password it could have read, and the address bar is the only thing that tells
       // somebody they are really on discord.com.
       await Linking.openURL(authorizeUrl);
+    } catch {
+      complain(t.auth.social.failed);
     } finally {
       // Cleared immediately. The rest of this flow happens in another app and comes back as
       // a deep link, so a spinner left running here would never stop.
       setPending(null);
     }
-  }, [pending]);
+  }, [complain, pending, t]);
 
   /**
    * Picks up a Discord sign-in that came back needing the terms.
