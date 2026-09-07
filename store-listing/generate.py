@@ -153,7 +153,8 @@ def compose(src_path, headline, accent, out_path):
 
 
 ICON_SRC = ROOT / "GameBuddy-App" / "assets" / "icon.png"
-ICON_BG = (11, 11, 18)  # #0B0B12, the adaptive-icon background color
+# The launcher icon's own background layer: a full-bleed #7C4DFF -> #00E5FF diagonal.
+ICON_BG_SRC = ROOT / "GameBuddy-App" / "assets" / "android-icon-background.png"
 WORDMARK_FONT = FONTS / "chakra-petch" / "700Bold" / "ChakraPetch_700Bold.ttf"
 TAGLINE_FONT = FONTS / "poppins" / "400Regular" / "Poppins_400Regular.ttf"
 TAGLINE = "Find people who actually want to play games with you."
@@ -163,10 +164,21 @@ MARK_CYAN = (0, 229, 255)      # #00E5FF
 
 
 def make_icon_512(out_path):
-    """Play wants a full 512x512 square; the tile's transparent corners are
-    flattened onto the brand background."""
+    """Play wants a full 512x512 square, and rounds the corners itself.
+
+    <p>The tile is the brand mark on a rounded gradient with transparent corners, so
+    something has to fill them. Flattening onto a flat colour is the obvious move and
+    the wrong one: Play's mask has a larger radius than the tile's own, so the fill
+    survives as four dark wedges around the artwork and the icon reads as sitting on a
+    black card. Nothing about the icon should be visible outside the mark itself.
+
+    <p>The tile's gradient is the adaptive-icon background masked to a rounded square,
+    pixel for pixel -- so compositing it back over that full-bleed background fills the
+    corners with the very gradient that was cut out of them. There is no seam to hide,
+    and it is the same square Android composites for the launcher.
+    """
     tile = Image.open(ICON_SRC).convert("RGBA")
-    flat = Image.new("RGBA", tile.size, ICON_BG + (255,))
+    flat = Image.open(ICON_BG_SRC).convert("RGBA").resize(tile.size, Image.LANCZOS)
     flat.alpha_composite(tile)
     flat.convert("RGB").resize((512, 512), Image.LANCZOS).save(out_path, "PNG")
     print(f"wrote {out_path.name}  512x512")
