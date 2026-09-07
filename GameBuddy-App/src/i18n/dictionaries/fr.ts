@@ -758,7 +758,7 @@ export const fr: Dictionary = {
     tutorial: 'Revoir le tutoriel',
     tutorialHint: 'Parcourt les cinq onglets et réaffiche les astuces',
     rate: 'Noter GameBuddy',
-    rateHint: 'Ouvre Google Play',
+    rateHint: 'Dis-nous ce que tu en penses',
     terms: "Conditions d'utilisation",
     termsHint: 'Y compris les règles de contenu et de conduite',
     privacy: 'Politique de confidentialité',
