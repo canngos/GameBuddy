@@ -1,0 +1,106 @@
+---
+/**
+ * A phone bezel around a real screenshot, in the theme the visitor is using.
+ *
+ * ## Two images, and why both are in the DOM
+ *
+ * The app has a light and a dark theme, and the site now has both too — so a dark screenshot
+ * on a light page (or the reverse) is immediately jarring. Each frame therefore carries both
+ * captures and CSS shows one.
+ *
+ * The obvious alternative, swapping `src` in JavaScript on toggle, was rejected: it means the
+ * new image is fetched at the moment of the click, so the phone goes blank for a beat every
+ * time somebody flips the theme. Both images in the DOM means the swap is instant.
+ *
+ * The cost is honest — a visitor downloads two images per frame instead of one. It is
+ * affordable because these are 11–24 kB WebP after `astro:assets` is done with them (the
+ * source PNGs are ~470 kB), and because the hidden one is `loading="lazy"` while the visible
+ * one is not. Whether the *hidden* one is fetched at all is up to the browser; none of them
+ * fetch a `display: none` image eagerly.
+ *
+ * ## Screenshots are real
+ *
+ * These are actual captures of the app, taken on a physical device once in each theme —
+ * a mockup would be easier and would risk advertising a screen that does not exist.
+ */
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  dark: ImageMetadata;
+  light: ImageMetadata;
+  alt: string;
+  /** Nudges the frame off-axis so a row of them reads as a group rather than a grid. */
+  rotate?: string;
+  /**
+   * Above the fold. Lazy-loading the hero image delays the very element LCP is measured
+   * against, so the visible copy is eager and gets fetch priority.
+   */
+  eager?: boolean;
+  /** Opts into the slow float. `a` and `b` run in opposite directions. */
+  float?: 'a' | 'b';
+  class?: string;
+}
+
+const {
+  dark,
+  light,
+  alt,
+  rotate = '',
+  eager = false,
+  float,
+  class: className = '',
+} = Astro.props;
+
+const shared = {
+  widths: [280, 420],
+  sizes: '(min-width: 768px) 280px, 60vw',
+  class: 'rounded-[1.6rem]',
+} as const;
+---
+
+<div
+  class:list={['relative', float && `float-${float}`, className]}
+  style={rotate ? `--frame-rotate: ${rotate}` : ''}
+>
+  <div class="rounded-[2rem] border-[6px] border-elevated bg-elevated shadow-2xl shadow-black/30">
+    {/* Light theme. Alt text on this one only — two images with the same alt would be
+        announced twice by a screen reader, which is why the other is aria-hidden. */}
+    <Image
+      {...shared}
+      src={light}
+      alt={alt}
+      data-theme-img="light"
+      loading={eager ? 'eager' : 'lazy'}
+      fetchpriority={eager ? 'high' : 'auto'}
+    />
+    <Image
+      {...shared}
+      src={dark}
+      alt=""
+      aria-hidden="true"
+      data-theme-img="dark"
+      loading="lazy"
+    />
+  </div>
+</div>
+
+<style>
+  /* The visible copy is decided by the theme attribute, in CSS, so it is already correct at
+     first paint — the same reason the colours are. */
+  [data-theme-img='dark'] {
+    display: none;
+  }
+  :global([data-theme='dark']) [data-theme-img='dark'] {
+    display: block;
+  }
+  :global([data-theme='dark']) [data-theme-img='light'] {
+    display: none;
+  }
+
+  /* The rotation lives on the wrapper so the float animation below can own `transform`
+     without the two fighting over the property. */
+  div[style*='--frame-rotate'] > div {
+    transform: rotate(var(--frame-rotate, 0deg));
+  }
+</style>

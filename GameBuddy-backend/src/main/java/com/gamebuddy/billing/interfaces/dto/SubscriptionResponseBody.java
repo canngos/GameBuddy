@@ -30,5 +30,20 @@ public class SubscriptionResponseBody implements BaseModel {
 
     private boolean canSeeWhoLikedYou;
     private boolean canUseAdvancedFilters;
-    private int maxGroupChats;
+
+    /** Whether opening a game lobby is included. Gold's perk; joining is free for everyone. */
+    private boolean canCreateLobby;
+
+    /**
+     * Whether the one-time day-3 Gold prompt is due right now.
+     *
+     * <p>Not an entitlement. It rides on this response because the app already asks for it
+     * wherever tiers matter, so the flag costs no extra round trip on a screen that is
+     * otherwise doing nothing. A dedicated endpoint would be a second request on every
+     * home mount to be told "no" almost every time.
+     *
+     * <p>Answering true does not mark it shown — see {@code UpgradePromptService.markShown}
+     * for why the client has to say when it actually rendered it.
+     */
+    private boolean upgradePromptDue;
 }

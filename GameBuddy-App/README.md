@@ -128,6 +128,21 @@ locally — reinstalling, or signing in on a second device, would defeat a local
 
 ## Android
 
+The package is **`com.findgamebuddy.app`**, and the odd-looking `find` prefix is
+deliberate. `com.gamebuddy.app` was the original choice and it is **already taken on Google
+Play by somebody else** — discovered at app-creation time, when the console refused it.
+Package names are globally unique and permanent once an app exists, so this is not a
+preference that can be revisited later.
+
+It is also the more correct name. Reverse-DNS packages are supposed to mirror a domain you
+control, and `gamebuddy.app` is a domain nobody here owns — the same reason the marketing
+site ended up at `findgamebuddy.com`. Both now agree.
+
+The Play Console app was created 2026-08-16 as *GameBuddy: Find Gamers to Play* (app id
+`4972657633723197721`), free, categorised as an App rather than a Game — Play applies extra
+policy to the Dating category and this is a gaming-partner app, so nothing in the listing
+should invite that classification.
+
 Minimum supported version is **API 24 (Android 7.0)** — that is React Native 0.86's
 floor, from `node_modules/react-native/gradle/libs.versions.toml`. Tested on an
 **API 26 (Android 8.0)** emulator, which is the oldest device this is claimed to work on.
@@ -158,13 +173,215 @@ an adb tunnel, where Metro reports `localhost` — `src/api/config.ts` rewrites 
 `10.0.2.2`, the emulator's alias for its host, because `localhost` there is the emulator
 itself.
 
+## Installing on a real device
+
+### Android — an APK, built in the cloud
+
+**A release APK cannot be built locally on Windows.** This is measured, not assumed — see
+the section below. Use EAS Build, which compiles on Linux where the limit does not exist,
+and which is the same command that later produces the Play Store bundle:
+
+```bash
+cd GameBuddy-App
+npm install -g eas-cli
+eas login                       # a free Expo account
+
+# Once per project: hand EAS the Firebase config. See below.
+eas env:set --scope project --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json --visibility sensitive --environment production --environment preview
+
+eas build --platform android --profile lan
+```
+
+#### google-services.json has to be handed over separately
+
+> **The file's `package_name` has to match `android.package` exactly.** The Gradle plugin
+> matches on that string and stops the build with `No matching client found for package
+> name` when it does not. This bit once, during the rename to `com.findgamebuddy.app` (see
+> *Android* above): the old file was still registered against `com.gamebuddy.app`.
+>
+> Hand-editing the JSON is **not** the fix — the app id and API key inside belong to whichever
+> registration Firebase issued them for. Register the app in the Firebase console under the
+> new package, download the fresh file, and replace *both* copies (repo root and
+> `android/app/`), then re-run the `eas env:set` below so the builder gets it too. Resolved
+> 2026-08-16; current file is project `gamebuddy-a4205`, app id ending `9738c2`, verified by
+> `FirebaseApp initialization successful` in logcat on a running build.
+
+Without that `env:set`, the build fails on the builder:
+
+```
+"google-services.json" is missing, make sure that the file exists.
+Remember that EAS Build only uploads the files tracked by git.
+```
+
+The file is gitignored — the workspace root excludes every Firebase and service-account
+file — so it is never uploaded, and `app.json` points straight at it.
+
+**A `.easignore` does not fix this.** It can only *exclude* files from the upload; it
+cannot include one that git does not track. That was tried and it failed with the same
+error.
+
+What works is an EAS **file environment variable**: the file is stored by EAS, written to
+a temporary path on the builder, and its location exposed as `GOOGLE_SERVICES_JSON`.
+`app.config.js` reads that variable and falls back to the path in `app.json` when it is
+absent, so `expo prebuild` and `expo run:android` keep working locally with no setup at
+all.
+
+The other option is to un-ignore the file and commit it. Its API key is public by design —
+it ships inside every APK and is restricted by the app's signing certificate — so this is
+not as reckless as it sounds. It was not done here because the repository deliberately
+excludes credential files, and one exception is how that convention stops being one.
+
+EAS prints a URL when it finishes; open it on the phone and install. The `lan` profile
+builds an APK (not an `.aab`), marks it internal-distribution so no store is involved, and
+sets `EXPO_PUBLIC_API_URL` to this PC's address.
+
+**Update the IP in `eas.json` when your router changes it.** It is a DHCP lease baked into
+a build, not configuration.
+
+The free tier gives a limited number of builds a month on a shared queue, so a build can
+wait a while before it starts. Nothing here requires a paid plan.
+
+#### Why not locally
+
+Both attempts failed the same way, and the error names neither Windows nor path lengths:
+
+```
+ninja: error: manifest 'build.ninja' still dirty after 100 tries
+```
+
+Above it, CMake explains itself:
+
+```
+.../react-native-reanimated/android/.cxx/RelWithDebInfo/<hash>/arm64-v8a/
+  CMakeFiles/reanimated.dir/    has 179 characters.
+The maximum full path to an object file is 250 characters
+  (see CMAKE_OBJECT_PATH_MAX).
+```
+
+CMake mirrors every absolute source path underneath the build directory, so the project's
+location appears twice in each object path. Measured: **367 characters against a limit of
+250.**
+
+Things that do not fix it:
+
+- **`LongPathsEnabled`** is already `1` in the registry on this machine. It is irrelevant —
+  the 250 is CMake's own `CMAKE_OBJECT_PATH_MAX`, not the Windows `MAX_PATH` of 260.
+- **A junction at `C:\gb`.** Tried it; Gradle resolves the link back to the real path
+  before CMake ever sees it, and the error came back byte for byte identical.
+- **Moving the app to `C:\gb`** would bring it to 245 — five characters under the limit,
+  with one source file. Any longer filename in a future version of reanimated puts it back
+  over. That is not a workflow, it is a coin toss.
+
+Building a *debug* variant locally still works and is unaffected — `npx expo run:android`
+is the normal loop. It is the release build, with its longer `RelWithDebInfo` directory
+name and its full native compile, that goes over.
+
+#### The phone also has to be able to reach the PC
+
+Docker publishes 8080 on all interfaces — `curl http://192.168.50.169:8080/actuator/health`
+from this machine already answers — but Windows Firewall drops inbound connections from
+anywhere else. Once, as administrator:
+
+```powershell
+New-NetFirewallRule -DisplayName "GameBuddy backend (LAN)" -Direction Inbound `
+  -LocalPort 8080 -Protocol TCP -Action Allow `
+  -RemoteAddress 192.168.50.0/24
+```
+
+Scoped by **subnet**, not by firewall profile. `-Profile Private` looks like the tighter
+choice and is a trap: Windows classifies this machine's Wi-Fi as *Public*
+(`Get-NetConnectionProfile` says so), so a Private-only rule is created, listed by
+`Get-NetFirewallRule`, and never applies. The connection is refused with nothing to
+suggest a rule exists at all.
+
+`-RemoteAddress` reaches the same restriction by a route that does not depend on how
+Windows happened to label the network: only hosts on your own LAN can open the port,
+whatever profile is active. Adjust the range if your router hands out something other than
+`192.168.50.x`.
+
+Then, from the phone's browser: `http://192.168.50.169:8080/actuator/health` should return
+`{"status":"UP"}`. If that fails, nothing in the app will work either, and the problem is
+the network rather than the build.
+
+### iPhone — Expo Go today, TestFlight later
+
+For testing against a local backend, **use Expo Go**. It is free, needs no Apple
+account, and the API base URL resolves from Metro's host automatically:
+
+```bash
+npx expo start
+```
+
+Scan the QR code with the iPhone camera. Push notifications will not work — they need a
+real build — but everything else does.
+
+**TestFlight is the wrong tool for a local backend**, for two reasons that are not worth
+fighting: iOS App Transport Security blocks plain HTTP in a real build, and a TestFlight
+build is meant to reach a deployed server rather than a laptop on your Wi-Fi. It becomes
+the right tool once the backend is deployed and on HTTPS.
+
+When that day comes:
+
+1. **Apple Developer Program — $99/year.** There is no free path to TestFlight.
+2. Create the app in App Store Connect with bundle id `com.findgamebuddy.app`.
+3. `eas build --platform ios --profile production` — EAS builds on cloud macOS, so no Mac
+   is required, and it generates and stores the signing certificates.
+4. `eas submit --platform ios --latest`
+5. Add yourself as an internal tester in App Store Connect → TestFlight.
+
+### Build profiles
+
+`production` is the source of truth and **the other three all `extends` it**, so they cannot
+silently drift from what ships. Each one overrides only what it genuinely needs to.
+
+| Profile | What it is for | Differs from `production` by |
+| --- | --- | --- |
+| `production` | The build end users get. `.aab` for Play, and the iOS build TestFlight receives | — |
+| `preview` | The same product, on **your own device**, to confirm the real thing is right before release | APK instead of `.aab` (an `.aab` cannot be sideloaded), internal distribution, own channel |
+| `gate` | The Maestro release gate | + LAN backend |
+| `lan` | Emulator or device, for **UI and flow** work | + LAN backend, **no RevenueCat key** |
+
+Three deliberate details, each of which has already gone wrong once:
+
+**`preview` overrides nothing but packaging.** It used to hand-copy `production`'s `env` and
+run under a separate `preview` EAS environment, which meant a secret added to `production`
+would quietly be missing from the one build meant to prove production works. It now `extends`
+and shares `environment: production`, so "the same as production" is structural rather than a
+promise someone has to remember to keep.
+
+**`lan` sets `EXPO_PUBLIC_REVENUECAT_API_KEY` to the empty string.** Not an oversight — it is
+how you *un*-inherit. Without it `lan` picks up the real `goog_` key and every throwaway
+UI build starts registering its test accounts as customers in the live RevenueCat project,
+for no benefit: a sideloaded APK cannot transact with Play Billing anyway.
+
+**`gate` keeps the real key on purpose.** Its entire job is catching release-only faults, and
+the RevenueCat termination bug in `QA_FINDINGS.md` is exactly that class — `gate` passed while
+`lan` and `preview` died, precisely because `gate` was the profile without a key. A gate that
+does not carry what production carries is not a gate.
+
+`autoIncrement` is `true` only on `production`. The others switch it off so a throwaway build
+does not burn a number out of the remote `versionCode` counter that Play releases draw from.
+
+**Every profile has its own EAS Update channel**, `production` included. That last one was
+missing until 2026-08-16, which meant shipped builds could not receive an over-the-air update
+at all — `updates.url` was configured in `app.json`, so the plumbing looked complete, but a
+build without a channel subscribes to nothing. Publish to a release with
+`eas update --branch <branch> --channel production`.
+
+The channels are deliberately distinct, so an update pushed to `preview` can never reach a
+store build. Combined with `runtimeVersion.policy: "appVersion"`, an update only reaches
+builds of the *same* app version — so JS-only fixes ship over the air, while anything touching
+native code correctly requires a new version and a new store release.
+
+The IP in `lan` and `gate` is a convenience, not configuration — it is your current DHCP lease
+and it will go stale.
+
 ## Known gaps
 
-- **Avatar images have nowhere to live.** The backend returns bare filenames like
-  `avatar-01.png`; the old Firebase URLs are gone. Until the art is hosted and
-  `EXPO_PUBLIC_AVATAR_BASE_URL` points at it, `src/avatars.ts` falls back to coloured
-  initials. See the comment in that file.
-- **`fcmToken` is the literal string `pending`.** Push is not wired up; the field is
-  required at registration, and `PUT /auth/fcm-token` replaces it once it is.
-- **Username rules are enforced only on the client** (`src/validation.ts`). The backend
-  requires non-blank and unique, nothing more.
+- **`plugins/withAndroidJdk17.js` hard-codes a Windows JDK path** as its default. It only
+  applies on Windows now, so EAS builds are unaffected, but a second Windows machine needs
+  `GAMEBUDDY_ANDROID_JDK` set.
+- **The `lan` build profile hard-codes a DHCP address.** See above.
+- **No `expo-system-ui`**, so `userInterfaceStyle` in `app.json` does nothing on Android.
+  Prebuild says so on every run. The in-app theme switcher is unaffected — it does not go
+  through that setting.

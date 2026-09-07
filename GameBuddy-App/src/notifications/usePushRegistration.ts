@@ -1,7 +1,9 @@
 import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
 import { authApi } from '../api/auth';
+import { ensureNotificationChannels } from './channel';
 import { hasBeenPrimed, permissionState } from './permission';
+import { isKnownKind } from './useNotificationRouting';
 
 /**
  * Registers this device for push, and decides whether to ask first.
@@ -23,17 +25,53 @@ import { hasBeenPrimed, permissionState } from './permission';
 /**
  * How a notification behaves while the app is open.
  *
- * <p>Banners are shown in the foreground on purpose. The alternative is a notification
- * that silently does nothing because the app happens to be open on a different screen,
- * which is how people conclude notifications are broken.
+ * <p><b>The app draws its own.</b> A kind this build recognises is presented in-app — a
+ * match raises the full-screen celebration (see {@link useMatchNotifications}), everything
+ * else raises a toast from the top (see {@link useInAppNotifications}) — so the system
+ * banner is suppressed for it. Letting Android draw one as well would be the same news
+ * twice, the second time in the OS's voice instead of ours, sliding down over the thing it
+ * is announcing.
+ *
+ * <p><b>An unrecognised kind still gets the system banner</b>, and that fallback is the
+ * important half of this rule. An installed app will meet kinds added to the backend after
+ * it shipped, and it has no in-app treatment for them; suppressing those would swallow the
+ * notification entirely. Better the OS's voice than silence. This is why the kind list is
+ * exported data in {@link useNotificationRouting} rather than a condition written out here
+ * — a new kind is added in one place or it is inconsistent everywhere.
+ *
+ * <p><b>A suppressed kind is kept out of the system tray as well.</b> That is not a second
+ * decision but the same one: Android presents a notification if any of banner, list or
+ * alert is asked for, so "in the tray but no banner" is not a state that exists — asking
+ * for the tray alone produced the heads-up banner too, over the very screen showing the
+ * message. What is given up is a tray entry for something that arrived while the gamer was
+ * watching it arrive, and it is given up only in the foreground: a push that lands while
+ * the app is backgrounded or closed never reaches this handler and behaves normally.
+ *
+ * <p><b>No sound from the OS.</b> The app plays its own cue, paired with its own haptic, at
+ * the moment the toast appears — see {@code src/ui/feedback.ts}. Leaving this true would
+ * play two sounds for one event.
+ *
+ * <p>This only affects the foreground. Anything arriving while the app is backgrounded or
+ * closed is untouched and behaves like any other push.
  */
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const kind = (notification.request.content.data as { kind?: string } | undefined)?.kind;
+    const drawnInApp = isKnownKind(kind);
+
+    return {
+      shouldShowBanner: !drawnInApp,
+      // Not `true`. On Android these are not the two separate places they read as: the
+      // native side presents the notification if *any* of banner, list or alert is set,
+      // and presenting it means a real system notification at the channel's importance —
+      // which for `messages` is a heads-up banner over whatever is on screen. Asking for
+      // the tray alone and getting the banner as well is how every message the app drew
+      // itself was also announced by Android, which is the report this fixes.
+      shouldShowList: !drawnInApp,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 /**
@@ -52,6 +90,11 @@ Notifications.setNotificationHandler({
 export async function registerDeviceToken(): Promise<void> {
   try {
     if ((await permissionState()) !== 'granted') return;
+
+    // Before the token, every time. The channel is what decides whether a notification
+    // appears over the screen or only in the shade, and an install that predates the
+    // channel — or one whose permission was granted from Android's settings — has none.
+    await ensureNotificationChannels();
 
     const token = await Notifications.getDevicePushTokenAsync();
     if (!token?.data) return;

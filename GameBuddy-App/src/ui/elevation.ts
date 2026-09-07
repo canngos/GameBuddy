@@ -22,7 +22,28 @@ import { Platform, type ViewStyle } from 'react-native';
  * `undefined` on one theme — makes the element stop painting its subtree when the theme
  * flips at runtime. See `useHairline` for the whole story.
  */
+/**
+ * Resolved styles, keyed by the two inputs — same reasoning as `glow` next door.
+ *
+ * `lift` is pure and is called inline inside `style` arrays (`Card`, `Button`, the tab
+ * bar), so a fresh object every render invalidated the array around it as well. Four
+ * levels and, in practice, one colour, so this settles at four entries.
+ */
+const cache = new Map<string, ViewStyle>();
+const MAX_ENTRIES = 64;
+
 export function lift(level: 'none' | 'sm' | 'md' | 'lg', color = '#000000'): ViewStyle {
+  const key = `${level}|${color}`;
+  const hit = cache.get(key);
+  if (hit !== undefined) return hit;
+
+  const style = buildLift(level, color);
+  if (cache.size >= MAX_ENTRIES) cache.clear();
+  cache.set(key, style);
+  return style;
+}
+
+function buildLift(level: 'none' | 'sm' | 'md' | 'lg', color: string): ViewStyle {
   const spec = LEVELS[level];
 
   return Platform.select<ViewStyle>({

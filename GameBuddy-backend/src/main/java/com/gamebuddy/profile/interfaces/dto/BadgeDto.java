@@ -24,8 +24,36 @@ public class BadgeDto {
 
     private int target;
 
-    /** Coins credited on collection. */
+    /**
+     * Coins credited on collection.
+     *
+     * <p>Zero on the four hard badges that hand over a frame instead — see
+     * {@link #cosmeticName}. It is never zero on anything else, so the client can treat
+     * "reward is zero" and "there is a cosmetic" as the same state without checking both.
+     */
     private int reward;
+
+    /** BRONZE, SILVER, GOLD or PRISMATIC. Decides the rim art, and whether the app animates it. */
+    private String tier;
+
+    /**
+     * True when the artwork is animated WebP rather than a still PNG.
+     *
+     * <p>Only two badges. Sent rather than derived from {@link #tier} because it is a
+     * property of the file, not of the difficulty — and because the client needs to know
+     * whether to pass {@code autoplay}, which is a rendering decision and should not depend
+     * on the app guessing what the backend uploaded.
+     */
+    private boolean animated;
+
+    /**
+     * The frame this unlocks, for the badges that pay in cosmetics rather than coins.
+     *
+     * <p>Null for everything else. Resolved server-side because only the backend knows
+     * which cosmetic row claims which badge, and the sheet has to be able to say what is
+     * actually on offer rather than "a reward".
+     */
+    private String cosmeticName;
 
     private boolean earned;
 

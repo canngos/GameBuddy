@@ -1,0 +1,67 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.findgamebuddy.com",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY": "goog_xmTnFlrJPKSREBlIkFfHLFdjzCR",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "656951909603-opej7fmrbns73r27vtaj8uj931ga2vnl.apps.googleusercontent.com",
+        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": "ca-app-pub-1806031824100901/9009681771",
+        "ADMOB_ANDROID_APP_ID": "ca-app-pub-1806031824100901~2460074542"
+      }
+    },
+    "preview": {
+      "extends": "production",
+      "autoIncrement": false,
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "gate": {
+      "extends": "production",
+      "autoIncrement": false,
+      "distribution": "internal",
+      "channel": "gate",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080",
+        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": "none"
+      }
+    },
+    "lan": {
+      "extends": "production",
+      "autoIncrement": false,
+      "distribution": "internal",
+      "channel": "lan",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.50.169:8080",
+        "EXPO_PUBLIC_REVENUECAT_API_KEY": "none",
+        "EXPO_PUBLIC_ADMOB_REWARDED_UNIT_ID": "none"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "../../keys/gamebuddy/project-736aa984-61c3-4516-9cb-3fc8125833b2.json",
+        "track": "internal"
+      }
+    }
+  }
+}

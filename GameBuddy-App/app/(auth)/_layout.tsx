@@ -1,5 +1,5 @@
-import { Stack } from 'expo-router';
-import { RouteGuard } from '../../src/session/RouteGuard';
+import { Stack } from "expo-router";
+import { RouteGuard } from "../../src/session/RouteGuard";
 
 /**
  * Only a signed-out user belongs here.
@@ -10,8 +10,10 @@ import { RouteGuard } from '../../src/session/RouteGuard';
  */
 export default function AuthLayout() {
   return (
-    <RouteGuard allow={(s) => s === 'signedOut'}>
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
+    <RouteGuard allow={(s) => s === "signedOut"}>
+      <Stack
+        screenOptions={{ headerShown: false, animation: "slide_from_right" }}
+      />
     </RouteGuard>
   );
 }

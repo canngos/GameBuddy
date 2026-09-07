@@ -22,6 +22,52 @@ public class GamerDto {
      */
     private String frame;
 
+    /**
+     * The card theme this gamer is wearing, as a slug, or null for none.
+     *
+     * <p>This is the one cosmetic that changes the card itself rather than sitting on the
+     * avatar — the deck paints its identity block in the theme's colours instead of the
+     * hue derived from the gamer's id. Colours live in the client; see
+     * {@link com.gamebuddy.shared.entity.CosmeticKind#THEME}.
+     */
+    private String theme;
+
     private List<GamesDto> favoriteGames;
     private List<String> selectedKeywords;
+
+    /**
+     * What this gamer plays on, as human-readable labels.
+     *
+     * <p>Labels rather than enum names, for the same reason the keywords above are names
+     * rather than ids: the deck renders these directly, and a client that has to translate
+     * {@code PLAYSTATION} into "PlayStation" is a client that will eventually spell it
+     * differently from every other screen.
+     *
+     * <p>Empty for accounts that pre-date the field. The card omits the row entirely rather
+     * than showing "Plays on: —", because an absent answer is not information.
+     */
+    private List<String> platforms;
+
+    /**
+     * Whether this gamer's like was a super like.
+     *
+     * <p>Only ever true on the "who liked you" list, which is the one place the question
+     * means anything: everywhere else this DTO describes somebody who has not necessarily
+     * liked you at all, and the field is left false rather than being made nullable to say
+     * "not applicable". A boolean that is false in the deck costs a word on the wire and
+     * spares every caller a null check.
+     */
+    /**
+     * Verified Discord handles, shown under the name on the card.
+     *
+     * <p><strong>Public links only.</strong> A deck card is, by definition, somebody the
+     * viewer has not matched with — that is the decision the card exists to support — so the
+     * matches-only setting excludes every one of them. Rather than pass a viewer down here to
+     * compute a relationship that is already known to be "none", this is filtered to
+     * {@code PUBLIC} at the source. The failure direction matters: if a friend ever did
+     * appear in the deck they would see less than they are entitled to, never more.
+     */
+    private List<LinkedAccountDto> linkedAccounts;
+
+    private boolean superLike;
 }

@@ -1,12 +1,13 @@
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, View } from 'react-native';
-import { CountryPicker } from '../../src/onboarding/CountryPicker';
-import { AvatarPicker } from '../../src/pickers/AvatarPicker';
-import { useDraft } from '../../src/onboarding/draft';
-import { StepHeader } from '../../src/onboarding/StepHeader';
-import { Button, cn, Screen, Text, TextField } from '../../src/ui';
-import { ageError, MIN_AGE } from '../../src/validation';
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { Pressable, View } from "react-native";
+import { useT } from "../../src/i18n/useT";
+import { CountryPicker } from "../../src/onboarding/CountryPicker";
+import { useDraft } from "../../src/onboarding/draft";
+import { StepHeader } from "../../src/onboarding/StepHeader";
+import { BirthDateField } from "../../src/onboarding/BirthDateField";
+import { Button, Screen, Text, cn, useIntroPadding } from "../../src/ui";
+import { birthDateError, MIN_AGE } from "../../src/validation";
 
 /**
  * The backend stores gender as a single character and does not constrain it further.
@@ -14,50 +15,63 @@ import { ageError, MIN_AGE } from '../../src/validation';
  * the backend accepts. Keeping them distinct is what stops the decline option from
  * rendering as pre-selected.
  */
-const GENDERS = [
-  { value: 'M', label: 'Man' },
-  { value: 'F', label: 'Woman' },
-  { value: 'O', label: 'Other' },
-  { value: '', label: 'Prefer not to say' },
-] as const;
+const GENDER_VALUES = ["M", "F", "O", ""] as const;
 
 export default function Profile() {
+  const intro = useIntroPadding();
   const router = useRouter();
+  const t = useT();
   const draft = useDraft();
   const [touched, setTouched] = useState(false);
 
-  const problems = {
-    age: ageError(draft.age),
-    country: draft.country ? null : 'Choose your country',
-    avatar: draft.avatarId ? null : 'Pick an avatar',
+  // Built here rather than as a module constant: a `const` array of labels is evaluated
+  // once at import time, long before anybody has chosen a language.
+  const genderLabels: Record<(typeof GENDER_VALUES)[number], string> = {
+    M: t.onboarding.profile.genderMan,
+    F: t.onboarding.profile.genderWoman,
+    O: t.onboarding.profile.genderOther,
+    "": t.onboarding.profile.genderNone,
   };
-  const valid = !problems.age && !problems.country && !problems.avatar;
+
+  const problems = {
+    birthDate: birthDateError(
+      draft.birthDay,
+      draft.birthMonth,
+      draft.birthYear,
+    ),
+    country: draft.country ? null : t.onboarding.profile.countryRequired,
+  };
+  const valid = !problems.birthDate && !problems.country;
 
   function next() {
     setTouched(true);
     if (!valid) return;
-    router.push('/games');
+    router.push("/avatar");
   }
 
   return (
     <Screen scroll>
       <StepHeader
         step={2}
-        total={4}
-        title="About you"
-        subtitle="Age decides who you are shown. Under-18 and over-18 are never matched with each other."
+        total={6}
+        title={t.onboarding.profile.title}
+        subtitle={t.onboarding.profile.subtitle}
       />
 
       <View className="gap-6">
-        <TextField
-          label="Age"
-          value={draft.age}
-          onChangeText={(t) => draft.set({ age: t.replace(/\D/g, '').slice(0, 2) })}
-          error={touched ? problems.age : null}
-          hint={`You must be at least ${MIN_AGE}.`}
-          keyboardType="number-pad"
-          maxLength={2}
-          placeholder="21"
+        <BirthDateField
+          day={draft.birthDay}
+          month={draft.birthMonth}
+          year={draft.birthYear}
+          onChange={(parts) =>
+            draft.set({
+              ...(parts.day !== undefined && { birthDay: parts.day }),
+              ...(parts.month !== undefined && { birthMonth: parts.month }),
+              ...(parts.year !== undefined && { birthYear: parts.year }),
+            })
+          }
+          error={touched && problems.birthDate ? problems.birthDate(t) : null}
+          hint={t.onboarding.profile.ageHint(MIN_AGE)}
         />
 
         <CountryPicker
@@ -68,56 +82,42 @@ export default function Profile() {
 
         <View>
           <Text variant="label" className="mb-3 text-muted">
-            Gender
+            {t.onboarding.profile.gender}
           </Text>
           <View className="flex-row flex-wrap gap-2">
-            {GENDERS.map((option) => {
-              const selected = draft.gender === option.value;
+            {GENDER_VALUES.map((value) => {
+              const selected = draft.gender === value;
+              const label = genderLabels[value];
               return (
                 <Pressable
-                  key={option.label}
-                  onPress={() => draft.set({ gender: option.value })}
+                  key={value || "none"}
+                  onPress={() => draft.set({ gender: value })}
                   accessibilityRole="radio"
                   accessibilityState={{ selected }}
                   className={cn(
-                    'rounded-full border-2 px-4 py-2.5 active:opacity-80',
-                    selected ? 'border-brand bg-brand' : 'border-line bg-raised',
+                    "rounded-full border-2 px-4 py-2.5 active:opacity-80",
+                    selected
+                      ? "border-primary bg-primary"
+                      : "border-line bg-raised",
                   )}
                 >
                   <Text
-                    variant={selected ? 'bodyStrong' : 'body'}
-                    className={selected ? 'text-white' : 'text-content'}
+                    variant={selected ? "bodyStrong" : "body"}
+                    className={selected ? "text-white" : "text-content"}
                   >
-                    {option.label}
+                    {label}
                   </Text>
                 </Pressable>
               );
             })}
           </View>
         </View>
-
-        <View>
-          <Text variant="label" className="mb-3 text-muted">
-            Avatar
-          </Text>
-
-          <AvatarPicker
-            selected={draft.avatarId}
-            onSelect={(avatarId) => draft.set({ avatarId })}
-          />
-
-          {touched && problems.avatar && (
-            <Text variant="caption" className="mt-3 text-danger">
-              {problems.avatar}
-            </Text>
-          )}
-        </View>
       </View>
 
       {/* No Back: the username step arrives here with `replace`, so this is the bottom
           of the stack and a back button would do nothing. */}
-      <View className="mt-auto pt-10">
-        <Button label="Continue" onPress={next} />
+      <View className={`mt-auto ${intro.footer}`}>
+        <Button label={t.common.continue} onPress={next} />
       </View>
     </Screen>
   );

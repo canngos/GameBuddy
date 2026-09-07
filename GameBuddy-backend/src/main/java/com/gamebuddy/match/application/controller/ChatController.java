@@ -8,9 +8,12 @@ import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import com.gamebuddy.match.domain.service.chat.SentMessage;
 import com.gamebuddy.match.interfaces.dto.ChatNotification;
 import com.gamebuddy.match.interfaces.request.ChatMessageRequest;
+import com.gamebuddy.match.interfaces.request.TypingRequest;
 import com.gamebuddy.match.interfaces.response.ConversationResponse;
 import com.gamebuddy.match.interfaces.response.InboxResponse;
+import com.gamebuddy.match.interfaces.response.PresenceResponse;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.messaging.UserMessaging;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -33,7 +35,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 @RequiredArgsConstructor
 public class ChatController {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final UserMessaging messaging;
     private final ChatMessageService chatMessageService;
 
     /**
@@ -83,7 +85,7 @@ public class ChatController {
      * recipient who is offline loses nothing.
      */
     private void deliver(SentMessage sent) {
-        messagingTemplate.convertAndSendToUser(
+        messaging.sendToUser(
                 sent.receiverPrincipalName(),
                 "/queue/messages",
                 new ChatNotification(sent.id().toString(), sent.senderId(), sent.senderName(), sent.body()));
@@ -115,6 +117,62 @@ public class ChatController {
         throw new BusinessException(TransactionCode.TOKEN_INVALID);
     }
 
+    /**
+     * Whether one gamer is online, for the header of a conversation.
+     *
+     * <p>Asked once when the screen opens; changes after that arrive on
+     * {@code /user/queue/presence} without polling.
+     *
+     * <p><strong>Matches only.</strong> Presence is personal information — it says when
+     * somebody is awake, and at their phone. It is disclosed to people they have agreed to
+     * talk to and to nobody else, which is the same rule chat itself applies.
+     */
+    @GetMapping("/presence/{userId}")
+    @ResponseBody
+    public ResponseEntity<PresenceResponse> presence(
+            @AuthenticationPrincipal Gamer principal, @PathVariable String userId) {
+        return ResponseEntity.ok(chatMessageService.presenceOf(principal, userId));
+    }
+
+    /**
+     * "They are typing", relayed to the other person and stored nowhere.
+     *
+     * <p>Over the socket rather than HTTP, unlike sending a message. The trade that makes
+     * HTTP right for a message — it must survive a dropped socket — is exactly backwards
+     * here: a typing indicator is worthless a second late, and one that arrives after the
+     * message it predicted is noise. If the socket is down there is nothing worth retrying.
+     */
+    @MessageMapping("/chat.typing")
+    public void typing(Principal principal, @Payload @Valid TypingRequest request) {
+        chatMessageService.relayTyping(senderOf(principal), request.getReceiver());
+    }
+
+    /**
+     * A frame whose only purpose is to arrive. Deliberately does nothing.
+     *
+     * <p>This exists because React Native cannot send a STOMP heartbeat. A heartbeat is a
+     * frame containing one newline, and RN's WebSocket mangles exactly that — so a client
+     * that promises to heartbeat every 10s appears silent, and this server correctly closes
+     * it. Measured: a session that sends nothing is cut at 33.7s with an ERROR frame.
+     *
+     * <p>The fix is to keep the promise with a frame RN <em>can</em> carry. Spring counts
+     * any inbound message as read activity, not only heartbeats — verified against this
+     * endpoint's own destination, where a client sending nothing but these survived
+     * indefinitely. So the client declares a heartbeat, then satisfies it with these.
+     *
+     * <p><strong>Why this matters beyond keeping a socket open.</strong> It is the only way
+     * the server learns that somebody's phone died rather than closed the app. Without it
+     * nothing ever fires {@code SessionDisconnectEvent} for them and
+     * {@code PresenceRegistry} shows them online forever.
+     *
+     * <p>No body, no validation, no database access — one dispatch and back. It runs
+     * several times a minute for every connected gamer, so it must stay that way.
+     */
+    @MessageMapping("/chat.keepalive")
+    public void keepalive() {
+        // Intentionally empty. See above: arriving is the entire contract.
+    }
+
     @GetMapping("/messages/get/{friendId}")
     public ResponseEntity<ConversationResponse> findChatMessages(
             @AuthenticationPrincipal Gamer principal, @PathVariable String friendId) {
@@ -124,6 +182,21 @@ public class ChatController {
     @GetMapping("/messages/get/inbox")
     public ResponseEntity<InboxResponse> findInbox(@AuthenticationPrincipal Gamer principal) {
         return ResponseEntity.ok(chatMessageService.findInbox(principal));
+    }
+
+    /**
+     * Marks a conversation read.
+     *
+     * <p>Loading the history already does this, so at first glance it is redundant — but the
+     * client caches a conversation it has open, and a thread on screen receiving messages
+     * over the socket never reloads at all. Both cases left a badge claiming unread messages
+     * the gamer had just read. This is the explicit version, called on open and on delivery.
+     */
+    @PostMapping("/messages/read/{friendId}")
+    @ResponseBody
+    public ResponseEntity<DefaultMessageResponse> markRead(
+            @AuthenticationPrincipal Gamer principal, @PathVariable String friendId) {
+        return ResponseEntity.ok(chatMessageService.markConversationRead(principal, friendId));
     }
 
     @PostMapping("/messages/report/{messageId}")

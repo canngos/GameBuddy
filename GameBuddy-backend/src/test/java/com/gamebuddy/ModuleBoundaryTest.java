@@ -1,6 +1,7 @@
 package com.gamebuddy;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.tngtech.archunit.core.domain.JavaAccess;
@@ -66,6 +67,8 @@ class ModuleBoundaryTest {
                     "..gamebuddy.profile..",
                     "..gamebuddy.community..",
                     "..gamebuddy.match..",
+                    "..gamebuddy.lobby..",
+                    "..gamebuddy.moderation..",
                     "..gamebuddy.notif..",
                     "..gamebuddy.billing..")
             .allowEmptyShould(true);
@@ -117,6 +120,39 @@ class ModuleBoundaryTest {
             .should()
             .dependOnClassesThat()
             .resideInAPackage("..gamebuddy.shared.entity..")
+            .allowEmptyShould(true);
+
+    /**
+     * A {@code @Transactional} method must be public, or the annotation is decoration.
+     *
+     * <p>Spring's transaction management is proxy-based, and a proxy can only intercept
+     * calls that arrive through it. A non-public method is invisible to the proxy: the
+     * annotation compiles, reads correctly, and does nothing.
+     *
+     * <p>This rule exists because the mistake has been made twice here, and both times it
+     * failed silently rather than loudly. {@code PresenceService.announce} was annotated and
+     * called on {@code this}, so every presence announcement died in a swallowed
+     * {@code LazyInitializationException}. {@code LastActiveTracker.touch} was
+     * package-private on a filter built with {@code new}, so {@code last_active_at} was
+     * never written once — which left re-engagement nudges dormant and made every retention
+     * figure on the analytics dashboard a structural zero.
+     *
+     * <p>Both bugs looked like healthy code and were caught only by reading the database.
+     * Public is not sufficient — the object must also be a Spring bean, and the call must
+     * not be a self-invocation — but non-public is always wrong, and it is the half a
+     * compiler can check.
+     */
+    @ArchTest
+    static final ArchRule transactionalMethodsArePublic = methods()
+            .that()
+            .areAnnotatedWith("org.springframework.transaction.annotation.Transactional")
+            .and()
+            .areDeclaredInClassesThat()
+            .areNotInterfaces()
+            .should()
+            .bePublic()
+            .because("Spring's transactional proxy cannot intercept a non-public method,"
+                    + " so the annotation would silently do nothing")
             .allowEmptyShould(true);
 
     // ------------------------------------------------------------------------

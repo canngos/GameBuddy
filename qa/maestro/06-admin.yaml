@@ -1,0 +1,172 @@
+# The moderator console, and the fact that ordinary accounts cannot reach it.
+#
+# Two halves, and the second matters more. Anyone can check that an admin sees the admin
+# screen; the question worth asking is whether a normal account is kept out of it, because
+# that is the failure nobody notices until it is being exploited.
+#
+# It runs against whichever staff account QA_ADMIN_EMAIL names. Staff accounts are ordinary
+# accounts promoted to role = 'ADMIN' by hand — there is no sign-up flow and no environment
+# variable that grants it. Skipped automatically when that variable is empty.
+
+appId: com.findgamebuddy.app
+name: 06 admin
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "I already have one"
+    timeout: 60000
+- tapOn: "I already have one"
+
+# This flow signs in inline rather than through `_login.yaml`, so it needs the consent
+# form answered here too. See `_consent.yaml`.
+- runFlow: _consent.yaml
+
+- assertVisible: "Welcome back"
+
+- tapOn:
+    id: "field-username-or-email"
+- inputText: ${QA_ADMIN_EMAIL}
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn:
+    id: "field-password"
+- inputText: ${QA_ADMIN_PASSWORD}
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Sign in"
+
+# An ADMIN lands on the console rather than the swipe deck.
+- extendedWaitUntil:
+    visible: "Console"
+    timeout: 40000
+
+# The admin tab bar is covered by the same debug-build LogBox notifications as the member
+# one. This half happened to pass without it, because the console is long enough to scroll
+# the notifications out of the way — which is luck, not a reason to leave it out.
+- runFlow: _dismiss-logbox.yaml
+
+- takeScreenshot: artifacts/06-01-console
+
+# The "Needs you" card is rendered only when there is something in it
+# (`openReports > 0 || avatarsPending > 0`), so on a quiet instance it is legitimately
+# absent. Asserting it unconditionally makes this flow fail on a *clean* system, which is
+# the wrong way round.
+- assertVisible:
+    text: "Avatars to review"
+    optional: true
+
+# The numbers the console exists to show. Asserted as present, not for particular values —
+# these are live counts and pinning them would make the flow fail every time somebody signs
+# up. "Matches" sits in the "What the app produced" card, seven cards down, so it has to be
+# scrolled to rather than asserted where the screen opens.
+- scrollUntilVisible:
+    element:
+      text: "Matches"
+    direction: DOWN
+    timeout: 30000
+- assertVisible: "Messages"
+- takeScreenshot: artifacts/06-02-console-stats
+
+# The admin tab bar: Overview, Reports, Avatars, Accounts, Codes, Settings.
+- tapOn: "Reports"
+- extendedWaitUntil:
+    visible: "Moderation"
+    timeout: 20000
+- takeScreenshot: artifacts/06-03-reports
+
+# The two decisions a moderator can make on a report. Present, not exercised: actioning a
+# real report from a UI test would delete content the API suite is also asserting against,
+# and the outcome of both buttons is already covered there. Optional because an empty queue
+# is a normal state.
+- assertVisible:
+    text: "Remove"
+    optional: true
+- assertVisible:
+    text: "Keep"
+    optional: true
+
+- tapOn: "Avatars"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: artifacts/06-04-avatars
+
+- tapOn: "Accounts"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: artifacts/06-05-accounts
+
+# Promotion codes. The list and the form, not a live code: creating one from here would
+# leave a redeemable coupon behind on whatever instance the flow ran against, and every
+# rule about what a code does is asserted in qa/functional/13-promo-codes.test.js. What
+# this covers is the half that suite cannot — that the tab mounts, that the form draws,
+# and that its fields are reachable on a real phone with a real keyboard.
+- tapOn: "Codes"
+- extendedWaitUntil:
+    visible: "Promotion codes"
+    timeout: 20000
+- takeScreenshot: artifacts/06-06-promo-codes
+
+- tapOn: "New code"
+- extendedWaitUntil:
+    visible: "New promotion code"
+    timeout: 20000
+
+# Both halves of the reward switch, because which field is on screen depends on it.
+- assertVisible: "Coins"
+- tapOn: "Gold"
+- assertVisible: "Days of Gold"
+- tapOn: "Coins"
+
+- tapOn:
+    id: "field-coins"
+- inputText: "500"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# The recipient picker, which is the one screen in the console that names individual
+# gamers. Reached rather than used: selecting somebody here would put a real account on a
+# draft, and Cancel is the way back out.
+- assertVisible: "Choose people"
+- takeScreenshot: artifacts/06-07-promo-new
+
+- tapOn: "Choose people"
+- extendedWaitUntil:
+    visible: "Choose people"
+    timeout: 20000
+- assertVisible: "Away 14d"
+- assertVisible: "Reporters"
+- takeScreenshot: artifacts/06-08-promo-picker
+- tapOn: "Done"
+
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Cancel"
+- extendedWaitUntil:
+    visible: "Promotion codes"
+    timeout: 20000
+
+# --- and now the half that matters ------------------------------------------------------
+# Sign out and back in as an ordinary member. The console must not be reachable.
+- runFlow: _login.yaml
+
+- assertVisible: "DISCOVER"
+- assertNotVisible: "Console"
+- assertNotVisible: "Avatars to review"
+- takeScreenshot: artifacts/06-09-member-no-console
+
+# The admin route by direct navigation, which is what someone would actually try. The app
+# must send them back rather than render it.
+#
+# Note the API answers /admin/** with 401 rather than 403 (see QA_FINDINGS.md #4), and an
+# empty 401 is what client.ts treats as an expired session — so the plausible failure here
+# is being signed out rather than being refused. Either way the console must not appear.
+- openLink: gamebuddy://console
+- extendedWaitUntil:
+    notVisible: "Avatars to review"
+    timeout: 15000
+- assertNotVisible: "Open reports"
+- takeScreenshot: artifacts/06-10-deeplink-refused

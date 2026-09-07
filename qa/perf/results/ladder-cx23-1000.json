@@ -1,0 +1,31 @@
+{
+  "plan": "cx23",
+  "dau": 1000,
+  "durationSeconds": 60,
+  "offered": {
+    "sessionsPerSecond": 0.041666666666666664,
+    "requestsPerSecond": 0.5416666666666666,
+    "concurrent": 15
+  },
+  "achieved": {
+    "requests": 49,
+    "requestsPerSecond": 0.8145260031533578,
+    "iterations": 4,
+    "droppedIterations": 0,
+    "failedRate": 0
+  },
+  "latencyMs": {
+    "avg": 14.036803163265304,
+    "med": 8.534969,
+    "p95": 68.22674099999998,
+    "p99": 74.93058183999997,
+    "max": 78.60283
+  },
+  "feedLatencyMs": {
+    "avg": 71.226513,
+    "med": 70.69210000000001,
+    "p95": 77.45525244999999,
+    "p99": 78.37331449,
+    "max": 78.60283
+  }
+}

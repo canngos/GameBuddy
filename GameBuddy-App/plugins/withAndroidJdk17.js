@@ -19,10 +19,22 @@ const { withGradleProperties } = require('expo/config-plugins');
  * toolchain provisioning puts the JDK it downloads, which is why nothing needed
  * installing here.
  */
-const DEFAULT_JDK =
-  'C:/Users/canba/.gradle/jdks/eclipse_adoptium-17-amd64-windows.2';
+const DEFAULT_JDK = 'C:/Users/canba/.gradle/jdks/eclipse_adoptium-17-amd64-windows.2';
 
 module.exports = function withAndroidJdk17(config) {
+  // Nothing to fix anywhere but this Windows machine, and pinning a *Windows* path on a
+  // Linux builder is worse than not pinning at all — EAS Build would write
+  // `org.gradle.java.home=C:/Users/...` into gradle.properties and fail before it
+  // compiled a line. EAS images already run a supported JDK, so the right behaviour off
+  // Windows is to leave the property alone.
+  //
+  // An explicit GAMEBUDDY_ANDROID_JDK still wins on any platform: somebody who has set it
+  // has said what they want.
+  const explicit = process.env.GAMEBUDDY_ANDROID_JDK;
+  if (!explicit && process.platform !== 'win32') {
+    return config;
+  }
+
   return withGradleProperties(config, (cfg) => {
     // Forward slashes, always. gradle.properties is a Java properties file, where a
     // backslash is an escape character — a Windows path written literally arrives as

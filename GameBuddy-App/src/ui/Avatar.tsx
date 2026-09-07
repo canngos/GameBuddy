@@ -1,7 +1,10 @@
-import { Image, View } from 'react-native';
-import { avatarColor, avatarUri, initialsOf } from '../avatars';
-import { brand } from '../theme';
+import { Image } from 'expo-image';
+import { memo, useMemo } from 'react';
+import { View } from 'react-native';
+import { avatarColor, avatarGradient, avatarUri, initialsOf } from '../avatars';
+import { useThemeColors } from '../theme';
 import { cn } from './cn';
+import { GradientView } from './Gradient';
 import { Text } from './Text';
 
 type AvatarProps = {
@@ -25,7 +28,7 @@ type AvatarProps = {
  * bare filenames cannot be resolved until the art is hosted, and a grey box on every
  * profile would be much worse than initials.
  */
-export function Avatar({
+export const Avatar = memo(function Avatar({
   source,
   name,
   colorSeed,
@@ -33,10 +36,36 @@ export function Avatar({
   selected = false,
   className,
 }: AvatarProps) {
+  const colors = useThemeColors();
   const uri = avatarUri(source);
+  const seed = colorSeed ?? name ?? source ?? '?';
   // Size is a runtime number, so it stays inline — an arbitrary Tailwind value cannot
   // be built from a variable, since the class list is extracted at build time.
-  const frame = { width: size, height: size, borderRadius: size / 2 };
+  //
+  // Memoised, along with the outer style array below, because this component sits in
+  // every row of every list in the app and both objects are props: rebuilding them each
+  // render is what stopped the rows above from ever bailing out.
+  const frame = useMemo(
+    () => ({ width: size, height: size, borderRadius: size / 2 }),
+    [size],
+  );
+
+  const box = useMemo(
+    () => [
+      frame,
+      {
+        borderWidth: selected ? 3 : 0,
+        borderColor: selected ? colors.primary : 'transparent',
+        backgroundColor: avatarColor(seed),
+      },
+    ],
+    [frame, selected, colors.primary, seed],
+  );
+
+  const label = useMemo(
+    () => ({ fontSize: size * 0.36, lineHeight: size * 0.44 }),
+    [size],
+  );
 
   return (
     <View
@@ -51,26 +80,44 @@ export function Avatar({
       // The tint is unconditional too, for the same reason. It is invisible behind an
       // image anyway, and it means a slow-loading avatar shows its own colour rather
       // than a grey box.
-      style={[
-        frame,
-        {
-          borderWidth: selected ? 3 : 0,
-          borderColor: selected ? brand.DEFAULT : 'transparent',
-          backgroundColor: avatarColor(colorSeed ?? name ?? source ?? '?'),
-        },
-      ]}
+      style={box}
     >
+      {/*
+        The gradient sits on top of that backgroundColor rather than replacing it, and both
+        are unconditional. It renders before the image so the image paints over it, which is
+        also why it is a sibling and not a wrapper — a slow-loading avatar shows its own
+        colour rather than a grey box, and a broken URL degrades to the monogram's backdrop
+        instead of to nothing.
+      */}
+      <GradientView
+        colors={avatarGradient(seed)}
+        direction="diagonal"
+        className="absolute inset-0"
+        pointerEvents="none"
+      />
+
       {uri ? (
-        <Image source={{ uri }} style={frame} resizeMode="cover" />
+        <Image
+          source={{ uri }}
+          style={frame}
+          contentFit="cover"
+          // The same faces recur constantly — the inbox, the friends list, a lobby
+          // roster, the deck — so a disk cache is the difference between paying for
+          // somebody's picture once and paying for it on every screen that shows them.
+          cachePolicy="memory-disk"
+          // Load-bearing now that these lists are virtualized: without it a recycled
+          // cell keeps the previous person's face until the new one decodes, which in a
+          // list of people is not a glitch so much as a lie.
+          recyclingKey={uri}
+          // No fade. An avatar is a small element in a dense row, and a transition on
+          // each one makes a list look like it is still loading after it has settled.
+          transition={0}
+        />
       ) : (
-        <Text
-          variant="heading"
-          className="text-white"
-          style={{ fontSize: size * 0.36, lineHeight: size * 0.44 }}
-        >
+        <Text variant="heading" className="text-white" style={label}>
           {initialsOf(name ?? source)}
         </Text>
       )}
     </View>
   );
-}
+});

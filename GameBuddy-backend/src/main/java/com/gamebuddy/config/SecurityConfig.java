@@ -49,6 +49,11 @@ public class SecurityConfig {
         "/auth/register",
         "/auth/sendCode",
         "/auth/verify",
+        // Both halves of a forgotten-password reset. Necessarily anonymous — somebody who
+        // cannot sign in is the only person who needs them. Each is throttled and each
+        // answers a bad code and an unknown address identically; see DefaultAuthService.
+        "/auth/reset/verify",
+        "/auth/reset/pwd",
         "/actuator/health/**",
         "/actuator/info",
         "/api-docs/**",
@@ -64,7 +69,40 @@ public class SecurityConfig {
         // being involved at all. Public because an <Image> fetches a URL with no
         // Authorization header, exactly as it would against R2's public bucket. Only the
         // MEDIA bucket is reachable through it; nothing awaiting review is.
-        "/media/**"
+        "/media/**",
+        // RevenueCat's webhook. Public to Spring Security because the caller is a server
+        // with no account and no JWT, but *not* unauthenticated: the controller checks a
+        // shared secret sent in the Authorization header and refuses without it. This is
+        // the only path that can grant a paid entitlement, so that check is the whole
+        // security boundary for billing — see RevenueCatWebhookController.
+        "/billing/revenuecat/webhook",
+        // AdMob's rewarded-ad callback. Public for the same reason as the line above —
+        // Google's servers call it and have no account here — but authenticated by the
+        // ECDSA signature AdMob puts on the query string, checked against Google's
+        // published verifier keys. This is the only path that can mint coins without a
+        // session, so that signature check is the whole security boundary for the ad
+        // economy; see RewardedAdController and RewardedAdVerifier.
+        "/ads/reward",
+        // Where Discord sends the browser back after somebody proves they own an
+        // account. Public for the same reason as the two above — the caller is a browser
+        // mid-redirect, with no session here and no token to present — and authenticated the
+        // same way in spirit: it carries a single-use link ticket, minted for one gamer and
+        // one provider, hashed at rest and burned on arrival. That ticket is the whole
+        // security boundary for linking, and it is deliberately not the JWT: a redirect URL
+        // ends up in browser history and in the provider's logs. See AccountLinkController
+        // and DefaultAccountLinkService.
+        "/auth/link/discord/callback",
+        // Signing in, as opposed to linking. Necessarily anonymous: somebody who has no
+        // account yet, or who has one and cannot get into it, is the only person who needs
+        // these. Listed one by one rather than as /auth/social/** because this is where
+        // accounts are created, and a wildcard is one refactor away from exposing something
+        // nobody meant to. Each is throttled by the `social` budget; see
+        // DefaultSocialAuthService for what the tokens they carry actually prove.
+        "/auth/social/providers",
+        "/auth/social/google",
+        "/auth/social/discord/start",
+        "/auth/social/discord/callback",
+        "/auth/social/exchange"
     };
 
     private final JwtAuthenticationFilter jwtAuthFilter;
@@ -97,8 +135,22 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                // 401 rather than a redirect to a login page that does not exist.
-                .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+                // Two handlers, because the two cases mean different things to the client.
+                //
+                // The entry point answers "no usable credentials" with 401 rather than a
+                // redirect to a login page that does not exist.
+                //
+                // The access-denied handler answers "credentials are fine, you may not do
+                // this" with 403 — and without it the AccessDeniedException raised by the
+                // /admin/** rule above fell through to the entry point instead. The app maps
+                // an empty 401 to onSessionExpired (src/api/client.ts), so an ordinary gamer
+                // who reached an admin route was signed out rather than refused. It also put
+                // the two admin surfaces in disagreement: /community/admin/reports already
+                // returns 403, because its @PreAuthorize denial is handled inside the
+                // dispatcher and never reaches here.
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                        .accessDeniedHandler(
+                                (request, response, denied) -> response.setStatus(HttpStatus.FORBIDDEN.value())))
                 .build();
     }
 }

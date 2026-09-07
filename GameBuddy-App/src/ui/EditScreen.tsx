@@ -1,10 +1,12 @@
-import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
-import { View } from 'react-native';
-import { Button } from './Button';
-import { ErrorNotice } from './ErrorNotice';
-import { Screen } from './Screen';
-import { Text } from './Text';
+import { useIntroPadding } from "./spacing";
+import { useRouter } from "expo-router";
+import type { ReactNode } from "react";
+import { View } from "react-native";
+import { useT } from "../i18n/useT";
+import { Button } from "./Button";
+import { ErrorNotice } from "./ErrorNotice";
+import { Screen } from "./Screen";
+import { Text } from "./Text";
 
 type EditScreenProps = {
   title: string;
@@ -17,6 +19,21 @@ type EditScreenProps = {
   canSave?: boolean;
   error?: unknown;
   saveLabel?: string;
+  /**
+   * Off for a screen whose child is its own scrolling list.
+   *
+   * The picker screens are FlatLists now, and a FlatList inside a ScrollView is the
+   * layout React Native warns about — it un-virtualises the list, which is the entire
+   * point of it. With this off the title block moves into the child (it takes a `header`)
+   * and the child fills the screen.
+   */
+  scroll?: boolean;
+  /**
+   * Sits in the pinned footer above the buttons, for a line that has to stay reachable —
+   * a selection count, say. Below the children it would be at the end of a three-hundred
+   * item list, which is where the games and keywords counts used to be.
+   */
+  footerNote?: ReactNode;
 };
 
 /**
@@ -33,38 +50,77 @@ export function EditScreen({
   saving = false,
   canSave = true,
   error,
-  saveLabel = 'Save',
+  saveLabel,
+  scroll = true,
+  footerNote,
 }: EditScreenProps) {
   const router = useRouter();
+  const t = useT();
 
   return (
-    <Screen scroll edges={['top', 'bottom']}>
-      <View className="gap-2 pb-6 pt-8">
-        <Text variant="title">{title}</Text>
-        {subtitle && (
-          <Text variant="body" className="text-muted">
-            {subtitle}
-          </Text>
-        )}
-      </View>
+    <Screen
+      scroll={scroll}
+      edges={["top", "bottom"]}
+      // Pinned rather than scrolled past. The games and keywords screens use this and
+      // their lists are a hundred rows long; Save at the end of the content meant
+      // scrolling the whole catalogue to reach it and back up to keep choosing.
+      footer={
+        <View className="gap-2">
+          {/* A save error belongs beside the button that failed. In the scrolling case it
+              also still renders below the content, where it always was. */}
+          {!scroll && !!error && <ErrorNotice error={error} />}
+          {footerNote}
+          <Button
+            label={saveLabel ?? t.common.save}
+            loading={saving}
+            disabled={!canSave}
+            onPress={onSave}
+          />
+          <Button
+            label={t.common.cancel}
+            variant="ghost"
+            disabled={saving}
+            onPress={() => router.back()}
+          />
+        </View>
+      }
+    >
+      {/* The title scrolls with the content when this screen owns the scrolling. When the
+          child owns it, the child takes the title through its own `header` — pinning it
+          here would cost a picker two rows of permanent viewport. */}
+      {scroll && <EditTitle title={title} subtitle={subtitle} />}
 
       {children}
 
-      {!!error && (
+      {scroll && !!error && (
         <View className="pt-4">
           <ErrorNotice error={error} />
         </View>
       )}
-
-      <View className="mt-auto gap-2 pt-10">
-        <Button label={saveLabel} loading={saving} disabled={!canSave} onPress={onSave} />
-        <Button
-          label="Cancel"
-          variant="ghost"
-          disabled={saving}
-          onPress={() => router.back()}
-        />
-      </View>
     </Screen>
+  );
+}
+
+/**
+ * The title block, exported so a `scroll={false}` screen can hand it to whatever child
+ * owns the scrolling — otherwise the title would simply not be drawn.
+ */
+export function EditTitle({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  const intro = useIntroPadding();
+  return (
+    <View className={`gap-2 pb-6 ${intro.heading}`}>
+      <Text variant="title">{title}</Text>
+      {subtitle && (
+        <Text variant="body" className="text-muted">
+          {subtitle}
+        </Text>
+      )}
+    </View>
   );
 }

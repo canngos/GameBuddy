@@ -1,0 +1,96 @@
+# What the app says when the network is gone.
+#
+# The failure this catches is the one every mobile app ships at least once: a request fails,
+# nothing is rendered, and the user is left looking at an empty screen deciding the app is
+# broken. An error the user can read — and a recovery when the network returns — is the
+# difference between a bug report and a retry.
+#
+# The network is cut **while the app is running**, and the app is never relaunched offline.
+# That is not a simplification, it is the only thing that can be tested here: this is a
+# debug build with no JS bundle in the APK, so an offline launch cannot fetch one from Metro
+# and dies on a red box —
+#
+#   com.facebook.react.devsupport ... loadJSBundleFromAssets (JSBundleLoader.kt:33)
+#
+# — which says nothing about the app and everything about the build. Cutting the connection
+# mid-session is also the more honest scenario: people lose signal while using an app far
+# more often than they open one with no signal at all.
+#
+# Messages is the screen used to provoke it because it is reached for the first time here,
+# so its queries have no react-query cache to fall back on and really do have to hit the
+# network.
+
+appId: com.findgamebuddy.app
+name: 07 offline
+---
+- runFlow: _login.yaml
+- assertVisible: "DISCOVER"
+
+# Cut the network with the app open.
+- setAirplaneMode: enabled
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn: "Messages"
+- extendedWaitUntil:
+    visible: "Your conversations"
+    timeout: 20000
+- takeScreenshot: artifacts/07-01-offline
+
+# Something readable, and something to do about it. ErrorNotice renders the API's own
+# message for an ApiError and "Something went wrong. Please try again." for a transport
+# failure — which is what this is — and puts a "Try again" button beside it. The button is
+# the part that matters: an error with no way out is only half an error state.
+- extendedWaitUntil:
+    visible: "Try again"
+    timeout: 20000
+- takeScreenshot: artifacts/07-02-error-shown
+
+# Restore, and confirm it recovers in place — no relaunch, no reinstall.
+- setAirplaneMode: disabled
+
+# The radio does not come back the instant airplane mode is switched off — the emulator
+# takes appreciably longer than the 5s this used to allow, so the first "Try again" was
+# being spent on a network that was still down and the retry that would have succeeded was
+# never made. Retried up to three times instead of waited on once, because how long the
+# interface takes to reassociate is not something worth pinning a number to. Each tap is
+# guarded, so once the inbox has loaded the button is gone and the rest are skipped.
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- runFlow:
+    when:
+      visible: "Try again"
+    commands:
+      - tapOn: "Try again"
+      - waitForAnimationToEnd:
+          timeout: 8000
+
+# Then leave the tab and come back, which is what a person does when a retry does not seem
+# to have helped — and it is the step that actually recovers the screen. "Try again" is
+# ErrorNotice's own retry and refetches **the inbox alone**, while this screen is assembled
+# from three queries (inbox, matches, friends) and all three failed with the radio off. The
+# button disappearing therefore only means the inbox query settled; the rows come from the
+# other two, and those are refetched by the `useFocusEffect` that runs on re-entering the
+# tab. That is why the first attempt at this cleared the error and still showed nothing.
+- tapOn: "Deck"
+- extendedWaitUntil:
+    visible: "DISCOVER"
+    timeout: 30000
+
+- tapOn: "Messages"
+
+# The partner's row coming back is the proof. "Your conversations" is the screen title and
+# renders whether or not anything loaded, so recovering to *it* would prove nothing — the
+# row only exists if the inbox, matches or friends query returned data.
+#
+# The row rather than the message text: this used to assert the seeded
+# "Hey! Ready for a game?" and failed on a screen that had recovered perfectly. Provisioning
+# runs once per suite, so by the time 07 runs, 03-chat has already sent a reply to this same
+# partner — and the inbox preview shows the *latest* message, which is 03's. Asserting the
+# seeded message only works when 07 is run on its own, which is the worst kind of test.
+- extendedWaitUntil:
+    visible: ${PARTNER_USERNAME}
+    timeout: 60000
+- assertVisible: "MATCHES · 1"
+- takeScreenshot: artifacts/07-03-recovered

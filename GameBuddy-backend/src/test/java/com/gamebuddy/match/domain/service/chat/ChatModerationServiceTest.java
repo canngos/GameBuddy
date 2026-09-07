@@ -9,6 +9,7 @@ import com.gamebuddy.match.infrastructure.entity.ChatMessage;
 import com.gamebuddy.match.infrastructure.repository.ChatMessageRepository;
 import com.gamebuddy.match.interfaces.dto.ReportedMessageDto;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.messaging.MessageCipher;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Instant;
 import java.util.List;

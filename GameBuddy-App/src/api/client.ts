@@ -38,6 +38,15 @@ export function setSessionExpiredHandler(handler: () => void): void {
   onSessionExpired = handler;
 }
 
+/**
+ * Lets sibling transports report an expired session. `unwrap` below calls the handler
+ * for everything that goes through `request`; the upload path in catalogue.ts has its
+ * own unwrap over expo-file-system and must trigger the same sign-out.
+ */
+export function notifySessionExpired(): void {
+  onSessionExpired();
+}
+
 async function request<T>(
   method: Method,
   path: string,
@@ -93,6 +102,20 @@ async function request<T>(
   return unwrap<T>(response, method, path);
 }
 
+/**
+ * What to say when the server refuses with nothing in the body.
+ *
+ * 401 and 403 both arrive empty from Spring Security's filter chain, before any controller
+ * runs, and they are the difference between "sign in again" and "you may not do this" —
+ * so 403 must not reach `isSessionExpired`. Answering an authorisation refusal by signing
+ * the user out is how a non-admin touching an admin route used to lose their session.
+ */
+function emptyBodyMessage(status: number): string {
+  if (status === 401) return 'Your session has expired. Please sign in again.';
+  if (status === 403) return 'You do not have access to this.';
+  return 'The server returned an empty response.';
+}
+
 async function unwrap<T>(response: Response, method: Method, path: string): Promise<T> {
   const text = await response.text();
 
@@ -102,9 +125,7 @@ async function unwrap<T>(response: Response, method: Method, path: string): Prom
   if (!text) {
     if (response.ok) return undefined as T;
     const error = new ApiError(
-      response.status === 401
-        ? 'Your session has expired. Please sign in again.'
-        : 'The server returned an empty response.',
+      emptyBodyMessage(response.status),
       ApiError.UNREADABLE,
       response.status,
     );

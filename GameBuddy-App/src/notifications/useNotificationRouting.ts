@@ -3,13 +3,55 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
 /**
+ * Every kind this build knows about. Mirrors `NotificationKind` on the backend.
+ *
+ * <p>Declared as data rather than left implicit in the switch below because three separate
+ * things now need to ask "do we recognise this?": the router, the in-app toast, and
+ * {@code usePushRegistration}, which suppresses the system banner for exactly the kinds the
+ * app draws itself. Re-listing them in three places is how one of them ends up a kind
+ * behind, and the symptom of that is a notification which shows twice or not at all.
+ */
+export const NOTIFICATION_KINDS = [
+  'MESSAGE',
+  'MATCH',
+  // Not a match — nothing is open yet — so it is its own kind on the backend and has to be
+  // its own here too. Missing from this list, it took the unknown-kind path: an OS banner
+  // the app could not suppress, opening the deck instead of the person who sent it.
+  'SUPER_LIKE',
+  'FRIEND_REQUEST',
+  'FRIEND_ACCEPTED',
+  'BADGE',
+  // The four COMMUNITY_* kinds retired with the Community feature. A late-arriving push
+  // or an old stored notification with one of them falls to the default '/home' branch,
+  // which is the designed behaviour for any kind a build does not know.
+  'LOBBY_JOIN_REQUEST',
+  'LOBBY_REQUEST_ACCEPTED',
+  'LOBBY_MESSAGE',
+  'LOBBY_CANCELLED',
+  'RETURN',
+  // An administrator put a code on this account. No target — the promotion codes screen
+  // lists everything that is waiting.
+  'PROMO',
+] as const;
+
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export function isKnownKind(kind: string | undefined): kind is NotificationKind {
+  return !!kind && (NOTIFICATION_KINDS as readonly string[]).includes(kind);
+}
+
+/**
  * Where each kind of notification goes when it is tapped.
  *
- * <p>Mirrors `NotificationKind` on the backend. A kind this build does not recognise
- * falls through to the deck rather than doing nothing — an installed app will meet kinds
- * added after it shipped, and a notification that opens nothing looks broken.
+ * <p>A kind this build does not recognise falls through to the deck rather than doing
+ * nothing — an installed app will meet kinds added after it shipped, and a notification
+ * that opens nothing looks broken.
+ *
+ * <p><b>Exported so the in-app toast can reuse it.</b> Tapping a toast must land in exactly
+ * the same place as tapping the notification it replaced; a second mapping written next to
+ * this one would agree on the day it was written and not for much longer.
  */
-function routeFor(kind: string | undefined, targetId: string | undefined, name?: string) {
+export function routeFor(kind: string | undefined, targetId: string | undefined, name?: string) {
   // The chat screen takes the username as a parameter so it can show it immediately,
   // before the conversation has loaded. Arriving from a notification without it left the
   // header reading "Conversation" — and the sender's name was sitting right there in the
@@ -28,21 +70,42 @@ function routeFor(kind: string | undefined, targetId: string | undefined, name?:
       // and the screen that lets you do it is the one worth opening.
       return targetId ? conversation(targetId) : '/messages';
 
+    case 'SUPER_LIKE':
+      // Their profile, not a conversation: there is no conversation yet. This is somebody
+      // saying yes and waiting for an answer, and the answer is given by looking at them.
+      return targetId
+        ? { pathname: '/messages/gamer/[userId]', params: { userId: targetId } }
+        : '/home';
+
     case 'FRIEND_REQUEST':
       // The profile tab, where requests are answered.
       return '/profile';
 
     case 'FRIEND_ACCEPTED':
-      return targetId ? { pathname: '/gamer/[userId]', params: { userId: targetId } } : '/profile';
+      return targetId
+        ? { pathname: '/messages/gamer/[userId]', params: { userId: targetId } }
+        : '/profile';
 
     case 'BADGE':
       return '/badges';
 
-    case 'COMMUNITY_POST':
-    case 'POST_LIKE':
-    case 'POST_COMMENT':
-    case 'COMMENT_LIKE':
-      return targetId ? { pathname: '/community/post/[postId]', params: { postId: targetId } } : '/community';
+    case 'LOBBY_JOIN_REQUEST':
+    case 'LOBBY_REQUEST_ACCEPTED':
+    case 'LOBBY_MESSAGE':
+      // The lobby screen answers all three: the owner's pending inbox, the accepted
+      // member's new team, and the chat are all on it. LOBBY_CANCELLED deliberately does
+      // not go there — the lobby is gone; the list shows what remains.
+      return targetId
+        ? { pathname: '/lobby/[lobbyId]', params: { lobbyId: targetId } }
+        : '/lobby';
+
+    case 'LOBBY_CANCELLED':
+      return '/lobby';
+
+    case 'PROMO':
+      // Straight to the screen that can redeem it. The code is already on the account by
+      // the time this arrives, so the tap that opens it is one tap from the coins.
+      return '/settings/promo';
 
     case 'RETURN':
       // Whatever was waiting is what the copy promised, and both of the things it can
@@ -61,33 +124,44 @@ function routeFor(kind: string | undefined, targetId: string | undefined, name?:
  * from cold. The second is the one that is easy to miss and the more common in practice —
  * a notification usually arrives when the app is closed.
  */
+// Per-process, not per-mount: the OS keeps returning the same stored response for
+// the life of the process, and this hook remounts whenever the session leaves and
+// re-enters the (main) group. A per-effect flag replayed a days-old notification
+// tap onto whoever signed in next.
+let consumedColdStartResponse = false;
+
 export function useNotificationRouting(enabled: boolean) {
   const router = useRouter();
 
   useEffect(() => {
     if (!enabled) return;
-    let handled = false;
+    let cancelled = false;
 
     const go = (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
       const data = response.notification.request.content.data as
-        | { kind?: string; targetId?: string }
-        | undefined;
+        { kind?: string; targetId?: string } | undefined;
       // The title is the sender's name for the kinds that have one.
       const title = response.notification.request.content.title ?? undefined;
-      router.push(routeFor(data?.kind, data?.targetId, title) as never);
+      // `withAnchor`: a conversation or lobby opened straight from a notification lands
+      // deep inside a stack the gamer never walked into — the anchor loads the list
+      // screen underneath so backing out reaches it instead of leaving the tab. Inert
+      // for the destinations that are plain tab routes.
+      router.push(routeFor(data?.kind, data?.targetId, title) as never, { withAnchor: true });
     };
 
     // A tap that started the app. Read once — asking again later would re-navigate on
     // every remount, dragging somebody back out of wherever they had moved to.
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!handled) {
-        handled = true;
-        go(response);
-      }
+      if (cancelled || consumedColdStartResponse) return;
+      consumedColdStartResponse = true;
+      go(response);
     });
 
     const subscription = Notifications.addNotificationResponseReceivedListener(go);
-    return () => subscription.remove();
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
   }, [enabled, router]);
 }

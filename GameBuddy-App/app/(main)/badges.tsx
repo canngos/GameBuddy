@@ -1,13 +1,46 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
-import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, View } from 'react-native';
-import { badgesApi } from '../../src/api/badges';
-import type { Badge, BadgeBoard } from '../../src/api/types';
-import { useThemeColors } from '../../src/theme';
-import { BackHeader, Button, Card, ErrorNotice, Screen, Text, messageOf } from '../../src/ui';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
+import { badgesApi } from "../../src/api/badges";
+import type { Badge, BadgeBoard, UserInfo } from "../../src/api/types";
+import { useReducedMotion } from 'react-native-reanimated';
+import { BadgeAura } from '../../src/ui/BadgeAura';
+import { useT } from "../../src/i18n/useT";
+import { useThemeColors } from "../../src/theme";
+import {
+  BackHeader,
+  Button,
+  Card,
+  ErrorNotice,
+  Screen,
+  Text,
+  messageOf,
+  useScreenScale,
+} from "../../src/ui";
 
-const BOARD_KEY = ['badges'];
+const BOARD_KEY = ["badges"];
+
+const grid = StyleSheet.create({
+  // `flex-1` with a third-width cap: three columns that divide the row exactly, and a
+  // partial last row that stays left-aligned instead of stretching.
+  tile: { flex: 1, maxWidth: "33.33%" },
+  column: { gap: 8 },
+  icon: { width: 82, height: 82 },
+});
+const TILE = grid.tile;
+const COLUMN = grid.column;
+const ICON = grid.icon;
+/** The tile art's side, which the aura has to be sized against. */
+const GRID_ICON = 82;
 
 /**
  * Badges: what there is to do, and what has been done.
@@ -22,11 +55,34 @@ const BOARD_KEY = ['badges'];
  */
 export default function Badges() {
   const colors = useThemeColors();
+  const t = useT();
   const queryClient = useQueryClient();
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
   const board = useQuery({ queryKey: BOARD_KEY, queryFn: badgesApi.board });
+
+  /**
+   * Reading the board can *earn* badges, so the profile behind it may now be wrong.
+   *
+   * The server awards on read: it re-evaluates every mission when this endpoint is hit,
+   * so simply opening this screen is what turns "3 matches" into First Contact. Claiming
+   * already invalidated the profile, but the far commoner path does not involve claiming
+   * anything — you open the board, see the new badge, and go back to a Profile still
+   * showing yesterday's count. It stayed wrong for the full five-minute stale window.
+   *
+   * Compared rather than invalidated unconditionally: the count is usually unchanged, and
+   * a refetch on every visit to this screen would be a request that answers with what the
+   * cache already holds.
+   */
+  const earned = board.data?.earned;
+  useEffect(() => {
+    if (earned === undefined) return;
+    const cached = queryClient.getQueryData<UserInfo>(["me"]);
+    if (cached && cached.badgeCount !== earned) {
+      void queryClient.invalidateQueries({ queryKey: ["me"] });
+    }
+  }, [earned, queryClient]);
 
   /**
    * Claiming and showcasing both answer with the whole board, so the response goes
@@ -40,19 +96,38 @@ export default function Badges() {
   const applyBoard = (next: BadgeBoard) => {
     setFailure(null);
     queryClient.setQueryData(BOARD_KEY, next);
-    void queryClient.invalidateQueries({ queryKey: ['me'] });
+    void queryClient.invalidateQueries({ queryKey: ["me"] });
   };
 
   const onError = (error: unknown) => setFailure(messageOf(error));
 
-  const collect = useMutation({ mutationFn: badgesApi.collect, onSuccess: applyBoard, onError });
-  const showcase = useMutation({ mutationFn: badgesApi.showcase, onSuccess: applyBoard, onError });
+  const collect = useMutation({
+    mutationFn: badgesApi.collect,
+    onSuccess: applyBoard,
+    onError,
+  });
+  const showcase = useMutation({
+    mutationFn: badgesApi.showcase,
+    onSuccess: applyBoard,
+    onError,
+  });
 
   const busy = collect.isPending || showcase.isPending;
-  const badges = board.data?.badges ?? [];
-  const shown = badges.filter((badge) => badge.showcased).map((badge) => badge.code);
+  // Memoised so it is a stable input to the memos below; the `?? []` fallback minted a
+  // fresh array every render while the board was still loading.
+  const badges = useMemo(() => board.data?.badges ?? [], [board.data]);
   const slots = board.data?.showcaseSlots ?? 3;
-  const open = badges.find((badge) => badge.code === openCode) ?? null;
+
+  // Derived from the whole catalogue, so both were a scan of it on every render — and
+  // this screen stays mounted behind the tab bar.
+  const shown = useMemo(
+    () => badges.filter((badge) => badge.showcased).map((badge) => badge.code),
+    [badges],
+  );
+  const open = useMemo(
+    () => badges.find((badge) => badge.code === openCode) ?? null,
+    [badges, openCode],
+  );
 
   /**
    * Opening a badge clears the last complaint.
@@ -61,10 +136,10 @@ export default function Badges() {
    * full" sits at the top of the grid until the next successful action — long after it
    * has been dealt with, and above a screen where nothing is wrong.
    */
-  const openBadge = (code: string) => {
+  const openBadge = useCallback((code: string) => {
     setFailure(null);
     setOpenCode(code);
-  };
+  }, []);
 
   /**
    * Toggles one badge in the showcase and sends the whole selection.
@@ -79,17 +154,23 @@ export default function Badges() {
       return;
     }
     if (shown.length >= slots) {
-      setFailure(`You can show ${slots} badges. Take one off first.`);
+      setFailure(t.market.badges.showcaseFull(slots));
       return;
     }
     showcase.mutate([...shown, badge.code]);
   };
 
+  const keyExtractor = useCallback((badge: Badge) => badge.code, []);
+
+  const renderTile = useCallback(
+    ({ item }: { item: Badge }) => <Tile badge={item} onPress={openBadge} />,
+    [openBadge],
+  );
+
   return (
-    <Screen scroll edges={['top']}>
+    <Screen edges={["top"]}>
       <BackHeader
-        title="Badges"
-        subtitle="Finish missions, claim coins, show off three"
+        title={t.market.badges.title}
         right={
           board.data ? (
             <Text variant="label" className="text-muted">
@@ -99,28 +180,40 @@ export default function Badges() {
         }
       />
 
-      {board.isPending && <ActivityIndicator color={colors.brand} />}
-      {board.error && <ErrorNotice error={board.error} onRetry={() => board.refetch()} />}
-
-      {failure && (
-        <Card className="mb-3">
-          <Text variant="body" className="text-danger">
-            {failure}
-          </Text>
-        </Card>
-      )}
-
-      {/* A three-column grid, laid out by width rather than by `gap` so the last row of
-          a partial set still lines up with the ones above it. */}
-      <View className="flex-row flex-wrap justify-between pb-6">
-        {badges.map((badge) => (
-          <Tile key={badge.code} badge={badge} onPress={() => openBadge(badge.code)} />
-        ))}
-        {/* Two spacers, so a row holding one or two tiles keeps them left-aligned
-            instead of spreading them across the width. */}
-        <View className="w-[31%]" />
-        <View className="w-[31%]" />
-      </View>
+      {/* Three columns. The two spacer Views this used to need are gone: `numColumns`
+          lays a partial last row out from the left on its own, which is what they were
+          simulating. */}
+      <FlatList
+        className="flex-1"
+        data={badges}
+        numColumns={3}
+        columnWrapperStyle={COLUMN}
+        keyExtractor={keyExtractor}
+        renderItem={renderTile}
+        contentContainerClassName="pb-6"
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={12}
+        maxToRenderPerBatch={9}
+        windowSize={7}
+        ListHeaderComponent={
+          <View className="gap-2">
+            {board.isPending && <ActivityIndicator color={colors.primary} />}
+            {!!board.error && (
+              <ErrorNotice
+                error={board.error}
+                onRetry={() => board.refetch()}
+              />
+            )}
+            {!!failure && (
+              <Card className="mb-3">
+                <Text variant="body" className="text-danger">
+                  {failure}
+                </Text>
+              </Card>
+            )}
+          </View>
+        }
+      />
 
       <Detail
         badge={open}
@@ -140,24 +233,61 @@ export default function Badges() {
  * the icons to download, and it means a badge cannot look like a different thing before
  * and after you earn it, which is what makes the wall worth staring at.
  */
-function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
+const Tile = memo(function Tile({
+  badge,
+  onPress,
+}: {
+  badge: Badge;
+  onPress: (code: string) => void;
+}) {
+  const t = useT();
+  const reduceMotion = useReducedMotion();
+  const press = useCallback(() => onPress(badge.code), [onPress, badge.code]);
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={press}
       accessibilityRole="button"
-      accessibilityLabel={`${badge.title}. ${badge.earned ? 'Earned' : `${badge.progress} of ${badge.target}`}`}
-      className="mb-5 w-[31%] items-center active:opacity-70"
+      accessibilityLabel={t.market.badges.tileA11y(
+        badge.title,
+        badge.earned
+          ? t.market.badges.earned
+          : t.market.badges.progressOf(badge.progress, badge.target),
+      )}
+      style={TILE}
+      className="mb-5 items-center active:opacity-70"
     >
-      <View className={badge.earned ? 'opacity-100' : 'opacity-35'}>
+      <View className={badge.earned ? "opacity-100" : "opacity-35"}>
+        {/* Only on a hard badge somebody actually holds. An aura behind a locked one
+            would advertise it as theirs, and the dimming above is what says it is not. */}
+        <BadgeAura size={GRID_ICON} active={badge.tier === "PRISMATIC" && badge.earned} />
         <Image
           source={{ uri: badge.icon }}
-          style={{ width: 82, height: 82 }}
+          style={ICON}
           contentFit="contain"
           transition={150}
+          // Two badges have animated WebP artwork. Without this they would sit still,
+          // because nothing here ever needed to move before — every animated *cosmetic*
+          // site in the app already passes it.
+          //
+          // Gated on the same two conditions as the aura, and for the same reasons: a
+          // locked badge is a dimmed picture rather than a prize being advertised, and
+          // somebody who asked for less motion meant the artwork too. `expo-image` shows
+          // the first frame when this is false, so it degrades to a still.
+          autoplay={badge.animated && badge.earned && !reduceMotion}
+          // A disk cache and a recycling key: the catalogue is fixed, so the second visit
+          // to this screen should paint from disk, and a recycled cell must not show the
+          // previous badge's art while the new one decodes.
+          cachePolicy="memory-disk"
+          recyclingKey={badge.code}
         />
       </View>
 
-      <Text variant="caption" numberOfLines={2} className="pt-1 text-center text-content">
+      <Text
+        variant="caption"
+        numberOfLines={2}
+        className="pt-1 text-center text-content"
+      >
         {badge.title}
       </Text>
 
@@ -167,9 +297,15 @@ function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
       {badge.earned ? (
         <Text
           variant="caption"
-          className={badge.collected ? 'text-center text-muted' : 'text-center text-brand'}
+          className={
+            badge.collected ? "text-center text-muted" : "text-center text-gold"
+          }
         >
-          {badge.collected ? 'Earned' : `+${badge.reward}`}
+          {badge.collected
+            ? t.market.badges.earned
+            : badge.cosmeticName
+              ? t.market.badges.rewardFrame
+              : `+${badge.reward}`}
         </Text>
       ) : (
         <Text variant="caption" className="text-center text-muted">
@@ -177,10 +313,12 @@ function Tile({ badge, onPress }: { badge: Badge; onPress: () => void }) {
         </Text>
       )}
 
-      {badge.showcased && <View className="mt-1 h-1 w-6 rounded-full bg-brand" />}
+      {badge.showcased && (
+        <View className="mt-1 h-1 w-6 rounded-full bg-primary" />
+      )}
     </Pressable>
   );
-}
+});
 
 /**
  * The sheet for one badge.
@@ -202,6 +340,10 @@ function Detail({
   onCollect: () => void;
   onToggleShowcase: () => void;
 }) {
+  // The art is the sheet's largest single element, so it is the first thing to give.
+  const badgeArt = useScreenScale().pick(96, 116, 132);
+  const t = useT();
+  const reduceMotion = useReducedMotion();
   return (
     <Modal
       visible={!!badge}
@@ -215,48 +357,83 @@ function Detail({
         <Pressable className="flex-1 justify-end bg-black/60" onPress={onClose}>
           {/* Swallows taps so pressing the sheet itself does not close it. */}
           <Pressable
-            className="items-center gap-3 rounded-t-[28px] bg-surface px-6 pb-10 pt-7"
+            /*
+             * Capped and scrollable, which it was not.
+             *
+             * A 132dp icon, a heading, a description that runs to three or four lines and up
+             * to three stacked buttons is around 480dp of sheet. On a 640dp phone that is
+             * most of the screen, and on a small one with large text the buttons went off
+             * the bottom with no way to reach them — the modal had no cap and nothing
+             * scrolled, so the only way out was the Android back button.
+             *
+             * Same treatment as `CandidateSheet`: the sheet is capped, the description
+             * scrolls, and the buttons are pinned below so the way out is always on screen.
+             */
+            className="max-h-[86%] overflow-hidden rounded-t-[28px] bg-surface"
             onPress={() => {}}
           >
-            <View className={badge.earned ? 'opacity-100' : 'opacity-35'}>
-              <Image
-                source={{ uri: badge.icon }}
-                style={{ width: 132, height: 132 }}
-                contentFit="contain"
-                transition={150}
-              />
-            </View>
+            <ScrollView
+              contentContainerClassName="items-center gap-3 px-6 pt-7"
+              showsVerticalScrollIndicator={false}
+            >
+              <View className={badge.earned ? "opacity-100" : "opacity-35"}>
+                {/* A `withRepeat` loop started in an effect is fine inside a Modal; it is
+                    Reanimated *entering* animations that do not run there on Android — see
+                    the note in `CosmeticPreview.tsx`. */}
+                <BadgeAura size={badgeArt} active={badge.tier === "PRISMATIC" && badge.earned} />
+                <Image
+                  source={{ uri: badge.icon }}
+                  style={{ width: badgeArt, height: badgeArt }}
+                  contentFit="contain"
+                  transition={150}
+                  autoplay={badge.animated && badge.earned && !reduceMotion}
+                  cachePolicy="memory-disk"
+                />
+              </View>
 
-            <Text variant="heading">{badge.title}</Text>
-            <Text variant="body" className="text-center text-muted">
-              {badge.description}
-            </Text>
-
-            {badge.earned ? (
-              <Text variant="label" className="text-brand">
-                Earned
+              <Text variant="heading">{badge.title}</Text>
+              <Text variant="body" className="text-center text-muted">
+                {badge.description}
               </Text>
-            ) : (
-              <Progress value={badge.progress} target={badge.target} />
-            )}
 
-            <View className="w-full gap-2 pt-2">
+              {badge.earned ? (
+                <Text variant="label" className="text-primary">
+                  {t.market.badges.earned}
+                </Text>
+              ) : (
+                <Progress value={badge.progress} target={badge.target} />
+              )}
+            </ScrollView>
+
+            <View className="w-full gap-2 px-6 pb-10 pt-3">
               {badge.earned && !badge.collected && (
                 <Button
-                  label={`Claim ${badge.reward} coins`}
+                  label={
+                    badge.cosmeticName
+                      ? t.market.badges.claimFrame(badge.cosmeticName)
+                      : t.market.badges.claimCoins(badge.reward)
+                  }
                   onPress={onCollect}
                   loading={busy}
                 />
               )}
               {badge.earned && (
                 <Button
-                  label={badge.showcased ? 'Remove from profile' : 'Show on profile'}
+                  label={
+                    badge.showcased
+                      ? t.market.badges.removeFromProfile
+                      : t.market.badges.showOnProfile
+                  }
                   variant="secondary"
                   onPress={onToggleShowcase}
                   disabled={busy}
                 />
               )}
-              <Button label="Close" variant="ghost" onPress={onClose} />
+              <Button
+                label={t.common.close}
+                variant="ghost"
+                onPress={onClose}
+              />
             </View>
           </Pressable>
         </Pressable>
@@ -266,18 +443,23 @@ function Detail({
 }
 
 function Progress({ value, target }: { value: number; target: number }) {
+  const t = useT();
   // The server caps progress at the target, so this cannot exceed 100 — but clamping
   // here as well costs nothing and keeps a bad response from drawing outside its track.
-  const percent = Math.min(100, Math.round((value / Math.max(1, target)) * 100));
+  const percent = Math.min(
+    100,
+    Math.round((value / Math.max(1, target)) * 100),
+  );
 
   return (
     <View className="w-full items-center gap-1.5 pt-1">
       <View className="h-2 w-full overflow-hidden rounded-full bg-raised">
-        <View className="h-full rounded-full bg-brand" style={{ width: `${percent}%` }} />
+        <View
+          className="h-full rounded-full bg-primary"
+          style={{ width: `${percent}%` }}
+        />
       </View>
-      <Text variant="caption">
-        {value} of {target}
-      </Text>
+      <Text variant="caption">{t.market.badges.progressOf(value, target)}</Text>
     </View>
   );
 }

@@ -1,0 +1,42 @@
+---
+/**
+ * The child safety standards, rendered from the document itself.
+ *
+ * Google Play's Child Safety Standards policy requires every app in the social and dating
+ * categories to publish standards against child sexual abuse and exploitation *outside* the
+ * app, and to hand the Play Console a URL for them. This page is that URL. A reviewer opens
+ * it, and so does anybody who wants to know what happens after they press report — which is
+ * why it is linked from the footer rather than left as an unlisted page satisfying a form.
+ *
+ * Imported from `documentation/legal/` for the same reason `privacy.astro` and `terms.astro`
+ * are: the terms already promise most of what this document details, and two copies of one
+ * promise drift the first time somebody amends one.
+ */
+import { Content } from '../../../documentation/legal/CHILD_SAFETY.md';
+import LegalNotice from '../components/LegalNotice.astro';
+import Prose from '../components/Prose.astro';
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  lang="en"
+  englishOnly
+  title="Child Safety Standards"
+  description="GameBuddy's published standards against child sexual abuse and exploitation: how we keep minors off an adults-only service, how to report, what we do about it, and who to contact."
+>
+  <article class="mx-auto max-w-3xl px-5 py-16">
+    <h1 class="font-display text-4xl font-bold tracking-tight">Child Safety Standards</h1>
+    <p class="mt-3 text-sm text-muted">
+      GameBuddy is for adults only. To report a child safety concern — with or without an
+      account — write to <a class="text-primary underline" href="mailto:contact@findgamebuddy.com"
+        >contact@findgamebuddy.com</a
+      >.
+    </p>
+
+    <LegalNotice lang="en" />
+
+    <Prose>
+      <Content />
+    </Prose>
+  </article>
+</Base>

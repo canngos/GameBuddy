@@ -19,6 +19,13 @@ GameBuddy-*-service
 *.env
 !.env.example
 *-service-account.json
+# The Firebase admin key filename matches none of the globs above, so exclude the whole
+# directory — it must never enter the build context. Same for DB dumps and the vuln report.
+secret/
+firebase-*.json
+google-services.json
+backups/
+SECURITY_REVIEW.md
 
 # Python
 **/__pycache__

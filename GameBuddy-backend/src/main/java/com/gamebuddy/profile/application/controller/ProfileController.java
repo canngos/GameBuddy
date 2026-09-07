@@ -156,4 +156,14 @@ public class ProfileController {
             @AuthenticationPrincipal Gamer principal, @Valid @RequestBody FriendRequest request) {
         return ResponseEntity.ok(profileService.sendFriendRequest(principal, request));
     }
+
+    /**
+     * Takes back a request this gamer sent. Distinct from {@code /reject/friend}, which
+     * answers a request you <em>received</em> — the sender has never had a way to undo one.
+     */
+    @PostMapping("/withdraw/friend")
+    public ResponseEntity<DefaultMessageResponse> withdrawFriendRequest(
+            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody FriendRequest request) {
+        return ResponseEntity.ok(profileService.withdrawFriendRequest(principal, request));
+    }
 }

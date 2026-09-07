@@ -18,11 +18,10 @@ public enum NotificationCategory {
     /** Somebody sent you a chat message. */
     MESSAGES,
 
-    /** Matches, friend requests and answers to them, badges you earned. */
+    /** Matches, friend requests and answers to them, badges you earned, lobby activity. */
     SOCIAL,
 
-    /** Posts, comments and likes in communities you joined. */
-    COMMUNITIES,
+    // COMMUNITIES retired with the Community feature; its gamer column went with it.
 
     /**
      * "Come back" nudges.
@@ -37,7 +36,6 @@ public enum NotificationCategory {
         return switch (this) {
             case MESSAGES -> gamer.isNotifyMessages();
             case SOCIAL -> gamer.isNotifySocial();
-            case COMMUNITIES -> gamer.isNotifyCommunities();
             case REMINDERS -> gamer.isRemindersEnabled();
         };
     }

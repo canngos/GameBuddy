@@ -1,3 +1,4 @@
+import type { PresenceUpdate } from '../chat/socket';
 import { api } from './client';
 import type { Conversation, InboxEntry } from './types';
 
@@ -35,6 +36,26 @@ export const chatApi = {
    */
   send: (receiver: string, message: string) =>
     api.post<void>('/messages/send', { receiver, message }),
+
+  /**
+   * Whether one gamer is online right now.
+   *
+   * Only the opening value — every change after it is pushed over the socket, so this is
+   * not something to poll. Refused unless the two have matched, which is the same rule
+   * that governs seeing their messages: when somebody is at their phone is personal.
+   */
+  presence: (userId: string) => api.get<PresenceUpdate>(`/presence/${userId}`),
+
+  /**
+   * Moves the read watermark for one conversation to now.
+   *
+   * Loading the history marks it read too, so this looks redundant — it is not. The
+   * history is cached, so re-opening a chat inside the cache window sends no request at
+   * all, and a thread already on screen receives over the socket without ever reloading.
+   * In both cases the server went on counting messages the gamer had plainly read, which
+   * is what kept the unread badge up after leaving a conversation.
+   */
+  markRead: (friendId: string) => api.post<void>(`/messages/read/${friendId}`),
 
   /**
    * Flags a message for moderation. Only the *recipient* may report — the backend

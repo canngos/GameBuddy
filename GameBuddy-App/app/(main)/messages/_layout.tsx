@@ -1,6 +1,15 @@
 import { Stack } from 'expo-router';
 
 /**
+ * The inbox is the floor of this stack, even when a screen deeper in is the first one
+ * mounted. A push from another tab (an admirer's profile, a notification's conversation)
+ * creates this navigator ex nihilo holding only the target, and backing out of it then
+ * falls out of the tab instead of landing on the list. Anchoring declares that the list
+ * always sits underneath — callers opt in per-push with `withAnchor: true`.
+ */
+export const unstable_settings = { anchor: 'index' };
+
+/**
  * The inbox and the conversations, as a stack inside the tab.
  *
  * A conversation used to be a tab of its own — declared with `href: null` so it had no

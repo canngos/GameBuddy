@@ -1,0 +1,66 @@
+# Chat, from the inbox to a sent message.
+#
+# provision.js has already matched MEMBER with PARTNER and had PARTNER send the first
+# message, so this opens a conversation that already has content in it — an empty thread
+# and a thread that failed to load look identical on screen, and only one of them is a bug.
+#
+# The API suite proves delivery over STOMP between two sockets. What it cannot prove is
+# that the message appears in this list, in the right order, attributed to the right
+# person. That is what this is for.
+
+appId: com.findgamebuddy.app
+name: 03 chat
+---
+- runFlow: _login.yaml
+
+# The tab bar label is title case ("Messages"); MESSAGES is the overline on the screen it
+# leads to, which is not on the deck to be tapped.
+- tapOn: "Messages"
+- extendedWaitUntil:
+    visible: "Your conversations"
+    timeout: 15000
+- takeScreenshot: artifacts/03-01-inbox
+
+# The partner's message must be in the inbox preview. This is the decrypted body coming
+# back out of the database, so it also demonstrates the round trip through MessageCipher.
+- assertVisible: ${PARTNER_USERNAME}
+- assertVisible: "Hey! Ready for a game?"
+
+- tapOn: ${PARTNER_USERNAME}
+- extendedWaitUntil:
+    visible: "Hey! Ready for a game?"
+    timeout: 15000
+- takeScreenshot: artifacts/03-02-conversation
+
+# Send one back.
+#
+# The composer has no `label`, so TextField derives no testID for it — it is addressed by
+# its "Message" placeholder, which Android exposes as hintText. The button beside it
+# carries accessibilityLabel="Send". Both are real selectors; the coordinate taps that used
+# to be here would land somewhere else the moment the compose row changed height.
+- tapOn: "Message"
+- inputText: "QA reply from the emulator"
+- takeScreenshot: artifacts/03-03-typed
+
+# Tapped, not submitted from the keyboard. The field is `multiline`, and on Android Enter
+# inserts a newline in a multiline input rather than firing onSubmitEditing.
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Send"
+
+# It has to appear in the thread. A send that clears the input but never renders is the
+# failure users report as "my messages do not go through".
+- extendedWaitUntil:
+    visible: "QA reply from the emulator"
+    timeout: 15000
+- takeScreenshot: artifacts/03-04-sent
+
+# And survive leaving and coming back, which proves it was persisted rather than only
+# echoed into local state.
+- back
+- extendedWaitUntil:
+    visible: "Your conversations"
+    timeout: 15000
+- assertVisible: "QA reply from the emulator"
+- takeScreenshot: artifacts/03-05-inbox-updated

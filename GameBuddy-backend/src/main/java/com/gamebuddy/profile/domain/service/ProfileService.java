@@ -51,4 +51,7 @@ public interface ProfileService {
     DefaultMessageResponse unblockUser(Gamer principal, FriendRequest unblockFriendRequest);
 
     DefaultMessageResponse sendFriendRequest(Gamer principal, FriendRequest sendFriendRequest);
+
+    /** Retracts a request you sent, which {@code rejectFriend} cannot do for the sender. */
+    DefaultMessageResponse withdrawFriendRequest(Gamer principal, FriendRequest withdrawRequest);
 }

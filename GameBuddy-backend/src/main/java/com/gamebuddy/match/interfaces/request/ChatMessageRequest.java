@@ -18,6 +18,7 @@ import lombok.Setter;
 public class ChatMessageRequest {
 
     @NotBlank(message = "Receiver is required")
+    @Size(max = 255, message = "Receiver is not valid")
     private String receiver;
 
     @NotBlank(message = "Message cannot be empty")

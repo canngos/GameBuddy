@@ -4,9 +4,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.common.enums.LinkVisibility;
+import com.gamebuddy.common.enums.LinkedProvider;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
-import com.gamebuddy.community.domain.service.CommunityMembership;
 import com.gamebuddy.profile.application.mapper.*;
 import com.gamebuddy.profile.interfaces.request.FriendRequest;
 import com.gamebuddy.profile.interfaces.response.*;
@@ -37,10 +38,6 @@ class DefaultProfileServiceTest {
     @InjectMocks
     private DefaultProfileService profileService;
 
-    /** Profile asks the community module rather than reading its tables; see #16. */
-    @Mock
-    private CommunityMembership communityMembership;
-
     @Mock
     private KeywordsRepository keywordsRepository;
 
@@ -61,6 +58,9 @@ class DefaultProfileServiceTest {
 
     @Mock
     private CosmeticUrls cosmeticUrls;
+
+    @Mock
+    private GamerLinkedAccountRepository linkedAccountRepository;
 
     @Mock
     private BadgeService badges;
@@ -171,6 +171,80 @@ class DefaultProfileServiceTest {
             assertNull(body.getCoin(), "coin balance must not leak to another user");
             assertNull(body.getFriends(), "friend list must not leak to another user");
             assertEquals("other", body.getUsername());
+        }
+
+        @Test
+        @DisplayName("your own linked accounts come back with the visibility you chose")
+        void linkedAccountsOnOwnProfileCarryTheirVisibility() {
+            when(linkedAccountRepository.findByGamer_UserId(gamer.getUserId()))
+                    .thenReturn(List.of(linkedAccount(gamer, LinkVisibility.MATCHES, "me#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, gamer.getUserId())
+                    .getBody()
+                    .getData();
+
+            assertEquals(1, body.getLinkedAccounts().size());
+            assertEquals("me#1234", body.getLinkedAccounts().get(0).getHandle());
+            assertEquals("MATCHES", body.getLinkedAccounts().get(0).getVisibility());
+        }
+
+        @Test
+        @DisplayName("a matches-only handle is absent for a stranger, not merely flagged")
+        void linkedAccountsAreFilteredForStrangers() {
+            when(linkedAccountRepository.findByGamer_UserId(other.getUserId()))
+                    .thenReturn(List.of(linkedAccount(other, LinkVisibility.MATCHES, "them#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, other.getUserId())
+                    .getBody()
+                    .getData();
+
+            // Absent rather than present-and-hidden: a client trusted not to draw it would
+            // be one response inspection away from publishing it.
+            assertTrue(body.getLinkedAccounts().isEmpty());
+        }
+
+        @Test
+        @DisplayName("a public handle reaches a stranger, but its visibility setting does not")
+        void publicLinkedAccountsReachStrangersWithoutTheSetting() {
+            when(linkedAccountRepository.findByGamer_UserId(other.getUserId()))
+                    .thenReturn(List.of(linkedAccount(other, LinkVisibility.PUBLIC, "them#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, other.getUserId())
+                    .getBody()
+                    .getData();
+
+            assertEquals("them#1234", body.getLinkedAccounts().get(0).getHandle());
+            assertNull(
+                    body.getLinkedAccounts().get(0).getVisibility(),
+                    "a setting made to keep strangers out is not described to a stranger");
+        }
+
+        @Test
+        @DisplayName("a match sees what a stranger cannot")
+        void linkedAccountsReachAMatch() {
+            gamer.getApprovedMatches().add(other);
+            other.getApprovedMatches().add(gamer);
+            when(linkedAccountRepository.findByGamer_UserId(other.getUserId()))
+                    .thenReturn(List.of(linkedAccount(other, LinkVisibility.MATCHES, "them#1234")));
+
+            var body = profileService
+                    .getUserInfo(gamer, other.getUserId())
+                    .getBody()
+                    .getData();
+
+            assertEquals("them#1234", body.getLinkedAccounts().get(0).getHandle());
+        }
+
+        private GamerLinkedAccount linkedAccount(Gamer owner, LinkVisibility visibility, String handle) {
+            GamerLinkedAccount link = new GamerLinkedAccount();
+            link.setGamer(owner);
+            link.setProvider(LinkedProvider.DISCORD);
+            link.setVisibility(visibility);
+            link.setHandle(handle);
+            return link;
         }
 
         @Test
@@ -458,6 +532,42 @@ class DefaultProfileServiceTest {
         }
 
         @Test
+        @DisplayName("withdrawing takes the request off the recipient's list, not the sender's")
+        void testWithdrawFriendRequest_whenPending_DropsIt() {
+            other.getWaitingFriends().add(gamer);
+
+            assertEquals(
+                    "100",
+                    profileService
+                            .withdrawFriendRequest(gamer, request(other))
+                            .getStatus()
+                            .getCode());
+            assertFalse(other.getWaitingFriends().contains(gamer));
+            verify(gamerRepository).save(other);
+        }
+
+        @Test
+        void testWithdrawFriendRequest_whenNothingPending_ReturnErrorCode116() {
+            FriendRequest req = request(other);
+
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> profileService.withdrawFriendRequest(gamer, req));
+            assertEquals(116, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("a request you received is not yours to withdraw — reject is that door")
+        void testWithdrawFriendRequest_whenTheyAskedYou_ReturnErrorCode116() {
+            gamer.getWaitingFriends().add(other);
+            FriendRequest req = request(other);
+
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> profileService.withdrawFriendRequest(gamer, req));
+            assertEquals(116, ex.getTransactionCode().getId());
+            assertTrue(gamer.getWaitingFriends().contains(other));
+        }
+
+        @Test
         void testRemoveFriend_whenNotFriends_ReturnErrorCode117() {
             FriendRequest req = request(other);
 
@@ -606,6 +716,32 @@ class DefaultProfileServiceTest {
             assertEquals("100", response.getStatus().getCode());
             assertTrue(other.getWaitingFriends().contains(gamer));
             verify(events).publishEvent(any(NotificationRequestedEvent.class));
+        }
+
+        @Test
+        @DisplayName("both asking at once is agreeing, not two requests nobody can answer")
+        void testSendFriendRequest_whenTheyAlreadyAskedYou_BecomesAFriendship() {
+            matched(gamer, other);
+            // They asked first. This used to add a second, crossed request: each profile
+            // screen then showed its own outgoing one, so neither side could reach an
+            // accept button and the friendship both had asked for could not happen.
+            gamer.getWaitingFriends().add(other);
+
+            DefaultMessageResponse response = profileService.sendFriendRequest(gamer, request(other));
+
+            assertEquals("100", response.getStatus().getCode());
+            assertTrue(gamer.getFriends().contains(other));
+            assertTrue(other.getFriends().contains(gamer), "the other side must be linked too");
+            assertFalse(gamer.getWaitingFriends().contains(other), "their request is answered, not left pending");
+            assertFalse(other.getWaitingFriends().contains(gamer), "and no new one is created");
+
+            // They are told it was accepted, which is what happened from where they stand.
+            ArgumentCaptor<NotificationRequestedEvent> captor =
+                    ArgumentCaptor.forClass(NotificationRequestedEvent.class);
+            verify(events, atLeastOnce()).publishEvent(captor.capture());
+            assertTrue(captor.getAllValues().stream()
+                    .anyMatch(e -> "fcm-other".equals(e.fcmToken())
+                            && e.title().equals(com.gamebuddy.common.util.Constants.FRIEND_REQUEST_ACCEPTED_TITLE)));
         }
     }
 }

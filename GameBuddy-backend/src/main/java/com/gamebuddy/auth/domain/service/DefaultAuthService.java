@@ -1,6 +1,5 @@
 package com.gamebuddy.auth.domain.service;
 
-import com.gamebuddy.auth.domain.event.ProfileChangedEvent;
 import com.gamebuddy.auth.infrastructure.entity.*;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.dto.*;
@@ -8,30 +7,32 @@ import com.gamebuddy.auth.interfaces.request.*;
 import com.gamebuddy.auth.interfaces.response.*;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.security.JwtService;
+import com.gamebuddy.common.security.TokenHashing;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
+import com.gamebuddy.shared.event.ProfileChangedEvent;
+import com.gamebuddy.shared.funnel.LikeCapCohort;
+import com.gamebuddy.shared.mail.EmailContent;
+import com.gamebuddy.shared.mail.Mailer;
+import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.MailException;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -44,35 +45,70 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DefaultAuthService implements AuthService {
 
+    /**
+     * How recently a session must have begun for it to stand in for a password.
+     *
+     * <p>Measured from the JWT's {@code sst} claim, which a refresh preserves — so this is
+     * "when did you last actually sign in", not "when did this token appear".
+     */
+    private static final Duration REAUTH_WINDOW = Duration.ofMinutes(10);
+
     /** How long a verification code stays usable. Previously: forever. */
     private static final Duration CODE_TTL = Duration.ofMinutes(15);
 
     /** Wrong guesses tolerated per code before it is burned. */
     private static final int MAX_CODE_ATTEMPTS = 5;
 
+    /**
+     * How long a reset ticket lives, and why it is shorter than the code's fifteen minutes.
+     *
+     * <p>The code has to survive a trip to a mail client on another device. The ticket only
+     * has to survive typing a password on a screen the user is already looking at, so there
+     * is no reason to leave it lying around for longer.
+     */
+    private static final Duration TICKET_TTL = Duration.ofMinutes(10);
+
+    /** 256 bits. Enough that guessing a ticket is not a strategy worth rate-limiting for. */
+    private static final int TICKET_BYTES = 32;
+
     private static final int MIN_GAMES = 3;
     private static final int MIN_KEYWORDS = 5;
+
+    /**
+     * One is enough, and more than one is the common case.
+     *
+     * <p>Unlike games and keywords, which need a handful before the recommender has
+     * anything to work with, a single platform is a complete and true answer — most people
+     * do play on exactly one. Demanding more would push them into ticking a box that is not
+     * true of them, which is worse than a short list.
+     */
+    private static final int MIN_PLATFORMS = 1;
 
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final GamerRepository gamerRepository;
     private final VerificationCodeRepository verificationCodeRepository;
+    private final PasswordResetTicketRepository passwordResetTicketRepository;
     private final GamesRepository gamesRepository;
     private final SessionRepository sessionRepository;
     private final KeywordsRepository keywordsRepository;
     private final AvatarsRepository avatarsRepository;
     private final GamerCosmeticRepository gamerCosmeticRepository;
     private final GamerBadgeRepository gamerBadgeRepository;
+    private final GamerMissionRepository gamerMissionRepository;
+    private final GamerLinkedAccountRepository linkedAccountRepository;
+    private final AccountLinkTicketRepository accountLinkTicketRepository;
+    private final GamerAuthIdentityRepository authIdentityRepository;
+    private final SessionIssuer sessionIssuer;
     private final ObjectStorage objectStorage;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender emailSender;
+    private final Mailer mailer;
     private final ApplicationEventPublisher events;
     private final AuthRateLimiters rateLimiters;
-
-    @Value("${spring.mail.username:noreply@gamebuddy.app}")
-    private String sender;
+    private final TextModerationService textModeration;
+    private final Clock clock;
 
     // =======================================================================
     // Unauthenticated
@@ -97,6 +133,16 @@ public class DefaultAuthService implements AuthService {
         // wrong. The previous code threw USER_NOT_FOUND first, which turned the login
         // endpoint into an account-enumeration oracle.
         Gamer gamer = gamerOptional.orElseThrow(() -> new BusinessException(TransactionCode.WRONG_PASSWORD));
+
+        // An account created through Google or Discord has no password at all. The same
+        // error as a wrong one, deliberately: "this account uses Google" would be an
+        // enumeration oracle, and the app's text for this code already says to try the
+        // social buttons. Short-circuited rather than left to the encoder, which logs a
+        // warning about a null hash on every attempt.
+        if (gamer.getPwd() == null) {
+            log.info("Password login attempted on a social-only account");
+            throw new BusinessException(TransactionCode.WRONG_PASSWORD);
+        }
 
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(gamer.getEmail(), password));
@@ -127,6 +173,11 @@ public class DefaultAuthService implements AuthService {
         rateLimiters.login().reset(throttleKey);
         String token = issueSession(gamer);
 
+        // The counterpart to the failed-attempt warning above. Without a record of the
+        // successes, a run of failures followed by silence is indistinguishable from a run
+        // of failures followed by someone getting in.
+        log.info("Login for {}", gamer.getUserId());
+
         LoginResponse response = new LoginResponse();
         LoginResponseBody body = new LoginResponseBody();
         body.setAccessToken(token);
@@ -148,6 +199,7 @@ public class DefaultAuthService implements AuthService {
     public RegisterResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail().trim().toLowerCase(Locale.ROOT);
         PasswordPolicy.validate(registerRequest.getPassword());
+        TermsPolicy.requireAcceptance(registerRequest.getAcceptedTerms());
 
         Gamer gamer = gamerRepository.findByEmail(email).orElse(null);
         if (gamer != null) {
@@ -162,9 +214,34 @@ public class DefaultAuthService implements AuthService {
             gamer.setUserId(UUID.randomUUID().toString());
             gamer.setEmail(email);
             gamer.setRole(Role.USER);
+            // Assigned here, once, and never again. The free like-cap experiment is not
+            // running yet — every tier still gets the same cap — but a cohort handed out
+            // later is not a cohort: the accounts that already existed would be sorted by a
+            // rule that was not in force while they were forming their habits, and their
+            // retention would be attributed to an experiment they never took part in.
+            gamer.setLikeCapCohort(LikeCapCohort.forUser(gamer.getUserId()));
         }
         gamer.setPwd(passwordEncoder.encode(registerRequest.getPassword()));
-        gamer.setFcmToken(registerRequest.getFcmToken());
+        // Stamped on every registration attempt, including a re-claimed unverified one:
+        // whoever ends up owning this account is the person who ticked the box just now.
+        gamer.setTermsAcceptedAt(clock.instant());
+        gamer.setTermsVersion(TermsPolicy.CURRENT_VERSION);
+        // Deliberately no device token here. Registration is not device registration: on
+        // Android 13+ the client has not asked for notification permission yet and cannot
+        // possess a real token, so what used to arrive was the literal placeholder
+        // "pending" — and it was stored verbatim, for every account.
+        //
+        // That made the column non-unique by construction. Every account that had not yet
+        // completed push registration carried an identical token, which broke the two
+        // places that resolve a gamer *by* token: the preference check in
+        // NotificationDispatcher (a NonUniqueResultException that escaped as a 500 from
+        // whatever request triggered the notification) and the history write in
+        // DefaultNotificationService. It also queued outbox rows addressed to "pending",
+        // which can only ever fail at Firebase.
+        //
+        // The device registers itself after sign-in through updateFcmToken, which detaches
+        // the token from any previous owner first and so keeps the column unique. A null
+        // here is the honest state: no device registered yet.
         gamerRepository.save(gamer);
 
         issueAndSendCode(email, true);
@@ -187,48 +264,21 @@ public class DefaultAuthService implements AuthService {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
         }
 
+        // An unknown address returns exactly what a wrong code does (below), so verify cannot
+        // be used to tell a registered email from an unregistered one.
         Gamer gamer = gamerRepository
                 .findByEmail(email)
-                .orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
 
-        VerificationCode verification = verificationCodeRepository
-                .findByEmailAndCodeAndIsValidTrue(email, code)
-                .orElseGet(() -> {
-                    // Charge the wrong guess against the live code so a brute-force run
-                    // burns its budget instead of guessing indefinitely.
-                    verificationCodeRepository
-                            .findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(email)
-                            .ifPresent(live -> {
-                                live.setAttempts(live.getAttempts() + 1);
-                                if (live.getAttempts() >= MAX_CODE_ATTEMPTS) {
-                                    live.setIsValid(false);
-                                }
-                                verificationCodeRepository.save(live);
-                            });
-                    throw new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND);
-                });
-
-        if (verification.isExpired()) {
-            verification.setIsValid(false);
-            verificationCodeRepository.save(verification);
-            throw new BusinessException(TransactionCode.VERIFICATION_CODE_EXPIRED);
-        }
-        if (verification.getAttempts() >= MAX_CODE_ATTEMPTS) {
-            verification.setIsValid(false);
-            verificationCodeRepository.save(verification);
-            throw new BusinessException(TransactionCode.TOO_MANY_ATTEMPTS);
-        }
-
-        // Burn this code and every other outstanding one for the address.
-        verification.setIsValid(false);
-        verificationCodeRepository.save(verification);
-        verificationCodeRepository.invalidateAllForEmail(email);
+        redeemCode(email, code, CodePurpose.REGISTRATION);
         rateLimiters.verify().reset(email);
 
         gamer.setIsVerified(true);
         // Proving control of the mailbox invalidates any previously issued token.
         gamer.revokeIssuedTokens();
         gamerRepository.save(gamer);
+
+        log.info("Account {} verified; previously issued tokens revoked", gamer.getUserId());
 
         String token = issueSession(gamer);
 
@@ -249,10 +299,154 @@ public class DefaultAuthService implements AuthService {
         if (!rateLimiters.sendCode().tryAcquire(email)) {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
         }
-        gamerRepository.findByEmail(email).orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
+        // Uniform response whether or not the address has an account, so this endpoint
+        // cannot be used to enumerate registered emails or to mail-bomb a known one: a real
+        // account is sent a code, an unknown address gets the same reply and nothing is sent.
+        gamerRepository
+                .findByEmail(email)
+                .ifPresent(g -> issueAndSendCode(email, Boolean.TRUE.equals(sendCodeRequest.getIsRegister())));
+        return DefaultMessageResponse.of("If an account exists for that address, a verification code has been sent");
+    }
 
-        issueAndSendCode(email, Boolean.TRUE.equals(sendCodeRequest.getIsRegister()));
-        return DefaultMessageResponse.of("Verification code sent successfully");
+    /**
+     * Step one of a reset: spend the emailed code, hand back a ticket for step two.
+     *
+     * <p>Deliberately not a session. {@code verifyCode} answers a correct code with an access
+     * token, which is right when the code proves "this address is mine" at signup and wrong
+     * here: the holder has not authenticated, they have only shown they can read the mailbox,
+     * and the one thing they should be able to do next is set a password. A ticket says
+     * exactly that and nothing more.
+     *
+     * <p>Every failure looks like a wrong code, including an address with no account, so this
+     * cannot be used to find out who has one.
+     */
+    @Override
+    @Transactional
+    public ResetVerifyResponse verifyResetCode(ResetVerifyRequest request) {
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+
+        if (!rateLimiters.resetPassword().tryAcquire(email)) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
+        }
+
+        gamerRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        redeemCode(email, request.getVerificationCode(), CodePurpose.PASSWORD_RESET);
+
+        // Any ticket from an abandoned earlier attempt stops being a way in.
+        passwordResetTicketRepository.burnAllForEmail(email);
+
+        byte[] raw = new byte[TICKET_BYTES];
+        RANDOM.nextBytes(raw);
+        String token = HexFormat.of().formatHex(raw);
+
+        Instant now = Instant.now();
+        PasswordResetTicket ticket = new PasswordResetTicket();
+        ticket.setEmail(email);
+        ticket.setTokenHash(hashToken(token));
+        ticket.setUsed(false);
+        ticket.setCreatedAt(now);
+        ticket.setExpiresAt(now.plus(TICKET_TTL));
+        passwordResetTicketRepository.save(ticket);
+
+        rateLimiters.resetPassword().reset(email);
+        log.info("Password reset code accepted for {}; ticket issued", email);
+
+        ResetVerifyResponse response = new ResetVerifyResponse();
+        ResetVerifyResponseBody body = new ResetVerifyResponseBody();
+        body.setResetToken(token);
+        response.setBody(new BaseBody<>(body));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
+    }
+
+    /**
+     * Step two: spend the ticket and set the new password.
+     *
+     * <p>Does what {@code changePwd} does once it is satisfied the request is genuine — encode,
+     * revoke, delete the sessions — because the two must not diverge on what "the password
+     * changed" means. What differs is only how the caller proved themselves: there, the
+     * current password; here, a ticket earned with a mailed code.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+
+        if (!rateLimiters.resetPassword().tryAcquire(email)) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
+        }
+
+        // A ticket that is missing, spent, expired or issued for a different address is one
+        // answer: start again. Distinguishing them would describe the state of somebody
+        // else's reset to whoever is guessing.
+        PasswordResetTicket ticket = passwordResetTicketRepository
+                .findByTokenHash(hashToken(request.getResetToken()))
+                .filter(t -> t.getEmail().equals(email))
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        if (ticket.isExpired()) {
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_EXPIRED);
+        }
+        if (Boolean.TRUE.equals(ticket.getUsed())) {
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND);
+        }
+
+        Gamer gamer = gamerRepository
+                .findByEmail(email)
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        String newPassword = request.getPassword();
+        // Guarded, because a social-only account legitimately arrives here with no
+        // password: the forgotten-password flow is exactly how somebody who has lost
+        // access to their Google account gets a way back in, and it *sets* one. The
+        // mailbox proof it rests on is the same either way.
+        if (gamer.getPwd() != null && passwordEncoder.matches(newPassword, gamer.getPwd())) {
+            throw new BusinessException(TransactionCode.PASSWORD_SAME);
+        }
+        PasswordPolicy.validate(newPassword);
+
+        gamer.setPwd(passwordEncoder.encode(newPassword));
+        gamer.revokeIssuedTokens();
+        gamerRepository.save(gamer);
+        sessionRepository.deleteAllByEmail(email);
+
+        ticket.setUsed(true);
+        passwordResetTicketRepository.save(ticket);
+        passwordResetTicketRepository.burnAllForEmail(email);
+        verificationCodeRepository.invalidateAllForEmail(email);
+
+        log.info("Password reset for {}; all sessions invalidated", gamer.getUserId());
+
+        sendPasswordChangedNotice(email);
+
+        return DefaultMessageResponse.of("Password changed successfully. Please sign in.");
+    }
+
+    /**
+     * Tells the account its password changed — the one message a takeover victim receives.
+     *
+     * <p>Failure is swallowed, unlike every other mail in this class. Elsewhere a dead relay
+     * should roll the transaction back, because an account with no deliverable code is worse
+     * than no account. Here the password has already changed and the sessions are already
+     * gone; throwing would undo a reset the user completed successfully because we could not
+     * send them a courtesy note.
+     */
+    private void sendPasswordChangedNotice(String email) {
+        EmailContent content = EmailContent.notice(
+                Constants.EMAIL_SUBJECT_PASSWORD_CHANGED,
+                Constants.EMAIL_PREHEADER_PASSWORD_CHANGED,
+                Constants.EMAIL_HEADING_PASSWORD_CHANGED,
+                String.format(Constants.EMAIL_INTRO_PASSWORD_CHANGED, email),
+                List.of(Constants.EMAIL_BODY_PASSWORD_CHANGED),
+                Constants.EMAIL_FOOTNOTE_PASSWORD_CHANGED);
+        try {
+            mailer.send(email, content);
+        } catch (MailException e) {
+            log.warn("Password-changed notice to {} could not be sent", email, e);
+        }
     }
 
     @Override
@@ -288,8 +482,15 @@ public class DefaultAuthService implements AuthService {
     public DefaultMessageResponse setUsername(Gamer principal, UsernameRequest usernameRequest) {
         Gamer gamer = reload(principal);
         String username = usernameRequest.getUsername().trim();
+        UsernamePolicy.validate(username);
+        // A username is on every message, every post and every profile card this account
+        // ever appears on, so it is refused rather than masked — there is no useful
+        // rendering of a slur with asterisks in it.
+        if (!textModeration.isCleanIdentifier(username)) {
+            throw new BusinessException(TransactionCode.USERNAME_NOT_ALLOWED);
+        }
 
-        Optional<Gamer> clash = gamerRepository.findByGamerUsername(username);
+        Optional<Gamer> clash = gamerRepository.findByGamerUsernameIgnoreCase(username);
         if (clash.isPresent() && !Objects.equals(clash.get().getUserId(), gamer.getUserId())) {
             throw new BusinessException(TransactionCode.USERNAME_EXISTS);
         }
@@ -314,8 +515,20 @@ public class DefaultAuthService implements AuthService {
             throw new BusinessException(
                     TransactionCode.INVALID_REQUEST, "select at least " + MIN_KEYWORDS + " keywords");
         }
+        // Checked here with the others rather than left to mapAndSetPlatforms below, so
+        // that every "you have not picked enough" refusal happens before any lookup. Left
+        // where it was mapped, somebody who sent no platforms got whatever error the avatar
+        // or game lookup produced first — a message about the wrong field entirely.
+        if (detailsRequest.getPlatforms() == null
+                || detailsRequest.getPlatforms().size() < MIN_PLATFORMS) {
+            throw new BusinessException(
+                    TransactionCode.INVALID_REQUEST, "select at least " + MIN_PLATFORMS + " platform");
+        }
 
-        gamer.setAge(detailsRequest.getAge());
+        // The client sends a date, never an age: the number that decides eligibility is
+        // computed here or it is not trustworthy.
+        gamer.setBirthDate(detailsRequest.getBirthDate());
+        gamer.setAge(AgePolicy.validate(detailsRequest.getBirthDate(), clock));
         gamer.setCountry(detailsRequest.getCountry());
         gamer.setGender(detailsRequest.getGender());
         // Only when one was sent. Onboarding no longer asks for an avatar — see
@@ -329,6 +542,7 @@ public class DefaultAuthService implements AuthService {
         gamer.getLikedgames().clear();
         mapAndSetKeywords(gamer, keywords);
         mapAndSetUserGames(gamer, games);
+        mapAndSetPlatforms(gamer, detailsRequest.getPlatforms());
         gamer.setIsRegistered(true);
         gamerRepository.save(gamer);
 
@@ -340,6 +554,13 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public DefaultMessageResponse changePwd(Gamer principal, ChangePwdRequest changePwdRequest) {
         Gamer gamer = reload(principal);
+
+        // Nothing to change, and nothing to check the current password against. The app
+        // reads `hasPassword` off the profile and offers "Set a password" instead, so this
+        // is the case where the two have drifted.
+        if (gamer.getPwd() == null) {
+            throw new BusinessException(TransactionCode.PASSWORD_NOT_SET);
+        }
 
         // The old endpoint changed the password on the strength of the bearer token
         // alone, so a leaked token meant permanent account takeover.
@@ -357,6 +578,11 @@ public class DefaultAuthService implements AuthService {
         gamerRepository.save(gamer);
         sessionRepository.deleteAllByEmail(gamer.getEmail());
 
+        // A password change is the action a user takes when they believe they have been
+        // compromised, and the action an attacker takes once they are in. Either way it is
+        // the first thing anyone looks for afterwards.
+        log.info("Password changed for {}; all sessions invalidated", gamer.getUserId());
+
         return DefaultMessageResponse.of("Password changed successfully. Please sign in again.");
     }
 
@@ -366,8 +592,41 @@ public class DefaultAuthService implements AuthService {
         Gamer gamer = reload(principal);
         Avatars avatar = requireSelectableAvatar(avatarRequest.getAvatarId());
 
+        /*
+         * The upload has to be cleared, not merely overtaken.
+         *
+         * {@link AvatarUrls} prefers {@code avatarKey} over this column whenever one is
+         * set, so writing the catalogue id on its own changed the row and nothing anybody
+         * could see: the picker showed the new avatar selected while every screen in the
+         * app went on drawing the uploaded photograph. Picking one of ours is a
+         * replacement, and the only way to say so is to remove the thing it replaces.
+         *
+         * The score and the timestamp go with it. They describe an image that is no longer
+         * anyone's avatar, and leaving a PENDING status behind would keep the account
+         * sitting in the moderation queue waiting on a decision about a photo that has
+         * already been withdrawn.
+         */
+        String previousKey = gamer.getAvatarKey();
+        AvatarStatus previousStatus = gamer.getAvatarStatus();
+
         gamer.setAvatar(avatar.getId());
+        gamer.setAvatarKey(null);
+        gamer.setAvatarStatus(null);
+        gamer.setAvatarScore(null);
+        gamer.setAvatarUploadedAt(null);
         gamerRepository.save(gamer);
+
+        // Same call, same reasoning, as deleteAccount: an image the application can no
+        // longer reach must not stay in a public bucket where anyone holding the URL
+        // still can. Inside the transaction for the same trade — a commit that fails
+        // here costs a photograph its owner has already chosen to replace, which is much
+        // the cheaper of the two mistakes.
+        if (previousKey != null) {
+            objectStorage.delete(
+                    previousStatus == AvatarStatus.APPROVED ? ObjectStorage.Bucket.MEDIA : ObjectStorage.Bucket.UPLOADS,
+                    previousKey);
+        }
+
         return DefaultMessageResponse.of("Avatar changed successfully");
     }
 
@@ -375,9 +634,23 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public DefaultMessageResponse changeAge(Gamer principal, ChangeAgeRequest changeAgeRequest) {
         Gamer gamer = reload(principal);
-        gamer.setAge(changeAgeRequest.getAge());
+        int age = AgePolicy.validate(changeAgeRequest.getBirthDate(), clock);
+
+        // Logged because this is the field an account holder would edit if they wanted to
+        // be somewhere they are not allowed. It cannot achieve that any more — the floor
+        // is 18 and it is checked above — but an unexplained change of date of birth is
+        // still the first thing worth seeing when investigating a report.
+        log.info(
+                "Gamer {} changed date of birth from {} to {} (age {})",
+                gamer.getUserId(),
+                gamer.getBirthDate(),
+                changeAgeRequest.getBirthDate(),
+                age);
+
+        gamer.setBirthDate(changeAgeRequest.getBirthDate());
+        gamer.setAge(age);
         gamerRepository.save(gamer);
-        return DefaultMessageResponse.of("Age changed successfully");
+        return DefaultMessageResponse.of("Date of birth changed successfully");
     }
 
     /**
@@ -394,7 +667,7 @@ public class DefaultAuthService implements AuthService {
      */
     @Override
     @Transactional
-    public DefaultMessageResponse deleteAccount(Gamer principal, DeleteAccountRequest request) {
+    public DefaultMessageResponse deleteAccount(Gamer principal, DeleteAccountRequest request, String bearerToken) {
         Gamer gamer = reload(principal);
 
         // Ordered before the password check: the caller is already authenticated as this
@@ -403,7 +676,14 @@ public class DefaultAuthService implements AuthService {
         if (gamer.getDeletedAt() != null) {
             throw new BusinessException(TransactionCode.ACCOUNT_DELETED);
         }
-        if (!passwordEncoder.matches(request.getCurrentPassword(), gamer.getPwd())) {
+        if (gamer.getPwd() == null) {
+            // No password to ask for, so freshness stands in for it: sign in again, then
+            // delete. That is the same property the password was providing — proof that
+            // whoever is holding this token has just satisfied the provider — and a stolen
+            // token cannot manufacture it, because a refresh preserves the original
+            // session start rather than moving it. See JwtService's `sst` claim.
+            requireFreshSession(bearerToken);
+        } else if (!passwordEncoder.matches(request.getCurrentPassword(), gamer.getPwd())) {
             throw new BusinessException(TransactionCode.CURRENT_PASSWORD_WRONG);
         }
 
@@ -452,6 +732,31 @@ public class DefaultAuthService implements AuthService {
         // Badges too. What somebody achieved is a record of what they did here, and the
         // showcase is the part of it other people could see.
         gamerBadgeRepository.deleteAllByUserId(gamer.getUserId());
+
+        // And the missions they were dealt. The rows carry a snapshot of how much they had
+        // talked and matched at the moment each set was handed out, which is a sketch of
+        // somebody's activity over months — exactly the kind of thing a deletion is for.
+        gamerMissionRepository.deleteAllByUserId(gamer.getUserId());
+
+        // Linked Discord accounts. The schema cascades on delete, but nothing here
+        // deletes — the row is anonymised — so without this the rows survive, and they are
+        // the two most identifying things left: a Discord snowflake and a display name that
+        // resolve to a real person on a service we do not control.
+        //
+        // Leaving them also bricks the external account permanently. `provider, external_id`
+        // is unique, so a returning user signing up fresh and linking the same Discord is
+        // told it belongs to another account and to unlink it there first — which is
+        // impossible, because that account can no longer authenticate.
+        linkedAccountRepository.deleteAllByGamer_UserId(gamer.getUserId());
+
+        // Any half-finished link, too. A ticket is single-use and short-lived, but it names
+        // the account it was minted for and there is no longer an account to name.
+        accountLinkTicketRepository.deleteAllByUserId(gamer.getUserId());
+
+        // And every way of signing in. Leaving these would let the same Google account walk
+        // straight back into a deleted account — the identity is keyed on the provider's
+        // subject, which does not change when the email column is anonymised above.
+        authIdentityRepository.deleteAllByUserId(gamer.getUserId());
 
         gamer.setDeletedAt(Instant.now());
         gamer.revokeIssuedTokens();
@@ -535,6 +840,23 @@ public class DefaultAuthService implements AuthService {
         return DefaultMessageResponse.of("Keywords changed successfully");
     }
 
+    /**
+     * Changes what a gamer plays on.
+     *
+     * <p>No {@code refreshRecommenderClusters} call, unlike games and keywords. The model
+     * ranks on taste, and platform is not taste — it is a hard constraint the feed applies
+     * afterwards as a filter. Marking the profile stale here would force a live re-rank for
+     * a change that cannot move a single score.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse changePlatforms(Gamer principal, ChangeDetailRequest changePlatformsRequest) {
+        Gamer gamer = reload(principal);
+        mapAndSetPlatforms(gamer, changePlatformsRequest.getGamesOrKeywordsList());
+        gamerRepository.save(gamer);
+        return DefaultMessageResponse.of("Platforms changed successfully");
+    }
+
     // =======================================================================
     // Helpers
     // =======================================================================
@@ -556,16 +878,108 @@ public class DefaultAuthService implements AuthService {
         return gamer;
     }
 
-    private String issueSession(Gamer gamer) {
-        String token = jwtService.generateToken(gamer);
-        sessionRepository.deleteAllByEmail(gamer.getEmail());
+    /**
+     * Issues a fresh token for the session the caller already holds.
+     *
+     * <p>Deliberately does almost nothing else. It does not re-check the password (the
+     * bearer token is the credential), and it does not re-run the login gates — the JWT
+     * filter has already loaded the account and refused a blocked or deleted one, and
+     * {@code tokensValidFrom} kills every outstanding token the moment a password
+     * changes, so a session cannot be refreshed past a revocation.
+     */
+    @Override
+    @Transactional
+    public LoginResponse refreshSession(Gamer principal, String bearerToken) {
+        Gamer gamer = gamerRepository
+                .findById(principal.getUserId())
+                .orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
 
-        Session session = new Session();
-        session.setTokenHash(hashToken(token));
-        session.setEmail(gamer.getEmail());
-        session.setExpiresAt(jwtService.extractExpiration(token));
-        sessionRepository.save(session);
-        return token;
+        Instant sessionStart = jwtService.extractSessionStart(bearerToken);
+        if (!jwtService.withinMaxSessionAge(sessionStart, Instant.now())) {
+            // The ceiling. Reported as an invalid token because that is what it is from
+            // here on, and because the client already knows to ask for the password when
+            // it sees this rather than showing an error nobody can act on.
+            log.info("Session for {} reached its maximum age; a new login is required", gamer.getUserId());
+            throw new BusinessException(TransactionCode.TOKEN_INVALID);
+        }
+
+        String token = issueSession(gamer, sessionStart);
+
+        LoginResponse response = new LoginResponse();
+        LoginResponseBody body = new LoginResponseBody();
+        body.setAccessToken(token);
+        body.setUserId(gamer.getUserId());
+        response.setBody(new BaseBody<>(body));
+        response.setStatus(new Status(TransactionCode.DEFAULT_100));
+        return response;
+    }
+
+    /**
+     * Starts a new session.
+     *
+     * <p>Both overloads now delegate to {@link SessionIssuer}, which social sign-in shares:
+     * the one-row-per-account rule and the login-versus-refresh distinction that the 30-day
+     * ceiling rests on are worth having in exactly one place.
+     */
+    private String issueSession(Gamer gamer) {
+        return sessionIssuer.issue(gamer);
+    }
+
+    private String issueSession(Gamer gamer, Instant sessionStart) {
+        return sessionIssuer.issue(gamer, sessionStart);
+    }
+
+    /**
+     * Spends a six-digit code, or refuses and charges the attempt.
+     *
+     * <p>Shared by registration and password reset so the two cannot drift apart on the
+     * rules that matter: expiry, the attempt cap, single use, and burning every sibling
+     * code on success.
+     *
+     * <p><b>The lookup is by address, not by code.</b> The code is bcrypt-hashed, so there is
+     * nothing to put in a WHERE clause — we take the live row for the address and compare
+     * against it. That is a happier shape than the one it replaces, which searched by code
+     * and then, on the miss, had to go looking for the row again just to charge the attempt.
+     *
+     * <p><b>A code issued for the other flow is treated exactly like a wrong guess</b> — same
+     * error, same attempt charged. Saying "that code is real but for something else" would
+     * tell an attacker which flow an address is in the middle of.
+     */
+    private VerificationCode redeemCode(String email, Integer code, CodePurpose purpose) {
+        VerificationCode live = verificationCodeRepository
+                .findFirstByEmailAndIsValidTrueOrderByCreatedAtDesc(email)
+                .orElseThrow(() -> new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND));
+
+        if (live.isExpired()) {
+            live.setIsValid(false);
+            verificationCodeRepository.save(live);
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_EXPIRED);
+        }
+        if (live.getAttempts() >= MAX_CODE_ATTEMPTS) {
+            live.setIsValid(false);
+            verificationCodeRepository.save(live);
+            throw new BusinessException(TransactionCode.TOO_MANY_ATTEMPTS);
+        }
+
+        boolean matches = live.getPurpose() == purpose
+                && code != null
+                && passwordEncoder.matches(String.valueOf(code), live.getCodeHash());
+        if (!matches) {
+            // Charge the wrong guess so a brute-force run burns its budget rather than
+            // walking the million values a six-digit code has.
+            live.setAttempts(live.getAttempts() + 1);
+            if (live.getAttempts() >= MAX_CODE_ATTEMPTS) {
+                live.setIsValid(false);
+            }
+            verificationCodeRepository.save(live);
+            throw new BusinessException(TransactionCode.VERIFICATION_CODE_NOT_FOUND);
+        }
+
+        // Burn this code and every other outstanding one for the address.
+        live.setIsValid(false);
+        verificationCodeRepository.save(live);
+        verificationCodeRepository.invalidateAllForEmail(email);
+        return live;
     }
 
     /** Creates a fresh code, invalidates any predecessors, and mails it out. */
@@ -576,7 +990,10 @@ public class DefaultAuthService implements AuthService {
         Instant now = Instant.now();
 
         VerificationCode verification = new VerificationCode();
-        verification.setCode(code);
+        // Hashed, never stored in the clear. See the comment on the entity for why bcrypt
+        // rather than the SHA-256 used for session tokens.
+        verification.setCodeHash(passwordEncoder.encode(String.valueOf(code)));
+        verification.setPurpose(forRegistration ? CodePurpose.REGISTRATION : CodePurpose.PASSWORD_RESET);
         verification.setEmail(email);
         verification.setIsValid(true);
         verification.setAttempts(0);
@@ -585,19 +1002,27 @@ public class DefaultAuthService implements AuthService {
         verificationCodeRepository.save(verification);
 
         long minutes = CODE_TTL.toMinutes();
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(sender);
-        message.setTo(email);
-        if (forRegistration) {
-            message.setSubject(String.format(Constants.EMAIL_SUBJECT, code));
-            message.setText(String.format(Constants.EMAIL_TEXT, code, minutes));
-        } else {
-            message.setSubject(Constants.EMAIL_SUBJECT_FORGOT_PASSWORD);
-            message.setText(String.format(Constants.EMAIL_TEXT_FORGOT_PASSWORD, code, email, minutes));
-        }
+        String caption = String.format(Constants.EMAIL_CODE_CAPTION, minutes);
+        EmailContent content = forRegistration
+                ? EmailContent.withCode(
+                        String.format(Constants.EMAIL_SUBJECT, code),
+                        Constants.EMAIL_PREHEADER,
+                        Constants.EMAIL_HEADING,
+                        Constants.EMAIL_INTRO,
+                        String.valueOf(code),
+                        caption,
+                        Constants.EMAIL_FOOTNOTE)
+                : EmailContent.withCode(
+                        String.format(Constants.EMAIL_SUBJECT_FORGOT_PASSWORD, code),
+                        Constants.EMAIL_PREHEADER_FORGOT_PASSWORD,
+                        Constants.EMAIL_HEADING_FORGOT_PASSWORD,
+                        String.format(Constants.EMAIL_INTRO_FORGOT_PASSWORD, email),
+                        String.valueOf(code),
+                        caption,
+                        Constants.EMAIL_FOOTNOTE_FORGOT_PASSWORD);
 
         try {
-            emailSender.send(message);
+            mailer.send(email, content);
         } catch (MailException e) {
             // Propagating rolls the surrounding transaction back, so no orphaned
             // account or dangling code survives a mail outage.
@@ -640,6 +1065,32 @@ public class DefaultAuthService implements AuthService {
         }
     }
 
+    /**
+     * Replaces the platform set from a list of enum names.
+     *
+     * <p>An unrecognised name is refused rather than skipped. Skipping would let a client
+     * that sends {@code "Playstation5"} appear to succeed while saving nothing, and the
+     * account holder would find an empty platform list with no error to explain it.
+     */
+    private void mapAndSetPlatforms(Gamer gamer, List<String> platformNames) {
+        if (platformNames == null || platformNames.size() < MIN_PLATFORMS) {
+            throw new BusinessException(
+                    TransactionCode.INVALID_REQUEST, "select at least " + MIN_PLATFORMS + " platform");
+        }
+        Set<Platform> platforms = new LinkedHashSet<>();
+        for (String name : platformNames) {
+            Platform platform = Platform.from(name);
+            if (platform == null) {
+                throw new BusinessException(TransactionCode.INVALID_REQUEST, "unknown platform " + name);
+            }
+            platforms.add(platform);
+        }
+        // Cleared and refilled rather than reassigned: Hibernate manages this collection,
+        // and handing it a different Set instance detaches the one it is tracking.
+        gamer.getPlatforms().clear();
+        gamer.getPlatforms().addAll(platforms);
+    }
+
     private void mapAndSetKeywords(Gamer gamer, List<String> keywordIds) {
         for (String keywordId : keywordIds) {
             Keywords keyword = keywordsRepository
@@ -650,21 +1101,72 @@ public class DefaultAuthService implements AuthService {
     }
 
     /**
-     * Asks the recommender to re-cluster once this transaction commits.
+     * Announces that this gamer's games or keywords changed.
      *
-     * <p>See {@link com.gamebuddy.auth.domain.event.RecommenderRefreshListener} for
-     * why this is no longer an inline call.
+     * <p>Consumed by {@code RecommenderStalenessListener} in the match module, which marks
+     * the gamer so the feed ranks them from their live profile until the model is retrained
+     * on it. Nothing here re-clusters anything: the recommender is trained offline, and the
+     * name this method still carries is the last trace of a design where every profile edit
+     * refitted the whole model.
+     *
+     * <p>The Javadoc used to point at a {@code RecommenderRefreshListener} that was never
+     * written, and for a while there was no consumer at all — so {@code /predict}, which
+     * ranks a known gamer from features pickled at training time, went on answering with
+     * the profile they had abandoned.
      */
     private void refreshRecommenderClusters(Gamer gamer) {
         events.publishEvent(new ProfileChangedEvent(gamer.getUserId()));
     }
 
-    private static String hashToken(String token) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 unavailable", e);
+    /**
+     * Sets a first password on an account that has never had one.
+     *
+     * <p>Deliberately does <em>not</em> revoke sessions, unlike {@link #changePwd}. A change
+     * is what somebody does when they believe they have been compromised, so ending every
+     * session is the point of it. This is somebody adding a second way in, having proved
+     * nothing was wrong with the first — signing them out of every device to celebrate would
+     * be punishing the safe behaviour.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse setPassword(Gamer principal, SetPasswordRequest request) {
+        Gamer gamer = reload(principal);
+        if (gamer.getPwd() != null) {
+            throw new BusinessException(TransactionCode.PASSWORD_ALREADY_SET);
         }
+        PasswordPolicy.validate(request.getPassword());
+
+        gamer.setPwd(passwordEncoder.encode(request.getPassword()));
+        gamerRepository.save(gamer);
+        log.info("Password set for {}", gamer.getUserId());
+        return DefaultMessageResponse.of("Password set.");
+    }
+
+    /**
+     * Refuses a destructive action on a session that is not minutes old.
+     *
+     * <p>The window is short on purpose: this is standing in for typing a password, and the
+     * honest flow is sign in, come back, confirm. Ten minutes covers a slow consent screen and
+     * a moment's hesitation, and nothing else.
+     */
+    private void requireFreshSession(String bearerToken) {
+        if (bearerToken == null || bearerToken.isBlank()) {
+            throw new BusinessException(TransactionCode.REAUTH_REQUIRED);
+        }
+        Instant sessionStart;
+        try {
+            sessionStart = jwtService.extractSessionStart(bearerToken);
+        } catch (RuntimeException e) {
+            // A token this filter already accepted should always parse, so this is a
+            // malformed one arriving some other way.
+            throw new BusinessException(TransactionCode.REAUTH_REQUIRED);
+        }
+        if (sessionStart == null || sessionStart.isBefore(clock.instant().minus(REAUTH_WINDOW))) {
+            throw new BusinessException(TransactionCode.REAUTH_REQUIRED);
+        }
+    }
+
+    private static String hashToken(String token) {
+        return TokenHashing.sha256Hex(token);
     }
 }

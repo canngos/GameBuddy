@@ -1,5 +1,8 @@
 import type { ViewStyle } from 'react-native';
-import { useIsDark, useThemeColors } from '../theme';
+import { useIsDark } from '../theme';
+// Straight from the tokens rather than through `useThemeColors`: the value is needed at
+// module scope, and reading it here also drops a second subscription from every consumer.
+import { semantic } from '../theme/tokens';
 
 /**
  * The dark theme's hairline border, as a style rather than a `dark:` class.
@@ -20,16 +23,23 @@ import { useIsDark, useThemeColors } from '../theme';
  * class, and it is better to have one honest exception than a class that works until
  * someone changes the theme.
  */
-export function useHairline(): ViewStyle {
-  const isDark = useIsDark();
-  const colors = useThemeColors();
+/*
+ * Both keys are always present, and the light value is a zero-width transparent border
+ * rather than nothing at all. That is not fussiness: an element whose resolved style
+ * *appears* on one theme and is absent on the other stops painting its whole subtree when
+ * the theme flips. Same keys every time, only the values move.
+ *
+ * Precomputed and frozen rather than built per render. There are exactly two possible
+ * answers and the theme is the only input, so building a fresh object each time bought
+ * nothing and cost every consumer its memoisation — the style goes straight into a `style`
+ * array, where a new identity invalidates the array too. Freezing keeps the sharing honest.
+ */
+const DARK_HAIRLINE: ViewStyle = Object.freeze({
+  borderWidth: 1,
+  borderColor: semantic.line.dark,
+});
+const LIGHT_HAIRLINE: ViewStyle = Object.freeze({ borderWidth: 0, borderColor: 'transparent' });
 
-  // Both keys are always present, and the light value is a zero-width transparent
-  // border rather than nothing at all. That is not fussiness: an element whose resolved
-  // style *appears* on one theme and is absent on the other stops painting its whole
-  // subtree when the theme flips. Same keys every time, only the values move.
-  return {
-    borderWidth: isDark ? 1 : 0,
-    borderColor: isDark ? colors.line : 'transparent',
-  };
+export function useHairline(): ViewStyle {
+  return useIsDark() ? DARK_HAIRLINE : LIGHT_HAIRLINE;
 }

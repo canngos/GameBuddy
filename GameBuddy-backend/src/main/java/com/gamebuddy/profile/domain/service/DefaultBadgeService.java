@@ -11,17 +11,22 @@ import com.gamebuddy.profile.interfaces.dto.BadgesResponseBody;
 import com.gamebuddy.profile.interfaces.dto.ShowcasedBadgeDto;
 import com.gamebuddy.profile.interfaces.response.BadgesResponse;
 import com.gamebuddy.shared.badge.BadgeMetric;
-import com.gamebuddy.shared.badge.BadgeMetricSource;
+import com.gamebuddy.shared.badge.GamerMetrics;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
+import com.gamebuddy.shared.entity.Cosmetic;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.GamerBadge;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
+import com.gamebuddy.shared.repository.CosmeticRepository;
 import com.gamebuddy.shared.repository.GamerBadgeRepository;
+import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.ObjectStorage;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -65,14 +70,21 @@ public class DefaultBadgeService implements BadgeService {
     private final ApplicationEventPublisher events;
 
     /**
-     * Every module's contribution to what this gamer has done.
+     * Everything every module knows about this gamer.
      *
-     * <p>Injected as a list, so the profile module never learns that messages are counted
-     * by {@code match} and posts by {@code community}. Adding a mission over something new
-     * costs a source in the module that owns the data and a line in {@link Badge} — and no
-     * new edge in the module graph.
+     * <p>The profile module never learns that messages are counted by {@code match} and
+     * lobbies by {@code lobby}: {@code GamerMetrics} injects the sources and merges them.
+     * Adding a badge over something new costs a source in the module that owns the data and
+     * a line in {@link Badge} — and no new edge in the module graph.
      */
-    private final List<BadgeMetricSource> metricSources;
+    private final GamerMetrics metrics;
+
+    private final CoinLedger coins;
+
+    /** For the four PRISMATIC badges that hand over a frame instead of coins. */
+    private final CosmeticRepository cosmetics;
+
+    private final GamerCosmeticRepository ownership;
 
     // =======================================================================
     // Reading
@@ -99,6 +111,7 @@ public class DefaultBadgeService implements BadgeService {
                     dto.setTitle(badge.getTitle());
                     dto.setDescription(badge.getDescription());
                     dto.setIcon(iconUrl(badge));
+                    dto.setAnimated(badge.isAnimated());
                     return dto;
                 })
                 .toList();
@@ -115,12 +128,16 @@ public class DefaultBadgeService implements BadgeService {
     // =======================================================================
 
     /**
-     * Claims the coins.
+     * Claims what a badge is worth: coins, or a frame that is not for sale.
      *
-     * <p>Read-check-write inside one transaction so it runs under {@link Gamer}'s
-     * {@code @Version}: two taps arriving together would otherwise both find the badge
-     * uncollected and credit the reward twice. The {@code collectedAt} write is what makes
-     * it once-only, and the version check is what makes that hold under a race.
+     * <p><strong>A conditional update, not read-check-write.</strong> It used to rely on
+     * {@link Gamer}'s {@code @Version} to stop two simultaneous taps both finding the badge
+     * uncollected — which worked, but by turning one of the two into a conflict the gamer
+     * then had to understand, and only because a coin credit happened to touch the gamer
+     * row. {@code UPDATE ... WHERE collected_at IS NULL} makes the claim itself the atom:
+     * zero rows back means somebody already had it, and the second tap becomes a no-op
+     * rather than an error. That matters more now than it did at 25 coins a badge — the
+     * hard tier pays 125, or a cosmetic that cannot be bought back if it is granted twice.
      */
     @Override
     @Transactional
@@ -134,14 +151,48 @@ public class DefaultBadgeService implements BadgeService {
         if (row.isCollected()) {
             throw new BusinessException(TransactionCode.ALREADY_COLLECTED);
         }
-
+        if (badgeRepository.collect(gamer.getUserId(), badge.getCode(), Instant.now()) == 0) {
+            throw new BusinessException(TransactionCode.ALREADY_COLLECTED);
+        }
         row.setCollectedAt(Instant.now());
-        gamer.setCoin(gamer.getCoin() + badge.getReward());
-        badgeRepository.save(row);
+
+        if (badge.grantsCosmetic()) {
+            grantCosmetic(gamer, badge);
+        } else {
+            coins.earn(gamer, badge.getReward(), CoinReason.BADGE_REWARD);
+            log.info("Gamer {} collected badge {} for {} coins", gamer.getUserId(), code, badge.getReward());
+        }
         gamerRepository.save(gamer);
 
-        log.info("Gamer {} collected badge {} for {} coins", gamer.getUserId(), code, badge.getReward());
         return board(gamer);
+    }
+
+    /**
+     * Hands over the frame a hard badge unlocks.
+     *
+     * <p>The cosmetic names the badge, not the other way round, so this is a lookup rather
+     * than a mapping kept in two places. A missing row is logged and swallowed: the badge is
+     * already marked collected by the update above, and throwing here would roll that back
+     * and leave the gamer tapping a button that can never succeed. A trophy that has not
+     * been uploaded yet is an operational mistake, not something to punish the player for.
+     */
+    private void grantCosmetic(Gamer gamer, Badge badge) {
+        cosmetics
+                .findByUnlockedByBadge(badge.getCode())
+                .ifPresentOrElse(
+                        cosmetic -> {
+                            // ON CONFLICT DO NOTHING, so re-granting is harmless even though
+                            // the conditional collect above should make it impossible.
+                            ownership.grant(gamer.getUserId(), cosmetic.getId(), Instant.now());
+                            log.info(
+                                    "Gamer {} collected badge {} and was granted {}",
+                                    gamer.getUserId(),
+                                    badge.getCode(),
+                                    cosmetic.getAssetKey());
+                        },
+                        () -> log.error(
+                                "Badge {} grants a cosmetic but no row claims it — check migration 39 and the art upload",
+                                badge.getCode()));
     }
 
     /**
@@ -197,10 +248,18 @@ public class DefaultBadgeService implements BadgeService {
     }
 
     /**
-     * Grants every mission this gamer has now finished.
+     * Grants every badge this gamer has now finished.
      *
      * <p>Idempotent, and cheap for someone who has finished everything — the fast path
      * below is the common one for an old account.
+     *
+     * <p><strong>The fast path compares sets, not sizes.</strong> It used to be
+     * {@code already.size() >= Badge.values().length}, which is only the same question when
+     * every row corresponds to a live badge. It does not: three codes were retired with the
+     * Community feature and their rows survive on purpose, so an account from that era
+     * holds thirteen rows against a ten-badge catalogue and short-circuited out of
+     * evaluation entirely — earning nothing, ever again, silently. The accounts most likely
+     * to qualify for the hard tier were exactly the ones that could never reach it.
      */
     @Override
     @Transactional
@@ -208,17 +267,17 @@ public class DefaultBadgeService implements BadgeService {
         Set<String> already = badgeRepository.findAllByUserId(gamer.getUserId()).stream()
                 .map(GamerBadge::getBadgeCode)
                 .collect(Collectors.toSet());
-        if (already.size() >= Badge.values().length) {
+        if (Arrays.stream(Badge.values()).allMatch(badge -> already.contains(badge.getCode()))) {
             return;
         }
 
-        Map<BadgeMetric, Integer> metrics = measure(gamer);
+        Map<BadgeMetric, Integer> measured = metrics.measure(gamer);
         List<GamerBadge> awarded = new ArrayList<>();
         for (Badge badge : Badge.values()) {
             if (already.contains(badge.getCode())) {
                 continue;
             }
-            if (metrics.getOrDefault(badge.getMetric(), 0) >= badge.getTarget()) {
+            if (measured.getOrDefault(badge.getMetric(), 0) >= badge.getTarget()) {
                 awarded.add(new GamerBadge(gamer.getUserId(), badge.getCode()));
             }
         }
@@ -233,6 +292,7 @@ public class DefaultBadgeService implements BadgeService {
             // Published rather than sent: the outbox delivers it after commit, so a
             // transaction that rolls back cannot congratulate anyone on nothing.
             events.publishEvent(new NotificationRequestedEvent(
+                    gamer.getUserId(),
                     gamer.getFcmToken(),
                     Constants.BADGE_TITLE,
                     String.format(Constants.BADGE_BODY, badge.getTitle()),
@@ -244,27 +304,17 @@ public class DefaultBadgeService implements BadgeService {
     // Internals
     // =======================================================================
 
-    /** Merges what every module knows about this gamer into one map. */
-    private Map<BadgeMetric, Integer> measure(Gamer gamer) {
-        Map<BadgeMetric, Integer> merged = new EnumMap<>(BadgeMetric.class);
-        for (BadgeMetricSource source : metricSources) {
-            // Two sources claiming the same metric is a mistake in the sources, not
-            // something to resolve silently — the larger wins so the gamer is never told
-            // they have done less than they have, and it is logged.
-            source.measure(gamer)
-                    .forEach((metric, value) -> merged.merge(metric, value, (a, b) -> {
-                        log.warn("Two sources measured {}: {} and {}", metric, a, b);
-                        return Math.max(a, b);
-                    }));
-        }
-        return merged;
-    }
-
     /** The board, as the asking gamer sees it. */
     private BadgesResponse board(Gamer gamer) {
         Map<String, GamerBadge> rows = badgeRepository.findAllByUserId(gamer.getUserId()).stream()
                 .collect(Collectors.toMap(GamerBadge::getBadgeCode, row -> row));
-        Map<BadgeMetric, Integer> metrics = measure(gamer);
+        Map<BadgeMetric, Integer> measured = metrics.measure(gamer);
+
+        // One query for the handful of trophy frames rather than one per hard badge. The
+        // sheet has to name what a cosmetic badge is actually offering, and "a reward" is
+        // not a thing anybody can want.
+        Map<String, String> trophies = cosmetics.findAllByUnlockedByBadgeIsNotNull().stream()
+                .collect(Collectors.toMap(Cosmetic::getUnlockedByBadge, Cosmetic::getName));
 
         List<BadgeDto> badges = new ArrayList<>();
         for (Badge badge : Badge.values()) {
@@ -276,9 +326,12 @@ public class DefaultBadgeService implements BadgeService {
             dto.setIcon(iconUrl(badge));
             dto.setTarget(badge.getTarget());
             dto.setReward(badge.getReward());
+            dto.setTier(badge.getTier().name());
+            dto.setAnimated(badge.isAnimated());
+            dto.setCosmeticName(badge.grantsCosmetic() ? trophies.get(badge.getCode()) : null);
             // Capped: an earned badge whose counter has moved on would otherwise report
             // 47/10, and a progress bar reading "47 of 10" looks broken rather than proud.
-            dto.setProgress(Math.min(metrics.getOrDefault(badge.getMetric(), 0), badge.getTarget()));
+            dto.setProgress(Math.min(measured.getOrDefault(badge.getMetric(), 0), badge.getTarget()));
             dto.setEarned(row != null);
             dto.setCollected(row != null && row.isCollected());
             dto.setShowcased(row != null && row.getShowcaseSlot() != null);

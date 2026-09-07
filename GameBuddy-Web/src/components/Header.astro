@@ -1,0 +1,79 @@
+---
+/**
+ * The site header.
+ *
+ * No mobile menu, deliberately. Three links, a language picker and a theme toggle fit on a
+ * 360px screen at this size, and a hamburger would mean shipping a menu implementation for a
+ * nav that is already visible.
+ */
+import { localeUrl, t, type Lang } from '../i18n';
+import { SITE } from '../config';
+import LanguagePicker from './LanguagePicker.astro';
+import ThemeToggle from './ThemeToggle.astro';
+
+interface Props {
+  lang: Lang;
+  path: string;
+}
+
+const { lang, path } = Astro.props;
+const home = localeUrl(lang);
+
+const links = [
+  { href: `${home === '/' ? '' : home}/#features`, label: t(lang, 'nav.features') },
+  { href: `${home === '/' ? '' : home}/#how`, label: t(lang, 'nav.how') },
+  { href: localeUrl(lang, 'support'), label: t(lang, 'nav.support') },
+];
+---
+
+<header class="sticky top-0 z-40 border-b border-line/60 bg-canvas/80 backdrop-blur-md">
+  <nav
+    class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-3.5"
+    aria-label="Primary"
+  >
+    <a href={home} class="flex shrink-0 items-center gap-2.5 font-display text-lg font-bold tracking-tight">
+      {/* The Duo-Grip mark, inlined so it needs no extra request. Same drawing as
+          public/favicon.svg — change them together. */}
+      <svg viewBox="0 0 64 64" width="32" height="32" class="h-8 w-8" aria-hidden="true">
+        <defs>
+          <linearGradient id="gb-mark" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="64">
+            <stop offset="0" stop-color="#7C4DFF"></stop>
+            <stop offset="1" stop-color="#00E5FF"></stop>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="14" fill="url(#gb-mark)"></rect>
+        <circle cx="20" cy="17.5" r="5" fill="#FFFFFF"></circle>
+        <circle cx="44" cy="17.5" r="5" fill="#FFFFFF"></circle>
+        <path
+          d="M20 25h24a10 10 0 0 1 9.6 12.8l-2.4 8A6 6 0 0 1 40 47l-3-4H27l-3 4a6 6 0 0 1-10.8-1.2l-2.4-8A10 10 0 0 1 20 25Z"
+          fill="#FFFFFF"></path>
+        <path
+          d="M21 32.5v7M17.5 36h7"
+          fill="none"
+          stroke="url(#gb-mark)"
+          stroke-width="2.8"
+          stroke-linecap="round"></path>
+        <circle cx="43" cy="34" r="1.9" fill="url(#gb-mark)"></circle>
+        <circle cx="47" cy="38" r="1.9" fill="url(#gb-mark)"></circle>
+      </svg>
+      <span>{SITE.name}</span>
+    </a>
+
+    <div class="flex items-center gap-2 sm:gap-4">
+      <ul class="hidden items-center gap-5 text-sm text-muted sm:flex">
+        {
+          links.map((link) => (
+            <li>
+              <a href={link.href} class="transition-colors hover:text-content">
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+
+      <LanguagePicker lang={lang} path={path} />
+      <ThemeToggle lang={lang} />
+    </div>
+  </nav>
+</header>

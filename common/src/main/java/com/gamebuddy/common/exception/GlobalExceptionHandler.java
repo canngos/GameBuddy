@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -97,6 +99,26 @@ public class GlobalExceptionHandler {
         return build(TransactionCode.TOKEN_INVALID, TransactionCode.TOKEN_INVALID.getMessage());
     }
 
+    /**
+     * An upload past the configured size limit is a 413, not a 500.
+     *
+     * <p>The container rejects the multipart stream before the controller runs, so without
+     * this it fell through to the catch-all and every over-cap avatar upload was reported as
+     * an "unexpected error". {@link MaxUploadSizeExceededException} is the size case
+     * specifically; any other malformed multipart is a 400.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<DefaultMessageResponse> handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        log.debug("Rejected an oversize upload: {}", ex.getMessage());
+        return statusOnly(HttpStatus.PAYLOAD_TOO_LARGE, "Uploaded file is too large");
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<DefaultMessageResponse> handleMultipart(MultipartException ex) {
+        log.debug("Rejected a malformed multipart request: {}", ex.getMessage());
+        return statusOnly(HttpStatus.BAD_REQUEST, "Malformed multipart request");
+    }
+
     /** Catch-all. The detail stays in the log; the caller gets nothing exploitable. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<DefaultMessageResponse> handleUnexpected(Exception ex) {
@@ -118,5 +140,16 @@ public class GlobalExceptionHandler {
         status.setSuccess(false);
         response.setStatus(status);
         return new ResponseEntity<>(response, code.getHttpStatus());
+    }
+
+    /** Builds a response whose status carries an HTTP code directly, for failures with no TransactionCode. */
+    private ResponseEntity<DefaultMessageResponse> statusOnly(HttpStatus httpStatus, String message) {
+        DefaultMessageResponse response = new DefaultMessageResponse();
+        Status status = new Status();
+        status.setCode(String.valueOf(httpStatus.value()));
+        status.setMessage(message);
+        status.setSuccess(false);
+        response.setStatus(status);
+        return new ResponseEntity<>(response, httpStatus);
     }
 }

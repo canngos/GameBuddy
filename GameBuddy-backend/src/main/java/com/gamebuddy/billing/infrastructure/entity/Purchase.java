@@ -78,4 +78,22 @@ public class Purchase implements Serializable {
      */
     @Column(name = "receipt", length = 4000)
     private String receipt;
+
+    /**
+     * RevenueCat's period_type: TRIAL, INTRO, NORMAL, PROMOTIONAL, PREPAID.
+     *
+     * <p>Without it a trial and a paid month are the same row, and neither "paywall view to
+     * trial start" nor "trial to paid" can be counted at all.
+     */
+    @Column(name = "period_type", length = 16)
+    private String periodType;
+
+    /**
+     * RevenueCat's event type: INITIAL_PURCHASE, RENEWAL, PRODUCT_CHANGE…
+     *
+     * <p>RENEWAL is what makes month-2 retention countable. A renewal and a first purchase
+     * are otherwise indistinguishable once the row is written.
+     */
+    @Column(name = "event_type", length = 32)
+    private String eventType;
 }

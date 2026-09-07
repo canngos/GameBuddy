@@ -250,4 +250,126 @@ class SwipeQuotaTest {
         assertEquals(SubscriptionTier.BASIC, quotaAt(NOW).effectiveTier(gold(NOW.minusSeconds(60))));
         assertEquals(SubscriptionTier.BASIC, quotaAt(NOW).effectiveTier(basic()));
     }
+
+    // -- refunds, for rewind -------------------------------------------------
+
+    @Test
+    @DisplayName("a refunded like gives back both the swipe and the like")
+    void refundGivesBackBoth() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        quota.charge(gamer, true);
+        assertEquals(1, gamer.getSwipesUsed());
+        assertEquals(1, gamer.getAcceptsUsed());
+
+        quota.refund(gamer, true);
+        assertEquals(0, gamer.getSwipesUsed());
+        assertEquals(0, gamer.getAcceptsUsed());
+    }
+
+    @Test
+    @DisplayName("a refunded pass gives back the swipe but touches no like")
+    void refundOfDeclineLeavesAcceptsAlone() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        quota.charge(gamer, true);
+        quota.charge(gamer, false);
+        assertEquals(2, gamer.getSwipesUsed());
+        assertEquals(1, gamer.getAcceptsUsed());
+
+        quota.refund(gamer, false);
+        assertEquals(1, gamer.getSwipesUsed());
+        assertEquals(1, gamer.getAcceptsUsed());
+    }
+
+    @Test
+    @DisplayName("a refund across the daily reset cannot mint a free like")
+    void refundFloorsAtZero() {
+        // The counters reset lazily, so a rewind can land after the window rolled: the
+        // swipe was charged yesterday and today's counter is already zero. Decrementing
+        // that would hand out a spare like every midnight.
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        quota.refund(gamer, true);
+
+        assertEquals(0, gamer.getSwipesUsed());
+        assertEquals(0, gamer.getAcceptsUsed());
+    }
+
+    @Test
+    @DisplayName("a refund does not move the day's reset instant")
+    void refundDoesNotExtendTheWindow() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+        quota.charge(gamer, true);
+        Instant resetAt = gamer.getQuotaResetAt();
+
+        quota.refund(gamer, true);
+
+        // The window belongs to the day, not to the decisions in it — moving it would let
+        // a rewind quietly extend somebody's allowance.
+        assertEquals(resetAt, gamer.getQuotaResetAt());
+    }
+
+    // -- bought likes --------------------------------------------------------
+
+    @Test
+    @DisplayName("bought likes raise today's cap")
+    void bonusAcceptsRaiseTheCap() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+        int cap = SubscriptionTier.BASIC.dailyAccepts();
+
+        for (int i = 0; i < cap; i++) {
+            quota.charge(gamer, true);
+        }
+        assertThrows(BusinessException.class, () -> quota.charge(gamer, true));
+
+        gamer.setBonusAccepts(5);
+        // Five more get through, and then the wall is back.
+        for (int i = 0; i < 5; i++) {
+            quota.charge(gamer, true);
+        }
+        assertThrows(BusinessException.class, () -> quota.charge(gamer, true));
+    }
+
+    @Test
+    @DisplayName("bought likes do not survive the daily reset")
+    void bonusAcceptsExpireWithTheWindow() {
+        // They are sold for the evening somebody is having, not as a stockpile — and a
+        // stockpile would remove any reason to buy a second one tomorrow.
+        Gamer gamer = basic();
+        quotaAt(NOW).charge(gamer, true);
+        gamer.setBonusAccepts(5);
+
+        quotaAt(NOW.plus(Duration.ofDays(1)).plusSeconds(1)).charge(gamer, true);
+
+        assertEquals(0, gamer.getBonusAccepts());
+    }
+
+    @Test
+    @DisplayName("remaining() counts bought likes, and stops counting them once stale")
+    void remainingIncludesBonus() {
+        SwipeQuota quota = quotaAt(NOW);
+        Gamer gamer = basic();
+
+        // Charged first, so the daily window is open before the bonus is granted. Order
+        // matters and it is not obvious: opening the window zeroes bonusAccepts along with
+        // the other counters, so a purchase written before the day has started is wiped by
+        // the first swipe. DefaultMatchService.buyConsumable opens the window itself for
+        // exactly this reason.
+        quota.charge(gamer, true);
+        gamer.setBonusAccepts(5);
+
+        int cap = SubscriptionTier.BASIC.dailyAccepts();
+        assertEquals(cap + 5 - 1, quota.remaining(gamer).remainingAccepts());
+
+        // A day later the window has rolled and the bought ones are gone, so reporting
+        // them as still available would promise likes that the next charge refuses.
+        SwipeQuota tomorrow = quotaAt(NOW.plus(Duration.ofDays(1)).plusSeconds(1));
+        assertEquals(cap, tomorrow.remaining(gamer).remainingAccepts());
+    }
 }

@@ -1,0 +1,182 @@
+---
+/**
+ * The landing page, as a component rather than a page.
+ *
+ * Both `src/pages/index.astro` (English, at `/`) and `src/pages/[lang]/index.astro` (the
+ * other six) render this. Astro's i18n routing is directory-based, so without this split the
+ * page markup would exist in seven files that have to be edited together — which is the
+ * arrangement that guarantees six of them fall behind.
+ */
+import chatDark from '../assets/screens/chat-dark.png';
+import chatLight from '../assets/screens/chat-light.png';
+import deckDark from '../assets/screens/deck-dark.png';
+import deckLight from '../assets/screens/deck-light.png';
+import marketDark from '../assets/screens/market-dark.png';
+import marketLight from '../assets/screens/market-light.png';
+import { dict, t, type Lang } from '../i18n';
+import Faq from './Faq.astro';
+import PhoneFrame from './PhoneFrame.astro';
+import Reveal from './Reveal.astro';
+import StoreButtons from './StoreButtons.astro';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const d = dict(lang);
+
+const features = [
+  { icon: '🎯', ...d.features.matched },
+  { icon: '🖥️', ...d.features.platform },
+  { icon: '💬', ...d.features.chat },
+  { icon: '🛡️', ...d.features.moderated },
+  { icon: '🏅', ...d.features.badges },
+  { icon: '🎁', ...d.features.free },
+];
+
+const steps = [
+  { n: '01', ...d.how.step1 },
+  { n: '02', ...d.how.step2 },
+  { n: '03', ...d.how.step3 },
+];
+---
+
+{/* --- hero ------------------------------------------------------------------------- */}
+<section class="relative overflow-hidden">
+  <div
+    aria-hidden="true"
+    class="gradient-surface pointer-events-none absolute -top-40 left-1/2 h-[500px] w-[900px] -translate-x-1/2 rounded-full opacity-20 blur-[120px]"
+  >
+  </div>
+
+  <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-24">
+    <div class="text-center md:text-left">
+      <p
+        class="hero-in inline-flex items-center gap-2 rounded-full border border-line bg-raised/60 px-3 py-1 text-xs text-muted"
+      >
+        <span class="h-1.5 w-1.5 rounded-full bg-online" aria-hidden="true"></span>
+        {t(lang, 'hero.badge')}
+      </p>
+
+      <h1
+        class="hero-in mt-5 font-display text-4xl leading-[1.1] font-bold sm:text-5xl lg:text-6xl"
+        style="--hero-delay: 80ms"
+      >
+        {t(lang, 'hero.titleBefore')}{' '}
+        <span class="gradient-text">{t(lang, 'hero.titleHighlight')}</span>{' '}
+        {t(lang, 'hero.titleAfter')}
+      </h1>
+
+      <p class="hero-in mt-5 max-w-lg text-lg leading-relaxed text-muted md:mx-0" style="--hero-delay: 160ms">
+        {t(lang, 'hero.subtitle')}
+      </p>
+
+      <div class="hero-in mt-8" style="--hero-delay: 240ms">
+        <StoreButtons lang={lang} />
+      </div>
+    </div>
+
+    {/*
+      The two hero phones float gently and in opposite directions, which reads as depth
+      rather than as decoration. `prefers-reduced-motion` stops it — see global.css.
+    */}
+    <div class="flex justify-center gap-4 md:justify-end">
+      <PhoneFrame
+        dark={deckDark}
+        light={deckLight}
+        alt={t(lang, 'hero.deckAlt')}
+        rotate="-3deg"
+        eager
+        float="a"
+        class="w-44 sm:w-56"
+      />
+      <PhoneFrame
+        dark={chatDark}
+        light={chatLight}
+        alt={t(lang, 'hero.chatAlt')}
+        rotate="3deg"
+        eager
+        float="b"
+        class="mt-10 w-44 sm:w-56"
+      />
+    </div>
+  </div>
+</section>
+
+{/* --- features --------------------------------------------------------------------- */}
+<section id="features" class="mx-auto max-w-6xl scroll-mt-20 px-5 py-16">
+  <Reveal>
+    <h2 class="font-display text-3xl font-bold sm:text-4xl">{t(lang, 'features.title')}</h2>
+    <p class="mt-3 max-w-2xl text-muted">{t(lang, 'features.intro')}</p>
+  </Reveal>
+
+  <ul class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {
+      features.map((feature, i) => (
+        <Reveal as="li" delay={i * 60} class="h-full">
+          <div class="h-full rounded-2xl border border-line bg-surface/60 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
+            <span class="text-2xl" aria-hidden="true">
+              {feature.icon}
+            </span>
+            <h3 class="mt-3 text-lg font-semibold">{feature.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-muted">{feature.body}</p>
+          </div>
+        </Reveal>
+      ))
+    }
+  </ul>
+</section>
+
+{/* --- how it works ----------------------------------------------------------------- */}
+<section id="how" class="scroll-mt-20 border-y border-line/60 bg-surface/30">
+  <div class="mx-auto max-w-6xl px-5 py-16">
+    <Reveal>
+      <h2 class="font-display text-3xl font-bold sm:text-4xl">{t(lang, 'how.title')}</h2>
+    </Reveal>
+
+    <div class="mt-10 grid gap-10 md:grid-cols-[1fr_auto] md:items-center">
+      <ol class="space-y-8">
+        {
+          steps.map((step, i) => (
+            <Reveal as="li" delay={i * 90}>
+              <div class="flex gap-5">
+                <span class="gradient-text font-display text-2xl font-bold tabular-nums" aria-hidden="true">
+                  {step.n}
+                </span>
+                <div>
+                  <h3 class="text-lg font-semibold">{step.title}</h3>
+                  <p class="mt-1.5 max-w-md text-sm leading-relaxed text-muted">{step.body}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))
+        }
+      </ol>
+
+      <Reveal>
+        <PhoneFrame
+          dark={marketDark}
+          light={marketLight}
+          alt={t(lang, 'how.marketAlt')}
+          class="mx-auto w-48 sm:w-60"
+        />
+      </Reveal>
+    </div>
+  </div>
+</section>
+
+<Faq lang={lang} />
+
+{/* --- closing ---------------------------------------------------------------------- */}
+<section class="mx-auto max-w-4xl px-5 py-20 text-center">
+  <Reveal>
+    <div class="rounded-3xl border border-line bg-surface/60 px-6 py-12">
+      <h2 class="font-display text-3xl font-bold">{t(lang, 'closing.title')}</h2>
+      <p class="mx-auto mt-3 max-w-md text-muted">{t(lang, 'closing.body')}</p>
+      <div class="mt-8 flex justify-center">
+        <StoreButtons lang={lang} compact />
+      </div>
+    </div>
+  </Reveal>
+</section>

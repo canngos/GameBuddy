@@ -4,17 +4,20 @@
     "slug": "gamebuddy",
     "scheme": "gamebuddy",
     "version": "1.0.0",
+    "platforms": ["android", "ios"],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.gamebuddy.app"
+      "bundleIdentifier": "com.findgamebuddy.app"
     },
     "android": {
-      "package": "com.gamebuddy.app",
+      "package": "com.findgamebuddy.app",
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.findgamebuddy.app",
+      "versionCode": 4,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0B0B12",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -29,8 +32,19 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
+      "react-native-nitro-google-signin",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0B0B12",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 128,
+          "dark": {
+            "backgroundColor": "#0B0B12"
+          }
+        }
+      ],
       [
         "expo-image-picker",
         {
@@ -42,17 +56,49 @@
       "expo-document-picker",
       "expo-image",
       [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
           "color": "#FF4D67",
-          "defaultChannel": "default"
+          "defaultChannel": "messages"
         }
       ],
-      "./plugins/withAndroidJdk17"
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511",
+          "userTrackingUsageDescription": "GameBuddy uses this to keep the adverts you can watch for coins relevant. You can say no and everything still works."
+        }
+      ],
+      "./plugins/withAndroidJdk17",
+      "./plugins/withKotlinVersion",
+      "./plugins/withLanCleartext"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a31ba997-d691-4546-90df-2abb2e3f3ed1"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a31ba997-d691-4546-90df-2abb2e3f3ed1"
+    },
+    "owner": "gamebuddy-apps-team"
   }
 }

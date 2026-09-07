@@ -1,0 +1,65 @@
+# Clears React Native's LogBox notifications, which sit on top of the tab bar.
+#
+# This is the single thing that made five of the seven flows fail, and it is not an app
+# defect: LogBox is a **dev-build** overlay and does not exist in a release build. But the
+# APK under test is a debug build, and every launch raises two notifications —
+#
+#   !, Open debugger to view warnings.
+#   !, [RevenueCat] Failed to ready ui_config before getOfferings…
+#
+# — which stack at the bottom of the screen. The lower one occupies [26,2144][1054,2271]
+# and the tab buttons are [*,2164][*,2290], so it covers almost all of them. Taps on
+# Messages and Market landed on the notification; Maestro reported COMPLETED, the screen did
+# not change, and it read as broken tab navigation.
+#
+# Why a coordinate, when this suite avoids them
+# ---------------------------------------------
+# The ✕ is a clickable node carrying no text, no accessibility label and no resource-id, so
+# there is nothing else to address it by. The position is stable in a way a normal element's
+# is not: the bottom-most notification always occupies the same slot — dismissing one moves
+# the next down into it — so the same point clears them one after another.
+#
+# Why each tap is guarded
+# -----------------------
+# That point is over the **Profile tab** when no notification is there, so tapping blind
+# would silently navigate instead. Each tap runs only while something matching a LogBox
+# notification is on screen. Bounded at three rather than looped, so a regex that ever
+# matched app content could not spin.
+#
+# The regex is LogBox's own shape rather than today's error text: the notification's
+# accessibility label is the level glyph ("!", or a count once several have stacked up),
+# then ", ", then the message. A new kind of warning is covered without editing this file.
+
+appId: com.findgamebuddy.app
+---
+# The RevenueCat failure is raised while the first authenticated screen is loading, so it
+# can arrive a beat after the deck does.
+- waitForAnimationToEnd:
+    timeout: 2000
+
+- runFlow:
+    when:
+      visible: "[!0-9]+, .*"
+    commands:
+      - tapOn:
+          point: "97%,92%"
+      - waitForAnimationToEnd:
+          timeout: 1000
+
+- runFlow:
+    when:
+      visible: "[!0-9]+, .*"
+    commands:
+      - tapOn:
+          point: "97%,92%"
+      - waitForAnimationToEnd:
+          timeout: 1000
+
+- runFlow:
+    when:
+      visible: "[!0-9]+, .*"
+    commands:
+      - tapOn:
+          point: "97%,92%"
+      - waitForAnimationToEnd:
+          timeout: 1000

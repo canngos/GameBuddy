@@ -1,0 +1,74 @@
+---
+/**
+ * The footer, which carries the links the stores actually check for.
+ *
+ * Privacy, terms, support and account deletion all have to be reachable from the site
+ * without installing anything. Putting them here means every page in every language
+ * satisfies that, rather than only the landing page.
+ *
+ * The child safety standards are here for a second reason: Google Play requires them to be
+ * published outside the app, and a page nobody can navigate to is a page that reads as a form
+ * being satisfied rather than a policy being kept.
+ *
+ * The three legal links point at the English pages from every locale — those documents are not
+ * translated, and the pages themselves say so.
+ */
+import { CONTACT, OPERATOR, SITE } from '../config';
+import { localeUrl, t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  contactEmail: string;
+}
+
+const { lang, contactEmail } = Astro.props;
+const year = new Date().getFullYear();
+
+const legal = [
+  { href: '/privacy', label: t(lang, 'footer.privacy') },
+  { href: '/terms', label: t(lang, 'footer.terms') },
+  { href: '/child-safety', label: t(lang, 'footer.childSafety') },
+  { href: localeUrl(lang, 'delete-account'), label: t(lang, 'footer.deleteAccount') },
+  { href: localeUrl(lang, 'support'), label: t(lang, 'footer.support') },
+];
+---
+
+<footer class="mt-24 border-t border-line/60 bg-surface/40">
+  <div class="mx-auto max-w-6xl px-5 py-12">
+    <div class="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+      <div class="max-w-sm">
+        <p class="font-display text-lg font-bold">{SITE.name}</p>
+        <p class="mt-2 text-sm leading-relaxed text-muted">
+          {t(lang, 'footer.tagline')}. {t(lang, 'footer.builtBy')}
+        </p>
+      </div>
+
+      <nav aria-label={t(lang, 'footer.legalNav')}>
+        <ul class="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-1">
+          {
+            legal.map((link) => (
+              <li>
+                <a href={link.href} class="text-muted transition-colors hover:text-content">
+                  {link.label}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+    </div>
+
+    <div
+      class="mt-10 flex flex-col gap-2 border-t border-line/60 pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between"
+    >
+      <p>© {year} {OPERATOR.name}, {OPERATOR.country}.</p>
+      <p>
+        {/* Two addresses, and the distinction is real — see src/config.ts. */}
+        {t(lang, 'footer.help')}:
+        <a class="underline hover:text-content" href={`mailto:${contactEmail}`}>{contactEmail}</a>
+        · {t(lang, 'footer.legalContact')}:
+        <a class="underline hover:text-content" href={`mailto:${CONTACT.legal}`}>{CONTACT.legal}</a>
+      </p>
+    </div>
+  </div>
+</footer>

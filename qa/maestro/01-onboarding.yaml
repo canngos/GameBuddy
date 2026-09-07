@@ -1,0 +1,327 @@
+# Verification through to a populated deck.
+#
+# Registration happens in provision.js: the verification code is only readable from
+# Postgres and there is no mail server. What is under test here is everything after that —
+# the recovery path for an unverified sign-in, the six onboarding screens, and the fact
+# that a brand-new account lands on a deck with people in it.
+#
+# That last assertion is the one worth having. A new account is not in the trained
+# artefact, so it is served by the cold-start path; if that breaks, the first thing every
+# new user sees is an empty screen.
+#
+# Inputs are addressed by `id`, not by their visible label. The label renders as its own
+# Text node above the field, so tapping it hits the caption and the typing lands in
+# whichever box still had focus — which is exactly how the first run of this flow put an
+# email address and a password into the same field. See src/ui/TextField.tsx.
+
+appId: com.findgamebuddy.app
+name: 01 onboarding
+---
+- launchApp:
+    clearState: true
+
+- assertVisible: "GameBuddy"
+- takeScreenshot: artifacts/01-01-welcome
+
+# Waited for rather than tapped straight away, and waited *generously*.
+#
+# This is a debug build with no bundle in the APK, so the first launch of a run pulls one
+# from Metro — 18 seconds from a cleared cache, and the splash carries the word "GameBuddy"
+# the whole time. That makes the assert above pass on a screen that has no buttons on it
+# yet, and a short timeout here then reports the welcome screen as broken when it is only
+# slow. 60s covers a cold bundle; a warm one arrives in about two.
+- extendedWaitUntil:
+    visible: "I already have one"
+    timeout: 60000
+- tapOn: "I already have one"
+
+# This flow signs in inline rather than through `_login.yaml`, so it needs the consent
+# form answered here too. See `_consent.yaml`.
+- runFlow: _consent.yaml
+
+- assertVisible: "Welcome back"
+
+- tapOn:
+    id: "field-username-or-email"
+- inputText: ${PENDING_EMAIL}
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn:
+    id: "field-password"
+- inputText: ${PASSWORD}
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: artifacts/01-02-login-filled
+
+- tapOn: "Sign in"
+
+# An unverified account is refused, and the app offers the way out rather than leaving the
+# user on an error. It does NOT jump straight to the code screen — that only happens after
+# a new code has been sent.
+- extendedWaitUntil:
+    visible: "Account not verified"
+    timeout: 20000
+- takeScreenshot: artifacts/01-03-not-verified
+
+# And this is why the code cannot be captured in advance: tapping here issues a *new* one,
+# invalidating whatever provision.js read a moment ago.
+- tapOn: "Email me a code"
+
+- extendedWaitUntil:
+    visible: "Check your email"
+    timeout: 20000
+- takeScreenshot: artifacts/01-04-verify
+
+# So it is read now, after the send, from the local helper.
+- runScript: scripts/fetch-code.js
+
+- tapOn:
+    id: "field-verification-code"
+- inputText: ${output.code}
+# Submitted from the keyboard rather than by tapping the button. The field sets
+# returnKeyType="go" and onSubmitEditing={submit}, so this is the intended interaction for
+# a six-digit code — and it avoids racing the layout shift that hiding the keyboard causes.
+- pressKey: Enter
+
+# --- onboarding -----------------------------------------------------------------------
+- extendedWaitUntil:
+    visible: "Pick a username"
+    timeout: 25000
+- tapOn:
+    id: "field-username"
+# Letters only, and generated in provision.js. Usernames are a PUBLIC text surface, so the
+# filter strips phone numbers from them — a digit-heavy random string is refused as one.
+- inputText: ${NEW_USERNAME}
+- takeScreenshot: artifacts/01-05-username
+# Submitted from the keyboard. Tapping "Continue" here does nothing: on a single-field
+# screen the button sits under the keyboard, so the tap lands on a key instead — Maestro
+# reports COMPLETED and no request is made, which is a genuinely confusing failure.
+- pressKey: Enter
+
+- extendedWaitUntil:
+    visible: "About you"
+    timeout: 20000
+
+# Before the date, because this screen's Continue button lands at roughly y=2200 and the
+# lower LogBox notification covers y=2144..2271 — so the button is not merely hard to tap,
+# it is wholly hidden and `scrollUntilVisible` reports "No visible element found: Continue"
+# on a screen that is showing one. Every onboarding step after this has its action button in
+# the same place, so clearing them once here covers all of them.
+- runFlow: _dismiss-logbox.yaml
+
+# **Deliberately not 24 / 08 / 1998.** Those are the fields' own placeholders, and Android
+# reports a placeholder in `text` as well as in `hintText` — so typing the placeholder value
+# produces an accessibility node identical to typing nothing at all, and a filled field
+# cannot be told from an empty one. That cost an afternoon: it looked exactly like the
+# number-pad IME refusing adb text injection, and it is not — the typing works. A date that
+# differs from the placeholder is what makes the assertion below mean anything.
+- tapOn:
+    id: "field-day"
+- inputText: "03"
+- tapOn:
+    id: "field-month"
+- inputText: "11"
+- tapOn:
+    id: "field-year"
+- inputText: "1995"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# The typing actually landed. Without this the next failure is a dead-looking Continue
+# button three steps away from its cause.
+- assertVisible: "03"
+- assertVisible: "11"
+- assertVisible: "1995"
+- takeScreenshot: artifacts/01-06b-dob
+
+- tapOn: "Choose a country"
+- extendedWaitUntil:
+    visible: "Where are you?"
+    timeout: 10000
+- takeScreenshot: artifacts/01-06a-country
+- tapOn: "Finland"
+
+- tapOn: "Man"
+
+# **No `hideKeyboard` here.** On Android Maestro implements it as a back press, so it is
+# only safe directly after `inputText`, where the keyboard is up and the press is spent
+# closing it. The country picker and the gender chips are taps, so by this point there is no
+# keyboard — and the back press went to the navigator instead. This screen is the bottom of
+# the onboarding stack (username arrives here with `replace`), so it popped the activity and
+# closed the app. logcat says `Transition ... type = CLOSE ... numActivities=0`, the
+# screenshot below was of the launcher, and the failure surfaced two steps later as
+# "No visible element found: Continue" — on a screen that no longer existed.
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- takeScreenshot: artifacts/01-06-profile
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Continue"
+
+- extendedWaitUntil:
+    visible: "Pick your look"
+    timeout: 20000
+- tapOn:
+    point: "30%,42%"
+- takeScreenshot: artifacts/01-07-avatar
+# Every remaining onboarding screen scrolls and puts its action button last, so each one is
+# scrolled to rather than assumed on screen. See the note on the profile step above.
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Continue"
+
+- extendedWaitUntil:
+    visible: "What do you play?"
+    timeout: 20000
+# Three games is the documented minimum. Tapped by position because the catalogue is
+# seeded data whose titles are not guaranteed — a flow that depends on "Valorant" being
+# present breaks the day the catalogue changes.
+#
+# Scrolled *before* the first taps, and that is what was actually wrong. The title above
+# comes from the step header, which is the FlatList's own list header — it and the genre
+# filter row take up the top half of the first screenful, so a tap at 45% lands on chrome
+# rather than on a card. Every run selected two games instead of four, the counter read
+# "1 more to go", and the blame fell on the scroll in between.
+- waitForAnimationToEnd:
+    timeout: 10000
+
+# An explicit swipe rather than `- scroll`: `scroll` travels a fixed fraction of the
+# viewport that is not tied to the row height, so whether a later pair of taps lands on new
+# cards or back on the same two is a coincidence of geometry. A drag from 85% to 15% covers
+# about 1680px against rows about 775px tall — better than two rows — so each pair is
+# always looking at cards no earlier pair touched. Slow, because a fast flick adds momentum
+# and makes the distance travelled a property of the physics rather than of the gesture.
+- swipe:
+    start: "50%,85%"
+    end: "50%,15%"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- tapOn:
+    point: "25%,45%"
+- tapOn:
+    point: "75%,45%"
+
+- swipe:
+    start: "50%,85%"
+    end: "50%,15%"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 5000
+
+- tapOn:
+    point: "25%,45%"
+- tapOn:
+    point: "75%,45%"
+- takeScreenshot: artifacts/01-08-games
+
+# SelectionCount reads "N more to go" until the minimum is met and "N selected" after, so
+# this is the oracle for whether the taps above chose distinct cards rather than toggling
+# the same ones on and off. Asserted here so a mis-aimed tap is reported where it happened,
+# instead of surfacing as a missing title on the screen that never opened.
+- assertVisible: ".*selected"
+- scrollUntilVisible:
+    element:
+      text: "Continue"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Continue"
+
+- extendedWaitUntil:
+    visible: "What do you play on?"
+    timeout: 20000
+# By name, not by position — and unlike games and keywords that is the *right* choice here.
+# Platforms are a fixed enum in src/profile/platforms.ts, not seeded catalogue data, so
+# "PC" cannot quietly stop existing the way a game title can. The positional tap this
+# replaces aimed at 50%,38% and landed in the gap between the PlayStation and Xbox rows,
+# selecting nothing at all.
+- tapOn: "PC"
+- takeScreenshot: artifacts/01-09-platforms
+- assertVisible: ".*selected"
+- scrollUntilVisible:
+    element:
+      text: "Next"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Next"
+
+- extendedWaitUntil:
+    visible: "How do you play?"
+    timeout: 20000
+# Five keywords is the minimum, and unlike the games grid this is a **full-width vertical
+# list** — one keyword per row, each about 7.5% of the screen tall. The x coordinate
+# therefore carries no information: the pairs at 25% and 70% that used to be here hit the
+# same row twice and toggled it straight back off, leaving one keyword picked out of five.
+# One column, five row centres.
+#
+# Scrolled past the step header first, exactly as the games grid above is, and here getting
+# it wrong is louder than a missed tap: the header ends in a **search field**, so the first
+# tap at 35% focused it and raised the keyboard, which then covered the rows the remaining
+# four taps were aimed at. Two keywords picked, "3 more to go", and a screenshot full of
+# Gboard.
+- waitForAnimationToEnd:
+    timeout: 10000
+- swipe:
+    start: "50%,85%"
+    end: "50%,15%"
+    duration: 800
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# 10% apart against rows about 7.5% tall, so no two taps can share a row.
+- tapOn:
+    point: "50%,20%"
+- tapOn:
+    point: "50%,30%"
+- tapOn:
+    point: "50%,40%"
+- tapOn:
+    point: "50%,50%"
+- tapOn:
+    point: "50%,60%"
+- takeScreenshot: artifacts/01-10-keywords
+- assertVisible: ".*selected"
+- scrollUntilVisible:
+    element:
+      text: "Finish"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Finish"
+
+# --- the payoff -------------------------------------------------------------------------
+
+# A fresh account lands on a five-step tutorial overlay that covers the whole home screen,
+# so "DISCOVER" is not visible until it is dismissed. Optional, because an account that has
+# already seen it goes straight to the deck — and a flow that *requires* the tutorial would
+# then fail on the second run.
+- tapOn:
+    text: "Skip"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- extendedWaitUntil:
+    visible: "DISCOVER"
+    timeout: 40000
+
+# Not because anything below needs the tab bar, but so the screenshot below is of the deck
+# rather than of the deck with two debug-build notifications across the bottom of it.
+- runFlow: _dismiss-logbox.yaml
+
+- assertVisible: "Who's playing"
+- takeScreenshot: artifacts/01-11-home
+
+# The cold-start deck. An empty one here is the failure this flow exists to catch.
+- assertVisible: "likes left"

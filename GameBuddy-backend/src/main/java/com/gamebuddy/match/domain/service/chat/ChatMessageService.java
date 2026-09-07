@@ -18,12 +18,21 @@ import com.gamebuddy.match.interfaces.dto.ConversationDto;
 import com.gamebuddy.match.interfaces.dto.ConversationResponseBody;
 import com.gamebuddy.match.interfaces.dto.InboxDto;
 import com.gamebuddy.match.interfaces.dto.InboxResponseBody;
+import com.gamebuddy.match.interfaces.dto.PresenceResponseBody;
+import com.gamebuddy.match.interfaces.dto.PresenceUpdate;
+import com.gamebuddy.match.interfaces.dto.TypingNotification;
 import com.gamebuddy.match.interfaces.response.ConversationResponse;
 import com.gamebuddy.match.interfaces.response.InboxResponse;
+import com.gamebuddy.match.interfaces.response.PresenceResponse;
 import com.gamebuddy.shared.entity.Avatars;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
+import com.gamebuddy.shared.messaging.MessageCipher;
+import com.gamebuddy.shared.messaging.UserMessaging;
+import com.gamebuddy.shared.moderation.TextAssessment;
+import com.gamebuddy.shared.moderation.TextModerationService;
+import com.gamebuddy.shared.moderation.TextSurface;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
@@ -59,6 +68,75 @@ public class ChatMessageService {
     private final MessageCipher cipher;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final PresenceService presenceService;
+    private final TextModerationService textModeration;
+    private final UserMessaging messaging;
+
+    /**
+     * How many messages have ever been sent, for the console's dashboard.
+     *
+     * <p>Exposed here rather than letting the console read {@code chat_message}, which this
+     * module owns. A count and nothing else: the console has no business being able to
+     * reach message bodies, and this is the shape that makes that true by construction
+     * rather than by everyone remembering.
+     */
+    @Transactional(readOnly = true)
+    public long messageCount() {
+        return messageRepository.count();
+    }
+
+    /**
+     * Whether somebody a gamer has matched with is online.
+     *
+     * <p>The match check is the point, not a formality. Presence tells you when a person is
+     * awake and holding their phone, so it is disclosed only to people they have agreed to
+     * talk to — the same bar chat itself sets. Asking about a stranger is refused rather
+     * than answered with "offline", which would still confirm the account exists.
+     */
+    @Transactional(readOnly = true)
+    public PresenceResponse presenceOf(Gamer principal, String userId) {
+        Gamer self = requireGamer(principal.getUserId());
+        Gamer other = requireGamer(userId);
+        if (!self.isMatchedWith(other)) {
+            throw new BusinessException(TransactionCode.NOT_MATCHED);
+        }
+
+        PresenceUpdate presence = presenceService.presenceOf(userId);
+        PresenceResponseBody body = new PresenceResponseBody();
+        body.setUserId(presence.userId());
+        body.setOnline(presence.online());
+        body.setLastSeenAt(presence.lastSeenAt());
+        return respond(new PresenceResponse(), body);
+    }
+
+    /**
+     * Passes a typing indicator to the recipient, if they are entitled to it.
+     *
+     * <p>Re-checks the match on every event rather than trusting that the conversation was
+     * opened legitimately, because the socket is a public destination and nothing stops a
+     * client sending this for an id it invented. A block or an age change also takes effect
+     * immediately, exactly as it does for messages.
+     *
+     * <p>Nothing is stored and nothing is queued for later. If the recipient is not
+     * connected the send is a no-op, which is correct: there is no such thing as a typing
+     * indicator you missed.
+     */
+    @Transactional(readOnly = true)
+    public void relayTyping(String senderId, String receiverId) {
+        if (senderId.equals(receiverId)) {
+            return;
+        }
+        Gamer sender = requireGamer(senderId);
+        Gamer receiver = requireGamer(receiverId);
+
+        if (!sender.isMatchedWith(receiver)
+                || sender.hasBlockRelationshipWith(receiver)
+                || !AgeBand.compatible(sender.getAge(), receiver.getAge())) {
+            return;
+        }
+
+        messaging.sendToUser(receiver.getEmail(), "/queue/typing", new TypingNotification(senderId));
+    }
 
     /**
      * Stores an inbound chat message.
@@ -84,15 +162,31 @@ public class ChatMessageService {
         if (!sender.isMatchedWith(receiver)) {
             throw new BusinessException(TransactionCode.NOT_MATCHED);
         }
-        if (sender.hasBlockRelationshipWith(receiver)) {
-            throw new BusinessException(TransactionCode.USER_BLOCKED);
+        // Which half of the block you are told about is your own. USER_BLOCKED said
+        // "Account is blocked" to both sides — a sentence written for a banned account,
+        // which read to the blocked gamer as though theirs was the account in trouble.
+        if (sender.hasBlocked(receiver)) {
+            throw new BusinessException(TransactionCode.USER_BLOCKED_BY_YOU);
+        }
+        if (sender.isBlockedBy(receiver)) {
+            throw new BusinessException(TransactionCode.USER_BLOCKED_YOU);
         }
         if (!AgeBand.compatible(sender.getAge(), receiver.getAge())) {
             throw new BusinessException(TransactionCode.AGE_BAND_MISMATCH);
         }
 
+        // Screened before it is encrypted, because after encryption nothing can read it —
+        // including a filter. PRIVATE: profanity is masked and slurs are refused, but
+        // contact details are left alone. Two matched adults agreeing to carry on in a
+        // party chat is this app working, not a leak to be plugged.
+        TextAssessment assessment = textModeration.screen(body, TextSurface.PRIVATE);
+        if (assessment.blocked()) {
+            throw new BusinessException(TransactionCode.CONTENT_BLOCKED);
+        }
+        String screened = assessment.cleaned();
+
         ChatRoom room = chatRoomService.findOrCreate(senderId, receiverId);
-        MessageCipher.Encrypted encrypted = cipher.encrypt(body);
+        MessageCipher.Encrypted encrypted = cipher.encrypt(screened);
 
         ChatMessage message = new ChatMessage();
         message.setId(UUID.randomUUID());
@@ -117,13 +211,22 @@ public class ChatMessageService {
         // same trade every chat app makes and worth revisiting if this ever carries
         // anything more sensitive than chat.
         events.publishEvent(new NotificationRequestedEvent(
-                receiver.getFcmToken(), sender.getGamerUsername(), preview(body), NotificationKind.MESSAGE, senderId));
+                receiver.getUserId(),
+                receiver.getFcmToken(),
+                sender.getGamerUsername(),
+                preview(screened),
+                NotificationKind.MESSAGE,
+                senderId));
 
+        // The screened text, not what was typed. The sender's own client renders what it
+        // gets back, so returning the original would show the author their unmasked words
+        // while everybody else saw asterisks — and they would reasonably conclude the
+        // filter had not fired.
         return new SentMessage(
                 message.getId(),
                 senderId,
                 sender.getGamerUsername(),
-                body,
+                screened,
                 message.getCreatedAt(),
                 receiver.getEmail());
     }
@@ -196,6 +299,25 @@ public class ChatMessageService {
         message.setReportedAt(clock.instant());
         messageRepository.save(message);
         return DefaultMessageResponse.of("Message reported successfully");
+    }
+
+    /**
+     * Marks a conversation read, on its own rather than as a side effect of loading it.
+     *
+     * <p>Reading the history moved the watermark and nothing else did, which left the unread
+     * badge lying in two ordinary situations. Re-opening a conversation the client still has
+     * cached issues no request, so nothing marked it read; and a message arriving over the
+     * socket while the thread is on screen is read the instant it appears, but the watermark
+     * sat behind it until the next full load. Both now call this.
+     *
+     * <p>Silent when the two have no room yet: there is nothing to mark, and a conversation
+     * opened before either side has said anything is a normal thing to do.
+     */
+    @Transactional
+    public DefaultMessageResponse markConversationRead(Gamer principal, String friendId) {
+        Gamer gamer = requireGamer(principal.getUserId());
+        chatRoomService.find(gamer.getUserId(), friendId).ifPresent(room -> markRead(room.getId(), gamer.getUserId()));
+        return DefaultMessageResponse.of("Conversation marked read");
     }
 
     /** Moves this gamer's read watermark to now. */

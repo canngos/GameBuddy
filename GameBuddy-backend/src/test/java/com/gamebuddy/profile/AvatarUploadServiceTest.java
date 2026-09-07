@@ -12,6 +12,7 @@ import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.profile.domain.service.AvatarUploadService;
 import com.gamebuddy.shared.entity.AvatarStatus;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.moderation.ImageAssessment;
 import com.gamebuddy.shared.moderation.ImageModerationService;
 import com.gamebuddy.shared.moderation.ModerationVerdict;
 import com.gamebuddy.shared.repository.GamerRepository;
@@ -19,6 +20,9 @@ import com.gamebuddy.shared.storage.ImageNormaliser;
 import com.gamebuddy.shared.storage.ObjectStorage;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,6 +43,8 @@ import org.springframework.mock.web.MockMultipartFile;
 @ExtendWith(MockitoExtension.class)
 class AvatarUploadServiceTest {
 
+    private static final Instant NOW = Instant.parse("2026-08-06T12:00:00Z");
+
     @Mock
     GamerRepository gamerRepository;
 
@@ -53,7 +59,8 @@ class AvatarUploadServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new AvatarUploadService(gamerRepository, storage, new ImageNormaliser(), moderation);
+        service = new AvatarUploadService(
+                gamerRepository, storage, new ImageNormaliser(), moderation, Clock.fixed(NOW, ZoneOffset.UTC));
         gamer = new Gamer();
         gamer.setUserId("gamer-1");
     }
@@ -79,7 +86,7 @@ class AvatarUploadServiceTest {
     @Test
     void anApprovedImageIsPromotedToThePublicBucket() {
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.APPROVE);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.APPROVE, 0.01));
 
         service.upload(gamer, upload());
 
@@ -90,7 +97,7 @@ class AvatarUploadServiceTest {
     @Test
     void anUncertainImageStaysInThePrivateBucket() {
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.REVIEW);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.REVIEW, 0.45));
 
         service.upload(gamer, upload());
 
@@ -102,7 +109,7 @@ class AvatarUploadServiceTest {
     @Test
     void aRejectedImageIsNeverPromoted() {
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.REJECT);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.REJECT, 0.95));
 
         service.upload(gamer, upload());
 
@@ -114,7 +121,7 @@ class AvatarUploadServiceTest {
     @Test
     void theBytesScreenedAreTheBytesStored() {
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.APPROVE);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.APPROVE, 0.01));
 
         service.upload(gamer, upload());
 
@@ -132,7 +139,7 @@ class AvatarUploadServiceTest {
     @Test
     void theStoredImageIsReEncodedNotThePayloadThatWasSent() {
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.APPROVE);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.APPROVE, 0.01));
         byte[] sent = png();
 
         service.upload(gamer, new MockMultipartFile("file", "photo.png", "image/png", sent));
@@ -150,7 +157,7 @@ class AvatarUploadServiceTest {
     @Test
     void theImageIsWrittenPrivatelyBeforeItIsScreened() {
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.APPROVE);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.APPROVE, 0.01));
 
         service.upload(gamer, upload());
 
@@ -183,7 +190,7 @@ class AvatarUploadServiceTest {
         gamer.setAvatarKey("avatars/gamer-1/old.jpg");
         gamer.setAvatarStatus(AvatarStatus.APPROVED);
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.APPROVE);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.APPROVE, 0.01));
 
         service.upload(gamer, upload());
 
@@ -197,7 +204,7 @@ class AvatarUploadServiceTest {
         gamer.setAvatarKey("avatars/gamer-1/old.jpg");
         gamer.setAvatarStatus(AvatarStatus.PENDING);
         gamerExists();
-        when(moderation.screen(any(), any())).thenReturn(ModerationVerdict.REVIEW);
+        when(moderation.screen(any(), any())).thenReturn(new ImageAssessment(ModerationVerdict.REVIEW, 0.45));
 
         service.upload(gamer, upload());
 

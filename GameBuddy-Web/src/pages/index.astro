@@ -1,0 +1,20 @@
+---
+/**
+ * English landing page, at `/`.
+ *
+ * The markup lives in `Landing.astro` so that this file and `[lang]/index.astro` cannot
+ * drift — see the note there.
+ */
+import Landing from '../components/Landing.astro';
+import { t } from '../i18n';
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  lang="en"
+  path=""
+  title={`${t('en', 'hero.titleBefore')} ${t('en', 'hero.titleHighlight')} ${t('en', 'hero.titleAfter')}`}
+  description="GameBuddy matches you with gamers who own the same games, play on the same platform and play the same way. Free, moderated, and 18+. Coming soon to Android."
+>
+  <Landing lang="en" />
+</Base>

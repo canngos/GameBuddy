@@ -4,12 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.auth.config.AuthRateLimitConfig;
 import com.gamebuddy.auth.infrastructure.repository.*;
 import com.gamebuddy.auth.interfaces.request.DeleteAccountRequest;
 import com.gamebuddy.auth.interfaces.request.FcmTokenRequest;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.exception.BusinessException;
-import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.shared.entity.AvatarStatus;
 import com.gamebuddy.shared.entity.Cosmetic;
@@ -18,9 +18,9 @@ import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.Games;
 import com.gamebuddy.shared.entity.Keywords;
 import com.gamebuddy.shared.event.AccountDeletedEvent;
+import com.gamebuddy.shared.mail.Mailer;
 import com.gamebuddy.shared.repository.*;
 import com.gamebuddy.shared.storage.ObjectStorage;
-import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +36,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -81,7 +80,7 @@ class AccountDeletionTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private JavaMailSender emailSender;
+    private Mailer mailer;
 
     @Mock
     private ApplicationEventPublisher events;
@@ -89,11 +88,33 @@ class AccountDeletionTest {
     @Mock
     private ObjectStorage objectStorage;
 
+    @Mock
+    private GamerMissionRepository gamerMissionRepository;
+
+    @Mock
+    private GamerLinkedAccountRepository linkedAccountRepository;
+
+    @Mock
+    private AccountLinkTicketRepository accountLinkTicketRepository;
+
+    @Mock
+    private GamerAuthIdentityRepository authIdentityRepository;
+
+    /** Mocked, not spied: the token this suite passes is a stub, never a real JWT. */
+    @Mock
+    private SessionIssuer sessionIssuer;
+
+    /** The production bean rather than a copy of its numbers; see DefaultAuthServiceTest. */
     @Spy
-    private AuthRateLimiters rateLimiters = new AuthRateLimiters(
-            new RateLimiter(10, Duration.ofMinutes(15)),
-            new RateLimiter(3, Duration.ofMinutes(15)),
-            new RateLimiter(10, Duration.ofMinutes(15)));
+    private AuthRateLimiters rateLimiters = new AuthRateLimitConfig().authRateLimiters();
+
+    /**
+     * Stands in for the caller's own JWT.
+     *
+     * <p>Never parsed in this suite: every account here has a password, and the token is
+     * only read on the passwordless path where freshness stands in for one.
+     */
+    private static final String TOKEN = "a-bearer-token";
 
     private Gamer gamer;
 
@@ -137,7 +158,7 @@ class AccountDeletionTest {
         @Test
         @DisplayName("deletion tells the other modules, so their personal data goes too")
         void testDeleteAccount_publishesAccountDeleted() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
             verify(events, atLeastOnce()).publishEvent(captor.capture());
@@ -158,7 +179,7 @@ class AccountDeletionTest {
         void testDeleteAccount_whenPasswordWrong_ReturnErrorCode150() {
             DeleteAccountRequest req = request("wrong");
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req));
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req, TOKEN));
             assertEquals(150, ex.getTransactionCode().getId());
             assertNull(gamer.getDeletedAt());
         }
@@ -166,7 +187,7 @@ class AccountDeletionTest {
         @Test
         @DisplayName("everything identifying the gamer is cleared")
         void testDeleteAccount_whenValid_AnonymisesPersonalData() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             assertNotNull(gamer.getDeletedAt());
             assertFalse(gamer.getEmail().contains("me@example.com"));
@@ -185,7 +206,7 @@ class AccountDeletionTest {
             gamer.setAvatarKey("avatars/" + gamer.getUserId() + "/a.jpg");
             gamer.setAvatarStatus(AvatarStatus.APPROVED);
 
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             // The row stops pointing at it *and* the object goes. Only the first would
             // leave a photograph of a real person readable by anyone holding the URL.
@@ -200,7 +221,7 @@ class AccountDeletionTest {
             gamer.setAvatarKey("avatars/" + gamer.getUserId() + "/b.jpg");
             gamer.setAvatarStatus(AvatarStatus.PENDING);
 
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             // Never promoted, so it is still in uploads. Deleting from the wrong bucket
             // would silently leave it where it is.
@@ -210,7 +231,7 @@ class AccountDeletionTest {
         @Test
         @DisplayName("an account that never uploaded anything touches storage not at all")
         void testDeleteAccount_whenNoAvatar_DoesNotTouchStorage() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             verifyNoInteractions(objectStorage);
         }
@@ -218,7 +239,7 @@ class AccountDeletionTest {
         @Test
         @DisplayName("taste data goes, so the recommender stops suggesting the account")
         void testDeleteAccount_whenValid_ClearsRecommenderInputs() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             assertTrue(gamer.getKeywords().isEmpty());
             assertTrue(gamer.getLikedgames().isEmpty());
@@ -227,7 +248,7 @@ class AccountDeletionTest {
         @Test
         @DisplayName("purchases are erased and both worn slots emptied")
         void testDeleteAccount_whenValid_ClearsCosmetics() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             // Unequipping matters as much as deleting: the gamer row survives deletion so
             // other people's content keeps its references, and a row still pointing at a
@@ -240,7 +261,7 @@ class AccountDeletionTest {
         @Test
         @DisplayName("earned badges go too")
         void testDeleteAccount_whenValid_ClearsBadges() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             // What somebody achieved is a record of what they did here, and the showcase is
             // the part of it other people could see.
@@ -248,9 +269,35 @@ class AccountDeletionTest {
         }
 
         @Test
+        @DisplayName("dealt missions go too, baselines and all")
+        void testDeleteAccount_whenValid_ClearsMissions() {
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
+
+            // Each row carries a snapshot of how much this account had talked, matched and
+            // spent at the moment a set was dealt. Across a campaign that is a sketch of
+            // somebody's activity over months, which is exactly what a deletion is for.
+            verify(gamerMissionRepository).deleteAllByUserId(gamer.getUserId());
+        }
+
+        @Test
+        @DisplayName("a linked Discord account goes, so the external account is not bricked")
+        void testDeleteAccount_whenValid_ClearsLinkedAccounts() {
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
+
+            // Not covered by the schema's ON DELETE CASCADE: this deletion anonymises the
+            // gamer row rather than removing it, so the cascade never fires. Left behind, the
+            // row keeps a Discord snowflake and a display name that identify a real person on
+            // a service we do not control — and because (provider, external_id) is unique, it
+            // also claims that external account forever. The same person signing up again
+            // would be told to unlink it from an account that can no longer authenticate.
+            verify(linkedAccountRepository).deleteAllByGamer_UserId(gamer.getUserId());
+            verify(accountLinkTicketRepository).deleteAllByUserId(gamer.getUserId());
+        }
+
+        @Test
         @DisplayName("the account stops authenticating everywhere, not just here")
         void testDeleteAccount_whenValid_DisablesAndRevokes() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             // isEnabled() is what the shared JWT filter checks, so this covers all five
             // services without any of them being told.
@@ -263,17 +310,17 @@ class AccountDeletionTest {
         @Test
         @DisplayName("the old password hash is replaced, not left verifiable")
         void testDeleteAccount_whenValid_ReplacesThePasswordHash() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
 
             assertEquals("re-encoded", gamer.getPwd());
         }
 
         @Test
         void testDeleteAccount_whenAlreadyDeleted_ReturnErrorCode156() {
-            authService.deleteAccount(gamer, request("correct"));
+            authService.deleteAccount(gamer, request("correct"), TOKEN);
             DeleteAccountRequest req = request("correct");
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req));
+            BusinessException ex = assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req, TOKEN));
             assertEquals(156, ex.getTransactionCode().getId());
         }
     }

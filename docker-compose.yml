@@ -1,8 +1,13 @@
 # GameBuddy, locally.
 #
-#   cp .env.example .env && docker compose up --build
+#   cp .env.example .env      # then set the REPLACE_ME secrets (openssl commands are in .env)
+#   docker compose up --build
 #
-# Brings up Postgres, the Python recommender and the backend, wired together. The schema is
+# Brings up Postgres, the Python recommender and the backend:
+#
+#   API      http://localhost:8080/swagger-ui
+#
+# The schema is
 # created from db/schema-baseline.sql on first start and the backend runs with
 # ddl-auto=validate, so this is the same shape as production rather than a convenient
 # approximation of it. If an entity and the SQL disagree, the backend refuses to start here,
@@ -20,9 +25,11 @@ services:
       POSTGRES_DB: ${DB_NAME:-gamebuddy}
       POSTGRES_USER: ${DB_USER:-gamebuddy}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+      # Passed to 99-app-role.sh so it can create the least-privileged app login on first init.
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
     ports:
       # Exposed so you can psql in and inspect what the app did.
-      - "${DB_PORT:-5432}:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # Runs once, on an empty data directory. Numbered so the baseline lands before the
@@ -32,6 +39,8 @@ services:
       # upgrade script and apply it by hand, or `docker compose down -v` and start over.
       - ./GameBuddy-backend/src/main/resources/db/schema-baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
       - ./GameBuddy-backend/src/main/resources/db/seed-local.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      # Runs last: creates the least-privileged app login (non-superuser) the backend uses. See C3.
+      - ./GameBuddy-backend/src/main/resources/db/99-app-role.sh:/docker-entrypoint-initdb.d/99-app-role.sh:ro
     healthcheck:
       # -d and -U matter: without them pg_isready checks the default database and reports
       # healthy while the init scripts are still running, and the backend starts against a
@@ -46,6 +55,10 @@ services:
     build:
       context: ./GameBuddy-Model
       dockerfile: Dockerfile
+      # Explicit: the Dockerfile has a second stage after this one, and Docker builds
+      # the last stage when no target is given. Without this, `model` runs the retrain
+      # entrypoint and exits 1.
+      target: serve
     environment:
       # Must match the backend's. A mismatch is not a loud failure: the model answers 503
       # and the feed surfaces a generic "Recommendation service unavailable", which looks
@@ -58,8 +71,26 @@ services:
       # them against what the queue actually receives rather than guessing twice.
       NSFW_REJECT_THRESHOLD: ${NSFW_REJECT_THRESHOLD:-0.85}
       NSFW_APPROVE_THRESHOLD: ${NSFW_APPROVE_THRESHOLD:-0.20}
+
+      # Stop recommending the synthetic seed accounts while still ranking with
+      # everything the model learned from them. Off here because in development the
+      # seed accounts ARE the population and hiding them empties the feed; turn it on
+      # at deploy, when real users exist to serve. A restart, not a retrain.
+      HIDE_SEED_ACCOUNTS: ${HIDE_SEED_ACCOUNTS:-false}
     ports:
-      - "${MODEL_PORT:-8000}:8000"
+      - "127.0.0.1:${MODEL_PORT:-8000}:8000"
+    volumes:
+      # The artefact has to outlive the container now that a nightly job rewrites it.
+      #
+      # Named, not a bind mount, because Docker seeds a named volume from the image the
+      # first time it is used: a fresh install serves the artefact baked into the image and
+      # is never broken, and from the first retrain onwards the volume's copy wins. A bind
+      # mount would instead hide the baked artefact behind an empty host directory and the
+      # service would answer 503 until someone trained one.
+      #
+      # Reset it with `docker compose down -v` or `docker volume rm
+      # gamebuddy_model-artifacts` to fall back to whatever the image ships.
+      - model-artifacts:/app/artifacts
     healthcheck:
       test:
         [
@@ -73,6 +104,88 @@ services:
       retries: 10
       start_period: 30s
 
+  # The nightly retrain: export the live population, train, swap the artefact in, reload.
+  #
+  # This is what makes the recommender track the product rather than a snapshot. /predict
+  # can only ever return gamers that are *inside* the artefact, so without a retrain every
+  # account created since the last one is invisible as a candidate — they can be served
+  # (cold start ranks them against the pool) but nobody is ever served *them*. A day is the
+  # right cadence for that: profile edits are already handled live by the staleness flag,
+  # so this exists to admit new gamers and to refresh the desirability prior.
+  #
+  # Midnight local, which is both quiet and ahead of the backend's 03:30 impression purge,
+  # so training sees the fullest log. Set RETRAIN_TZ to your users' timezone, not the
+  # server's — a container defaults to UTC and "midnight" silently becomes mid-evening.
+  #
+  # Deliberately not `restart: always` on failure semantics alone: the job keeps the old
+  # artefact serving whenever anything goes wrong, so a bad night degrades to a stale
+  # model rather than to no model.
+  model-retrain:
+    build:
+      context: ./GameBuddy-Model
+      dockerfile: Dockerfile
+      target: retrain
+    command:
+      - --schedule=${RETRAIN_AT:-00:00}
+      - --timezone=${RETRAIN_TZ:-UTC}
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-gamebuddy}:${DB_PASSWORD:?set DB_PASSWORD in .env}@postgres:5432/${DB_NAME:-gamebuddy}
+      # Same key the model service checks, so the job can ask it to reload.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?set INTERNAL_API_KEY in .env}
+      PREDICT_SERVICE_URL: http://model:8000
+
+      # Train on the seeded accounts as well as the real ones.
+      #
+      # True while the seeded population *is* the candidate pool, which is the situation
+      # until enough real users exist to fill a deck on their own. With it false the job
+      # exports only real accounts, finds a handful, and refuses the retrain every night —
+      # correct behaviour, and useless noise while the answer is known.
+      #
+      # Flip to false once real users can carry the feed, then delete the seed with
+      #   psql ... -f db/delete-seed.sql
+      # and let the next run rebuild the artefact from people alone. Do the two together:
+      # deleting the seed while this is still true simply trains on whoever is left.
+      #
+      # A script rather than the one-line DELETE that used to be documented here — that
+      # statement fails on the first foreign key, and the seed owns communities that a
+      # blind cascade would take real users' posts with. See the script's own header.
+      RETRAIN_INCLUDE_BOTS: ${RETRAIN_INCLUDE_BOTS:-true}
+    volumes:
+      # The same volume the model serves from. The job writes the artefact; the service
+      # reads it after being told to reload.
+      - model-artifacts:/app/artifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      model:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Redis, for fanning WebSocket delivery and presence across backend instances.
+  #
+  # Not needed to run GameBuddy. With one instance the in-process broker reaches every
+  # socket there is, and the backend falls back to that whenever no host is configured —
+  # see ChatMessagingConfig. It is here so the multi-instance path is the one exercised in
+  # development rather than first met in production.
+  #
+  # No volume, and no persistence worth configuring. Everything in here describes sockets
+  # that are open right now; a restart makes all of it false, so keeping it would be worse
+  # than losing it. Presence rebuilds itself within one re-assert cycle.
+  redis:
+    image: redis:8-alpine
+    # --save "" turns off RDB snapshots. Nothing here is worth writing to disk, and the
+    # default snapshotting would fsync a file nobody ever reads.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      # Exposed so you can redis-cli in and watch the fan-out with MONITOR.
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
   backend:
     build:
       context: .
@@ -84,10 +197,19 @@ services:
         # Waits for the model to actually load its artefact. Without this the backend comes
         # up first and the first few recommendation requests fail for no visible reason.
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      # Setting this is what turns the fan-out on; there is no second switch. Unset it and
+      # the backend delivers to its own sockets only, which is correct for one instance.
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-gamebuddy}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER:-gamebuddy}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # The backend connects as the least-privileged, NON-superuser app role, never the
+      # bootstrap superuser — a superuser DB login would be RCE via COPY ... FROM PROGRAM. See C3.
+      SPRING_DATASOURCE_USERNAME: gamebuddy_app
+      SPRING_DATASOURCE_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
       DB_SCHEMA: gamebuddy
 
       # The schema is owned by SQL. 'validate' means a mismatch stops the application
@@ -114,16 +236,81 @@ services:
       LOCAL_MEDIA_DIR: /app/.media
       LOCAL_MEDIA_URL: ${LOCAL_MEDIA_URL:-http://10.0.2.2:8080/media}
 
+      # Rate limits. Every one is optional and every one is forwarded bare on purpose:
+      # Compose resolves an unset variable to the empty string, and the application treats
+      # an empty rate-limit value as "not configured" and keeps the default it shipped
+      # with. So the normal state of this block is that none of them are in .env and none
+      # of them do anything — the same arrangement as R2_ACCESS_KEY_ID above.
+      #
+      # Declared here rather than in the prod overlay because compose MERGES environment
+      # maps, so one definition serves both environments. The defaults and the reasoning
+      # behind each number are in application.yml under `gamebuddy.rate-limit`; DEPLOY.md
+      # section 8 has the table and the procedure for changing one on the server.
+      MATCH_DECISION_PERMITS: ${MATCH_DECISION_PERMITS:-}
+      MATCH_DECISION_WINDOW: ${MATCH_DECISION_WINDOW:-}
+      LOBBY_CREATE_PERMITS: ${LOBBY_CREATE_PERMITS:-}
+      LOBBY_CREATE_WINDOW: ${LOBBY_CREATE_WINDOW:-}
+      LOBBY_JOIN_PERMITS: ${LOBBY_JOIN_PERMITS:-}
+      LOBBY_JOIN_WINDOW: ${LOBBY_JOIN_WINDOW:-}
+      LOBBY_MESSAGE_PERMITS: ${LOBBY_MESSAGE_PERMITS:-}
+      LOBBY_MESSAGE_WINDOW: ${LOBBY_MESSAGE_WINDOW:-}
+      AUTH_LOGIN_PERMITS: ${AUTH_LOGIN_PERMITS:-}
+      AUTH_LOGIN_WINDOW: ${AUTH_LOGIN_WINDOW:-}
+      AUTH_VERIFY_PERMITS: ${AUTH_VERIFY_PERMITS:-}
+      AUTH_VERIFY_WINDOW: ${AUTH_VERIFY_WINDOW:-}
+      AUTH_SEND_CODE_PERMITS: ${AUTH_SEND_CODE_PERMITS:-}
+      AUTH_SEND_CODE_WINDOW: ${AUTH_SEND_CODE_WINDOW:-}
+      AUTH_RESET_PASSWORD_PERMITS: ${AUTH_RESET_PASSWORD_PERMITS:-}
+      AUTH_RESET_PASSWORD_WINDOW: ${AUTH_RESET_PASSWORD_WINDOW:-}
+      BILLING_PROMO_REDEEM_PERMITS: ${BILLING_PROMO_REDEEM_PERMITS:-}
+      BILLING_PROMO_REDEEM_WINDOW: ${BILLING_PROMO_REDEEM_WINDOW:-}
+
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CHAT_ENCRYPTION_KEY: ${CHAT_ENCRYPTION_KEY:?set CHAT_ENCRYPTION_KEY in .env}
+
+      # How long an avatar the classifier was unsure about waits for a human before it
+      # publishes itself. See AvatarReviewJob — the queue is meant to be ignorable.
+      AVATAR_PUBLISH_AFTER: ${AVATAR_PUBLISH_AFTER:-P3D}
 
       # Prints verification codes to `docker compose logs backend` instead of sending them.
       # Without this, registration rolls its transaction back when SMTP is unreachable and
       # no account can be created at all.
       MAIL_MODE: log
+
+      # The shared secret RevenueCat sends in the Authorization header of its webhook, and
+      # the only thing that can grant a paid entitlement now that receipt verification is
+      # RevenueCat's job. The backend refuses to start without it, so this default keeps
+      # local work running; set a real one from `openssl rand -base64 32` in .env before
+      # pointing a RevenueCat project at this.
+      REVENUECAT_WEBHOOK_TOKEN: ${REVENUECAT_WEBHOOK_TOKEN:-local-development-webhook-token}
+
+      # Discord account linking. All three are optional: leave them empty and linking
+      # refuses with a clear message while every other screen carries on working.
+      #
+      # BACKEND_PUBLIC_URL is where the phone's *browser* reaches this backend, which is not
+      # where the app reaches it -- on the Android emulator, localhost is the emulator, so the
+      # host machine is 10.0.2.2. It has to match the redirect URI registered with Discord
+      # byte for byte, because Discord compares them at the token exchange.
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+      # Google sign-in. Optional in the same way: unset means the button is not offered.
+      GOOGLE_WEB_CLIENT_ID: ${GOOGLE_WEB_CLIENT_ID:-}
+      BACKEND_PUBLIC_URL: ${BACKEND_PUBLIC_URL:-http://10.0.2.2:8080}
+
+      # The coin economy is deliberately NOT forwarded bare here, unlike the rate limits
+      # below. Those bind into a nested object, where Spring skips an empty value; these
+      # are plain numbers on the properties class, and an empty string is not an int -- a
+      # bare `${COINS_AD_COINS:-}` stops the application booting. To retune a rate, set the
+      # variable in this block explicitly, or edit the defaults in application.yml under
+      # `gamebuddy.coins`.
+
       # Still required even in log mode: with no host configured Boot creates no
       # JavaMailSender and the application will not start.
-      MAIL_HOST: localhost
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-}
+      SMTP_EMAIL: ${SMTP_EMAIL:-}
+      SMTP_EMAIL_PWD: ${SMTP_EMAIL_PWD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
 
       # Push delivery. On, because the service-account key is now mounted below.
@@ -149,6 +336,11 @@ services:
       WS_ALLOWED_ORIGINS: "http://localhost:[*],http://127.0.0.1:[*],http://192.168.*:[*]"
 
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+      # Where the ECS JSON log file is written. The console keeps its human-readable format, so
+      # `docker compose logs backend` is unchanged.
+      LOG_FILE: /app/logs/gamebuddy.json
+      ENVIRONMENT: ${ENVIRONMENT:-local}
     volumes:
       # The Firebase service-account key, read-only.
       #
@@ -162,6 +354,10 @@ services:
       # present so that running without credentials does not lose every upload on the
       # next `docker compose up`.
       - media-data:/app/.media
+      # The log file. A volume rather than a bind mount so the
+      # non-root user in the image owns it on every host — a bind mount from Windows
+      # arrives root-owned and the JVM silently falls back to console-only logging.
+      - backend-logs:/app/logs
 
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -174,6 +370,11 @@ services:
 
 volumes:
   postgres-data:
+  # Written by model-retrain, read by model. Seeded from the image on first use, so the
+  # stack works before the first retrain has ever run.
+  model-artifacts:
   # Only used when R2 is not configured. Named rather than a bind mount so it behaves the
   # same on Windows, macOS and Linux.
   media-data:
+  # The backend writes its JSON log file here; console logging is unaffected.
+  backend-logs:

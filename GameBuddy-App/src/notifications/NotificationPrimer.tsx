@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
+import { useUpper } from '../i18n/case';
+import { useT } from '../i18n/useT';
 import { Button, Card, Text } from '../ui';
 import { markPrimed, requestSystemPermission } from './permission';
 
@@ -20,6 +22,8 @@ import { markPrimed, requestSystemPermission } from './permission';
  * lets somebody make a real decision, and it is what the notifications then deliver.
  */
 export function NotificationPrimer({ onDone }: { onDone: () => void }) {
+  const t = useT();
+  const upper = useUpper();
   const [asking, setAsking] = useState(false);
 
   const allow = async () => {
@@ -45,29 +49,31 @@ export function NotificationPrimer({ onDone }: { onDone: () => void }) {
   return (
     <View className="flex-1 justify-center gap-6 px-6">
       <View className="gap-2">
-        <Text variant="overline">NOTIFICATIONS</Text>
-        <Text variant="title">Don't miss the good part</Text>
+        <Text variant="overline">{upper(t.notifications.header)}</Text>
+        <Text variant="title">{t.notifications.primerTitle}</Text>
         <Text variant="body" className="text-muted">
-          GameBuddy is other people. Most of what happens here happens while the app is
-          closed.
+          {t.notifications.primerBody}
         </Text>
       </View>
 
       <Card className="gap-4">
-        <Reason title="When you match" body="Both of you said yes — that is when a conversation can start." />
-        <Reason title="When someone messages you" body="So a reply does not wait until you next happen to open the app." />
-        <Reason title="What your communities are doing" body="New posts, and replies to yours." />
+        <Reason title={t.notifications.reasonMatchTitle} body={t.notifications.reasonMatchBody} />
+        <Reason
+          title={t.notifications.reasonMessageTitle}
+          body={t.notifications.reasonMessageBody}
+        />
+        <Reason title={t.notifications.reasonLobbyTitle} body={t.notifications.reasonLobbyBody} />
       </Card>
 
       <View className="gap-2">
-        <Button label="Turn on notifications" loading={asking} onPress={allow} />
+        <Button label={t.notifications.turnOn} loading={asking} onPress={allow} />
         {/* Not styled as a lesser choice. A "no" that has been made deliberately hard to
             find is the pattern this whole screen exists to avoid. */}
-        <Button label="Not now" variant="ghost" disabled={asking} onPress={notNow} />
+        <Button label={t.notifications.notNow} variant="ghost" disabled={asking} onPress={notNow} />
       </View>
 
       <Text variant="caption" className="text-center">
-        You can change this any time in Settings, and choose which kinds you want.
+        {t.notifications.changeLater}
       </Text>
     </View>
   );
@@ -76,7 +82,7 @@ export function NotificationPrimer({ onDone }: { onDone: () => void }) {
 function Reason({ title, body }: { title: string; body: string }) {
   return (
     <View className="flex-row gap-3">
-      <View className="mt-1.5 h-2 w-2 rounded-full bg-brand" />
+      <View className="mt-1.5 h-2 w-2 rounded-full bg-primary" />
       <View className="flex-1 gap-0.5">
         <Text variant="bodyStrong">{title}</Text>
         <Text variant="caption">{body}</Text>

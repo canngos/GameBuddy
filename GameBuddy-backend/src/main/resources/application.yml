@@ -57,10 +57,10 @@ spring:
     #
     # To send nothing and print the code instead, set gamebuddy.mail.mode=log. See
     # MailConfig — that is a local-only switch and it is not the default.
-    host: ${MAIL_HOST:smtp.gmail.com}
+    host: ${MAIL_HOST:smtp-relay.brevo.com}
     port: ${MAIL_PORT:587}
-    username: ${EMAIL:}
-    password: ${EMAIL_PWD:}
+    username: ${SMTP_EMAIL:}
+    password: ${SMTP_EMAIL_PWD:}
     properties:
       mail:
         smtp:
@@ -86,12 +86,26 @@ gamebuddy:
     # 'smtp' sends for real. 'log' prints the verification code and sends nothing, which is
     # the only way to reach the signup screen without a mail server. Never 'log' in
     # production: it would let anyone reading the logs verify any address.
-    mode: ${MAIL_MODE:smtp}
+    mode: ${MAIL_MODE:log}
+    from: ${MAIL_FROM:noreply@mail.findgamebuddy.com}
 
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:7d}
     issuer: gamebuddy
+
+  avatars:
+    # How long an image the classifier was genuinely unsure about waits for a person
+    # before it is published anyway. Not a safety threshold — anything the model was
+    # confident about was already rejected, and everything here stays reportable. It is a
+    # promise about how long somebody's photograph can be held without an answer, and it
+    # exists because a queue only one person can drain is a queue that will not be.
+    publish-after: ${AVATAR_PUBLISH_AFTER:P3D}
+    # Uploads that arrived while the classifier was unreachable have no score and were
+    # never judged at all. Retried often, because the wait is a user looking at their own
+    # greyed-out picture.
+    rescreen-cron: ${AVATAR_RESCREEN_CRON:0 */10 * * * *}
+    publish-cron: ${AVATAR_PUBLISH_CRON:0 20 * * * *}
 
   chat:
     # Message bodies are encrypted before they reach the database, so a leaked dump or a
@@ -129,6 +143,144 @@ gamebuddy:
     read-timeout: 30s
     api-key: ${INTERNAL_API_KEY}
 
+  rate-limit:
+    # Abuse controls, tunable without a rebuild.
+    #
+    # Every one of these is a fixed window keyed by the account (or, on the auth
+    # endpoints, by the address being used), and every one of them is set ABOVE what a
+    # person can do rather than above what a person ought to need to do. That distinction
+    # is the whole lesson of this block: the original numbers were half these, chosen by
+    # reasoning about careful use, and production testers were refused while swiping at an
+    # ordinary pace and while trying to remember their own password. A limit that catches
+    # real users is not a stricter limit, it is a broken feature — the script it is aimed
+    # at is orders of magnitude past any of these either way.
+    #
+    # None of these is what actually bounds abuse, which is why they can be generous. The
+    # daily swipe allowance, the one-live-lobby-per-owner rule, the five-guess cap that
+    # invalidates a verification code, and password hashing each do that job in their own
+    # place.
+    #
+    # The values repeated here are the same defaults declared in the Java that reads them,
+    # so a deployment with none of these set still gets exactly what was tested;
+    # RateLimitBudgetsTest fails if the two ever disagree. Raising one is always safe.
+    # Lowering one is a decision about which real users to turn away.
+    match:
+      # Swiping the deck. Two a second sustained for a minute — past what a thumb does
+      # flat out. Was 30/1m, which a normal session spent in about fifteen seconds.
+      decision:
+        permits: ${MATCH_DECISION_PERMITS:120}
+        window: ${MATCH_DECISION_WINDOW:1m}
+
+    lobby:
+      # Opening a lobby. The binding limit is one live lobby per owner, enforced
+      # separately; this only stops a create-cancel loop.
+      create:
+        permits: ${LOBBY_CREATE_PERMITS:20}
+        window: ${LOBBY_CREATE_WINDOW:1d}
+      # Asking to join. Requests are how you find out whether a team has room, and most
+      # are never answered, so a browsing evening spends a lot of them.
+      join:
+        permits: ${LOBBY_JOIN_PERMITS:40}
+        window: ${LOBBY_JOIN_WINDOW:1h}
+      # Lobby chat. A squad settling on a time talks in bursts of very short messages.
+      message:
+        permits: ${LOBBY_MESSAGE_PERMITS:60}
+        window: ${LOBBY_MESSAGE_WINDOW:1m}
+
+    auth:
+      # Failed sign-ins, per account. Cleared immediately by a successful login. The short
+      # window is deliberate: being wrong about somebody should cost them minutes.
+      login:
+        permits: ${AUTH_LOGIN_PERMITS:15}
+        window: ${AUTH_LOGIN_WINDOW:5m}
+      # Guesses at a mailed code. Not the control that holds the 900k code space shut —
+      # MAX_CODE_ATTEMPTS invalidates the code itself after five wrong guesses.
+      verify:
+        permits: ${AUTH_VERIFY_PERMITS:20}
+        window: ${AUTH_VERIFY_WINDOW:15m}
+      # Code emails. The one budget here worth keeping tight, because each permit spends
+      # somebody else's inbox and the person flooded is not the person asking.
+      send-code:
+        permits: ${AUTH_SEND_CODE_PERMITS:6}
+        window: ${AUTH_SEND_CODE_WINDOW:15m}
+      # Both password-reset steps share this, so one completed reset costs two permits.
+      reset-password:
+        permits: ${AUTH_RESET_PASSWORD_PERMITS:20}
+        window: ${AUTH_RESET_PASSWORD_WINDOW:15m}
+      # Discord link attempts, per account. The only budget here on an authenticated
+      # endpoint: the JWT already stopped the anonymous case, so this just prevents one
+      # account minting link tickets in a loop.
+      link:
+        permits: ${AUTH_LINK_PERMITS:10}
+        window: ${AUTH_LINK_WINDOW:15m}
+      # Google and Discord sign-in attempts, keyed by a hash of the credential presented.
+      # One honest sign-in can be two calls -- a new account is refused once for the terms
+      # and retried with the box ticked -- so thirty is fifteen of those.
+      social:
+        permits: ${AUTH_SOCIAL_PERMITS:30}
+        window: ${AUTH_SOCIAL_WINDOW:15m}
+
+    billing:
+      # Guesses at a promotion code, per account. The code space is what actually holds
+      # this shut; the limit only makes guessing pointless, and it is keyed by the person
+      # redeeming rather than by the code, so nobody can lock a real campaign code out for
+      # everybody else holding it.
+      promo-redeem:
+        permits: ${BILLING_PROMO_REDEEM_PERMITS:20}
+        window: ${BILLING_PROMO_REDEEM_WINDOW:1h}
+
+  link:
+    # Verified Discord accounts on a profile. The integration is free: Discord OAuth2 needs
+    # no partner approval for the `identify` scope. See DefaultAccountLinkService.
+    #
+    # Steam linking was removed in September 2026 -- its Web API key could not be obtained,
+    # and a provider that can only ever fail is worse than one that is absent.
+    #
+    # Leave the credentials empty and linking simply refuses with a clear code -- a clone
+    # with no Discord application registered still starts and still runs every other screen.
+
+    # Where this backend is reachable from the phone's *browser*, which is not the same as
+    # where the app reaches it. On the Android emulator that is 10.0.2.2: inside the
+    # emulator, localhost is the emulator. This value has to match the redirect URI
+    # registered with Discord byte for byte.
+    public-base-url: ${BACKEND_PUBLIC_URL:http://10.0.2.2:8080}
+    # Where the callback sends the browser when it is done. The app's own URL scheme,
+    # registered in app.json.
+    app-return-url: ${APP_LINK_RETURN_URL:gamebuddy://settings/linked}
+
+    discord:
+      client-id: ${DISCORD_CLIENT_ID:}
+      # Proves this server is the application the authorisation code was issued to. Never
+      # leaves the backend, and is why the code exchange cannot happen in the app.
+      client-secret: ${DISCORD_CLIENT_SECRET:}
+      url: ${DISCORD_API_URL:https://discord.com/api/v10}
+      connect-timeout: 5s
+      # The loosest read timeout in the application, and deliberately: this is the only
+      # downstream that is neither on the private network nor under our control, and a
+      # user is watching a "linking..." spinner while it runs.
+      read-timeout: 15s
+
+  social:
+    # Signing in with Google or Discord. Optional, like linking above: leave the client id
+    # empty and Google is simply not offered -- GET /auth/social/providers answers with what
+    # is configured and the app draws only those buttons.
+    #
+    # Discord's credentials are NOT repeated here. It is the same OAuth application as
+    # profile linking, with a second redirect URI registered; two copies of a client secret
+    # is one of them to forget when it rotates.
+    google:
+      # The *web* OAuth client id from the Google Cloud console, which is what an ID token's
+      # `aud` carries -- not the Android one, which appears in `azp` and is not checked.
+      # Public information (it ships inside the app too), so configuration rather than a
+      # secret. Changing it orphans every stored Google subject: `sub` is stable per account
+      # per project.
+      web-client-id: ${GOOGLE_WEB_CLIENT_ID:}
+      # Google's published signing keys. Configurable only so a test can point it at a stub.
+      jwk-set-uri: ${GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}
+    # Where the Discord callback sends the browser. Deliberately not settings/linked: that
+    # screen is for a signed-in gamer, and this flow has no session yet.
+    app-return-url: ${APP_SOCIAL_RETURN_URL:gamebuddy://social}
+
   predict:
     # The only remaining out-of-process dependency: the Python model is a different
     # runtime. Everything that used to be an HTTP call between services is a method call.
@@ -151,24 +303,49 @@ gamebuddy:
     retention: ${IMPRESSION_RETENTION:P90D}
     cleanup-cron: ${IMPRESSION_CLEANUP_CRON:0 30 3 * * *}
 
+  # The coin economy. Every faucet rate lives here so it can be retuned by a deploy
+  # rather than a release -- see CoinEconomyProperties for what good numbers look like.
+  #
+  # The defaults in that class are what this build was tested with; these lines exist so
+  # the values are visible and overridable, not because they differ.
+  coins:
+    # One full cycle. Day 8 pays what day 1 pays, so a streak has to be kept to be worth
+    # anything -- it used to plateau at the top rate forever.
+    daily-ladder: ${COINS_DAILY_LADDER:5,10,15,20,25,30,35}
+    daily-cooldown: ${COINS_DAILY_COOLDOWN:24h}
+    # 36h, not 48: at 48 a "daily" streak survived on about three and a half claims a week.
+    streak-grace: ${COINS_STREAK_GRACE:36h}
+    # 15 x 3/day. A rewarded view earns roughly one to two cents, so the old 20 x 5 gave
+    # away about four times what it brought in.
+    ad-coins: ${COINS_AD_COINS:15}
+    ad-daily-cap: ${COINS_AD_DAILY_CAP:3}
+    stipend: ${COINS_STIPEND:600}
+    stipend-interval: ${COINS_STIPEND_INTERVAL:30d}
+    # What one mission pays, by the band its set was dealt from. The curve rises across the
+    # eight-set campaign and then falls back to the opening rate forever, because a ladder
+    # of rising rewards that never ends is a faucet with extra steps -- the campaign is what
+    # bounds it, and `veteran` is what keeps grinding from out-earning finishing.
+    #
+    # Frozen onto each row when it is dealt, so changing these does not move the price of a
+    # mission already on somebody's screen.
+    mission-rewards:
+      easy: ${COINS_MISSION_EASY:15}
+      medium: ${COINS_MISSION_MEDIUM:25}
+      hard: ${COINS_MISSION_HARD:35}
+      veteran: ${COINS_MISSION_VETERAN:15}
+
   billing:
-    # Nothing is registered by default, and PurchaseService rejects any platform it has no
-    # verifier for. A deployment that has not been configured refuses to sell rather than
-    # giving product away.
-    google:
-      # Needs a service-account JSON with "View financial data" on the Play Console.
-      enabled: ${GOOGLE_BILLING_ENABLED:false}
-      package-name: ${GOOGLE_PACKAGE_NAME:}
-      service-account-file: ${GOOGLE_SERVICE_ACCOUNT_FILE:}
-    apple:
-      # Needs Apple's root certificates on disk; they are shipped with the deployment,
-      # never fetched at runtime.
-      enabled: ${APPLE_BILLING_ENABLED:false}
-      bundle-id: ${APPLE_BUNDLE_ID:}
-      root-certificate-dir: ${APPLE_ROOT_CERT_DIR:}
-    # Verifies NOTHING. Local development only — with this on, anyone who can reach the
-    # endpoint can grant themselves Gold and unlimited coins.
-    sandbox: ${BILLING_SANDBOX:false}
+    revenuecat:
+      # The shared secret typed into the Authorization field of the webhook in the
+      # RevenueCat dashboard. RevenueCat sends it verbatim in the Authorization header.
+      #
+      # This is the ONLY thing standing between an anonymous POST and a free subscription:
+      # with receipt verification delegated to RevenueCat, the webhook is the single path
+      # that can grant a paid entitlement. RevenueCatWebhookController refuses to start
+      # without it rather than defaulting to something permissive.
+      #
+      # Generate one with `openssl rand -base64 32` and put the same value in both places.
+      webhook-token: ${REVENUECAT_WEBHOOK_TOKEN:}
 
 springdoc:
   swagger-ui:
@@ -197,6 +374,52 @@ management:
 logging:
   level:
     com.gamebuddy: ${LOG_LEVEL:INFO}
+    # One line per HTTP request. Kept out of the com.gamebuddy tree deliberately so it can
+    # be silenced on its own — it is by far the loudest logger here, and turning it down
+    # should not mean going dark everywhere else. See RequestLoggingFilter.LOGGER_NAME.
+    gamebuddy.access: ${ACCESS_LOG_LEVEL:INFO}
+
+  # Two destinations with two audiences. The console keeps Spring's human-readable
+  # pattern, because `docker compose logs backend` is still the fastest way to see what a
+  # process is doing right now. The file is ECS JSON, which is what Filebeat ships to
+  # Elasticsearch — see docker-compose.yml and observability/filebeat/filebeat.yml.
+  #
+  # A file rather than a direct appender to Elasticsearch, on purpose: logs survive the
+  # search cluster being down, restarted or slow, and the application never blocks on it.
+  # A logging pipeline that can take the application down with it is worse than no
+  # logging pipeline.
+  file:
+    name: ${LOG_FILE:./logs/gamebuddy.json}
+
+  logback:
+    rollingpolicy:
+      # Bounded so a container cannot fill its volume. Filebeat follows renames, so
+      # rotation loses nothing that has not already been shipped.
+      max-file-size: ${LOG_MAX_FILE_SIZE:10MB}
+      max-history: ${LOG_MAX_HISTORY:7}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:200MB}
+
+  structured:
+    format:
+      # Elastic Common Schema: @timestamp, log.level, service.name, error.stack_trace and
+      # the rest under the names Elasticsearch and Kibana already expect. Built into Boot
+      # since 3.4, so no encoder dependency and no logback-spring.xml to maintain.
+      file: ecs
+    ecs:
+      service:
+        name: ${spring.application.name}
+        version: ${SERVICE_VERSION:1.0.0}
+        environment: ${ENVIRONMENT:local}
+        # Which instance wrote the line. One container today, so it is the container id and
+        # nobody looks at it; the moment there are two behind a load balancer it is the
+        # difference between "the API is throwing 500s" and "one replica is".
+        node-name: ${HOSTNAME:${COMPUTERNAME:local}}
+    json:
+      stacktrace:
+        # Elasticsearch rejects a document whose field exceeds the analysed-string limit,
+        # and a deep reflective stack trace can reach it. Truncating loses the tail of a
+        # trace; not truncating loses the entire log entry.
+        max-length: 8192
 
 server:
   port: ${SERVER_PORT:8080}

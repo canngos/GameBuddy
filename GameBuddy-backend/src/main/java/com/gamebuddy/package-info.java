@@ -8,7 +8,8 @@
  *   ├── shared      entities and types more than one module needs (Gamer, Games, ...)
  *   ├── auth        registration, login, sessions, account deletion
  *   ├── profile     profiles, avatars, achievements, coins, friends
- *   ├── community   communities, posts, comments, moderation
+ *   ├── lobby       open game lobbies, join requests, lobby chat
+ *   ├── moderation  profile reports and the moderator queue
  *   ├── match       recommendations, swipes, matches, chat
  *   ├── notif       push notifications
  *   └── billing     subscriptions and in-app purchases

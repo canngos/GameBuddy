@@ -11,12 +11,18 @@ import com.gamebuddy.profile.interfaces.dto.BadgesResponseBody;
 import com.gamebuddy.profile.interfaces.dto.ShowcasedBadgeDto;
 import com.gamebuddy.shared.badge.BadgeMetric;
 import com.gamebuddy.shared.badge.BadgeMetricSource;
+import com.gamebuddy.shared.badge.GamerMetrics;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.entity.GamerBadge;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
+import com.gamebuddy.shared.repository.CosmeticRepository;
 import com.gamebuddy.shared.repository.GamerBadgeRepository;
+import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.ObjectStorage;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -54,6 +60,12 @@ class DefaultBadgeServiceTest {
 
     private DefaultBadgeService badgeService;
 
+    @Mock
+    private CosmeticRepository cosmeticRepository;
+
+    @Mock
+    private GamerCosmeticRepository ownershipRepository;
+
     /** What the fake metric sources report. Set per test. */
     private Map<BadgeMetric, Integer> metrics;
 
@@ -80,17 +92,33 @@ class DefaultBadgeServiceTest {
         // Two sources, each owning different metrics — the real arrangement, where the
         // profile module measures some and other modules measure the rest.
         BadgeMetricSource one = g -> filtered(BadgeMetric.MATCHES, BadgeMetric.FRIENDS);
-        BadgeMetricSource two =
-                g -> filtered(BadgeMetric.MESSAGES_SENT, BadgeMetric.POSTS_WRITTEN, BadgeMetric.COMMUNITIES_JOINED);
+        BadgeMetricSource two = g -> filtered(BadgeMetric.MESSAGES_SENT, BadgeMetric.LOBBIES_JOINED);
 
-        badgeService = new DefaultBadgeService(badgeRepository, gamerRepository, storage, events, List.of(one, two));
+        badgeService = new DefaultBadgeService(
+                badgeRepository,
+                gamerRepository,
+                storage,
+                events,
+                // Real, not a mock: the merge across sources is the behaviour under test in
+                // half of these cases, and a stubbed merger would assert nothing about it.
+                new GamerMetrics(List.of(one, two)),
+                // Real, over a mocked repository: the badge reward is a coin movement now,
+                // and a stubbed ledger would pay nothing while the tests still passed.
+                new CoinLedger(mock(CoinLedgerRepository.class), Clock.systemUTC()),
+                cosmeticRepository,
+                ownershipRepository);
 
         when(gamerRepository.findById(gamer.getUserId())).thenReturn(Optional.of(gamer));
         when(gamerRepository.save(any(Gamer.class))).thenAnswer(i -> i.getArgument(0));
         when(badgeRepository.findAllByUserId(gamer.getUserId())).thenAnswer(i -> List.copyOf(rows));
         when(badgeRepository.save(any(GamerBadge.class))).thenAnswer(i -> i.getArgument(0));
         when(badgeRepository.saveAll(anyList())).thenAnswer(i -> i.getArgument(0));
+        // collect() is a conditional UPDATE now, and its return value *is* the claim: one
+        // row means this caller won it. The tests for losing that race stub it to zero.
+        when(badgeRepository.collect(anyString(), anyString(), any())).thenReturn(1);
         when(storage.publicUrl(anyString())).thenAnswer(i -> "https://cdn/" + i.getArgument(0));
+        // No trophy frames by default. The tests that care about a cosmetic reward say so.
+        when(cosmeticRepository.findAllByUnlockedByBadgeIsNotNull()).thenReturn(List.of());
     }
 
     private Map<BadgeMetric, Integer> filtered(BadgeMetric... owned) {
@@ -242,29 +270,29 @@ class DefaultBadgeServiceTest {
         @Test
         @DisplayName("earning one notifies the gamer it belongs to")
         void testEvaluate_whenAwarded_PublishesNotification() {
-            metrics.put(BadgeMetric.COMMUNITIES_JOINED, 1);
+            metrics.put(BadgeMetric.FRIENDS, 1);
 
             badgeService.evaluate(gamer);
 
             ArgumentCaptor<NotificationRequestedEvent> event = ArgumentCaptor.captor();
             verify(events).publishEvent(event.capture());
             assertEquals("fcm-me", event.getValue().fcmToken());
-            assertTrue(event.getValue().body().contains(Badge.GUILD_MEMBER.getTitle()));
+            assertTrue(event.getValue().body().contains(Badge.FRIENDLY_PERSON.getTitle()));
         }
 
         @Test
         @DisplayName("metrics come from every source, not just the first")
         void testEvaluate_whenMetricBelongsToAnotherSource_StillCounts() {
-            // POSTS_WRITTEN is owned by the second fake source. A merge that stopped at the
-            // first would silently make every community mission unreachable.
-            metrics.put(BadgeMetric.POSTS_WRITTEN, 1);
+            // MESSAGES_SENT is owned by the second fake source. A merge that stopped at
+            // the first would silently make every chat mission unreachable.
+            metrics.put(BadgeMetric.MESSAGES_SENT, 1);
 
             badgeService.evaluate(gamer);
 
             ArgumentCaptor<List<GamerBadge>> saved = ArgumentCaptor.captor();
             verify(badgeRepository).saveAll(saved.capture());
-            assertTrue(saved.getValue().stream()
-                    .anyMatch(row -> row.getBadgeCode().equals(Badge.SAY_SOMETHING.getCode())));
+            assertTrue(
+                    saved.getValue().stream().anyMatch(row -> row.getBadgeCode().equals(Badge.ICEBREAKER.getCode())));
         }
 
         @Test
@@ -389,8 +417,8 @@ class DefaultBadgeServiceTest {
             List<String> codes = List.of(
                     Badge.FIRST_CONTACT.getCode(),
                     Badge.ICEBREAKER.getCode(),
-                    Badge.GUILD_MEMBER.getCode(),
-                    Badge.SAY_SOMETHING.getCode());
+                    Badge.FRIENDLY_PERSON.getCode(),
+                    Badge.SQUAD_FORMING.getCode());
 
             BusinessException ex = assertThrows(BusinessException.class, () -> badgeService.showcase(gamer, codes));
             assertEquals(167, ex.getTransactionCode().getId());

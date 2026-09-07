@@ -1,5 +1,6 @@
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '../i18n/useT';
 import { Button } from './Button';
 import { Card } from './Card';
 import { Text } from './Text';
@@ -14,17 +15,16 @@ import { Text } from './Text';
  * The same five cover a post, a comment and a person — "someone may be a minor" is the
  * one that matters most and it was always about the account rather than the text.
  */
-const REASONS = [
-  'Harassment or abuse',
-  'Sexual content',
-  'Spam or advertising',
-  'Someone may be a minor',
-  'Something else',
-] as const;
-
 type ReportSheetProps = {
-  /** What is being reported, for the title: "post" or "comment". */
-  what: string;
+  /**
+   * What is being reported, as a *whole title* rather than a noun spliced into one.
+   *
+   * It used to be the bare word — `what="profile"` rendered as `Report this {what}` —
+   * which reads fine in English and falls apart everywhere else: German capitalises the
+   * noun, French and Spanish need agreement, and Turkish puts the demonstrative and the
+   * suffix somewhere a template cannot reach. Each language now writes the sentence.
+   */
+  subject: 'profile' | 'message';
   onPick: (reason: string) => void;
   onCancel: () => void;
 };
@@ -36,7 +36,16 @@ type ReportSheetProps = {
  * overlays: Reanimated's entering animations do not run inside a `Modal` on Android, and
  * a sibling that covers the screen behaves the same without that trap.
  */
-export function ReportSheet({ what, onPick, onCancel }: ReportSheetProps) {
+export function ReportSheet({ subject, onPick, onCancel }: ReportSheetProps) {
+  const t = useT();
+
+  const reasons = [
+    t.ui.reasonHarassment,
+    t.ui.reasonSexual,
+    t.ui.reasonSpam,
+    t.ui.reasonMinor,
+    t.ui.reasonOther,
+  ];
   // The overlay covers the whole screen, safe area included — it has to, or the dimming
   // stops short of the edges. So the sheet inside it has to keep itself clear of the
   // navigation bar, which was overlapping Cancel on a three-button Android layout.
@@ -49,18 +58,20 @@ export function ReportSheet({ what, onPick, onCancel }: ReportSheetProps) {
         className="flex-1"
         onPress={onCancel}
         accessibilityRole="button"
-        accessibilityLabel="Cancel report"
+        accessibilityLabel={t.ui.reportCancelA11y}
       />
       <View className="p-4" style={{ paddingBottom: insets.bottom + 16 }}>
         <Card className="gap-2">
           <View className="gap-1 pb-1">
-            <Text variant="bodyStrong">Report this {what}</Text>
+            <Text variant="bodyStrong">
+              {subject === 'profile' ? t.ui.reportProfileTitle : t.ui.reportMessageTitle}
+            </Text>
             <Text variant="caption">
-              A moderator will look at it. You can only report something once.
+              {t.ui.reportBlurb}
             </Text>
           </View>
 
-          {REASONS.map((reason) => (
+          {reasons.map((reason) => (
             <Button
               key={reason}
               label={reason}
@@ -70,7 +81,7 @@ export function ReportSheet({ what, onPick, onCancel }: ReportSheetProps) {
             />
           ))}
 
-          <Button label="Cancel" variant="secondary" size="md" onPress={onCancel} />
+          <Button label={t.common.cancel} variant="secondary" size="md" onPress={onCancel} />
         </Card>
       </View>
     </View>

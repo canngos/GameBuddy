@@ -17,29 +17,33 @@ import java.time.Instant;
  */
 public enum SubscriptionTier {
 
-    /** The free tier. Everything works; some things are rationed. */
-    BASIC(50, 5, false, false, 3),
+    /**
+     * The free tier. Everything works; some things are rationed.
+     *
+     * <p>Fifteen likes a day, not five. Five was set before there was a population to
+     * match against, and at this density it put the wall in front of people before their
+     * first match — somebody who has never seen the product work does not upgrade, they
+     * leave. The cap is a retention dial rather than a revenue lever, and the number to
+     * watch after changing it is day-7 retention, not conversion.
+     *
+     * <p>Swipes stay at 50. The budget is one pool with a sub-cap, so 15 likes out of 50
+     * decisions still asks somebody to choose.
+     */
+    BASIC(50, 15, false, false),
 
     /** The paid tier. */
-    GOLD(Integer.MAX_VALUE, Integer.MAX_VALUE, true, true, 25);
+    GOLD(Integer.MAX_VALUE, Integer.MAX_VALUE, true, true);
 
     private final int dailySwipes;
     private final int dailyAccepts;
     private final boolean canSeeWhoLikedYou;
     private final boolean canUseAdvancedFilters;
-    private final int maxGroupChats;
 
-    SubscriptionTier(
-            int dailySwipes,
-            int dailyAccepts,
-            boolean canSeeWhoLikedYou,
-            boolean canUseAdvancedFilters,
-            int maxGroupChats) {
+    SubscriptionTier(int dailySwipes, int dailyAccepts, boolean canSeeWhoLikedYou, boolean canUseAdvancedFilters) {
         this.dailySwipes = dailySwipes;
         this.dailyAccepts = dailyAccepts;
         this.canSeeWhoLikedYou = canSeeWhoLikedYou;
         this.canUseAdvancedFilters = canUseAdvancedFilters;
-        this.maxGroupChats = maxGroupChats;
     }
 
     /**
@@ -79,10 +83,6 @@ public enum SubscriptionTier {
     /** Whether recommendations may be filtered by game, platform or region. */
     public boolean canUseAdvancedFilters() {
         return canUseAdvancedFilters;
-    }
-
-    public int maxGroupChats() {
-        return maxGroupChats;
     }
 
     public boolean hasUnlimitedSwipes() {

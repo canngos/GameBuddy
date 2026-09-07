@@ -1,25 +1,43 @@
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { View } from 'react-native';
-import { authApi } from '../../src/api/auth';
-import { ApiError, Code } from '../../src/api/envelope';
-import { useSession } from '../../src/session/store';
-import { Button, ErrorNotice, Screen, Text, TextField } from '../../src/ui';
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { useState } from "react";
+import { View } from "react-native";
+import { authApi } from "../../src/api/auth";
+import { ApiError, Code } from "../../src/api/envelope";
+import { SocialButtons } from "../../src/session/SocialButtons";
+import { useSocialSignIn } from "../../src/session/social";
+import { useSession } from "../../src/session/store";
+import { useT } from "../../src/i18n/useT";
+import {
+  BackButton,
+  Button,
+  ErrorNotice,
+  Screen,
+  Text,
+  TextField,
+  useIntroPadding,
+} from "../../src/ui";
+import { normalisePassword } from "../../src/validation";
 
 export default function Login() {
+  const intro = useIntroPadding();
+  const t = useT();
   const router = useRouter();
   const signIn = useSession((s) => s.signIn);
+  const social = useSocialSignIn();
 
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
 
   const login = useMutation({
     mutationFn: async () => {
-      const session = await authApi.login(identifier.trim(), password);
+      const session = await authApi.login(
+        identifier.trim(),
+        normalisePassword(password),
+      );
       await signIn(session.accessToken, session.userId);
     },
-    onSuccess: () => router.replace('/home'),
+    onSuccess: () => router.replace("/home"),
   });
 
   /**
@@ -37,32 +55,38 @@ export default function Login() {
   const sendCode = useMutation({
     mutationFn: () => authApi.sendCode(identifier.trim()),
     onSuccess: () =>
-      router.replace({ pathname: '/verify', params: { email: identifier.trim() } }),
+      router.replace({
+        pathname: "/verify",
+        params: { email: identifier.trim() },
+      }),
   });
 
-  const canSubmit = identifier.trim().length > 0 && password.length > 0;
+  const canSubmit =
+    identifier.trim().length > 0 && normalisePassword(password).length > 0;
 
   return (
     <Screen scroll>
-      <View className="gap-2 pb-8 pt-12">
-        <Text variant="title">Welcome back</Text>
+      <BackButton />
+
+      <View className={`gap-2 pb-8 ${intro.top}`}>
+        <Text variant="title">{t.auth.login.title}</Text>
         <Text variant="body" className="text-muted">
-          Sign in with your username or email.
+          {t.auth.login.subtitle}
         </Text>
       </View>
 
       <View className="gap-5">
         <TextField
-          label="Username or email"
+          label={t.auth.login.identifier}
           value={identifier}
           onChangeText={setIdentifier}
           textContentType="username"
           autoComplete="username"
-          placeholder="you@example.com"
+          placeholder={t.auth.emailPlaceholder}
         />
 
         <TextField
-          label="Password"
+          label={t.auth.login.password}
           value={password}
           onChangeText={setPassword}
           secure
@@ -71,6 +95,16 @@ export default function Login() {
           onSubmitEditing={() => canSubmit && login.mutate()}
           returnKeyType="go"
         />
+
+        {/* Right under the field it rescues, which is where someone who has just failed
+            to remember a password is already looking. */}
+        <Text
+          variant="bodyStrong"
+          className="-mt-2 self-end text-primary"
+          onPress={() => router.push("/forgot")}
+        >
+          {t.auth.login.forgot}
+        </Text>
 
         {login.error && !needsCode && <ErrorNotice error={login.error} />}
 
@@ -82,10 +116,10 @@ export default function Login() {
             <Text variant="caption">
               {/* Only useful if the identifier is the email — sendCode looks up by
                   address, so a username here comes back as "User not found". */}
-              We can email a new code to finish setting up this account.
+              {t.auth.login.needsCode}
             </Text>
             <Button
-              label="Email me a code"
+              label={t.auth.login.emailCode}
               variant="secondary"
               size="md"
               loading={sendCode.isPending}
@@ -96,15 +130,20 @@ export default function Login() {
         )}
       </View>
 
-      <View className="mt-auto gap-2 pt-10">
+      <View className={`mt-auto gap-2 ${intro.footer}`}>
         <Button
-          label="Sign in"
+          label={t.auth.login.submit}
           loading={login.isPending}
           disabled={!canSubmit}
           onPress={() => login.mutate()}
         />
-        <Button label="Back" variant="ghost" onPress={() => router.back()} />
+
+        {/* Below the password button, not above it: somebody who opened this screen came
+            here to type a password, and moving their target down the screen to advertise
+            something else is the app changing the subject. */}
+        <SocialButtons social={social} />
       </View>
+
     </Screen>
   );
 }

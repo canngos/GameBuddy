@@ -73,17 +73,31 @@ public class NotificationDispatcher {
      * <p>Costs one indexed lookup per notification. Worth it: this is the difference
      * between a preference and a suggestion.
      *
-     * <p>A token with no account behind it is allowed through. That means the device was
-     * detached — reinstalled, or claimed by another account — and the send will fail
-     * harmlessly at Firebase. Refusing here would silently swallow notifications for a
-     * state we cannot distinguish from a race.
+     * <p>An id with no account behind it is allowed through. That means the account went
+     * away between the publish and this listener, and the send will fail harmlessly.
+     * Refusing here would silently swallow notifications for a state we cannot distinguish
+     * from a race.
+     *
+     * <p><strong>Looked up by id, not by token.</strong> This was
+     * {@code findByFcmToken(event.fcmToken())}, which is wrong twice over. A token
+     * identifies a device and an account is what holds preferences, so the question "does
+     * this person want this?" was being asked of a device. And it was not even unique:
+     * registration stored the client's {@code "pending"} placeholder verbatim, so every
+     * account that had not yet completed push registration carried an identical token.
+     * Two such accounts made this throw {@code NonUniqueResultException}, which escaped
+     * through the publishing transaction and turned the caller into a 500 — accepting a
+     * match failed because of a preference check. A primary-key lookup cannot be
+     * ambiguous, and it is cheaper than the index scan it replaces.
      */
     private boolean wanted(NotificationRequestedEvent event) {
         if (event.kind() == null) {
             return true;
         }
+        if (event.recipientId() == null) {
+            return true;
+        }
         return gamerRepository
-                .findByFcmToken(event.fcmToken())
+                .findById(event.recipientId())
                 .map(gamer -> event.kind().category().wantedBy(gamer))
                 .orElse(true);
     }

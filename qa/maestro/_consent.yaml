@@ -1,0 +1,28 @@
+# Answers Google's UMP consent form, which the app raises once it reaches the auth screen.
+#
+# Every flow here launches with `clearState`, and that wipes the shared preferences UMP
+# records an answer in — so each run is a first run as far as consent is concerned and the
+# form comes up over the sign-in screen, swallowing the taps that follow. It is a Play
+# Services dialog rather than an app screen, so there is nothing in the app's own hierarchy
+# to wait on that would tell it apart; the button text is the only handle.
+#
+# Guarded rather than unconditional: a device that already holds an answer never shows the
+# form, and a flow that *required* it would then fail on the second run — the same reason
+# the tutorial Skip in `_login.yaml` is optional.
+#
+# `Consent` rather than `Do not consent`, because the app under test is the one that serves
+# ads, and a refusal would put every later run on a different code path from the shipping
+# default.
+#
+# Called with `runFlow: _consent.yaml`. The leading underscore keeps it out of
+# `maestro test .` — it is a step, not a test.
+
+appId: com.findgamebuddy.app
+---
+- runFlow:
+    when:
+      visible: "Consent"
+    commands:
+      - tapOn: "Consent"
+      - waitForAnimationToEnd:
+          timeout: 3000

@@ -1,0 +1,165 @@
+# Every settings screen loads and comes back.
+#
+# Deliberately shallow and wide. These are the screens nobody opens during development, so
+# they are where a route rename or a missing provider goes unnoticed — and the failure is a
+# blank screen or a crash, which this catches by simply visiting all of them.
+#
+# Each sub-screen is asserted on its *own* title rather than screenshotted and trusted. A
+# route that silently fails to mount leaves the previous screen on display, and a
+# screenshot of the wrong screen looks exactly like a screenshot of the right one.
+#
+# Nothing here saves a change. Destructive settings (delete account, password) are asserted
+# on the API side where the result can be checked and rolled back.
+
+appId: com.findgamebuddy.app
+name: 05 settings
+---
+- runFlow: _login.yaml
+
+# The tab bar label is "Profile"; so is the screen's own title. The overline above it is
+# the unambiguous one.
+- tapOn: "Profile"
+- extendedWaitUntil:
+    visible: "YOU"
+    timeout: 15000
+- takeScreenshot: artifacts/05-01-profile
+
+# Games, platforms and keywords are at the bottom of the profile card, below the banner,
+# the stats row and the badge showcase — so they are off-screen on arrival and have to be
+# scrolled to rather than asserted where the screen happens to open.
+- scrollUntilVisible:
+    element:
+      text: "Games"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Plays on"
+- assertVisible: "Play style"
+- takeScreenshot: artifacts/05-02-profile-tags
+
+# The cog in the header. It carries accessibilityLabel="Settings", which is a real
+# selector — the previous blind tap at 92%,8% happened to land on it and would stop doing
+# so the first time the header gained anything.
+- tapOn: "Settings"
+- extendedWaitUntil:
+    visible: "PROFILE"
+    timeout: 15000
+- assertVisible: "APPEARANCE"
+# Scrolled to rather than asserted in place: Appearance grew a Language row, which pushed
+# this section off the first screenful. A bare assertVisible only ever passed because the
+# list used to be one row shorter.
+- scrollUntilVisible:
+    element:
+      text: "NOTIFICATIONS"
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: artifacts/05-03-settings
+
+# Back to the top, because the scroll above left the Profile rows off-screen above and the
+# sub-screens below are all reached from them.
+- scrollUntilVisible:
+    element:
+      text: "PROFILE"
+    direction: UP
+    timeout: 20000
+
+# --- every sub-screen, each asserted on its own title -------------------------------------
+
+- tapOn: "Games"
+- extendedWaitUntil:
+    visible: "Games you play"
+    timeout: 15000
+- takeScreenshot: artifacts/05-04-games
+- back
+
+- tapOn: "Platforms"
+- extendedWaitUntil:
+    visible: "What you play on"
+    timeout: 15000
+- takeScreenshot: artifacts/05-05-platforms
+- back
+
+- tapOn: "Play style"
+- extendedWaitUntil:
+    visible: "How you play"
+    timeout: 15000
+- takeScreenshot: artifacts/05-06-keywords
+- back
+
+- tapOn: "Avatar"
+- extendedWaitUntil:
+    visible: "YOUR OWN PHOTO"
+    timeout: 15000
+- assertVisible: "OR PICK ONE OF OURS"
+- takeScreenshot: artifacts/05-07-avatar
+- back
+
+- tapOn: "Date of birth"
+# Wrapped in .* on purpose. Maestro matches a text node in full, not as a substring — every
+# assertion in this suite that passes names a whole node — so a prefix of this screen's
+# subtitle ("…to be here. Other people see your age, never the date.") matches nothing. The
+# subtitle is what is asserted rather than the title because "Date of birth" is also the
+# settings row that leads here, and a title that equals its own link proves no navigation.
+- extendedWaitUntil:
+    visible: ".*old enough to be here.*"
+    timeout: 15000
+- takeScreenshot: artifacts/05-08-dob
+- back
+
+# ACCOUNT is the last section, so it needs scrolling to. Scrolled to *Blocked* rather than
+# to the ACCOUNT header: `scrollUntilVisible` stops as soon as its target is fully on
+# screen, which leaves the header at the bottom edge and the rows under it still below the
+# fold — ACCOUNT and Password were visible and Blocked, one row further down, was not.
+# Scrolling to the thing that is about to be tapped is the version that cannot drift.
+- scrollUntilVisible:
+    element:
+      text: "Blocked"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "ACCOUNT"
+- assertVisible: "Password"
+
+- tapOn: "Blocked"
+- extendedWaitUntil:
+    visible: "Blocked"
+    timeout: 15000
+- takeScreenshot: artifacts/05-09-blocked
+- back
+
+# Promotion codes, between Password and Blocked in the ACCOUNT group. A wrong code rather
+# than a real one: the refusal is the half that has to work on a phone — it is the message
+# somebody sees after mistyping something from an email — and a code that actually worked
+# would have to exist on whatever instance this ran against.
+- scrollUntilVisible:
+    element:
+      text: "Promotion codes"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "Promotion codes"
+- extendedWaitUntil:
+    visible: "Enter a code"
+    timeout: 15000
+- takeScreenshot: artifacts/05-09b-promo-codes
+
+- tapOn:
+    id: "field-code"
+- inputText: "NOSUCHCODE"
+- hideKeyboard
+- waitForAnimationToEnd:
+    timeout: 3000
+- tapOn: "Redeem"
+- extendedWaitUntil:
+    visible: "That code is not valid."
+    timeout: 20000
+- takeScreenshot: artifacts/05-09c-promo-refused
+- back
+
+# Sign out and Delete my account sit *below* the ACCOUNT rows, so bringing ACCOUNT onto the
+# screen does not bring these with it — they need their own scroll. Asserted rather than
+# tapped, for obvious reasons: this flow has five screens left to visit.
+- scrollUntilVisible:
+    element:
+      text: "Sign out"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Delete my account"
+- takeScreenshot: artifacts/05-10-settings-returned

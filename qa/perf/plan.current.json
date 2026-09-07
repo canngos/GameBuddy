@@ -1,0 +1,12 @@
+{
+  "name": "cx23",
+  "label": "CX23 — 2 vCPU Intel, 4 GB",
+  "cpus": "0,1",
+  "generator": "8-15",
+  "mem": {
+    "postgres": "900m",
+    "backend": "2g",
+    "model": "900m",
+    "redis": "128m"
+  }
+}

@@ -5,163 +5,223 @@ import com.gamebuddy.billing.infrastructure.entity.PurchasePlatform;
 import com.gamebuddy.billing.infrastructure.entity.PurchaseStatus;
 import com.gamebuddy.billing.infrastructure.repository.PurchaseRepository;
 import com.gamebuddy.common.enums.SubscriptionTier;
-import com.gamebuddy.common.enums.TransactionCode;
-import com.gamebuddy.common.exception.BusinessException;
+import com.gamebuddy.shared.coin.CoinLedger;
+import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Redeems a store purchase into an entitlement.
+ * Turns a purchase that RevenueCat has already verified into an entitlement.
  *
- * <p>The order of operations is the whole design, and it is deliberate:
+ * <p><b>Nothing here verifies a receipt, and nothing here is reachable by a client.</b>
+ * That is the point of the change: receipt verification is fiddly, security-critical, and
+ * differs between Apple and Google, so it is delegated to RevenueCat, which talks to the
+ * stores and tells us the outcome over a signed webhook. We never see a receipt.
+ *
+ * <p>The consequence worth being explicit about: the only remaining path into this class
+ * is {@code RevenueCatService}, driven by an authenticated webhook. There is deliberately
+ * no endpoint where the app can say "I bought this, please grant it" — that would be a
+ * free subscription for anybody who can write a POST request, and removing verification
+ * without removing that path is exactly how a paywall becomes decorative.
+ *
+ * <p>Two invariants survive from the old design and still matter:
  *
  * <ol>
- *   <li><b>Verify with the store first.</b> Nothing is granted, and nothing is written, on
- *       the strength of what the client claims.
- *   <li><b>Record the transaction, then grant.</b> The unique constraint on the store's
- *       transaction id is what makes redemption idempotent, so it has to be taken before
- *       the entitlement is handed over. Granting first and recording afterwards leaves a
- *       window in which a retry grants twice.
- *   <li><b>Extend from whichever is later — the current expiry or now.</b> Renewing early
- *       must add to the remaining time rather than truncate it, and renewing after a lapse
- *       must not back-date the new period into the gap.
+ *   <li><b>Record the transaction, then grant.</b> The unique constraint on
+ *       {@code (platform, store_transaction_id)} is what makes this idempotent, so it has
+ *       to be taken before the entitlement is handed over. RevenueCat retries webhooks
+ *       until we answer 2xx, so duplicates are the normal case, not an edge case.
+ *   <li><b>Extend from whichever is later — the current expiry or now.</b> Only used when
+ *       the store gives us no expiry of its own; when it does, the store wins, because it
+ *       knows about grace periods, billing retries and refunds that we do not.
  * </ol>
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class PurchaseService {
 
     private final PurchaseRepository purchases;
     private final GamerRepository gamers;
     private final Clock clock;
-    private final Map<PurchasePlatform, ReceiptVerifier> verifiers = new EnumMap<>(PurchasePlatform.class);
-
-    public PurchaseService(
-            PurchaseRepository purchases, GamerRepository gamers, Clock clock, List<ReceiptVerifier> verifiers) {
-        this.purchases = purchases;
-        this.gamers = gamers;
-        this.clock = clock;
-        verifiers.forEach(verifier -> this.verifiers.put(verifier.platform(), verifier));
-
-        if (this.verifiers.isEmpty()) {
-            // Not an exception: a service with no billing configured should still start and
-            // serve everything else. It just cannot sell anything.
-            log.warn("No receipt verifiers are registered; every purchase will be rejected.");
-        }
-    }
+    private final CoinLedger coins;
 
     /**
-     * @param userId who is redeeming
-     * @param platform which store the receipt came from
-     * @param storeProductId the product id as the client reports it, checked against the receipt
-     * @param receipt the opaque store payload
+     * What a verified purchase tells us, independent of who verified it.
+     *
+     * @param periodType RevenueCat's period_type; TRIAL is what separates a trial from a paid month
+     * @param eventType RevenueCat's event type; RENEWAL is what makes month-2 retention countable
+     */
+    public record VerifiedPurchase(
+            String userId,
+            Product product,
+            PurchasePlatform platform,
+            String storeTransactionId,
+            Instant purchasedAt,
+            Instant expiresAt,
+            String periodType,
+            String eventType) {}
+
+    /**
+     * Grants a purchase, or does nothing if it has already been granted.
+     *
+     * <p>Returns false for a duplicate rather than throwing. A webhook retry is not an
+     * error — it is RevenueCat doing exactly what it promises — and answering it with a
+     * failure would make it retry forever.
+     *
+     * @return true if this call is what granted the entitlement
      */
     @Transactional
-    public Purchase redeem(String userId, PurchasePlatform platform, String storeProductId, String receipt) {
-        Product product = Product.byStoreId(storeProductId)
-                .orElseThrow(() -> new BusinessException(TransactionCode.PRODUCT_NOT_FOUND));
-
-        ReceiptVerifier verifier = verifiers.get(platform);
-        if (verifier == null) {
-            // Fails closed. An unconfigured platform must reject rather than trust.
-            log.warn("Purchase rejected: no verifier configured for {}", platform);
-            throw new BusinessException(TransactionCode.PURCHASE_VERIFICATION_FAILED);
+    public boolean grant(VerifiedPurchase verified) {
+        if (purchases.existsByPlatformAndStoreTransactionId(verified.platform(), verified.storeTransactionId())) {
+            log.debug("Purchase {} already granted; ignoring replay", verified.storeTransactionId());
+            return false;
         }
 
-        ReceiptVerifier.VerifiedPurchase verified = verifier.verify(receipt, product);
-        if (verified.product() != product) {
-            // The store disagrees with the client about what was bought. Believe the store,
-            // and refuse — otherwise a coin pack could be redeemed as a subscription.
-            log.warn(
-                    "Purchase rejected: client claimed {} but the store reported {}",
-                    product.storeId(),
-                    verified.product().storeId());
-            throw new BusinessException(TransactionCode.PURCHASE_VERIFICATION_FAILED);
+        Gamer gamer = gamers.findById(verified.userId()).orElse(null);
+        if (gamer == null) {
+            // Deliberately not an exception. A webhook for an account that no longer exists
+            // (deleted between purchase and delivery) is not something a retry will fix, and
+            // failing the request would have RevenueCat resend it indefinitely.
+            log.warn("Purchase {} is for unknown account {}", verified.storeTransactionId(), verified.userId());
+            return false;
         }
 
-        // Cheap pre-check for the common replay; the unique constraint below is what makes
-        // it correct under concurrency.
-        if (purchases.existsByPlatformAndStoreTransactionId(platform, verified.storeTransactionId())) {
-            throw new BusinessException(TransactionCode.PURCHASE_ALREADY_PROCESSED);
-        }
-
-        Gamer gamer = gamers.findById(userId).orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
+        Product product = verified.product();
 
         Purchase purchase = new Purchase();
         purchase.setId(UUID.randomUUID());
-        purchase.setUserId(userId);
+        purchase.setUserId(verified.userId());
         purchase.setProductId(product.storeId());
-        purchase.setPlatform(platform);
+        purchase.setPlatform(verified.platform());
         purchase.setStoreTransactionId(verified.storeTransactionId());
         purchase.setStatus(PurchaseStatus.GRANTED);
-        purchase.setPurchasedAt(verified.purchasedAt());
-        purchase.setReceipt(truncate(receipt));
+        purchase.setPurchasedAt(verified.purchasedAt() == null ? clock.instant() : verified.purchasedAt());
+        purchase.setPeriodType(verified.periodType());
+        purchase.setEventType(verified.eventType());
 
+        Purchase saved;
         try {
-            // flush so the unique violation surfaces here, where it can be turned into a
-            // clean "already processed" rather than escaping as a 500 at commit time.
-            purchases.saveAndFlush(purchase);
+            /*
+             * Flushed here so a unique violation surfaces now, where it is a replay, rather
+             * than escaping at commit time as a 500 that RevenueCat would retry.
+             *
+             * **The return value is the managed entity and `purchase` is not.** This row
+             * carries its own assigned UUID and the class has no `@Version` and does not
+             * implement `Persistable`, so Spring Data asks `isNew()`, sees a non-null id,
+             * and takes it for an update: `save` therefore goes through `merge`, which
+             * copies the state onto a *different* instance and leaves this one detached.
+             * Writing the entitlement expiry onto `purchase` below wrote it to an object
+             * nothing was going to persist, so every subscription in the ledger recorded a
+             * null expiry while the gamer's own row was granted correctly. Silent, and
+             * invisible until somebody asks the ledger when an entitlement should have
+             * ended — a refund or chargeback question, which is exactly when the record
+             * needs to be right.
+             */
+            saved = purchases.saveAndFlush(purchase);
         } catch (DataIntegrityViolationException e) {
-            // Two concurrent redemptions of the same receipt: the loser reports the replay.
-            throw new BusinessException(TransactionCode.PURCHASE_ALREADY_PROCESSED, e);
+            log.debug("Concurrent delivery of {} treated as a replay", verified.storeTransactionId());
+            return false;
         }
 
         if (product.isSubscription()) {
-            Instant expiresAt = grantSubscription(gamer, product, verified.expiresAt());
-            purchase.setEntitlementExpiresAt(expiresAt);
+            saved.setEntitlementExpiresAt(grantSubscription(gamer, product, verified.expiresAt()));
         } else {
-            gamer.setCoin(gamer.getCoin() + product.coins());
+            coins.earn(gamer, product.coins(), CoinReason.COIN_PACK);
         }
         gamers.save(gamer);
 
-        log.info("Granted {} to {} (transaction {})", product.storeId(), userId, verified.storeTransactionId());
-        return purchase;
+        log.info(
+                "Granted {} to {} (transaction {})",
+                product.storeId(),
+                verified.userId(),
+                verified.storeTransactionId());
+        return true;
     }
 
     /**
      * Extends the paid period.
      *
-     * @param storeExpiry the store's own expiry, which is authoritative when present —
-     *     Apple and Google know about renewals, grace periods and refunds that we do not
+     * @param storeExpiry the store's own expiry, authoritative when present
      */
     private Instant grantSubscription(Gamer gamer, Product product, Instant storeExpiry) {
+        if (storeExpiry != null) {
+            gamer.setSubscriptionTier(product.tier());
+            gamer.setSubscriptionExpiresAt(storeExpiry);
+            return storeExpiry;
+        }
+        return extendGold(gamer, product.period());
+    }
+
+    /**
+     * Adds a period of Gold to whatever the account already holds, and returns the new
+     * expiry. Does not save — the caller owns the transaction and the gamer.
+     *
+     * <p>Extended from the later of "now" and the existing expiry. Using the existing
+     * expiry alone would back-date a renewal made after a lapse; using now alone would
+     * throw away time an early renewer had already paid for.
+     *
+     * <p>Public and shared with the promotion codes because there must be exactly one
+     * answer to "what does another month mean for somebody who already has three weeks".
+     * The alternative was a second copy of these six lines in the promo service, which
+     * would agree with this one on the day it was written and not for much longer.
+     */
+    public Instant extendGold(Gamer gamer, Duration period) {
         Instant now = clock.instant();
 
-        Instant expiresAt;
-        if (storeExpiry != null) {
-            expiresAt = storeExpiry;
-        } else {
-            // Extend from the later of "now" and the existing expiry. Using the existing
-            // expiry alone would back-date a renewal made after a lapse; using now alone
-            // would throw away time an early renewer had already paid for.
-            SubscriptionTier current =
-                    SubscriptionTier.effective(gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), now);
-            Instant base = current == SubscriptionTier.BASIC || gamer.getSubscriptionExpiresAt() == null
-                    ? now
-                    : gamer.getSubscriptionExpiresAt();
-            expiresAt = base.plus(product.period());
-        }
+        SubscriptionTier current =
+                SubscriptionTier.effective(gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), now);
+        Instant base = current == SubscriptionTier.BASIC || gamer.getSubscriptionExpiresAt() == null
+                ? now
+                : gamer.getSubscriptionExpiresAt();
+        Instant expiresAt = base.plus(period);
 
-        gamer.setSubscriptionTier(product.tier());
+        gamer.setSubscriptionTier(SubscriptionTier.GOLD);
         gamer.setSubscriptionExpiresAt(expiresAt);
         return expiresAt;
+    }
+
+    /**
+     * Ends a subscription now, without touching the purchase ledger.
+     *
+     * <p>For expiry: the paid period simply ran out. The row stays {@code GRANTED} because
+     * it was — the gamer had every day they paid for.
+     *
+     * <p>The tier column is cleared alongside the expiry. Nothing in the application needs
+     * it — every reader goes through {@link SubscriptionTier#effective} — but a stored
+     * {@code GOLD} on somebody who is not a member reads as true to anyone querying the
+     * table directly, and support tools and ad-hoc counts are written against exactly that
+     * column. This only covers the paths that pass through here; a subscription whose expiry
+     * quietly passes with no webhook is never revisited, which is why the column also
+     * carries a comment saying it is not the source of truth.
+     */
+    @Transactional
+    public void expire(String userId) {
+        gamers.findById(userId).ifPresent(gamer -> {
+            if (gamer.getSubscriptionExpiresAt() != null
+                    && gamer.getSubscriptionExpiresAt().isAfter(clock.instant())) {
+                gamer.setSubscriptionExpiresAt(clock.instant());
+                gamer.setSubscriptionTier(SubscriptionTier.BASIC);
+                gamers.save(gamer);
+                log.info("Subscription for {} expired", userId);
+            }
+        });
     }
 
     /**
      * Revokes an entitlement after a refund or chargeback.
      *
      * <p>The row is kept and marked rather than deleted, so the transaction id stays
-     * claimed and the same receipt cannot simply be redeemed again.
+     * claimed and the same purchase cannot be delivered again.
      */
     @Transactional
     public void refund(PurchasePlatform platform, String storeTransactionId) {
@@ -170,26 +230,32 @@ public class PurchaseService {
                 .ifPresent(purchase -> {
                     purchase.setStatus(PurchaseStatus.REFUNDED);
 
-                    gamers.findById(purchase.getUserId()).ifPresent(gamer -> {
-                        Product.byStoreId(purchase.getProductId()).ifPresent(product -> {
-                            if (product.isSubscription()) {
-                                // Expire immediately. The tier is derived from the expiry, so this
-                                // is enough — nothing else has to be written back.
-                                gamer.setSubscriptionExpiresAt(clock.instant());
-                            } else {
-                                // Coins may already be spent, so this can go negative if we let it.
-                                gamer.setCoin(Math.max(0, gamer.getCoin() - product.coins()));
-                            }
-                            gamers.save(gamer);
-                        });
-                    });
+                    gamers.findById(purchase.getUserId()).ifPresent(gamer -> Product.byStoreId(purchase.getProductId())
+                            .ifPresent(product -> {
+                                if (product.isSubscription()) {
+                                    // The tier is derived from the expiry, so this is enough.
+                                    gamer.setSubscriptionExpiresAt(clock.instant());
+                                } else {
+                                    // Coins may already be spent, so this can go negative if we let it.
+                                    coins.spend(gamer, product.coins(), CoinReason.REFUND);
+                                }
+                                gamers.save(gamer);
+                            }));
 
                     log.info("Refunded {} for {}", storeTransactionId, purchase.getUserId());
                 });
     }
 
-    private static String truncate(String receipt) {
-        int max = 4000;
-        return receipt.length() <= max ? receipt : receipt.substring(0, max);
+    /**
+     * Moves an entitlement from one account to another.
+     *
+     * <p>Happens when somebody signs in to a second account on a device that already owns a
+     * subscription. The store considers it one purchase, so two accounts must not both keep
+     * it — the old one is expired as the new one is granted.
+     */
+    @Transactional
+    public void transfer(String fromUserId, String toUserId) {
+        expire(fromUserId);
+        log.info("Entitlement transferred from {} to {}", fromUserId, toUserId);
     }
 }

@@ -4,11 +4,11 @@ import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.BaseModel;
 import com.gamebuddy.common.base.BaseResponse;
 import com.gamebuddy.common.base.Status;
+import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.util.Constants;
-import com.gamebuddy.community.domain.service.CommunityMembership;
 import com.gamebuddy.profile.application.mapper.ProfileCatalogueMapper;
 import com.gamebuddy.profile.application.mapper.ProfileMapper;
 import com.gamebuddy.profile.interfaces.dto.*;
@@ -40,7 +40,7 @@ public class DefaultProfileService implements ProfileService {
     private final CosmeticUrls cosmeticUrls;
     private final ProfileCatalogueMapper profileCatalogueMapper;
     private final ProfileMapper profileMapper;
-    private final CommunityMembership communityMembership;
+    private final GamerLinkedAccountRepository linkedAccountRepository;
     private final BadgeService badges;
     private final ApplicationEventPublisher events;
 
@@ -83,11 +83,20 @@ public class DefaultProfileService implements ProfileService {
             // account exists would tell the caller they have been blocked.
             throw new BusinessException(TransactionCode.USER_NOT_FOUND);
         }
+        if (!own && !gamer.isDiscoverable()) {
+            // The moderator, fetched by id. Nothing links to this account, but ids appear
+            // in deep links and in anything anybody has previously seen, so the only
+            // reliable answer is the one given for an account that is not there.
+            throw new BusinessException(TransactionCode.USER_NOT_FOUND);
+        }
 
         UserInfoResponseBody body = new UserInfoResponseBody();
         body.setUserId(gamer.getUserId());
         body.setUsername(gamer.getGamerUsername());
         body.setAge(gamer.getAge() == null ? null : String.valueOf(gamer.getAge()));
+        // Your own only. See UserInfoResponseBody#birthDate.
+        body.setBirthDate(
+                own && gamer.getBirthDate() != null ? gamer.getBirthDate().toString() : null);
         body.setCountry(gamer.getCountry());
         body.setGender(gamer.getGender());
         body.setAvatar(
@@ -96,22 +105,52 @@ public class DefaultProfileService implements ProfileService {
                         : avatarUrls.visibleTo(gamer));
         body.setFrame(cosmeticUrls.frameUrl(gamer));
         body.setBanner(cosmeticUrls.bannerUrl(gamer));
+        body.setTheme(cosmeticUrls.themeOf(gamer));
         body.setGames(profileCatalogueMapper.toGameDtos(gamer.getLikedgames()));
         body.setKeywords(profileCatalogueMapper.toKeywordDtos(gamer.getKeywords()));
+        body.setPlatforms(gamer.getPlatforms().stream().map(Platform::label).toList());
         // The three on show, and the total. Not the whole board: that is a screen of its
         // own, and sending thirteen missions with progress to render a number and three
         // pictures would put the badge catalogue on every profile view.
         body.setBadges(badges.showcasedFor(gamer));
         body.setBadgeCount((int) badges.earnedCount(gamer));
-        body.setJoinedCommunities(toCommunityDtos(gamer));
+        body.setLinkedAccounts(linkedAccountsVisibleTo(gamer, self, own));
 
         if (own) {
             body.setEmail(gamer.getEmail());
             body.setCoin(gamer.getCoin());
             body.setFriends(toFriendDtos(gamer.getFriends()));
+            body.setRole(gamer.getRole().name());
+            // How this account can get in. Own profile only, and for the same reason the
+            // email is: it is a fact about the credential, not about the person other
+            // people are looking at.
+            body.setHasPassword(gamer.getPassword() != null);
+            body.setAuthProviders(gamerRepository.findAuthProviders(gamer.getUserId()));
         }
 
         return respond(new UserInfoResponse(), body);
+    }
+
+    /**
+     * The linked accounts {@code viewer} is allowed to see on {@code owner}'s profile.
+     *
+     * <p>Each link chooses its own audience — see {@code LinkVisibility}. A Discord handle is
+     * a way to contact somebody outside the app, so the default is matches and friends only,
+     * which is the same line {@code TextSurface} draws around typed text: two people who have
+     * agreed to talk swapping handles is the product working, and the same handle broadcast
+     * to the deck is a different thing.
+     *
+     * <p>The visibility itself is returned only on your own profile. Telling a stranger that a
+     * handle exists but is restricted describes a choice made to keep them out.
+     */
+    private List<LinkedAccountDto> linkedAccountsVisibleTo(Gamer owner, Gamer viewer, boolean own) {
+        return linkedAccountRepository.findByGamer_UserId(owner.getUserId()).stream()
+                .filter(link -> link.isVisibleTo(owner, viewer))
+                .map(link -> new LinkedAccountDto(
+                        link.getProvider().name(),
+                        link.getHandle(),
+                        own ? link.getVisibility().name() : null))
+                .toList();
     }
 
     // =======================================================================
@@ -250,6 +289,7 @@ public class DefaultProfileService implements ProfileService {
         gamerRepository.save(user);
 
         events.publishEvent(new NotificationRequestedEvent(
+                user.getUserId(),
                 user.getFcmToken(),
                 Constants.FRIEND_REQUEST_ACCEPTED_TITLE,
                 String.format(Constants.FRIEND_REQUEST_ACCEPTED_BODY, gamer.getGamerUsername()),
@@ -376,10 +416,37 @@ public class DefaultProfileService implements ProfileService {
             throw new BusinessException(TransactionCode.ALREADY_SENT_REQUEST);
         }
 
+        // They asked first, and this is the same answer. Two people tapping "add friend"
+        // on each other before either has opened their requests list is ordinary — and it
+        // used to leave both requests pending, with each profile screen showing only the
+        // outgoing one. Neither side could reach an accept button, and the friendship both
+        // of them had just asked for could not happen. Crossing counts as agreeing.
+        if (gamer.getWaitingFriends().contains(user)) {
+            gamer.getWaitingFriends().remove(user);
+            gamer.getFriends().add(user);
+            user.getFriends().add(gamer);
+            gamerRepository.save(gamer);
+            gamerRepository.save(user);
+
+            // The other side is told their request was accepted, which is what happened
+            // from where they are standing. This gamer is not notified: they are holding
+            // the phone that did it, and the response tells them.
+            events.publishEvent(new NotificationRequestedEvent(
+                    user.getUserId(),
+                    user.getFcmToken(),
+                    Constants.FRIEND_REQUEST_ACCEPTED_TITLE,
+                    String.format(Constants.FRIEND_REQUEST_ACCEPTED_BODY, gamer.getGamerUsername()),
+                    NotificationKind.FRIEND_ACCEPTED,
+                    gamer.getUserId()));
+
+            return DefaultMessageResponse.of("Friend added successfully");
+        }
+
         user.getWaitingFriends().add(gamer);
         gamerRepository.save(user);
 
         events.publishEvent(new NotificationRequestedEvent(
+                user.getUserId(),
                 user.getFcmToken(),
                 Constants.FRIEND_REQUEST_TITLE,
                 String.format(Constants.FRIEND_REQUEST_BODY, gamer.getGamerUsername()),
@@ -387,6 +454,35 @@ public class DefaultProfileService implements ProfileService {
                 gamer.getUserId()));
 
         return DefaultMessageResponse.of("Friend request sent successfully");
+    }
+
+    /**
+     * Takes back a friend request you sent.
+     *
+     * <p>The mirror image of {@link #rejectFriend}, and it needs to be its own method
+     * precisely because that one is not symmetric: rejecting removes the other gamer from
+     * <em>your own</em> waiting list, so a sender calling it only ever got FRIEND_NO_REQUEST.
+     * There was no way to retract a request at all — a mistaken tap was permanent until the
+     * other side answered it.
+     *
+     * <p>Removes the sender from the recipient's waiting list, so the request simply stops
+     * existing. No notification: the recipient was told a request arrived, and telling them
+     * it has been withdrawn draws attention to something the sender evidently thought
+     * better of.
+     */
+    @Override
+    @Transactional
+    public DefaultMessageResponse withdrawFriendRequest(Gamer principal, FriendRequest request) {
+        Gamer gamer = reload(principal);
+        Gamer user = requireGamer(request.getUserId());
+
+        if (!user.getWaitingFriends().contains(gamer)) {
+            throw new BusinessException(TransactionCode.FRIEND_NO_REQUEST);
+        }
+
+        user.getWaitingFriends().remove(gamer);
+        gamerRepository.save(user);
+        return DefaultMessageResponse.of("Friend request withdrawn successfully");
     }
 
     // =======================================================================
@@ -419,27 +515,6 @@ public class DefaultProfileService implements ProfileService {
                     GamerDto dto = profileMapper.toDto(friend);
                     dto.setAvatar(avatars.get(friend.getUserId()));
                     dto.setFrame(cosmeticUrls.frameUrl(friend));
-                    return dto;
-                })
-                .toList();
-    }
-
-    /**
-     * The communities on a profile, asked of the module that owns them.
-     *
-     * <p>This used to map {@code community} with a second entity of its own and walk
-     * {@code Gamer.joinedCommunities} — one module reading another's tables through a
-     * duplicate mapping of the same join table, which is how the two ends came to disagree
-     * about which of them owned it.
-     */
-    private List<CommunityDto> toCommunityDtos(Gamer gamer) {
-        return communityMembership.findJoinedBy(gamer).stream()
-                .map(joined -> {
-                    CommunityDto dto = new CommunityDto();
-                    dto.setCommunityId(joined.id().toString());
-                    dto.setName(joined.name());
-                    dto.setCommunityAvatar(joined.avatar());
-                    dto.setIsOwner(joined.owned());
                     return dto;
                 })
                 .toList();

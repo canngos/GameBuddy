@@ -44,7 +44,14 @@ export const secureStorage = {
       globalThis.localStorage?.setItem(key, value);
       return;
     }
-    await SecureStore.setItemAsync(key, value);
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch (error) {
+      // A keychain write can fail too - locked keychain, full keystore, a device
+      // restored from backup. Losing persistence is recoverable; blocking whatever
+      // awaited this write (sign-in, the notification primer's dismiss) is not.
+      console.warn('[session] Could not write secure storage', error);
+    }
   },
 
   async remove(key: string): Promise<void> {

@@ -51,21 +51,71 @@ public class JwtService {
     }
 
     /**
-     * Mints a token whose subject is the user's login name (their email).
+     * When the session this token belongs to began — not when this token was minted.
      *
-     * <p>The two {@code Date.from} calls are not a java.time oversight (java:S2143):
-     * jjwt's builder only accepts {@code java.util.Date}. Every value this class hands
-     * back to GameBuddy code is an {@link Instant}.
+     * <p>A refreshed token is a new token for the same session, so {@code iat} moves and
+     * this does not. It is what bounds a sliding session: see
+     * {@link JwtProperties#maxSessionAge()}.
+     */
+    static final String SESSION_START_CLAIM = "sst";
+
+    /**
+     * Mints a token whose subject is the user's login name (their email), starting a new
+     * session.
+     *
+     * <p>The {@code Date.from} calls are not a java.time oversight (java:S2143): jjwt's
+     * builder only accepts {@code java.util.Date}. Every value this class hands back to
+     * GameBuddy code is an {@link Instant}.
      */
     public String generateToken(UserDetails userDetails) {
+        return generateToken(userDetails, Instant.now());
+    }
+
+    /**
+     * Mints a token that continues an existing session.
+     *
+     * <p>Used by the refresh path. Carrying the original {@code sessionStart} forward is
+     * the whole point — a session that reset its own age on every refresh could be
+     * extended forever, which is exactly what the ceiling exists to prevent.
+     */
+    public String generateToken(UserDetails userDetails, Instant sessionStart) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(userDetails.getUsername())
                 .issuer(properties.issuer())
                 .issuedAt(Date.from(now))
+                .claim(SESSION_START_CLAIM, sessionStart.getEpochSecond())
                 .expiration(Date.from(now.plus(properties.expiration())))
                 .signWith(signingKey)
                 .compact();
+    }
+
+    /**
+     * When the session behind this token began.
+     *
+     * <p>Falls back to {@code iat} for tokens minted before the claim existed, which
+     * makes those sessions age from when they were issued — the honest reading, and it
+     * means the ceiling starts applying to them without anybody being logged out by the
+     * deploy that introduced it.
+     */
+    public Instant extractSessionStart(String token) {
+        Claims claims = parse(token);
+        Long seconds = claims.get(SESSION_START_CLAIM, Long.class);
+        return seconds == null ? toInstant(claims.getIssuedAt()) : Instant.ofEpochSecond(seconds);
+    }
+
+    /** How long a freshly minted token is good for. The client uses it to pace refreshes. */
+    public java.time.Duration expiration() {
+        return properties.expiration();
+    }
+
+    /**
+     * Whether a session that began at {@code sessionStart} may still be extended.
+     *
+     * <p>Kept here beside the claim it reads so the ceiling has one definition.
+     */
+    public boolean withinMaxSessionAge(Instant sessionStart, Instant now) {
+        return sessionStart != null && !now.isAfter(sessionStart.plus(properties.maxSessionAge()));
     }
 
     /** @return the {@code sub} claim, i.e. the user's email. */

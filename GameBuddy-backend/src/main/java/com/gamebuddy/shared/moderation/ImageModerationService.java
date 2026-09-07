@@ -33,7 +33,7 @@ public class ImageModerationService {
      *     uploaded. Screening the original would let a client send a clean image that
      *     decodes to something else, and would waste the work on bytes we are discarding.
      */
-    public ModerationVerdict screen(byte[] image, String filename) {
+    public ImageAssessment screen(byte[] image, String filename) {
         try {
             Resource part = new ByteArrayResource(image) {
                 @Override
@@ -47,12 +47,12 @@ public class ImageModerationService {
             ImageModerationClient.ModerationResponse response = client.moderate(part);
             ModerationVerdict verdict = parse(response.verdict());
             log.info("Image screened: {} ({})", verdict, response.score());
-            return verdict;
+            return new ImageAssessment(verdict, response.score());
         } catch (RuntimeException e) {
             // The image itself is never logged. Whatever this just handled, the logs are
             // the last place it should end up.
             log.error("Image screening failed, holding for review: {}", e.getMessage());
-            return ModerationVerdict.REVIEW;
+            return ImageAssessment.held();
         }
     }
 

@@ -47,6 +47,40 @@ public class AuthController {
         return ResponseEntity.ok(authService.sendVerificationEmail(request));
     }
 
+    /**
+     * Step one of a forgotten-password reset: spend the mailed code for a short-lived ticket.
+     *
+     * <p>The code itself is requested through {@code /auth/sendCode} with
+     * {@code isRegister=false} — that endpoint is already throttled and already answers
+     * identically whether or not the address has an account, so there is nothing to add here.
+     */
+    @PostMapping("/reset/verify")
+    public ResponseEntity<ResetVerifyResponse> verifyResetCode(@Valid @RequestBody ResetVerifyRequest request) {
+        return ResponseEntity.ok(authService.verifyResetCode(request));
+    }
+
+    /** Step two: the ticket from step one, plus the password to set. */
+    @PostMapping("/reset/pwd")
+    public ResponseEntity<DefaultMessageResponse> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
+    }
+
+    /**
+     * Extends the caller's session, returning a token with a later expiry.
+     *
+     * <p>Header-based for the same reason {@code validateToken} is: the session's start
+     * is a claim inside the presented token, and the principal alone does not carry it.
+     * The filter has already verified the token by the time this runs — an expired one
+     * never reaches here, it is refused as 401 upstream, which is the correct answer to
+     * "refresh a session that is already over".
+     */
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refresh(
+            @AuthenticationPrincipal Gamer principal,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(authService.refreshSession(principal, BearerToken.require(authorization)));
+    }
+
     /** Kept header-based: this endpoint's whole job is to inspect a supplied token. */
     @PostMapping("/validateToken")
     public ResponseEntity<TokenResponse> validateToken(
@@ -87,12 +121,28 @@ public class AuthController {
     /**
      * Deletes the caller's account.
      *
-     * <p>Requires the password: a stolen token must not be enough to destroy the account.
+     * <p>Requires the password: a stolen token must not be enough to destroy the account. An
+     * account signed up through Google or Discord has none, so the token is passed through as
+     * well and its age stands in — see {@code DefaultAuthService#requireFreshSession}.
      */
     @DeleteMapping("/account")
     public ResponseEntity<DefaultMessageResponse> deleteAccount(
-            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody DeleteAccountRequest request) {
-        return ResponseEntity.ok(authService.deleteAccount(principal, request));
+            @AuthenticationPrincipal Gamer principal,
+            @Valid @RequestBody DeleteAccountRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        return ResponseEntity.ok(authService.deleteAccount(principal, request, BearerToken.require(authorization)));
+    }
+
+    /**
+     * Sets a first password on an account that has none.
+     *
+     * <p>Its own endpoint rather than a mode of {@code PUT /auth/change/pwd}: that one proves
+     * the old password and ends every session, and neither is right here.
+     */
+    @PostMapping("/password")
+    public ResponseEntity<DefaultMessageResponse> setPassword(
+            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody SetPasswordRequest request) {
+        return ResponseEntity.ok(authService.setPassword(principal, request));
     }
 
     /** Called by the client on every start; Firebase rotates device tokens. */
@@ -112,5 +162,16 @@ public class AuthController {
     public ResponseEntity<DefaultMessageResponse> changeKeywords(
             @AuthenticationPrincipal Gamer principal, @Valid @RequestBody ChangeDetailRequest request) {
         return ResponseEntity.ok(authService.changeKeywords(principal, request));
+    }
+
+    /**
+     * Reuses {@code ChangeDetailRequest} — the body is a list of names either way, and a
+     * third single-field request class would differ from the other two only in what the
+     * field is called.
+     */
+    @PutMapping("/change/platforms")
+    public ResponseEntity<DefaultMessageResponse> changePlatforms(
+            @AuthenticationPrincipal Gamer principal, @Valid @RequestBody ChangeDetailRequest request) {
+        return ResponseEntity.ok(authService.changePlatforms(principal, request));
     }
 }

@@ -1,0 +1,90 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { usePathname, useRouter } from 'expo-router';
+import { useCallback, useEffect } from 'react';
+import { maybeRequestReview } from '../engagement/reviewPrompt';
+import type { QueryKeyRoot } from '../query/keys';
+import { useCelebration, type MatchedGamer } from './celebration';
+import { MatchOverlay } from './MatchOverlay';
+
+/**
+ * Where the app currently is, held outside React.
+ *
+ * `MatchCelebration` sits in the (main) layout, so a `usePathname()` inside it re-ran the
+ * whole component - two worklet creations and three hook reads deep in `MatchOverlay` -
+ * on every navigation anyone ever made, only to return null. The pathname is read purely
+ * inside the press handler, so a null-rendering leaf records it and the celebration
+ * itself renders only when a match actually arrives.
+ */
+const lastPathname = { current: '/' };
+
+function PathnameRecorder() {
+  const pathname = usePathname();
+  // In an effect, not during render: the handlers that read this run on presses, which
+  // can only happen after the commit, so nothing observes the one-frame lag.
+  useEffect(() => {
+    lastPathname.current = pathname;
+  }, [pathname]);
+  return null;
+}
+
+/**
+ * The match celebration, mounted once for the whole app.
+ *
+ * Lives in `app/(main)/_layout.tsx` rather than on the deck, because a match can now be
+ * raised from two places: the accept response the swiper gets, and a push landing on the
+ * other party while they are somewhere else entirely. See `celebration.ts`.
+ *
+ * Above the tabs and inside the route guard, so it can never appear over onboarding or for
+ * an account that is not signed in.
+ */
+export function MatchCelebration() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const matched = useCelebration((s) => s.matched);
+  const dismiss = useCelebration((s) => s.dismiss);
+
+  const onMessage = useCallback(
+    (gamer: MatchedGamer) => {
+        // Dismiss before navigating. The overlay is mounted above the whole tab navigator
+        // now, so leaving it up would follow the gamer into the conversation and sit on
+        // top of it.
+        dismiss();
+        // The inbox has a new thread in it that it does not know about yet.
+        //
+        // `'inbox'`, not `'conversations'`. The latter was the key here for the whole life
+        // of this component and no query has ever used it, so this line did nothing.
+        void queryClient.invalidateQueries({ queryKey: ['inbox'] satisfies QueryKeyRoot[] });
+        const conversation = {
+          pathname: '/messages/[friendId]',
+          params: { friendId: gamer.userId, username: gamer.username },
+        } as never;
+        // Where back-from-the-chat lands depends on where the match was raised. Matched
+        // on their profile inside the Messages stack: the chat *replaces* the profile,
+        // so back goes to the inbox rather than bouncing off the profile of somebody
+        // just messaged. Matched anywhere else (the deck, mostly): a cross-tab push,
+        // anchored so the inbox sits underneath the new conversation.
+        if (lastPathname.current.startsWith('/messages/gamer/')) {
+          router.replace(conversation);
+        } else {
+          router.push(conversation, { withAnchor: true });
+        }
+      },
+    [dismiss, queryClient, router],
+  );
+
+  // Closing the celebration without going to the chat is the one genuinely idle moment in
+  // this app: something good just happened and nothing else is waiting. That is where the
+  // review card is asked for — never on the way into a conversation, which is the thing the
+  // match was for. See `src/engagement/reviewPrompt.ts`.
+  const onClose = useCallback(() => {
+    dismiss();
+    void maybeRequestReview(queryClient);
+  }, [dismiss, queryClient]);
+
+  return (
+    <>
+      <PathnameRecorder />
+      <MatchOverlay candidate={matched} onDismiss={onClose} onMessage={onMessage} />
+    </>
+  );
+}

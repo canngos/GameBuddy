@@ -12,6 +12,8 @@ import com.gamebuddy.match.infrastructure.entity.ChatRoom;
 import com.gamebuddy.match.infrastructure.repository.ChatMessageRepository;
 import com.gamebuddy.match.infrastructure.repository.ChatParticipantRepository;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.messaging.MessageCipher;
+import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.AvatarsRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.AvatarUrls;
@@ -37,6 +39,13 @@ import org.springframework.context.ApplicationEventPublisher;
 class ChatMessageServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-08-02T12:00:00Z");
+
+    /**
+     * The real filter, not a mock: it is a pure function over a word list, so a stub would
+     * only prove a stub was called. What matters is whether a slur actually gets stored.
+     */
+    @Spy
+    private TextModerationService textModeration = new TextModerationService();
 
     @InjectMocks
     private ChatMessageService chatMessageService;
@@ -198,27 +207,32 @@ class ChatMessageServiceTest {
         }
 
         @Test
-        @DisplayName("blocking ends an existing conversation immediately")
-        void testSave_whenBlockedAfterMatching_ReturnErrorCode113() {
+        @DisplayName("blocking ends an existing conversation immediately, and says who did it")
+        void testSave_whenBlockedAfterMatching_ReturnErrorCode186() {
             // The pair matched first, then one blocked the other. Nothing rewrote the
             // match tables, so without this check the conversation carried on.
+            //
+            // 186 rather than 113: the sender is the one who blocked, and is told so.
             sender.getBlockedFriends().add(receiver);
             String from = sender.getUserId();
             String to = receiver.getUserId();
 
             BusinessException ex = assertThrows(BusinessException.class, () -> chatMessageService.save(from, to, "hi"));
-            assertEquals(113, ex.getTransactionCode().getId());
+            assertEquals(186, ex.getTransactionCode().getId());
         }
 
         @Test
-        @DisplayName("being blocked ends it too, not just doing the blocking")
-        void testSave_whenBlockedByReceiver_ReturnErrorCode113() {
+        @DisplayName("being blocked ends it too, and reads as being blocked rather than blocking")
+        void testSave_whenBlockedByReceiver_ReturnErrorCode121() {
+            // The other half of the block. Both used to answer 113, "Account is blocked" —
+            // a sentence written for a banned account, which told the person on this side
+            // that theirs was the account in trouble.
             receiver.getBlockedFriends().add(sender);
             String from = sender.getUserId();
             String to = receiver.getUserId();
 
             BusinessException ex = assertThrows(BusinessException.class, () -> chatMessageService.save(from, to, "hi"));
-            assertEquals(113, ex.getTransactionCode().getId());
+            assertEquals(121, ex.getTransactionCode().getId());
         }
 
         @Test

@@ -26,27 +26,48 @@ export function avatarUri(avatar: string | null | undefined): string | null {
  *
  * Grapheme-naive — it takes code points, so an emoji username gives one emoji rather
  * than half a surrogate pair, but a combining accent may be dropped.
+ *
+ * `toLocaleUpperCase` rather than `toUpperCase`: a Turkish reader's initial for "İlkay"
+ * is `İ`, and the locale-less version silently gives them `I` — a different letter.
  */
 export function initialsOf(name: string | null | undefined): string {
   if (!name) return '?';
   const words = name.trim().split(/[\s_.-]+/).filter(Boolean);
   if (words.length === 0) return '?';
-  if (words.length === 1) return [...words[0]].slice(0, 2).join('').toUpperCase();
-  return ([...words[0]][0] + [...words[1]][0]).toUpperCase();
+  if (words.length === 1) return [...words[0]].slice(0, 2).join('').toLocaleUpperCase();
+  return ([...words[0]][0] + [...words[1]][0]).toLocaleUpperCase();
 }
 
 /**
- * A stable colour per identity, so the same person is always the same colour.
- *
- * Saturation and lightness are fixed so white text stays legible on every hue.
+ * A stable hue per identity, so the same person is always the same colour.
  *
  * The hash is finished with an avalanche step rather than used raw. A plain
  * `hash * 31 + charCode` leaves *similar seeds adjacent*: the eight onboarding avatars
  * seeded "1".."8" hashed to 49..56 and therefore to hues 49..56 — eight swatches of the
  * same olive, which looked like a rendering fault rather than eight choices. Mixing the
  * bits means one step in the seed is an arbitrary jump in the output.
+ *
+ * Exported so that everything hashing an identity — the flat tint and the gradient below —
+ * goes through the *same* function. Two hashes would mean the same person had two
+ * different colours depending on which surface they appeared on, and the second one would
+ * inevitably be written without the avalanche step and reproduce the olive bug.
  */
-export function avatarColor(seed: string): string {
+/**
+ * Hues by seed.
+ *
+ * The hash walks the whole seed and then does two multiply-shift rounds, and it used to run
+ * on every render of every avatar — twice, because `avatarColor` and `avatarGradient` each
+ * call it. Every list row in the app has an avatar. The answer depends only on the seed and
+ * a session meets a bounded number of people, so this is cached; the cap is there so a
+ * pathological caller cannot grow it without limit.
+ */
+const hues = new Map<string, number>();
+const MAX_HUES = 512;
+
+export function avatarHue(seed: string): number {
+  const hit = hues.get(seed);
+  if (hit !== undefined) return hit;
+
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (Math.imul(hash, 31) + seed.charCodeAt(i)) | 0;
@@ -54,5 +75,48 @@ export function avatarColor(seed: string): string {
   hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
   hash = Math.imul(hash ^ (hash >>> 16), 0x45d9f3b);
   hash = (hash ^ (hash >>> 16)) >>> 0;
-  return `hsl(${hash % 360}, 55%, 55%)`;
+
+  const hue = hash % 360;
+  if (hues.size >= MAX_HUES) hues.clear();
+  hues.set(seed, hue);
+  return hue;
+}
+
+/**
+ * The flat tint. Saturation and lightness are fixed so white text stays legible on
+ * every hue.
+ *
+ * Still used on its own where a gradient cannot go — a single `backgroundColor`, which is
+ * how the deck and the admirers list paint their placeholder blocks.
+ */
+export function avatarColor(seed: string): string {
+  return `hsl(${avatarHue(seed)}, 55%, 55%)`;
+}
+
+/**
+ * The same identity as a two-stop gradient, for the monogram behind someone with no photo.
+ *
+ * Starts on {@link avatarColor}'s exact hue and saturation, so an avatar does not change
+ * colour when this ships — it just stops being flat. The second stop runs 40° around the
+ * wheel and darkens, which is far enough to read as a gradient, near enough that it never
+ * lands on a clashing complementary, and directional enough that the initials sit on the
+ * lighter end.
+ */
+const gradients = new Map<string, readonly [string, string]>();
+
+export function avatarGradient(seed: string): readonly [string, string] {
+  // Cached for its *identity* as much as its cost. The result goes straight into
+  // `GradientView`'s `colors` prop, and a fresh array per render is a changed prop —
+  // which is enough to keep every avatar in a list re-rendering forever.
+  const hit = gradients.get(seed);
+  if (hit !== undefined) return hit;
+
+  const hue = avatarHue(seed);
+  const stops: readonly [string, string] = [
+    `hsl(${hue}, 55%, 58%)`,
+    `hsl(${(hue + 40) % 360}, 62%, 44%)`,
+  ];
+  if (gradients.size >= MAX_HUES) gradients.clear();
+  gradients.set(seed, stops);
+  return stops;
 }

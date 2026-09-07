@@ -1,16 +1,28 @@
 import '../global.css';
 
-import { QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ScreenScaleProvider } from '../src/ui/useScreenScale';
+import { gatherAdConsent } from '../src/ads/consent';
+import { identifyForCrashReports } from '../src/diagnostics/crashReporting';
+import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
+import { AnimatedSplash } from '../src/ui/AnimatedSplash';
+import { AppErrorBoundary } from '../src/ui/AppErrorBoundary';
+import { useLangStore } from '../src/i18n/store';
+import { configureGoogle } from '../src/session/google';
 import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
+import { useSoundEnabled } from '../src/ui/sound';
+import { useHapticsEnabled } from '../src/ui/haptics';
 
 // Hold the native splash until fonts are parsed, the stored token has been read, and
 // the theme preference is known. Without this the app flashes blank, then Roboto, then
@@ -20,27 +32,123 @@ SplashScreen.preventAutoHideAsync().catch(() => {
   // Already hidden, which happens on a fast refresh. Not a problem.
 });
 
+// Before anything else, so an error thrown while the rest of this module is still
+// evaluating is logged rather than swallowed.
+installGlobalErrorHandler();
+
 // The API client is wired to the session store once, at module scope, so it is done
 // before any component can fire a request during its first render.
 connectSessionToApi();
 
+// Google Sign-In is configured once, here rather than at the button: `configure` is
+// synchronous native work and the first tap should not pay for it. A no-op in a build with
+// no client id, which is every clone that has not been given a Google project.
+configureGoogle();
+
+/**
+ * Expo Router renders this instead of the tree when a descendant throws.
+ *
+ * Exported from the root layout so it covers everything. Without it a render error
+ * unmounts the app and leaves a white screen carrying no information at all — which is
+ * what a release build did, while the same error in development was a red box.
+ */
+export { AppErrorBoundary as ErrorBoundary };
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
+  // Whether the animated draw-on splash has finished. It plays once per cold start, on
+  // top of the already-mounted shell, continuing where the static native splash stops.
+  const [introDone, setIntroDone] = useState(false);
   const status = useSession((s) => s.status);
   const restore = useSession((s) => s.restore);
   const schemeHydrated = useScheme((s) => s.hydrated);
   const loadScheme = useScheme((s) => s.load);
+  const loadSound = useSoundEnabled((s) => s.load);
+  const loadHaptics = useHapticsEnabled((s) => s.load);
+  const langHydrated = useLangStore((s) => s.hydrated);
+  const loadLang = useLangStore((s) => s.load);
+  const userId = useSession((s) => s.userId);
+
+  // Ties crash reports to an account. Native crash capture is already running by the time
+  // any of this executes — it is installed by the Crashlytics NDK handler at process start,
+  // which is the whole reason it can see a segfault that no JavaScript handler can. This
+  // only adds the identity, so a report has something to correlate on: one intermittent
+  // crash is noise, whereas "always the same accounts" or "always a first launch" is a lead.
+  useEffect(() => {
+    if (userId) identifyForCrashReports(userId);
+  }, [userId]);
+
+  /*
+   * Renew the session whenever the app comes back to the foreground.
+   *
+   * `restore` covers cold starts, but a phone can keep this process alive for days —
+   * iOS especially — so a launch-only renewal would let a heavy user's token expire
+   * underneath them while the app was never actually closed. `renewIfStale` is a no-op
+   * until the token is past half its life, so this costs one comparison per resume.
+   */
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void useSession.getState().renewIfStale();
+
+      /*
+       * Tell react-query whether anyone is looking.
+       *
+       * Nothing was doing this, and react-query has no idea about `AppState` on its own —
+       * so every polling query kept its timer running while the app sat in the background:
+       * the inbox every fifteen seconds and an open conversation every ten, each fetching a
+       * whole unpaginated list, indefinitely, over mobile data.
+       *
+       * `refetchIntervalInBackground` defaults to false, so this one line is the entire
+       * fix: react-query pauses the intervals while unfocused and refetches what went
+       * stale on the way back.
+       *
+       * Deliberately *not* paired with `onlineManager`. That needs NetInfo — a native
+       * dependency and a rebuild — to buy little: while foregrounded a failed request is
+       * cheap, and the retry policy in `src/query.ts` already declines to retry anything
+       * that is not transient.
+       */
+      focusManager.setFocused(next === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     void restore();
     void loadScheme();
-  }, [restore, loadScheme]);
+    // Before the first frame, like the theme: showing English and then swapping it is
+    // a flicker only the people who need this feature would ever see.
+    void loadLang();
+    // Deliberately not part of `ready` below. A theme read late repaints the whole app, so
+    // launch waits for it; a sound preference read late costs at most one unwanted blip in
+    // the first moments of a session — and gating the splash on it would delay every launch
+    // for a setting almost nobody changes. See `src/ui/sound.ts`.
+    void loadSound();
+    // Same reasoning, same trade — see `src/ui/haptics.ts`.
+    void loadHaptics();
+  }, [restore, loadScheme, loadSound, loadHaptics, loadLang]);
 
-  const ready = (fontsLoaded || !!fontError) && status !== 'loading' && schemeHydrated;
+  const ready =
+    (fontsLoaded || !!fontError) && status !== 'loading' && schemeHydrated && langHydrated;
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
+
+  /*
+   * Ask for advertising consent, once the splash has lifted.
+   *
+   * Google's order is to gather consent as early as possible so an advert can be requested
+   * the moment one is wanted. "As early as possible" still means after the intro, though:
+   * the form is a native modal, and putting one behind the draw-on splash would either
+   * fight it for the screen or be dismissed by somebody who never saw what they answered.
+   *
+   * Not awaited, and nothing renders differently while it runs — the form appears over the
+   * first real screen. `gatherAdConsent` keeps its own once-per-process flag, so a remount
+   * cannot ask twice.
+   */
+  useEffect(() => {
+    if (introDone) void gatherAdConsent();
+  }, [introDone]);
 
   // Fonts failing to load is not worth blocking launch over — the system font is ugly,
   // not broken — but it should be visible in the logs rather than silent.
@@ -50,7 +158,14 @@ export default function RootLayout() {
 
   if (!ready) return null;
 
-  return <Shell />;
+  // The shell mounts underneath the overlay, so by the time the animation lifts the app
+  // is already rendered and interactive — the splash never makes anyone wait for it.
+  return (
+    <View style={{ flex: 1 }}>
+      <Shell />
+      {!introDone && <AnimatedSplash onDone={() => setIntroDone(true)} />}
+    </View>
+  );
 }
 
 /**
@@ -64,20 +179,38 @@ function Shell() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              // A colour value, not a class: this styles the navigator's own container,
-              // which sits outside the React tree NativeWind processes. Without it the
-              // white default flashes between screens in dark mode.
-              contentStyle: { backgroundColor: colors.canvas },
-            }}
-          />
-        </QueryClientProvider>
-      </SafeAreaProvider>
+      {/* Feeds real keyboard geometry to the whole tree.
+
+          React Native's own KeyboardAvoidingView relies on the system resizing the window
+          — which Android stopped doing once Expo enabled edge-to-edge by default in SDK
+          54. `adjustResize` is still in the manifest and is now simply ignored, so the
+          component became a no-op and the keyboard covered anything at the bottom of the
+          screen. The chat compose box was unusable: field and Send button both sat behind
+          it, so you could neither see what you typed nor reach the button.
+
+          This provider reads the keyboard inset from the platform directly rather than
+          inferring it from window size, so it is unaffected by edge-to-edge. */}
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          {/* Above everything that draws. The tier is read by `Text`, by the tab bar and by
+              every screen that sizes itself, so it has to be resolved before any of them
+              mount — and resolved once, not per component. See `useScreenScale`. */}
+          <ScreenScaleProvider>
+            <QueryClientProvider client={queryClient}>
+              <StatusBar style={isDark ? 'light' : 'dark'} />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  // A colour value, not a class: this styles the navigator's own container,
+                  // which sits outside the React tree NativeWind processes. Without it the
+                  // white default flashes between screens in dark mode.
+                  contentStyle: { backgroundColor: colors.canvas },
+                }}
+              />
+            </QueryClientProvider>
+          </ScreenScaleProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

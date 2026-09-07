@@ -16,6 +16,15 @@ import lombok.Setter;
  * never persisted. Every code ever issued therefore stayed valid forever, which made
  * the 6-digit space brute-forceable. Expiry and attempt limits now live here so they
  * are enforced in the database rather than in memory.
+ *
+ * <p><b>The code is stored as a bcrypt hash, never in the clear.</b> A fast digest would
+ * buy nothing: six digits is a million values, so anyone holding this table could exhaust
+ * the space in seconds. Bcrypt's cost is the control. The consequence for callers is that a
+ * row cannot be looked up <em>by</em> code — find the live row for the address and compare.
+ *
+ * <p><b>And it is scoped to one purpose.</b> Without that, a code mailed for a password
+ * reset was redeemable at {@code /auth/verify}, which signs the account in — a passwordless
+ * login nobody designed.
  */
 @Entity
 @Table(
@@ -31,8 +40,13 @@ public class VerificationCode {
     @GeneratedValue
     private UUID id;
 
-    @Column(nullable = false)
-    private Integer code;
+    @Column(name = "code_hash", nullable = false, length = 60)
+    private String codeHash;
+
+    /** What this code may be redeemed for. Never null; see the class comment. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private CodePurpose purpose = CodePurpose.REGISTRATION;
 
     @Column(nullable = false)
     private String email;

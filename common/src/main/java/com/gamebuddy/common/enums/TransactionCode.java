@@ -63,6 +63,9 @@ public enum TransactionCode {
     COIN_NOT_ENOUGH(129, "Not enough coins", HttpStatus.CONFLICT),
 
     // --- Communities --------------------------------------------------------
+    // 131-139 belonged to the retired Community feature. The entries stay so the numbers
+    // stay spent — a reused id would mean two generations of clients disagreeing about
+    // what an error meant. Only the ones still thrown remain referenced.
     COMMUNITY_NOT_FOUND(131, "Community not found", HttpStatus.NOT_FOUND),
     NOT_MEMBER(132, "You are not a member of this community", HttpStatus.FORBIDDEN),
     POST_NOT_FOUND(133, "Post not found", HttpStatus.NOT_FOUND),
@@ -141,6 +144,217 @@ public enum TransactionCode {
     // --- Badges -------------------------------------------------------------
     /** More badges chosen for the showcase than a profile has slots for. */
     SHOWCASE_FULL(167, "You can show at most three badges", HttpStatus.CONFLICT),
+
+    // --- Eligibility and content --------------------------------------------
+    /**
+     * The stated date of birth puts the account holder under 18. Its own code rather than
+     * a generic invalid value, because the client has to say something specific and final
+     * here — this is the one rejection that is not worth retrying.
+     */
+    UNDERAGE(168, "You must be at least 18 years old to use GameBuddy", HttpStatus.FORBIDDEN),
+    /** Registration attempted without agreeing to the terms. */
+    TERMS_NOT_ACCEPTED(169, "You must accept the terms to create an account", HttpStatus.BAD_REQUEST),
+    /**
+     * Text refused outright by the content filter — a slur, or sexual abuse aimed at
+     * somebody. Ordinary profanity is masked instead and never reaches this.
+     */
+    CONTENT_BLOCKED(170, "That message breaks the community rules", HttpStatus.BAD_REQUEST),
+    NOTHING_TO_REWIND(171, "There is no swipe to take back", HttpStatus.CONFLICT),
+    /**
+     * The like being rewound was answered. Undoing it would delete a conversation both
+     * sides can already see, and take a match away from somebody who did nothing wrong.
+     */
+    REWIND_MATCHED(172, "You matched with them — that one cannot be taken back", HttpStatus.CONFLICT),
+    /**
+     * Was BOOST_ALREADY_ACTIVE, for the retired deck boost — same meaning, and now about the
+     * lobby: a boost is bought once and lasts until the lobby starts, so a second one buys
+     * nothing. The id is reused rather than retired because the message is the same sentence
+     * about the same act, and the old code had no client left to confuse.
+     */
+    LOBBY_ALREADY_BOOSTED(173, "That lobby is already boosted", HttpStatus.CONFLICT),
+    /** The daily coins, a quest or the stipend was asked for before it was due. */
+    REWARD_NOT_READY(174, "There is nothing to claim yet", HttpStatus.CONFLICT),
+    /** A quest whose target has not been reached. */
+    QUEST_UNFINISHED(175, "That one is not finished yet", HttpStatus.CONFLICT),
+    /**
+     * Two writes to the same row raced and this one lost the optimistic lock.
+     *
+     * <p>Almost always a double-tap on a button that spends or earns coins. The winner's
+     * write stands; this one changed nothing, which is exactly the property the lock exists
+     * to guarantee. A conflict rather than a server error, because nothing is broken.
+     */
+    CONCURRENT_MODIFICATION(176, "That went through already — check and try again", HttpStatus.CONFLICT),
+    /**
+     * Every admirer has already been revealed.
+     *
+     * <p>Its own code because the alternative was USER_NOT_FOUND, which is true internally
+     * — there is no next admirer to look up — and reads to a gamer as though something is
+     * broken with their account.
+     */
+    NO_ADMIRERS_LEFT(177, "You have already revealed everybody", HttpStatus.CONFLICT),
+    LOBBY_NOT_FOUND(178, "Lobby not found", HttpStatus.NOT_FOUND),
+    LOBBY_FULL(179, "This lobby is already full", HttpStatus.CONFLICT),
+    /**
+     * The lobby stopped taking this action: it is locked, ended, cancelled or archived.
+     *
+     * <p>One code for every "too late" rather than one per state, because the caller's
+     * remedy is the same in all of them — refresh and look at the lobby as it is now.
+     */
+    LOBBY_NOT_OPEN(180, "This lobby is no longer open", HttpStatus.CONFLICT),
+    LOBBY_ALREADY_MEMBER(181, "You already asked to join this lobby", HttpStatus.CONFLICT),
+    LOBBY_NOT_MEMBER(182, "You are not in this lobby", HttpStatus.FORBIDDEN),
+    /** One live lobby per owner. Backed by a partial unique index the entity cannot express. */
+    LOBBY_LIMIT_REACHED(183, "Finish or cancel your current lobby first", HttpStatus.CONFLICT),
+    LOBBY_REQUEST_NOT_FOUND(184, "No pending request from this gamer", HttpStatus.NOT_FOUND),
+    /**
+     * The owner already said no, and that answer is final for this lobby.
+     *
+     * <p>Final by design: an owner who screens strangers by hand must be able to answer
+     * each of them exactly once, not be petitioned until they give in.
+     */
+    LOBBY_REJECTED(185, "The owner already answered your request", HttpStatus.CONFLICT),
+
+    /**
+     * The sender is the one who blocked, and is writing to the person they blocked.
+     *
+     * <p>The counterpart to {@link #USER_BLOCKED_YOU}, which says the other side blocked
+     * you. Chat tells the two apart — {@link #USER_BLOCKED} covered both directions with
+     * one sentence written for a banned account, so whichever end you were, the message
+     * described somebody else's situation. Nothing is disclosed by separating them here:
+     * both people already know a block exists the moment a message will not send, and each
+     * is only ever told about their own half of it.
+     */
+    USER_BLOCKED_BY_YOU(186, "You have blocked this gamer", HttpStatus.FORBIDDEN),
+    /**
+     * A username the content filter will not accept. Separate from {@link #CONTENT_BLOCKED}
+     * because the person has to do something about it: a message that breaks the rules is
+     * simply not sent, but a username has to be replaced before the account can go on, and
+     * being told "that message breaks the rules" while naming yourself explains nothing.
+     */
+    USERNAME_NOT_ALLOWED(187, "Pick a different username — that one is not allowed", HttpStatus.BAD_REQUEST),
+
+    BUNDLE_NOT_FOUND(188, "Bundle not found", HttpStatus.NOT_FOUND),
+
+    /**
+     * A bundle is all-or-nothing: it refuses rather than charging for the half you lack.
+     *
+     * <p>Its own code rather than {@link #COSMETIC_ALREADY_OWNED} because the remedy is
+     * different — that one means "you have this", this one means "buy the other piece on
+     * its own" — and the client says so.
+     */
+    BUNDLE_PARTLY_OWNED(189, "You already own part of this bundle", HttpStatus.CONFLICT),
+
+    /**
+     * A promotion code that does not exist — mistyped, or one an administrator has since
+     * disabled or deleted.
+     *
+     * <p>Disabled and deleted deliberately answer the same thing as a typo. The person
+     * holding the code can do nothing about either, and "this code was switched off" is a
+     * statement about staff activity that a redemption screen has no business making.
+     */
+    PROMO_CODE_INVALID(190, "That code is not valid", HttpStatus.NOT_FOUND),
+
+    /** The validity window closed. Separate from invalid: the code was real, and late. */
+    PROMO_CODE_EXPIRED(191, "That code has expired", HttpStatus.GONE),
+
+    /** The code has been redeemed as many times as it was allowed to be. */
+    PROMO_CODE_EXHAUSTED(192, "That code has been fully used", HttpStatus.CONFLICT),
+
+    /**
+     * This account has already redeemed this code.
+     *
+     * <p>Its own code rather than {@link #PROMO_CODE_EXHAUSTED} because the remedy differs:
+     * that one means "you were too late", this one means "you already have it", and a
+     * second tap on a slow-looking button is the ordinary way to arrive here.
+     */
+    PROMO_CODE_ALREADY_REDEEMED(193, "You have already used this code", HttpStatus.CONFLICT),
+
+    /**
+     * A code issued to specific accounts, redeemed by somebody else.
+     *
+     * <p>Told honestly rather than folded into {@link #PROMO_CODE_INVALID}: the usual way
+     * to reach this is a friend passing on a code that was addressed to them, and "that
+     * code is not valid" would send them hunting for a typo that does not exist. Nothing
+     * is disclosed — the code was already in their hands.
+     */
+    PROMO_CODE_NOT_YOURS(194, "That code belongs to another account", HttpStatus.FORBIDDEN),
+
+    /** An administrator asked for a code string that is already taken. */
+    PROMO_CODE_EXISTS(195, "A code with that name already exists", HttpStatus.CONFLICT),
+
+    /** An administrator assigned a code to an account that is gone, banned, or staff. */
+    PROMO_USER_NOT_FOUND(196, "That account cannot receive a code", HttpStatus.NOT_FOUND),
+
+    /**
+     * The Discord account presented is already linked to a different gamer.
+     *
+     * <p>Refused rather than moved, and this is the constraint that makes verification mean
+     * anything: without it one proof of ownership could be replayed onto every account
+     * somebody controls, which is the impersonation the whole flow exists to prevent.
+     *
+     * <p>Its own code because the remedy is specific and the user can act on it — unlink it
+     * from the other account, or sign in to the right one. "Something went wrong" would send
+     * them round the consent screen again to fail identically.
+     */
+    ACCOUNT_ALREADY_LINKED(197, "That account is already linked to another gamer", HttpStatus.CONFLICT),
+
+    /** Unlinking or changing visibility on a provider that was never linked. */
+    ACCOUNT_NOT_LINKED(198, "No linked account for that provider", HttpStatus.NOT_FOUND),
+
+    /**
+     * The provider round-trip did not complete.
+     *
+     * <p>Deliberately one code for every way it can fail — an expired ticket, a refused
+     * exchange, a provider that would not vouch for the assertion, Discord being down. The user's next
+     * move is the same in all of them (start again), none of the distinctions are actionable,
+     * and describing which check failed to whoever is holding a forged callback is free help
+     * for them. The specifics are logged.
+     */
+    ACCOUNT_LINK_FAILED(199, "That link could not be completed. Please try again", HttpStatus.BAD_REQUEST),
+
+    /**
+     * The Google or Discord identity presented could not be verified.
+     *
+     * <p>One code for a malformed token, an expired one, a signature that does not check out
+     * against the provider's keys, and an audience meant for a different application. The
+     * caller's move is the same in every case, and telling somebody holding a forged token
+     * which check refused them is free help for them.
+     */
+    SOCIAL_TOKEN_INVALID(200, "That sign-in could not be verified. Please try again", HttpStatus.UNAUTHORIZED),
+
+    /**
+     * The provider vouched for the identity but not for the email address on it.
+     *
+     * <p>Refused rather than worked around, because an unverified address is precisely the
+     * takeover vector: attaching a new identity to an existing GameBuddy account by matching
+     * emails is safe only when somebody else has already proved the mailbox.
+     */
+    SOCIAL_EMAIL_UNVERIFIED(
+            201, "Verify the email on your Google or Discord account first", HttpStatus.FORBIDDEN),
+
+    /** Changing a password on an account that has never had one. It has to be set instead. */
+    PASSWORD_NOT_SET(202, "This account has no password yet", HttpStatus.CONFLICT),
+
+    /** Setting a first password on an account that already has one. Change it instead. */
+    PASSWORD_ALREADY_SET(203, "This account already has a password", HttpStatus.CONFLICT),
+
+    /**
+     * Removing the only remaining way into an account.
+     *
+     * <p>The last sign-in method may not be unlinked while no password is set. Doing it would
+     * not be a lockout the user chose; it would be one they had no reason to expect.
+     */
+    AUTH_IDENTITY_LAST(204, "Set a password before removing your only way to sign in", HttpStatus.CONFLICT),
+
+    /**
+     * A destructive action on a session that is no longer fresh.
+     *
+     * <p>Deleting an account normally costs the current password. An account signed in with
+     * Google has none, so freshness stands in for it: sign in again, then delete. A stolen
+     * token cannot manufacture that, because refreshing preserves the original session start
+     * rather than moving it.
+     */
+    REAUTH_REQUIRED(205, "Sign in again to confirm this", HttpStatus.FORBIDDEN),
 
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);

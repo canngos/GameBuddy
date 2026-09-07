@@ -1,5 +1,5 @@
 import { File, UploadType } from 'expo-file-system';
-import { api, authHeader } from './client';
+import { api, authHeader, notifySessionExpired } from './client';
 import { API_BASE_URL } from './config';
 import { ApiError, type Envelope } from './envelope';
 import type { Avatar, AvatarUpload, Game, Keyword, UserInfo } from './types';
@@ -85,22 +85,6 @@ export const profileApi = {
 
 
 /**
- * A filename for the multipart part.
- *
- * The picker does not always supply one — on Android it frequently returns a content://
- * URI with no name at all — and a part without a filename is refused by the server's
- * parser as malformed, which surfaces as a 400 about the image rather than about the
- * request.
- */
-function fileNameFor(uri: string, mimeType?: string | null): string {
-  const fromUri = uri.split('/').pop()?.split('?')[0];
-  if (fromUri && fromUri.includes('.')) return fromUri;
-  const extension = mimeType?.split('/')[1] ?? 'jpg';
-  return `avatar.${extension}`;
-}
-
-
-/**
  * Unwraps an expo-file-system upload into the same shape everything else returns.
  *
  * `File.upload` hands back a status and a raw string rather than a `Response`, so the
@@ -119,11 +103,15 @@ function unwrapUpload<T>(response: { status: number; body: string }): T {
   const status = envelope.status;
   if (response.status < 200 || response.status >= 300 || status?.success === false) {
     if (__DEV__) console.warn('[api] upload failed', response.status, response.body.slice(0, 300));
-    throw new ApiError(
+    const error = new ApiError(
       status?.message?.trim() || 'Something went wrong. Please try again.',
       status?.code ?? String(response.status),
       response.status,
     );
+    // Same rule as `unwrap` in client.ts: an expired session must clear the token, or an
+    // upload with a dead token surfaces as a generic error and the user stays stuck.
+    if (error.isSessionExpired) notifySessionExpired();
+    throw error;
   }
   return (envelope.body?.data ?? (undefined as T)) as T;
 }
