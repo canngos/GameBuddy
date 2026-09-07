@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, {
   Easing,
+  Extrapolation,
   interpolate,
   useAnimatedStyle,
   useReducedMotion,
@@ -44,6 +45,11 @@ export function SwipeDemo({ onDismiss }: { onDismiss: () => void }) {
     // 0→1 right, 1→2 back, 2→3 left, 3→4 back, 4→5 up, 5→6 back.
     progress.value = withRepeat(
       withSequence(
+        // Rewind before replaying. A repeated sequence picks up from wherever the value
+        // already sits -- 6, at the end of a lap -- so without this the next lap animates
+        // 6→1 and walks the whole demonstration backwards. The hand rests dead centre at
+        // both 6 and 0, so the snap itself is invisible.
+        withTiming(0, { duration: 0 }),
         ...[1, 2, 3, 4, 5, 6].map((to) =>
           withTiming(to, { duration: LEG_MS, easing: Easing.inOut(Easing.quad) }),
         ),
@@ -53,21 +59,37 @@ export function SwipeDemo({ onDismiss }: { onDismiss: () => void }) {
     );
   }, [progress, reduceMotion]);
 
+  // Every one of these MUST clamp. Each axis describes only the legs it owns -- X says
+  // nothing about 4→6, Y says nothing about 0→4 -- and `interpolate` extends the end slope
+  // by default rather than holding the end value. Unclamped, X kept climbing through the
+  // "up" leg (ending 108px right of centre) and Y read 216px *below* centre at the start of
+  // the cycle, so the hand entered from off-stage and drifted diagonally the whole way: it
+  // never once moved purely right, purely left, or purely up. Clamping is what makes each
+  // axis rest at zero while the other is doing the talking.
   const handStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: interpolate(progress.value, [0, 1, 2, 3, 4], [0, 54, 0, -54, 0]) },
-      { translateY: interpolate(progress.value, [4, 5, 6], [0, -54, 0]) },
+      {
+        translateX: interpolate(
+          progress.value,
+          [0, 1, 2, 3, 4],
+          [0, 54, 0, -54, 0],
+          Extrapolation.CLAMP,
+        ),
+      },
+      {
+        translateY: interpolate(progress.value, [4, 5, 6], [0, -54, 0], Extrapolation.CLAMP),
+      },
     ],
   }));
 
   const rightStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [0, 0.6, 1.6, 2], [0, 1, 1, 0]),
+    opacity: interpolate(progress.value, [0, 0.6, 1.6, 2], [0, 1, 1, 0], Extrapolation.CLAMP),
   }));
   const leftStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [2, 2.6, 3.6, 4], [0, 1, 1, 0]),
+    opacity: interpolate(progress.value, [2, 2.6, 3.6, 4], [0, 1, 1, 0], Extrapolation.CLAMP),
   }));
   const upStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(progress.value, [4, 4.6, 5.6, 6], [0, 1, 1, 0]),
+    opacity: interpolate(progress.value, [4, 4.6, 5.6, 6], [0, 1, 1, 0], Extrapolation.CLAMP),
   }));
 
   return (
