@@ -753,7 +753,7 @@ export const es: Dictionary = {
     tutorial: 'Ver el tutorial otra vez',
     tutorialHint: 'Recorre las cinco pestañas y vuelve a mostrar los consejos',
     rate: 'Valorar GameBuddy',
-    rateHint: 'Abre Google Play',
+    rateHint: 'Cuéntanos qué te parece',
     terms: 'Términos del servicio',
     termsHint: 'Incluye las reglas de contenido y conducta',
     privacy: 'Política de privacidad',

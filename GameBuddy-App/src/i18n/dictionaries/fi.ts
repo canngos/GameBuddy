@@ -754,7 +754,7 @@ export const fi: Dictionary = {
     tutorial: 'Näytä esittely uudelleen',
     tutorialHint: 'Käy läpi viisi välilehteä ja palauttaa vinkit',
     rate: 'Arvioi GameBuddy',
-    rateHint: 'Avaa Google Playn',
+    rateHint: 'Kerro mitä mieltä olet',
     terms: 'Käyttöehdot',
     termsHint: 'Sisältää sisältö- ja käytössäännöt',
     privacy: 'Tietosuojaseloste',

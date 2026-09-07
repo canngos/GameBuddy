@@ -752,7 +752,7 @@ export const tr: Dictionary = {
     tutorial: 'Tanıtımı tekrar göster',
     tutorialHint: 'Beş sekmeyi gezer ve ipuçlarını geri getirir',
     rate: 'GameBuddy’yi puanla',
-    rateHint: 'Google Play’i açar',
+    rateHint: 'Ne düşündüğünü bize söyle',
     terms: 'Kullanım Koşulları',
     termsHint: 'İçerik ve davranış kurallarını da içerir',
     privacy: 'Gizlilik Politikası',

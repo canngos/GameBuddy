@@ -830,7 +830,7 @@ export const en = {
     tutorial: 'Show the tutorial again',
     tutorialHint: 'Walks you through the five tabs, and brings the tips back',
     rate: 'Rate GameBuddy',
-    rateHint: 'Opens Google Play',
+    rateHint: 'Tell us what you think',
     terms: 'Terms of Service',
     termsHint: 'Including the rules on content and conduct',
     privacy: 'Privacy Policy',

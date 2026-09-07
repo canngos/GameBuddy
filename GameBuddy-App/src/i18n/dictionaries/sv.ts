@@ -752,7 +752,7 @@ export const sv: Dictionary = {
     tutorial: 'Visa guiden igen',
     tutorialHint: 'Går igenom de fem flikarna och tar tillbaka tipsen',
     rate: 'Betygsätt GameBuddy',
-    rateHint: 'Öppnar Google Play',
+    rateHint: 'Berätta vad du tycker',
     terms: 'Användarvillkor',
     termsHint: 'Inklusive reglerna för innehåll och uppförande',
     privacy: 'Integritetspolicy',
