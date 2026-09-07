@@ -125,13 +125,34 @@ export function configureGoogle(): void {
 }
 
 /**
- * Opens the account sheet and returns a Google ID token.
+ * How the account sheet ended.
  *
- * @returns the token, or null when the person dismissed the sheet. A cancel is not an
- *   error: nothing has gone wrong and there is nothing to tell them.
+ * Three outcomes rather than "a token or null", because the caller owes the person something
+ * different in each case and the old shape could not express the difference.
+ *
+ * `unfinished` deliberately covers both a deliberate dismissal and a broken OAuth setup.
+ * Credential Manager reports `RESULT_CANCELED` for each, and the SDK says as much at the point
+ * it maps the exception: it "reports RESULT_CANCELED both for real user dismissals and for
+ * OAuth misconfiguration". That ambiguity is not academic. It hid an unregistered Play App
+ * Signing certificate for a full day, because a build that could not sign anybody in looked
+ * exactly like somebody changing their mind: the sheet opened, an account was picked, and the
+ * app returned silently. Reporting it is the lesser wrong of the two, and the copy is written
+ * to read true either way.
+ */
+export type GoogleSignInOutcome =
+  /** A token to send to the backend. */
+  | { status: 'signed-in'; idToken: string }
+  /** Say something. Either they backed out, or this build cannot sign anybody in. */
+  | { status: 'unfinished' }
+  /** Say nothing: a second tap landing on a sheet that is already open. */
+  | { status: 'superseded' };
+
+/**
+ * Opens the account sheet.
+ *
  * @throws {GoogleUnavailableError} when the device or the build cannot do this at all
  */
-export async function signInWithGoogle(): Promise<string | null> {
+export async function signInWithGoogle(): Promise<GoogleSignInOutcome> {
   if (!WEB_CLIENT_ID) throw new GoogleUnavailableError('not-configured');
   const google = sdk();
   if (!google) throw new GoogleUnavailableError('not-in-this-build');
@@ -164,15 +185,17 @@ export async function signInWithGoogle(): Promise<string | null> {
       response = await google.GoogleOneTapSignIn.createAccount();
     }
 
-    if (!google.isSuccessResponse(response)) return null;
-    return response.data.idToken ?? null;
+    if (!google.isSuccessResponse(response)) return { status: 'unfinished' };
+    // A success carrying no token is still a build that cannot sign in, not a decision.
+    const idToken = response.data.idToken;
+    return idToken ? { status: 'signed-in', idToken } : { status: 'unfinished' };
   } catch (error) {
     if (google.isErrorWithCode(error)) {
       switch (error.code) {
         case google.statusCodes.SIGN_IN_CANCELLED:
         case google.statusCodes.IN_PROGRESS:
           // A second tap while the first sheet is still up is not a failure worth a message.
-          return null;
+          return { status: 'superseded' };
         case google.statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
           throw new GoogleUnavailableError('no-play-services');
         case google.statusCodes.DEVELOPER_ERROR:
