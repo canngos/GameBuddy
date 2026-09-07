@@ -1,10 +1,9 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { Gamepad2, MessagesSquare, Users } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { View } from "react-native";
 import { LanguageButton, LanguagePicker } from "../../src/i18n/LanguagePicker";
 import { SocialButtons } from "../../src/session/SocialButtons";
-import { SocialConsentSheet } from "../../src/session/SocialConsentSheet";
 import { useSocialSignIn } from "../../src/session/social";
 import { useT } from "../../src/i18n/useT";
 import { Button, Icon, Screen, Text, useScreenScale } from "../../src/ui";
@@ -27,18 +26,6 @@ export default function Welcome() {
   const t = useT();
   const [picking, setPicking] = useState(false);
   const social = useSocialSignIn();
-
-  // A Discord sign-in that came back needing the terms. `app/social.tsx` is a spinner with
-  // no state of its own, so it hands the still-unspent ticket back here and the consent
-  // sheet opens where the flow started.
-  const { socialTicket } = useLocalSearchParams<{ socialTicket?: string }>();
-  const resumed = useRef<string | null>(null);
-  const { resumeWithTicket } = social;
-  useEffect(() => {
-    if (!socialTicket || resumed.current === socialTicket) return;
-    resumed.current = socialTicket;
-    resumeWithTicket(socialTicket);
-  }, [socialTicket, resumeWithTicket]);
 
   // Paired here rather than in the dictionary: an icon is not copy, and a translator
   // opening the Finnish file should not meet a Lucide import.
@@ -125,14 +112,6 @@ export default function Welcome() {
         <SocialButtons social={social} />
       </View>
 
-      <SocialConsentSheet
-        visible={social.consentNeeded}
-        busy={social.pending !== null}
-        accepted={social.accepted}
-        onAccepted={social.setAccepted}
-        onContinue={() => void social.confirmConsent()}
-        onDismiss={social.dismissConsent}
-      />
     </Screen>
   );
 }

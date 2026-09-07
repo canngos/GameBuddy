@@ -5,6 +5,7 @@ import { authApi } from '../src/api/auth';
 import { ApiError, Code } from '../src/api/envelope';
 import { useT } from '../src/i18n/useT';
 import { landingRoute } from '../src/session/routes';
+import { useSocialPending } from '../src/session/socialPending';
 import { useSession } from '../src/session/store';
 import { Screen, Text, showToast } from '../src/ui';
 import { TriangleAlert } from 'lucide-react-native';
@@ -73,10 +74,11 @@ export default function SocialCallback() {
         leave(resolved === 'loading' ? '/welcome' : landingRoute[resolved]);
       } catch (error) {
         if (error instanceof ApiError && error.is(Code.TERMS_NOT_ACCEPTED)) {
-          // The one case this screen cannot finish on its own: a new account needs the
-          // tick, and the consent sheet lives on the welcome screen where the flow began.
-          // The ticket survives a terms refusal by design, so the retry there still works.
-          leave(`/welcome?socialTicket=${encodeURIComponent(ticket)}`);
+          // Not a failure: a new account needs the tick, and that is the consent step's job.
+          // The ticket survives a terms refusal by design, so the retry there still works, and
+          // it travels in the store rather than the URL, like everything else the step holds.
+          useSocialPending.getState().hold({ kind: 'discord', ticket });
+          leave('/consent');
           return;
         }
         if (error instanceof ApiError && error.is(Code.SOCIAL_EMAIL_UNVERIFIED)) {

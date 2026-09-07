@@ -5,7 +5,6 @@ import { View } from "react-native";
 import { authApi } from "../../src/api/auth";
 import { ApiError, Code } from "../../src/api/envelope";
 import { SocialButtons } from "../../src/session/SocialButtons";
-import { SocialConsentSheet } from "../../src/session/SocialConsentSheet";
 import { useSocialSignIn } from "../../src/session/social";
 import { useSession } from "../../src/session/store";
 import { useT } from "../../src/i18n/useT";
@@ -145,14 +144,6 @@ export default function Login() {
         <SocialButtons social={social} />
       </View>
 
-      <SocialConsentSheet
-        visible={social.consentNeeded}
-        busy={social.pending !== null}
-        accepted={social.accepted}
-        onAccepted={social.setAccepted}
-        onContinue={() => void social.confirmConsent()}
-        onDismiss={social.dismissConsent}
-      />
     </Screen>
   );
 }

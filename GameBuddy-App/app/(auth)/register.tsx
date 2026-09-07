@@ -4,8 +4,8 @@ import { useState } from "react";
 import { View } from "react-native";
 import { authApi } from "../../src/api/auth";
 import { ApiError, Code } from "../../src/api/envelope";
-import { openPrivacy, openTerms } from "../../src/legal";
 import { useT } from "../../src/i18n/useT";
+import { ConsentText } from "../../src/session/ConsentText";
 import {
   BackButton,
   Button,
@@ -101,28 +101,7 @@ export default function Register() {
             onChange={setAccepted}
             accessibilityLabel={t.auth.register.consentA11y}
           >
-            {/* The sentence arrives as ordered segments so each language keeps its own
-                word order around the bold age phrase and the two document links. */}
-            <Text variant="body">
-              {t.auth.register.consent.map((segment, index) =>
-                segment.link ? (
-                  <Text
-                    key={index}
-                    variant="bodyStrong"
-                    className="text-primary"
-                    onPress={segment.link === "terms" ? openTerms : openPrivacy}
-                  >
-                    {segment.text}
-                  </Text>
-                ) : segment.bold ? (
-                  <Text key={index} variant="bodyStrong">
-                    {segment.text}
-                  </Text>
-                ) : (
-                  segment.text
-                ),
-              )}
-            </Text>
+            <ConsentText />
           </Checkbox>
 
           {consentProblem && (
