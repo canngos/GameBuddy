@@ -551,12 +551,14 @@ export const es: Dictionary = {
       packCoins: (n: string) => `${n} monedas`,
       takesYouTo: (n: string) => `Nuevo saldo: ${n}`,
       packA11y: (coins: number, price: string) => `Comprar ${coins} monedas por ${price}`,
+      packA11yPending: (coins: number) => `Comprar ${coins} monedas, cargando el precio`,
       onTheWay: 'Tus monedas están en camino',
       onTheWayBody: 'Puede tardar un momento. No hace falta comprar otra vez.',
     },
 
     gold: {
       done: 'Listo',
+      continue: 'Continuar',
       continuePrice: (price: string) => `Continuar — ${price}`,
       unavailable: 'Las compras no están disponibles ahora mismo',
       notNow: 'Ahora no',
@@ -576,7 +578,7 @@ export const es: Dictionary = {
       periodMonth: '1 mes',
       periodYear: '12 meses',
       noteTrial: '3 días de prueba gratis',
-      noteYearly: 'Ahorra un 58%',
+      noteYearlySave: (percent: number) => `Ahorra un ${percent}%`,
       billedEvery: (period: string) => `Se factura cada ${period}`,
       purchasePending: 'Tu compra está en proceso',
       purchasePendingBody: 'Puede tardar un momento. No hace falta comprar otra vez.',

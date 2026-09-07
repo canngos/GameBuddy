@@ -10,7 +10,14 @@ import {
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { billingApi, GOLD_PLANS, type GoldPlan } from "../../src/api/billing";
+import {
+  billingApi,
+  GOLD_PLANS,
+  type GoldPlan,
+  type PriceLookup,
+  type ResolvedPrice,
+} from "../../src/api/billing";
+import { useStorePrices } from "../../src/billing/useStorePrices";
 import { cosmeticsApi } from "../../src/api/cosmetics";
 import type { Cosmetic, CosmeticStore } from "../../src/api/types";
 import { trackFunnel } from "../../src/api/funnel";
@@ -61,6 +68,8 @@ export default function Gold() {
   const router = useRouter();
   const t = useT();
   const [selected, setSelected] = useState<GoldPlan>(GOLD_PLANS[1]);
+  const priceOf = useStorePrices();
+  const selectedPrice = priceOf(selected.productId);
 
   const subscription = useQuery({
     queryKey: ["subscription"],
@@ -96,9 +105,15 @@ export default function Gold() {
                 was wired up. */}
             <Button
               label={
-                canBuy
-                  ? t.market.gold.continuePrice(selected.price)
-                  : t.market.gold.unavailable
+                // A bounded placeholder is fine beside a price and wrong inside a button
+                // label, where it would read as a half-drawn control. "Continue" is a
+                // complete label on its own, so the priced version simply arrives a beat
+                // later on the rare occasion the prefetch has not landed.
+                !canBuy
+                  ? t.market.gold.unavailable
+                  : selectedPrice.pending
+                    ? t.market.gold.continue
+                    : t.market.gold.continuePrice(selectedPrice.text)
               }
               loading={buy.isPending}
               disabled={!canBuy}
@@ -144,6 +159,8 @@ export default function Gold() {
               <PlanRow
                 key={plan.productId}
                 plan={plan}
+                price={priceOf(plan.productId)}
+                saving={yearlySaving(plan, priceOf)}
                 selected={selected.productId === plan.productId}
                 onPress={() => setSelected(plan)}
               />
@@ -438,6 +455,32 @@ function GoldCosmeticRow({
 }
 
 /**
+ * What the yearly plan saves against paying monthly, as a whole percentage, or null.
+ *
+ * This used to be the literal string "Save 58%" in `GOLD_PLANS`. That figure is only true
+ * in dollars: the stores set regional prices independently, so a country where the yearly
+ * tier is priced differently to the monthly one makes the claim false — and a wrong saving
+ * on a subscription is a store-review problem, not a cosmetic one.
+ *
+ * So it is derived, under the same rule as the coin packs' bonus badge: both figures live,
+ * or both bundled, and in the same currency, or no badge at all. A missing badge costs a
+ * little persuasion; a wrong one is a misrepresentation next to a recurring charge.
+ */
+function yearlySaving(plan: GoldPlan, priceOf: PriceLookup): number | null {
+  if (plan.productId !== "gamebuddy.gold.yearly") return null;
+
+  const yearly = priceOf("gamebuddy.gold.yearly");
+  const monthly = priceOf("gamebuddy.gold.monthly");
+  if (yearly.pending || monthly.pending) return null;
+  if (yearly.source !== monthly.source) return null;
+  if (yearly.currency !== monthly.currency) return null;
+  if (!(yearly.amount > 0) || !(monthly.amount > 0)) return null;
+
+  const saved = Math.round((1 - yearly.amount / (monthly.amount * 12)) * 100);
+  return saved >= 5 ? saved : null;
+}
+
+/**
  * One plan.
  *
  * Was a `SelectRow` — the same control the theme picker uses. That put "Yearly · $39.99"
@@ -451,10 +494,15 @@ function GoldCosmeticRow({
  */
 function PlanRow({
   plan,
+  price,
+  saving,
   selected,
   onPress,
 }: {
   plan: GoldPlan;
+  price: ResolvedPrice;
+  /** Only the yearly plan has one, and only when it can be worked out honestly. */
+  saving: number | null;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -480,7 +528,7 @@ function PlanRow({
     "gamebuddy.gold.yearly": {
       label: t.market.gold.planYearly,
       period: t.market.gold.periodYear,
-      note: t.market.gold.noteYearly,
+      note: saving === null ? null : t.market.gold.noteYearlySave(saving),
     },
   };
   const { label, period, note } = copy[plan.productId];
@@ -490,7 +538,11 @@ function PlanRow({
       onPress={onPress}
       accessibilityRole="radio"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${label}, ${plan.price}${note ? `, ${note}` : ""}`}
+      accessibilityLabel={
+        price.pending
+          ? label
+          : `${label}, ${price.text}${note ? `, ${note}` : ""}`
+      }
       // Both branches carry the same class keys and only the values move — a class that
       // appears on one state and not the other stops NativeWind painting the subtree.
       // See `src/ui/hairline.ts`.
@@ -517,16 +569,20 @@ function PlanRow({
 
       {/* The price as a numeral, tabular, so three stacked plans line up on the decimal
           instead of drifting by a digit. */}
-      <Text
-        variant="numeral"
-        className={
-          selected
-            ? "text-[18px] leading-[24px] text-gold"
-            : "text-[18px] leading-[24px] text-content"
-        }
-      >
-        {plan.price}
-      </Text>
+      {price.pending ? (
+        <View className="h-5 w-16 rounded bg-line" />
+      ) : (
+        <Text
+          variant="numeral"
+          className={
+            selected
+              ? "text-[18px] leading-[24px] text-gold"
+              : "text-[18px] leading-[24px] text-content"
+          }
+        >
+          {price.text}
+        </Text>
+      )}
     </Pressable>
   );
 }

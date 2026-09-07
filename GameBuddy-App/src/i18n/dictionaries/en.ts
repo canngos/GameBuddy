@@ -621,12 +621,14 @@ export const en = {
       packCoins: (n: string) => `${n} coins`,
       takesYouTo: (n: string) => `New balance: ${n}`,
       packA11y: (coins: number, price: string) => `Buy ${coins} coins for ${price}`,
+      packA11yPending: (coins: number) => `Buy ${coins} coins, price loading`,
       onTheWay: 'Your coins are on the way',
       onTheWayBody: 'This can take a moment. No need to buy again.',
     },
 
     gold: {
       done: 'Done',
+      continue: 'Continue',
       continuePrice: (price: string) => `Continue — ${price}`,
       unavailable: 'Purchases are not available right now',
       notNow: 'Not now',
@@ -646,8 +648,10 @@ export const en = {
       periodMonth: '1 month',
       periodYear: '12 months',
       noteTrial: '3-day free trial',
-      /** Mirrors the saving GOLD_PLANS advertises; the price data itself stays there. */
-      noteYearly: 'Save 58%',
+      /** The figure is derived from the store's own monthly and yearly prices — see
+          `yearlySaving` in app/(main)/gold.tsx. It is not a constant any more because
+          regional pricing can make one country's saving different from another's. */
+      noteYearlySave: (percent: number) => `Save ${percent}%`,
       billedEvery: (period: string) => `Billed every ${period}`,
       purchasePending: 'Your purchase is going through',
       purchasePendingBody: 'This can take a moment. No need to buy again.',

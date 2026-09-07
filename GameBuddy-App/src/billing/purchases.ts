@@ -1,5 +1,5 @@
 import { NativeModules, Platform } from 'react-native';
-import type { PRODUCT_CATEGORY } from 'react-native-purchases';
+import type { PRODUCT_CATEGORY, PurchasesStoreProduct as StoreProduct } from 'react-native-purchases';
 import type { Subscription } from '../api/types';
 
 /**
@@ -109,6 +109,23 @@ type PurchasesSdk = typeof import('react-native-purchases').default;
 let sdkCache: PurchasesSdk | null | undefined;
 let configuredFor: string | null = null;
 
+/**
+ * Resolves the first time {@link identify} has finished, however it finished.
+ *
+ * `getProducts` throws if it is called before `configure`, and `identify` is fired from an
+ * effect in `app/(main)/_layout.tsx` — so anything that reads prices on mount is in a race
+ * with it on a cold start straight into the Market tab. Waiting on this instead of guessing
+ * closes that race.
+ *
+ * It resolves on the failure paths too, including the builds that can never purchase at
+ * all. A waiter that only woke on success would hang for the whole of its own deadline on
+ * exactly the builds where the answer was already known.
+ */
+let markConfigured: () => void = () => {};
+const configuredOnce = new Promise<void>((resolve) => {
+  markConfigured = resolve;
+});
+
 function sdk(): PurchasesSdk | null {
   if (sdkCache !== undefined) return sdkCache;
 
@@ -156,8 +173,14 @@ export function storeAvailable(): boolean {
  */
 export async function identify(userId: string): Promise<void> {
   const Purchases = sdk();
-  if (!Purchases || !API_KEY) return;
-  if (configuredFor === userId) return;
+  if (!Purchases || !API_KEY) {
+    markConfigured();
+    return;
+  }
+  if (configuredFor === userId) {
+    markConfigured();
+    return;
+  }
 
   try {
     if (configuredFor === null) {
@@ -173,6 +196,8 @@ export async function identify(userId: string): Promise<void> {
     // Never fatal. Failing to reach RevenueCat must not stop somebody using the app; it
     // only means purchases will not work until it succeeds.
     if (__DEV__) console.warn('[billing] could not identify to RevenueCat', error);
+  } finally {
+    markConfigured();
   }
 }
 
@@ -216,6 +241,50 @@ export class PurchaseCancelledError extends Error {
 }
 
 /**
+ * Which half of the store a product lives in.
+ *
+ * The category has to be stated. `getProducts` defaults to SUBSCRIPTION, so asking for a
+ * coin pack without it queries the wrong half of the store and comes back empty — the
+ * paywall would have reported "not available right now" for all three packs while Play was
+ * selling them perfectly well. Gold is a subscription; coin packs are not.
+ *
+ * The split is read off the id prefix, which holds for all seven ids in `Product.java` but
+ * is a convention rather than a guarantee: a subscription added later under some other
+ * prefix would be looked up as a one-time product and silently come back empty. Anything
+ * sold as a recurring plan has to be named here too.
+ *
+ * The literals are written out rather than referenced through the `PRODUCT_CATEGORY` enum
+ * because naming an enum *value* imports the package, which is exactly what the lazy load
+ * above exists to avoid; `PRODUCT_CATEGORY` is imported as a type only, so this stays
+ * checked against the SDK while compiling to two plain strings.
+ */
+function categoryFor(productId: string): PRODUCT_CATEGORY {
+  return productId.startsWith('gamebuddy.gold.')
+    ? ('SUBSCRIPTION' as PRODUCT_CATEGORY)
+    : ('NON_SUBSCRIPTION' as PRODUCT_CATEGORY);
+}
+
+/**
+ * Finds the product we asked for in what the store sent back.
+ *
+ * Google Play splits a subscription into a product and one or more *base plans*, and
+ * RevenueCat names the pair `<productId>:<basePlanId>` — so asking for
+ * `gamebuddy.gold.monthly` returns something whose identifier is
+ * `gamebuddy.gold.monthly:monthly`. An `===` test therefore missed every Gold plan and
+ * threw StoreUnavailableError before the store sheet ever opened. Exact match is still
+ * tried first, because Apple and the coin packs return the bare id.
+ *
+ * One copy, called from both `purchase` and `fetchStorePrices`. It was written twice once
+ * already, and the second copy is how the base-plan bug came back.
+ */
+function matchProduct(products: readonly StoreProduct[], productId: string) {
+  return (
+    products.find((candidate) => candidate.identifier === productId) ??
+    products.find((candidate) => candidate.identifier.startsWith(`${productId}:`))
+  );
+}
+
+/**
  * Opens the store sheet for a product and resolves once the store has taken payment.
  *
  * Resolving does **not** mean the account is Gold — RevenueCat still has to tell our
@@ -223,9 +292,10 @@ export class PurchaseCancelledError extends Error {
  *
  * Products are fetched by id rather than through an Offering. Our backend keys entitlements
  * off the store product id in `Product.java`, so the id is the contract; an Offering adds a
- * layer of indirection that would have to agree with it. Offerings become worth it when
- * prices need localising or plans need changing without an app release — see the note on
- * `GOLD_PLANS`.
+ * layer of indirection that would have to agree with it. Localised prices no longer argue
+ * for Offerings either — `getProducts` already returns `priceString`, which is what
+ * `fetchStorePrices` below reads. What an Offering would still buy is changing *which*
+ * plans are shown without an app release, which we do not need yet.
  *
  * Fetching by id is not quite as literal as it sounds on Google Play, and both wrinkles are
  * handled below: the category has to be named, and a subscription comes back under
@@ -243,35 +313,9 @@ export async function purchase(productId: string): Promise<void> {
     throw new StoreUnavailableError('noKey', 'No RevenueCat key is configured in this build.');
   }
 
-  // The category has to be stated. `getProducts` defaults to SUBSCRIPTION, so asking for a
-  // coin pack without it queries the wrong half of the store and comes back empty — the
-  // paywall would have reported "not available right now" for all three packs while Play was
-  // selling them perfectly well. Gold is a subscription; coin packs are not.
-  //
-  // The split is read off the id prefix, which holds for all six ids in `Product.java` but is
-  // a convention rather than a guarantee: a subscription added later under some other prefix
-  // would be looked up as a one-time product and silently come back empty. Anything sold as a
-  // recurring plan has to be named here too.
-  //
-  // The literals are written out rather than referenced through the `PRODUCT_CATEGORY` enum
-  // because naming an enum *value* imports the package, which is exactly what the lazy load
-  // above exists to avoid; `PRODUCT_CATEGORY` is imported as a type only, so this stays
-  // checked against the SDK while compiling to two plain strings.
-  const category: PRODUCT_CATEGORY = productId.startsWith('gamebuddy.gold.')
-    ? ('SUBSCRIPTION' as PRODUCT_CATEGORY)
-    : ('NON_SUBSCRIPTION' as PRODUCT_CATEGORY);
+  const products = await Purchases.getProducts([productId], categoryFor(productId));
 
-  const products = await Purchases.getProducts([productId], category);
-
-  // Google Play splits a subscription into a product and one or more *base plans*, and
-  // RevenueCat names the pair `<productId>:<basePlanId>` — so asking for
-  // `gamebuddy.gold.monthly` returns something whose identifier is
-  // `gamebuddy.gold.monthly:monthly`. An `===` test therefore missed every Gold plan and
-  // threw StoreUnavailableError before the store sheet ever opened. Exact match is still
-  // tried first, because Apple and the coin packs return the bare id.
-  const product =
-    products.find((candidate) => candidate.identifier === productId) ??
-    products.find((candidate) => candidate.identifier.startsWith(`${productId}:`));
+  const product = matchProduct(products, productId);
 
   if (!product) {
     // The id is not sold on this store. Ours to fix — the plan list and the store
@@ -285,6 +329,95 @@ export async function purchase(productId: string): Promise<void> {
   } catch (error) {
     if (isCancellation(error)) throw new PurchaseCancelledError();
     throw error;
+  }
+}
+
+/** One product's price, as the store in front of this particular buyer states it. */
+export type StorePrice = {
+  /** Our id, not RevenueCat's `<id>:<basePlan>`. */
+  productId: string;
+  /** Ready to render, formatted and symbolised by the store: "$3.99", "₺149,99". */
+  priceString: string;
+  /** The same figure as a number, for arithmetic only. Never render this. */
+  amount: number;
+  /** ISO-4217. Two prices may only be compared when these match. */
+  currencyCode: string;
+};
+
+/**
+ * How long the store gets before a paywall gives up and shows its bundled copy.
+ *
+ * A paywall that cannot price itself still has to open. Six seconds is longer than the call
+ * takes on any working connection and short enough that nobody is left looking at a
+ * placeholder wondering whether the screen is broken.
+ */
+const PRICE_TIMEOUT_MS = 6_000;
+
+/**
+ * Localised prices for a set of product ids.
+ *
+ * **This is the reason the app stopped hardcoding "$1.99".** The store is the authority on
+ * price — it owns currency, regional tiers and tax — so a string in our bundle is wrong for
+ * everyone outside the United States, and wrong for everyone the moment a price changes in
+ * the Play Console. Reading `priceString` makes a reprice a console edit instead of an app
+ * release, and stops us showing a dollar figure to somebody who will be charged in lira.
+ *
+ * **Never throws and never hangs.** Every failure resolves to a shorter list, or to none at
+ * all, and the caller falls back to bundled copy. An id the store does not sell is simply
+ * absent — the same condition `purchase` raises `productMissing` for, because there it
+ * blocks a sale, whereas here it only costs a localised label.
+ */
+export async function fetchStorePrices(ids: readonly string[]): Promise<StorePrice[]> {
+  const Purchases = sdk();
+  if (!Purchases || !API_KEY || Platform.OS === 'web') return [];
+
+  // `getProducts` before `configure` throws. See `configuredOnce`.
+  await configuredOnce;
+  if (configuredFor === null) return [];
+
+  // One call per category, not one per product: the ids split into two halves of the store
+  // and each half is a single round trip.
+  const wanted = [...new Set(ids)];
+  const byCategory = new Map<PRODUCT_CATEGORY, string[]>();
+  for (const id of wanted) {
+    const category = categoryFor(id);
+    byCategory.set(category, [...(byCategory.get(category) ?? []), id]);
+  }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const fetched = await Promise.race([
+      Promise.all(
+        [...byCategory].map(([category, group]) => Purchases.getProducts(group, category)),
+      ),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('timed out')), PRICE_TIMEOUT_MS);
+      }),
+    ]);
+
+    const products = fetched.flat();
+    const priced: StorePrice[] = [];
+    for (const id of wanted) {
+      const product = matchProduct(products, id);
+      if (!product) {
+        // Ours to fix — our list and the store disagree — so it is logged loudly rather
+        // than shown to the buyer, who gets the bundled price instead.
+        if (__DEV__) console.error('[billing] store does not price', id);
+        continue;
+      }
+      priced.push({
+        productId: id,
+        priceString: product.priceString,
+        amount: product.price,
+        currencyCode: product.currencyCode,
+      });
+    }
+    return priced;
+  } catch (error) {
+    if (__DEV__) console.warn('[billing] could not read store prices', error);
+    return [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 

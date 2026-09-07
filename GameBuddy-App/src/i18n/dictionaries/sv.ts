@@ -550,12 +550,14 @@ export const sv: Dictionary = {
       packCoins: (n: string) => `${n} mynt`,
       takesYouTo: (n: string) => `Nytt saldo: ${n}`,
       packA11y: (coins: number, price: string) => `Köp ${coins} mynt för ${price}`,
+      packA11yPending: (coins: number) => `Köp ${coins} mynt, priset laddas`,
       onTheWay: 'Dina mynt är på väg',
       onTheWayBody: 'Det kan ta en stund. Du behöver inte köpa igen.',
     },
 
     gold: {
       done: 'Klar',
+      continue: 'Fortsätt',
       continuePrice: (price: string) => `Fortsätt — ${price}`,
       unavailable: 'Köp är inte tillgängliga just nu',
       notNow: 'Inte nu',
@@ -575,7 +577,7 @@ export const sv: Dictionary = {
       periodMonth: '1 månad',
       periodYear: '12 månader',
       noteTrial: '3 dagars gratis provperiod',
-      noteYearly: 'Spara 58 %',
+      noteYearlySave: (percent: number) => `Spara ${percent} %`,
       billedEvery: (period: string) => `Faktureras varje ${period}`,
       purchasePending: 'Ditt köp är på väg',
       purchasePendingBody: 'Det kan ta en stund. Du behöver inte köpa igen.',

@@ -41,6 +41,7 @@ export const QUERY_KEYS = [
   'recommendations',
   'sentRequests',
   'socialProviders',
+  'storePrices',
   'subscription',
 ] as const;
 
