@@ -69,7 +69,7 @@ class ProductTest {
          * nothing, so the exact values are pinned rather than derived.
          */
         @Test
-        @DisplayName("sells exactly the six ids registered with the stores")
+        @DisplayName("sells exactly the seven ids registered with the stores")
         void storeIds() {
             assertThat(java.util.Arrays.stream(Product.values()).map(Product::storeId))
                     .containsExactlyInAnyOrder(
@@ -78,7 +78,8 @@ class ProductTest {
                             "gamebuddy.gold.yearly",
                             "gamebuddy.coins.500",
                             "gamebuddy.coins.1200",
-                            "gamebuddy.coins.3000");
+                            "gamebuddy.coins.3000",
+                            "gamebuddy.coins.7000");
         }
 
         @Test
@@ -90,6 +91,10 @@ class ProductTest {
             assertThat(Product.COINS_LARGE.isSubscription()).isFalse();
             assertThat(Product.COINS_LARGE.coins()).isEqualTo(3000);
             assertThat(Product.COINS_LARGE.tier()).isNull();
+
+            assertThat(Product.COINS_MEGA.isSubscription()).isFalse();
+            assertThat(Product.COINS_MEGA.coins()).isEqualTo(7000);
+            assertThat(Product.COINS_MEGA.tier()).isNull();
         }
     }
 }

@@ -72,6 +72,12 @@ the DTO that reports them, and the controller that populates the DTO.
 - `Product.java:34-36` defines coin packs of 500 / 1,200 / 3,000 — **not purchasable from
   the app.**
 
+> **All four numbers above are historical.** Badges pay 775 from 10 (three retired with
+> Community), the faucets of §3.4.1 all shipped and were retuned to ~320/week on
+> 2026-08-31, and the catalogue is **44 items / 39,500 coins** after
+> `upgrade-2026-44-shelf-reprice.sql`. Coin packs are purchasable, and there are four of
+> them — see §3.2.2.
+
 ---
 
 ## 2. Decisions already taken
@@ -193,7 +199,28 @@ gamebuddy.coins.3000        3000 coins
 |---|---|---|
 | Weekly | $3.99 | Impulse buy at the moment of need |
 | Monthly | $7.99 | Anchor. Pre-selected. Carries a **3-day free trial** |
-| Yearly | $39.99 | Shown as "save 58%" |
+| Yearly | $39.99 | Shown as a derived saving, ~58% at US prices |
+
+> **Updated 7 September 2026.** Gold prices are unchanged. The coin packs doubled and a
+> fourth was added, because priced off the pack people actually buy a coin was worth
+> $0.0030 and the dearest item in the shop cost $4.50 — below Discord's cheapest
+> decoration:
+>
+> | SKU | Coins | Price | Bonus |
+> |---|---|---|---|
+> | `gamebuddy.coins.500` | 500 | **$3.99** | — |
+> | `gamebuddy.coins.1200` | 1 200 | **$7.99** | +20% |
+> | `gamebuddy.coins.3000` | 3 000 | **$16.99** | +41% |
+> | `gamebuddy.coins.7000` | 7 000 | **$34.99** | +60% |
+>
+> The largest pack is deliberately below Gold yearly: a coin pack costing the same as a
+> year of Gold invites the comparison and loses it. The yearly "save 58%" is now *derived*
+> from the store's own monthly and yearly prices rather than hardcoded, because regional
+> pricing can make a fixed figure false — see `yearlySaving` in `app/(main)/gold.tsx`.
+>
+> Prices are no longer duplicated in the bundle either: `useStorePrices` reads
+> `priceString` from RevenueCat, so a reprice is a console edit rather than an app release,
+> and a Turkish buyer is shown lira instead of dollars.
 
 Set **regional price tiers from day one** — Turkey, Brazil, India, SEA convert near zero at
 US pricing.

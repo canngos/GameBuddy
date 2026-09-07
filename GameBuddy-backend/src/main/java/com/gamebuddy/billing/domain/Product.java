@@ -43,7 +43,18 @@ public enum Product {
      */
     COINS_SMALL("gamebuddy.coins.500", null, null, 500),
     COINS_MEDIUM("gamebuddy.coins.1200", null, null, 1200),
-    COINS_LARGE("gamebuddy.coins.3000", null, null, 3000);
+    COINS_LARGE("gamebuddy.coins.3000", null, null, 3000),
+
+    /**
+     * The largest pack, and the only one that buys the dearest item on the shelf outright.
+     *
+     * <p>Added with the 2026-09-07 reprice. Most of what a shop takes comes from a small
+     * number of buyers choosing the biggest thing offered, so the top of the ladder is
+     * where the ceiling on a willing buyer sits; without a rung above 3000 that ceiling was
+     * ours rather than theirs. Deliberately priced below {@link #GOLD_YEARLY} — a coin pack
+     * costing the same as a year of Gold invites the comparison and loses it.
+     */
+    COINS_MEGA("gamebuddy.coins.7000", null, null, 7000);
 
     private final String storeId;
     private final SubscriptionTier tier;

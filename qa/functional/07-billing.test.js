@@ -34,6 +34,7 @@ const PRODUCTS = {
   goldMonthly: 'gamebuddy.gold.monthly',
   goldYearly: 'gamebuddy.gold.yearly',
   coinsSmall: 'gamebuddy.coins.500',
+  coinsMega: 'gamebuddy.coins.7000',
 };
 
 /** A RevenueCat event, shaped exactly as their webhook sends it. */
@@ -173,6 +174,23 @@ describe('billing', () => {
 
       const after_ = Number(db.scalar(`select coin from gamebuddy.gamer where user_id = '${db.esc(a.userId)}';`));
       assert.equal(after_, before + 500, 'the coin pack did not credit 500 coins');
+      assert.equal(await tierOf(a.token), 'BASIC', 'a consumable must not grant a subscription tier');
+    });
+
+    // The pack added by the 2026-09-07 reprice. Worth its own case rather than trusting the
+    // one above to cover it: a coin pack the enum does not know verifies against the store,
+    // logs "unknown product", and grants nothing to somebody who has already been charged.
+    // That is the failure Product's own Javadoc says it exists to prevent, and GOLD_WEEKLY
+    // records it having actually happened once.
+    test('the largest coin pack credits its full 7000', async () => {
+      const [a] = seeded(1);
+      const before = Number(db.scalar(`select coin from gamebuddy.gamer where user_id = '${db.esc(a.userId)}';`));
+
+      const res = await webhook(event('NON_RENEWING_PURCHASE', a.userId, { product_id: PRODUCTS.coinsMega }));
+      assert.equal(res.status, 200, res.text);
+
+      const after_ = Number(db.scalar(`select coin from gamebuddy.gamer where user_id = '${db.esc(a.userId)}';`));
+      assert.equal(after_, before + 7000, 'the mega pack did not credit 7000 coins');
       assert.equal(await tierOf(a.token), 'BASIC', 'a consumable must not grant a subscription tier');
     });
   });
