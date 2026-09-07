@@ -1,10 +1,5 @@
-import {
-  GoogleOneTapSignIn,
-  isErrorWithCode,
-  isNoSavedCredentialFoundResponse,
-  isSuccessResponse,
-  statusCodes,
-} from 'react-native-nitro-google-signin';
+import { TurboModuleRegistry } from 'react-native';
+import type * as GoogleSignInSdk from 'react-native-nitro-google-signin';
 
 /**
  * The only file in this app that imports a Google Sign-In SDK.
@@ -18,6 +13,9 @@ import {
  * `react-native-nitro-google-signin` is the free MIT package that uses Credential Manager on
  * Android, which is what Google now requires. Its `configure` is synchronous and must run
  * before anything else, so the root layout calls {@link configureGoogle} once.
+ *
+ * **The package is loaded lazily and never at module scope** — see {@link sdk} for why that
+ * is a correctness requirement here rather than a micro-optimisation.
  */
 
 /**
@@ -32,8 +30,59 @@ import {
  */
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
-/** Whether this build was given a client id at all. The welcome screen hides the button otherwise. */
-export const googleAvailable = !!WEB_CLIENT_ID;
+type GoogleSdk = typeof GoogleSignInSdk;
+
+let sdkCache: GoogleSdk | null | undefined;
+
+/**
+ * The SDK, or null on a build whose binary does not contain it.
+ *
+ * **This has to be a lazy require, and the reason is an over-the-air update.** The JS in an
+ * update is served to every install whose `runtimeVersion` matches, and the policy here is
+ * `appVersion` — so every build carrying version 1.0.0 gets the same bundle whether or not
+ * its binary has these native modules. A build made before Google sign-in shipped is one of
+ * them.
+ *
+ * Nitro does not degrade quietly the way RevenueCat does. `react-native-nitro-modules` calls
+ * `TurboModuleRegistry.getEnforcing('NitroModules')` *while it is being evaluated*, so a
+ * static `import` of the Google package throws during module evaluation — before any
+ * try/catch of ours, and before the root layout's `ErrorBoundary` exists to catch it. Since
+ * {@link configureGoogle} runs at module scope in `app/_layout.tsx`, that is a crash on
+ * launch, shipped over the air, to people whose installed app was working perfectly.
+ *
+ * So: check the native side first with the *non-throwing* registry lookup, then require
+ * behind a try/catch. Same shape as `sdk()` in `src/billing/purchases.ts`, for the same
+ * reason — a disabled button with an explanation beats an obscure crash.
+ */
+function sdk(): GoogleSdk | null {
+  if (sdkCache !== undefined) return sdkCache;
+
+  // `get` returns null where `getEnforcing` throws. That difference is the whole guard.
+  if (TurboModuleRegistry.get('NitroModules') == null) {
+    if (__DEV__) {
+      console.warn('[google] NitroModules is missing — this build cannot sign in with Google');
+    }
+    sdkCache = null;
+    return sdkCache;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    sdkCache = require('react-native-nitro-google-signin') as GoogleSdk;
+  } catch (error) {
+    if (__DEV__) console.warn('[google] react-native-nitro-google-signin failed to load', error);
+    sdkCache = null;
+  }
+  return sdkCache;
+}
+
+/**
+ * Whether this build can sign in with Google at all. The welcome screen hides the button
+ * otherwise — on a clone with no client id, and on a build made before this shipped.
+ */
+export function googleAvailable(): boolean {
+  return !!WEB_CLIENT_ID && sdk() !== null;
+}
 
 /**
  * Thrown when the device cannot do Google sign-in at all.
@@ -43,7 +92,15 @@ export const googleAvailable = !!WEB_CLIENT_ID;
  * `StoreUnavailableError`, which does the same job for billing.
  */
 export class GoogleUnavailableError extends Error {
-  constructor(readonly reason: 'no-play-services' | 'not-configured' | 'misconfigured') {
+  constructor(
+    readonly reason:
+      | 'no-play-services'
+      | 'not-configured'
+      | 'misconfigured'
+      // The binary predates Google sign-in. Reachable only if something calls this without
+      // checking {@link googleAvailable} first, since the button is hidden in that case.
+      | 'not-in-this-build',
+  ) {
     super(`Google sign-in unavailable: ${reason}`);
     this.name = 'GoogleUnavailableError';
   }
@@ -59,7 +116,11 @@ let configured = false;
  */
 export function configureGoogle(): void {
   if (configured || !WEB_CLIENT_ID) return;
-  GoogleOneTapSignIn.configure({ webClientId: WEB_CLIENT_ID });
+  // Returns rather than throws on a build without the SDK. This runs at module scope in the
+  // root layout, where a throw is a white screen on launch and nothing else.
+  const google = sdk();
+  if (!google) return;
+  google.GoogleOneTapSignIn.configure({ webClientId: WEB_CLIENT_ID });
   configured = true;
 }
 
@@ -72,18 +133,20 @@ export function configureGoogle(): void {
  */
 export async function signInWithGoogle(): Promise<string | null> {
   if (!WEB_CLIENT_ID) throw new GoogleUnavailableError('not-configured');
+  const google = sdk();
+  if (!google) throw new GoogleUnavailableError('not-in-this-build');
   configureGoogle();
 
   try {
     // Android only; a no-op on iOS. `true` lets Google offer its own update dialog, which
     // is a fixable outcome rather than a dead end.
-    await GoogleOneTapSignIn.checkPlayServices(true);
+    await google.GoogleOneTapSignIn.checkPlayServices(true);
 
     // The explicit "Sign in with Google" sheet rather than the silent path. The silent one
     // returns `noSavedCredentialFound` for anybody who has never used Google here, which is
     // most people the first time — and a button that appears to do nothing is worse than a
     // sheet that takes one extra tap.
-    let response = await GoogleOneTapSignIn.presentExplicitSignIn();
+    let response = await google.GoogleOneTapSignIn.presentExplicitSignIn();
 
     // **Older Play Services cannot serve that request at all.** `GetSignInWithGoogleOption`
     // is newer than `GetGoogleIdOption`, and a device whose Play Services predates it
@@ -97,22 +160,22 @@ export async function signInWithGoogle(): Promise<string | null> {
     //
     // Only on `noSavedCredentialFound`, never on a cancel: somebody who dismissed the sheet
     // has answered, and reopening a second picker over that would be the app arguing.
-    if (isNoSavedCredentialFoundResponse(response)) {
-      response = await GoogleOneTapSignIn.createAccount();
+    if (google.isNoSavedCredentialFoundResponse(response)) {
+      response = await google.GoogleOneTapSignIn.createAccount();
     }
 
-    if (!isSuccessResponse(response)) return null;
+    if (!google.isSuccessResponse(response)) return null;
     return response.data.idToken ?? null;
   } catch (error) {
-    if (isErrorWithCode(error)) {
+    if (google.isErrorWithCode(error)) {
       switch (error.code) {
-        case statusCodes.SIGN_IN_CANCELLED:
-        case statusCodes.IN_PROGRESS:
+        case google.statusCodes.SIGN_IN_CANCELLED:
+        case google.statusCodes.IN_PROGRESS:
           // A second tap while the first sheet is still up is not a failure worth a message.
           return null;
-        case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+        case google.statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
           throw new GoogleUnavailableError('no-play-services');
-        case statusCodes.DEVELOPER_ERROR:
+        case google.statusCodes.DEVELOPER_ERROR:
           // The signing certificate has no OAuth client registered for it. Every build made
           // from a new keystore hits this until the SHA-1 is added in the Cloud console, and
           // it is invisible in every other way — so it gets its own reason.
