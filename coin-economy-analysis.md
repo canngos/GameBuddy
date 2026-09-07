@@ -60,7 +60,13 @@ is worth **$0.004**, so 100 coins is **$0.40 of pack value**.
 ### The sinks, for scale
 
 The catalogue is the only large sink and it is finite: **34 items, 18,450 coins** (and this
-wave adds five more). Recurring sinks are small — Super Like 100, Extra Likes (+5) 200, Unlock
+wave adds five more).
+
+> **Updated 7 September 2026.** That figure was already stale when it was written — it is
+> the pre-`upgrade-2026-36` shelf. With wave 2 and the themes the catalogue was **44
+> purchasable items, 28,200 coins**, and after `upgrade-2026-44-shelf-reprice.sql` raised
+> everything 40% it is **44 items, 39,500 coins**. The coin packs doubled at the same time,
+> so the sink grew in both currencies at once. See the note at the end of §2. Recurring sinks are small — Super Like 100, Extra Likes (+5) 200, Unlock
 Admirer 150, Rewind 50, Lobby Boost 300. A player earning 950 a week who already owns what
 they want has nothing to spend on, which is the other half of why the rate mattered.
 
@@ -93,6 +99,19 @@ reachable by turning up *and* watching an advert — the passive ceiling on its 
 full 530 requires claiming every day and watching all three adverts every day, which should
 feel like effort rather than like the default. This is asserted in `CoinFaucetTest` so it
 cannot drift again silently.
+
+### The other half, seven days later
+
+Retuning income was only ever half the problem. On **7 September 2026** the prices moved
+too, because the audit above measured a coin's *supply* and never asked what one was worth:
+against the 3 000-coin pack a coin was $0.0030, which put the dearest item in the shop at
+**$4.50** — below the cheapest thing Discord sells. Coin packs went to $3.99 / $7.99 /
+$16.99 with a fourth at $34.99 for 7 000, and the shelf went up 40%.
+
+That does not change any number in this document — the faucets are untouched, and ~320 a
+week still stands — but it changes what those coins buy. The flagship frame moves from 4.7
+weeks of free play to 6.6, and the entry rung from 2.2 days to 3.3. The band this audit was
+defending is intact; the shelf it pours into simply costs what the market charges now.
 
 ### And the rates are now deployable
 

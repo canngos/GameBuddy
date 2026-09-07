@@ -62,10 +62,49 @@ nothing else to spend on.
 
 ### Does our pricing make sense against theirs?
 
-A 500-coin pack is $1.99, so coins are worth roughly $0.004 each.
+**Superseded on 7 September 2026. The conclusion below was wrong, and the reason it was
+wrong is worth keeping.**
 
-| Our item | Coins | ≈ Real money | Comparable |
+It priced a coin off the *smallest* pack — 500 for $1.99, so $0.0040 a coin — and almost
+nobody buys the smallest pack. Against the pack people actually buy (3000 for $8.99) a coin
+was worth $0.0030, and the whole ladder was a quarter cheaper than the table below claimed:
+
+| Our item | Coins | Claimed above | Actually |
 |---|---|---|---|
+| Signature frame | 100 | $0.40 | $0.30 |
+| Hive frame | 400 | $1.60 | $1.20 |
+| Glitch frame (animated) | 1 300 | $5.20 | $3.90 |
+| Ember frame (animated) | 1 500 | $6.00 | **$4.50** |
+
+So the dearest item in the shop cost $4.50 against a market whose *cheapest* comparable —
+a single Discord decoration — is $5.99. The ladder did not land inside the band; it sat
+underneath it. And at ~320 earned coins a week the flagship was under five weeks of free
+play, which is not a purchase decision at all.
+
+**What was done.** Coin packs doubled and a fourth was added (`$3.99 / $7.99 / $16.99 /
+$34.99` for 500 / 1 200 / 3 000 / 7 000), and the shelf went up 40%
+(`upgrade-2026-44-shelf-reprice.sql`). The Ember frame is now 2 100 coins ≈ **$11.89**,
+inside Discord's $5.99–$12.99 band, and about 6.6 weeks of free play. The entry rung moved
+100 → 150, still about three days.
+
+The original text follows, kept because the comparables in it are still good and the
+mistake in it is instructive.
+
+> A 500-coin pack is $1.99, so coins are worth roughly $0.004 each.
+>
+> | Our item | Coins | ≈ Real money | Comparable |
+> |---|---|---|---|
+> | Signature frame | 100 | $0.40 | Steam emoticon (100 pts) |
+> | Hive frame | 400 | $1.60 | Steam static background (500 pts) |
+> | Glitch frame (animated) | 1 300 | $5.20 | Discord decoration ($5.99), Steam animated frame (2 000 pts) |
+> | Ember frame (animated) | 1 500 | $6.00 | Discord decoration, mid-range |
+>
+> The ladder lands inside the band the market already charges, and the ~4× animated-to-static
+> ratio matches Steam's. **No repricing is indicated.** Worth remembering that most of our coins
+> are *earned* rather than bought, so these numbers are a ceiling on perceived value, not a
+> revenue forecast.
+
+---|---|---|---|
 | Signature frame | 100 | $0.40 | Steam emoticon (100 pts) |
 | Hive frame | 400 | $1.60 | Steam static background (500 pts) |
 | Glitch frame (animated) | 1 300 | $5.20 | Discord decoration ($5.99), Steam animated frame (2 000 pts) |

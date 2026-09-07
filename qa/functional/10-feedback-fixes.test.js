@@ -198,6 +198,7 @@ describe('free cosmetics are claimed, not assumed', () => {
   let gamer;
   let steelId;
   let paidId;
+  let paidPrice;
 
   const store = async (token) => {
     const res = await get(P.cosmetics, { token });
@@ -211,8 +212,20 @@ describe('free cosmetics are claimed, not assumed', () => {
     assert.equal(free.length, 1, 'exactly one free item should remain in the catalogue');
     steelId = free[0].id;
     assert.equal(free[0].name, 'Steel', 'and it should be the Steel frame');
-    paidId = items.find((i) => i.price === 100)?.id;
-    assert.ok(paidId, 'the repriced entry tier should exist at 100 coins');
+    // Derived, not pinned. The entry rung has been repriced twice now -- upgrade-2026-30
+    // created it at 100, upgrade-2026-44 moved it to 150 -- and both times this assertion
+    // was what broke. What the suite actually cares about is that a cheap rung exists and
+    // is really charged, so take the cheapest paid item and check that it is still cheap.
+    const cheapest = items
+      .filter((i) => i.price > 0 && !i.membershipOnly)
+      .sort((a, b) => a.price - b.price)[0];
+    assert.ok(cheapest, 'the catalogue should have something to buy');
+    assert.ok(
+      cheapest.price <= 200,
+      `the entry tier should stay inside a few days of free play, was ${cheapest.price}`,
+    );
+    paidId = cheapest.id;
+    paidPrice = cheapest.price;
   });
 
   after(() => cleanup());
@@ -252,8 +265,8 @@ describe('free cosmetics are claimed, not assumed', () => {
   });
 
   test('the repriced entry tier is a real purchase — no coins, no item', async () => {
-    // A fresh account starts poor, which is the case that proves 100 is actually charged
-    // rather than treated as free.
+    // A fresh account starts poor, which is the case that proves the entry tier is actually
+    // charged rather than treated as free.
     const poor = await createAccount();
     const attempt = await post(`${P.cosmetics}/${paidId}/buy`, undefined, { token: poor.token });
     assert.equal(attempt.code, CODE.COIN_NOT_ENOUGH, attempt.text);
@@ -262,13 +275,14 @@ describe('free cosmetics are claimed, not assumed', () => {
     assert.equal(items.find((i) => i.id === paidId)?.owned, false);
   });
 
-  test('with coins, the same purchase debits exactly 100', async () => {
+  test('with coins, the same purchase debits exactly what it cost', async () => {
     const buyer = await createAccount();
-    grantCoins(buyer.userId, 500);
+    const granted = paidPrice * 5;
+    grantCoins(buyer.userId, granted);
 
     const bought = await post(`${P.cosmetics}/${paidId}/buy`, undefined, { token: buyer.token });
     assert.equal(bought.status, 200, bought.text);
-    assert.equal(bought.data?.coins, 400, 'exactly 100 spent');
+    assert.equal(bought.data?.coins, granted - paidPrice, `exactly ${paidPrice} spent`);
   });
 });
 
