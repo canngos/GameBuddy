@@ -6,15 +6,19 @@ import { matchApi } from '../api/match';
 import type { Consumables } from '../api/types';
 import { useUpper } from '../i18n/case';
 import { useT } from '../i18n/useT';
-import { Icon, Text, feedback, messageOf, showToast } from '../ui';
+import { Text, feedback, messageOf, showToast } from '../ui';
+import { ConsumableIcon, type ConsumableArt } from './ConsumableIcon';
 
 /**
  * Mirrors Consumable.java and BoostPolicy. A price shown wrong is worse than not shown.
  * Codes and prices only — the words come from the dictionary at render time.
  */
 const ITEMS = [
-  { code: 'SUPER_LIKE' as const, icon: Sparkles, cost: 100 },
-  { code: 'EXTRA_LIKES' as const, icon: Heart, cost: 200 },
+  // `icon` is the Lucide glyph the purchase toast shows; `art` is the drawn mark in the
+  // row. Two fields rather than one because `Toast.icon` is typed `LucideIcon`, and a
+  // toast is not the place for a product picture anyway.
+  { code: 'SUPER_LIKE' as const, icon: Sparkles, art: 'superLike' as ConsumableArt, cost: 100 },
+  { code: 'EXTRA_LIKES' as const, icon: Heart, art: 'extraLikes' as ConsumableArt, cost: 200 },
 ];
 
 /**
@@ -108,9 +112,10 @@ export function ConsumableShelf({ balance }: { balance: number }) {
             ].join(' ')}
           >
             {/* Both of these buy a *like*, so both take the accent — the one colour in the
-                palette that is allowed to mean that. */}
+                palette that is allowed to mean that, and what separates this shelf from the
+                gold coin packs above it at a glance. 26dp to match those. */}
             <View className="h-10 w-10 items-center justify-center rounded-full bg-surface">
-              <Icon as={item.icon} size={18} tone="accent" />
+              <ConsumableIcon art={item.art} size={26} />
             </View>
 
             <View className="flex-1 gap-0.5">
