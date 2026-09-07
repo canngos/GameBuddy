@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { TriangleAlert } from 'lucide-react-native';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Linking } from 'react-native';
 import { authApi } from '../api/auth';
 import { ApiError, Code } from '../api/envelope';
@@ -9,6 +9,7 @@ import { useT } from '../i18n/useT';
 import { showToast } from '../ui';
 import { GoogleUnavailableError, signInWithGoogle } from './google';
 import { landingRoute } from './routes';
+import { type HeldCredential, useSocialPending } from './socialPending';
 import { useSession } from './store';
 
 /**
@@ -22,33 +23,19 @@ import { useSession } from './store';
  *   which `app/social.tsx` picks up and exchanges. Nothing here waits for it — the deep link
  *   is a fresh entry into the app, not a resolved promise.
  *
- * **The consent detour.** A brand-new account needs the terms accepted, and the app cannot
+ * **The consent step.** A brand-new account needs the terms accepted, and the app cannot
  * know in advance whether this person is new: that is exactly what the server is being asked.
  * So the first call goes without the flag, and a `TERMS_NOT_ACCEPTED` answer is not an error
- * but a question — the sheet opens and the *same credential* is sent again with the tick.
- * Google ID tokens are good for about an hour, and the Discord ticket is deliberately left
- * unspent on that path, so the retry is free either way.
+ * but a question — the credential is held, the person is taken to `/consent`, and the *same
+ * credential* is sent again with the tick. Google ID tokens are good for about an hour, and
+ * the Discord ticket is deliberately left unspent on that path, so the retry is free either
+ * way. Somebody signing back in never sees the step: the server says so on the first call.
  */
-
-/** What the consent sheet will retry with, kept together with which call to retry. */
-type HeldCredential = { kind: 'google'; idToken: string } | { kind: 'discord'; ticket: string };
-
 export function useSocialSignIn() {
   const router = useRouter();
   const t = useT();
   const signIn = useSession((s) => s.signIn);
-
   const [pending, setPending] = useState<'google' | 'discord' | null>(null);
-  const [consentNeeded, setConsentNeeded] = useState(false);
-  const [accepted, setAccepted] = useState(false);
-
-  /**
-   * The credential the consent sheet will retry with.
-   *
-   * A ref rather than state: nothing renders from it, and putting a Google ID token through
-   * a render cycle is one more place it can be read from.
-   */
-  const held = useRef<HeldCredential | null>(null);
 
   const land = useCallback(() => {
     // Where a new account goes is not "/home": it has no username yet, and the guard would
@@ -60,18 +47,18 @@ export function useSocialSignIn() {
   const adopt = useCallback(
     async (session: SocialSession) => {
       await signIn(session.accessToken, session.userId);
-      setConsentNeeded(false);
-      setAccepted(false);
-      held.current = null;
+      // Land first, release second: the consent step leaves when its credential goes, and
+      // it should leave for the username step, not for wherever an empty store points.
       land();
+      useSocialPending.getState().release();
     },
     [land, signIn],
   );
 
   /**
-   * Runs one sign-in attempt and turns the two expected refusals into outcomes.
+   * Runs one sign-in attempt and turns the expected refusal into the consent step.
    *
-   * @returns true when it finished, false when it needs the consent sheet
+   * @returns true when it finished, false when it went to `/consent` instead
    */
   const attempt = useCallback(
     async (credential: HeldCredential, acceptedTerms?: boolean): Promise<boolean> => {
@@ -85,28 +72,44 @@ export function useSocialSignIn() {
       } catch (error) {
         if (error instanceof ApiError && error.is(Code.TERMS_NOT_ACCEPTED)) {
           // Not a failure: the server is asking for the tick.
-          held.current = credential;
-          setConsentNeeded(true);
+          useSocialPending.getState().hold(credential);
+          router.push('/consent' as never);
           return false;
         }
         throw error;
       }
     },
-    [adopt],
+    [adopt, router],
   );
 
   /**
    * One place to say a sign-in did not work.
    *
-   * Every path below ends either signed in or here. That is the point: both providers used to
-   * have exits that returned without a word, and a button that does nothing is indistinguishable
-   * from a button that is broken - which is exactly how an unregistered signing certificate went
-   * unnoticed. `app/social.tsx` has always ended the Discord round trip this way; this is the
-   * same courtesy for every other exit.
+   * Every path below ends either signed in, on the consent step, or here. That is the point:
+   * both providers used to have exits that returned without a word, and a button that does
+   * nothing is indistinguishable from a button that is broken - which is exactly how an
+   * unregistered signing certificate went unnoticed. `app/social.tsx` has always ended the
+   * Discord round trip this way; this is the same courtesy for every other exit.
    */
   const complain = useCallback(
     (title: string) => showToast({ id: 'social:failed', title, icon: TriangleAlert, tone: 'danger' }),
     [],
+  );
+
+  /** Turns whatever escaped an attempt into words. Never rethrows: nothing above would hear it. */
+  const report = useCallback(
+    (error: unknown) => {
+      if (error instanceof GoogleUnavailableError) {
+        complain(t.auth.social.googleUnavailable);
+      } else if (error instanceof ApiError && error.is(Code.SOCIAL_EMAIL_UNVERIFIED)) {
+        complain(t.auth.social.emailUnverified);
+      } else {
+        // A dead network, a 500, a bug. Rethrowing from an async callback reaches nobody - it
+        // becomes an unhandled rejection and the screen just sits there.
+        complain(t.auth.social.failed);
+      }
+    },
+    [complain, t],
   );
 
   const google = useCallback(async () => {
@@ -122,21 +125,11 @@ export function useSocialSignIn() {
       }
       await attempt({ kind: 'google', idToken: outcome.idToken });
     } catch (error) {
-      if (error instanceof GoogleUnavailableError) {
-        complain(t.auth.social.googleUnavailable);
-        return;
-      }
-      if (error instanceof ApiError && error.is(Code.SOCIAL_EMAIL_UNVERIFIED)) {
-        complain(t.auth.social.emailUnverified);
-        return;
-      }
-      // Everything else: a dead network, a 500, a bug. Rethrowing reached nobody - this is an
-      // async callback, so the throw became an unhandled rejection and the screen just sat there.
-      complain(t.auth.social.failed);
+      report(error);
     } finally {
       setPending(null);
     }
-  }, [attempt, complain, pending, t]);
+  }, [attempt, complain, pending, report, t]);
 
   const discord = useCallback(async () => {
     if (pending) return;
@@ -156,44 +149,19 @@ export function useSocialSignIn() {
     }
   }, [complain, pending, t]);
 
-  /**
-   * Picks up a Discord sign-in that came back needing the terms.
-   *
-   * `app/social.tsx` cannot show the sheet itself — it is a spinner with no state — so it
-   * hands the still-unspent ticket back to whichever screen started the flow.
-   */
-  const resumeWithTicket = useCallback((ticket: string) => {
-    held.current = { kind: 'discord', ticket };
-    setConsentNeeded(true);
-  }, []);
-
-  /** The consent sheet's Continue: the same credential, now with the tick. */
+  /** The consent step's Continue: the held credential again, now with the tick. */
   const confirmConsent = useCallback(async () => {
-    const credential = held.current;
-    if (!credential || !accepted) return;
+    const credential = useSocialPending.getState().credential;
+    if (!credential || pending) return;
     setPending(credential.kind);
     try {
       await attempt(credential, true);
+    } catch (error) {
+      report(error);
     } finally {
       setPending(null);
     }
-  }, [accepted, attempt]);
+  }, [attempt, pending, report]);
 
-  const dismissConsent = useCallback(() => {
-    setConsentNeeded(false);
-    setAccepted(false);
-    held.current = null;
-  }, []);
-
-  return {
-    google,
-    discord,
-    resumeWithTicket,
-    pending,
-    consentNeeded,
-    accepted,
-    setAccepted,
-    confirmConsent,
-    dismissConsent,
-  };
+  return { google, discord, pending, confirmConsent };
 }
