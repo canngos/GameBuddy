@@ -32,7 +32,9 @@ export function SocialButtons({ social }: { social: ReturnType<typeof useSocialS
 
   const offered = providers.data?.providers;
   // Undefined while loading or after a failure: show what the build supports.
-  const showGoogle = googleAvailable && (offered === undefined || offered.includes('GOOGLE'));
+  // A call, not a constant: it also answers whether the *binary* has the SDK, which an
+  // over-the-air update cannot change. See `googleAvailable` in `src/session/google.ts`.
+  const showGoogle = googleAvailable() && (offered === undefined || offered.includes('GOOGLE'));
   const showDiscord = offered === undefined || offered.includes('DISCORD');
 
   if (!showGoogle && !showDiscord) return null;
