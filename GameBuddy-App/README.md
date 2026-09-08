@@ -303,35 +303,83 @@ Then, from the phone's browser: `http://192.168.50.169:8080/actuator/health` sho
 `{"status":"UP"}`. If that fails, nothing in the app will work either, and the problem is
 the network rather than the build.
 
-### iPhone — Expo Go today, TestFlight later
+### iPhone — a simulator build in the browser today, TestFlight later
 
-For testing against a local backend, **use Expo Go**. It is free, needs no Apple
-account, and the API base URL resolves from Metro's host automatically:
+**Expo Go cannot run this app.** It ships Nitro Google Sign-In, Google Mobile Ads,
+RevenueCat and Firebase; none of them exist in Expo Go, and `src/session/google.ts` and
+`src/billing/purchases.ts` both degrade rather than crash precisely because a build can be
+missing them. Expo Go would launch and then be unable to sign anybody in.
+
+What works from Windows, with **no Apple developer account**:
 
 ```bash
-npx expo start
+eas build --platform ios --profile ios-simulator
 ```
 
-Scan the QR code with the iPhone camera. Push notifications will not work — they need a
-real build — but everything else does.
+That produces a `.tar.gz` holding `GameBuddy.app`, built for the iOS Simulator. EAS asks for
+no Apple credentials at all for a simulator build. Upload the archive to
+[appetize.io](https://appetize.io/upload) and it runs in a browser tab — an anonymous upload
+is enough for a smoke test, and the free tier allows 30 minutes a month. Pick a few different
+iPhone models while you are there; see `UI_NOTE.md` on checking three screen geometries.
 
-**TestFlight is the wrong tool for a local backend**, for two reasons that are not worth
-fighting: iOS App Transport Security blocks plain HTTP in a real build, and a TestFlight
-build is meant to reach a deployed server rather than a laptop on your Wi-Fi. It becomes
-the right tool once the backend is deployed and on HTTPS.
+What a simulator build genuinely proves: that the native project compiles at all, that the
+pods resolve, and that every screen lays out and navigates on iOS. Google sign-in exercises
+the iOS OAuth client and its URL scheme. The API calls hit production over HTTPS.
 
-When that day comes:
+What it cannot prove, because the Simulator has none of them: push delivery, in-app
+purchases, App Tracking Transparency, and the camera. Those wait for a real device.
+
+**TestFlight is the only honest "it fully works" test**, and it is behind the paid account:
 
 1. **Apple Developer Program — $99/year.** There is no free path to TestFlight.
 2. Create the app in App Store Connect with bundle id `com.findgamebuddy.app`.
-3. `eas build --platform ios --profile production` — EAS builds on cloud macOS, so no Mac
+3. Finish the four deferred items under *iOS: what is still missing* below.
+4. `eas build --platform ios --profile production` — EAS builds on cloud macOS, so no Mac
    is required, and it generates and stores the signing certificates.
-4. `eas submit --platform ios --latest`
-5. Add yourself as an internal tester in App Store Connect → TestFlight.
+5. `eas submit --platform ios --latest`
+6. Add yourself as an internal tester in App Store Connect → TestFlight.
+
+### iOS: what is configured, and what is still missing
+
+Registered on 2026-09-08, all free, all bundle id `com.findgamebuddy.app`:
+
+| Thing | Where | Value lives in |
+| --- | --- | --- |
+| OAuth client (iOS) | Cloud project 656951909603 — the OAuth project, **not** Firebase | `eas.json` env + `.env` |
+| Firebase iOS app | project `gamebuddy-a4205` | `GoogleService-Info.plist`, uploaded to EAS as `GOOGLE_SERVICES_INFO_PLIST` |
+| AdMob iOS app + rewarded unit | publisher `pub-1806031824100901` | `eas.json` under `production.ios` |
+
+Two of those carry a trap worth restating.
+
+**The Google client id must be named explicitly on iOS.** Android is matched by package name
+and signing certificate, so its client is never written down. Apple has no such signal, and
+the SDK's fallback is `CLIENT_ID` inside `GoogleService-Info.plist` — which our plist does not
+contain, because Firebase holds no OAuth clients. Left implicit, `configure()` throws and the
+Google button silently does nothing. The reversed id is also the URL scheme, set through the
+plugin option in `app.json`; the two always change together.
+
+**Firebase forces the iOS linkage.** `@react-native-firebase` v26 resolves the Firebase iOS
+SDK through Swift Package Manager, which requires dynamic frameworks, while Google Sign-In and
+Mobile Ads want static. `app.config.js` passes `disableSPM` to put Firebase back on CocoaPods
+and `expo-build-properties` sets `useFrameworks: "static"` to match. Change one and the pods
+stop agreeing.
+
+Still missing, each blocked on the $99 account:
+
+- **RevenueCat.** Only the `goog_` key exists. `production.ios` sets the key to `none`, so the
+  paywall reports itself switched off rather than erroring. Needs an App Store Connect app and
+  IAP products before an `appl_` key can be issued.
+- **Push.** `registerDeviceToken` returns early on iOS: `getDevicePushTokenAsync` gives an APNs
+  token, the backend sends through FCM, and bridging them needs an APNs key from the Apple
+  developer portal. Delete that guard once the key is in Firebase.
+- **App Tracking Transparency.** The `NSUserTrackingUsageDescription` string ships, but the
+  AdMob IDFA explainer message has not been created in Privacy & messaging.
+- **Limited ad serving.** The iOS AdMob app stays limited until an App Store listing is linked,
+  exactly as the Android one was before Play.
 
 ### Build profiles
 
-`production` is the source of truth and **the other three all `extends` it**, so they cannot
+`production` is the source of truth and **the other four all `extends` it**, so they cannot
 silently drift from what ships. Each one overrides only what it genuinely needs to.
 
 | Profile | What it is for | Differs from `production` by |
@@ -340,6 +388,18 @@ silently drift from what ships. Each one overrides only what it genuinely needs 
 | `preview` | The same product, on **your own device**, to confirm the real thing is right before release | APK instead of `.aab` (an `.aab` cannot be sideloaded), internal distribution, own channel |
 | `gate` | The Maestro release gate | + LAN backend |
 | `lan` | Emulator or device, for **UI and flow** work | + LAN backend, **no RevenueCat key** |
+| `ios-simulator` | An iOS build that runs in Appetize from Windows, with no Apple account | `extends` `preview`; `ios.simulator`, test rewarded unit |
+
+**`production` carries an `ios` block, and that is where the platform's values diverge.** The
+AdMob app id and rewarded unit are per platform — an app id from one account with a unit from
+another is refused, which is the failure recorded in `src/ads/rewarded.ts` — and RevenueCat is
+switched off entirely on iOS until an `appl_` key exists. Platform blocks are deep-merged over
+the shared `env`, so everything else is still inherited rather than restated.
+
+**`lan` and `gate` are Android-only in practice.** Both point at a plain-HTTP LAN address, iOS
+App Transport Security blocks that in a real build, and `plugins/withLanCleartext.js` has no
+iOS counterpart. Appetize could not reach a LAN machine regardless, which is why
+`ios-simulator` extends `preview` and talks to production over HTTPS.
 
 Three deliberate details, each of which has already gone wrong once:
 
