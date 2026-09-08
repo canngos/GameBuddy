@@ -11,6 +11,7 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.match.application.mapper.ChatMapper;
+import com.gamebuddy.match.config.MatchProperties;
 import com.gamebuddy.match.domain.client.PredictClient;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent.ServedCandidate;
@@ -105,6 +106,7 @@ public class DefaultMatchService implements MatchService {
     private final SuperLikeRepository superLikes;
     private final CoinLedger coins;
     private final Clock clock;
+    private final MatchProperties matchProperties;
 
     /**
      * The cutoff for the exclusion queries: declines older than this stop hiding anyone.
@@ -112,9 +114,14 @@ public class DefaultMatchService implements MatchService {
      * <p>Declines used to be permanent, which meant the candidate pool could only shrink:
      * the ranking is deterministic, so anyone ever passed over never came back and an active
      * swiper eventually ran out of people entirely.
+     *
+     * <p>Read from configuration on every call rather than cached, so the window a
+     * deployment sets is the window every query uses; see
+     * {@link MatchProperties#getDeclineRecycle()} for why the right value depends on how
+     * many gamers there are.
      */
     private Instant declineHorizon() {
-        return clock.instant().minus(DeclinedMatch.RECYCLE_AFTER);
+        return clock.instant().minus(matchProperties.getDeclineRecycle());
     }
 
     @Override

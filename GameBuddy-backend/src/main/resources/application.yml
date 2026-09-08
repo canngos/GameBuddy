@@ -303,6 +303,14 @@ gamebuddy:
     retention: ${IMPRESSION_RETENTION:P90D}
     cleanup-cron: ${IMPRESSION_CLEANUP_CRON:0 30 3 * * *}
 
+  match:
+    # How long swiping past somebody keeps them out of the deck. This is a function of how
+    # many gamers there are, not of taste: a long window is free only in a pool nobody can
+    # reach the end of, and ours can be exhausted in a sitting. Raise it as the user base
+    # grows -- the right value is the largest one that does not routinely empty a deck.
+    # See MatchProperties.declineRecycle. The nightly sweep deletes declines a day past it.
+    decline-recycle: ${DECLINE_RECYCLE:P7D}
+
   # The coin economy. Every faucet rate lives here so it can be retuned by a deploy
   # rather than a release -- see CoinEconomyProperties for what good numbers look like.
   #

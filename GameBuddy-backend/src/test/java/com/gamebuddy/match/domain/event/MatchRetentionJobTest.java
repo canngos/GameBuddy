@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-import com.gamebuddy.match.infrastructure.entity.DeclinedMatch;
+import com.gamebuddy.match.config.MatchProperties;
 import com.gamebuddy.match.infrastructure.repository.DeclinedMatchRepository;
 import com.gamebuddy.match.infrastructure.repository.RecommendationImpressionRepository;
 import java.time.Clock;
@@ -21,6 +21,13 @@ class MatchRetentionJobTest {
 
     private static final Instant NOW = Instant.parse("2026-08-01T03:30:00Z");
 
+    /**
+     * Deliberately not the configured default, so the sweep reading its window from
+     * somewhere else — a constant, or a second copy of the property — fails here rather
+     * than passing by coincidence.
+     */
+    private static final Duration RECYCLE = Duration.ofDays(5);
+
     private RecommendationImpressionRepository impressions;
     private DeclinedMatchRepository declines;
     private MatchRetentionJob job;
@@ -29,7 +36,9 @@ class MatchRetentionJobTest {
     void setUp() {
         impressions = mock(RecommendationImpressionRepository.class);
         declines = mock(DeclinedMatchRepository.class);
-        job = new MatchRetentionJob(impressions, declines, Clock.fixed(NOW, ZoneOffset.UTC));
+        MatchProperties properties = new MatchProperties();
+        properties.setDeclineRecycle(RECYCLE);
+        job = new MatchRetentionJob(impressions, declines, Clock.fixed(NOW, ZoneOffset.UTC), properties);
         ReflectionTestUtils.setField(job, "retention", Duration.ofDays(90));
     }
 
@@ -63,7 +72,7 @@ class MatchRetentionJobTest {
         verify(declines).deleteDeclinedBefore(cutoff.capture());
         // A day of slack past the exclusion window, so the deletion stays clearly behind
         // the read cutoff instead of racing it.
-        assertEquals(NOW.minus(DeclinedMatch.RECYCLE_AFTER).minus(Duration.ofDays(1)), cutoff.getValue());
+        assertEquals(NOW.minus(RECYCLE).minus(Duration.ofDays(1)), cutoff.getValue());
     }
 
     @Test

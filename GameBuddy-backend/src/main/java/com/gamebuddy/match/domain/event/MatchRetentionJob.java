@@ -1,6 +1,6 @@
 package com.gamebuddy.match.domain.event;
 
-import com.gamebuddy.match.infrastructure.entity.DeclinedMatch;
+import com.gamebuddy.match.config.MatchProperties;
 import com.gamebuddy.match.infrastructure.repository.DeclinedMatchRepository;
 import com.gamebuddy.match.infrastructure.repository.RecommendationImpressionRepository;
 import java.time.Clock;
@@ -31,6 +31,7 @@ public class MatchRetentionJob {
     private final RecommendationImpressionRepository impressions;
     private final DeclinedMatchRepository declinedMatches;
     private final Clock clock;
+    private final MatchProperties matchProperties;
 
     /**
      * How much history to keep. Long enough to retrain on a meaningful window and to
@@ -64,12 +65,17 @@ public class MatchRetentionJob {
      * <p>Separate from the impression sweep and separately transactional, so a failure in one
      * does not skip the other. The extra day of slack past the exclusion window keeps the
      * deletion clearly behind the read cutoff rather than racing it.
+     *
+     * <p>The window comes from the same {@link MatchProperties} the exclusion queries read.
+     * That is what makes the slack meaningful: two copies of the number could be changed
+     * apart, and a sweep running ahead of the read cutoff would delete rows that were still
+     * hiding somebody.
      */
     @Transactional
     @Scheduled(cron = "${gamebuddy.declines.cleanup-cron:0 45 3 * * *}")
     public void purgeExpiredDeclines() {
         try {
-            Duration keep = DeclinedMatch.RECYCLE_AFTER.plus(DELETION_SLACK);
+            Duration keep = matchProperties.getDeclineRecycle().plus(DELETION_SLACK);
             int removed = declinedMatches.deleteDeclinedBefore(clock.instant().minus(keep));
             if (removed > 0) {
                 log.info("Purged {} expired decline(s) older than {}", removed, keep);
