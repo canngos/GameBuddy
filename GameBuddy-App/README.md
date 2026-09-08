@@ -316,11 +316,17 @@ What works from Windows, with **no Apple developer account**:
 eas build --platform ios --profile ios-simulator
 ```
 
-That produces a `.tar.gz` holding `GameBuddy.app`, built for the iOS Simulator. EAS asks for
-no Apple credentials at all for a simulator build. Upload the archive to
-[appetize.io](https://appetize.io/upload) and it runs in a browser tab — an anonymous upload
-is enough for a smoke test, and the free tier allows 30 minutes a month. Pick a few different
-iPhone models while you are there; see `UI_NOTE.md` on checking three screen geometries.
+That produces a `.tar.gz` holding `GameBuddy.app`, built for the iOS Simulator as a universal
+binary with both `x86_64` and `arm64` slices. EAS asks for no Apple credentials at all for a
+simulator build. Upload the archive as-is to [appetize.io](https://appetize.io/upload) — the
+`.tar.gz` is already the shape Appetize wants, so do not unpack it — and it runs in a browser
+tab. Pick a few different iPhone models while you are there; see `UI_NOTE.md` on checking
+three screen geometries.
+
+**Appetize needs a free account.** Anonymous upload no longer exists: the API answers
+`401 {"message":"Invalid API token"}` without one, so the archive has to go through the web
+upload form while signed in, or through the REST API with a token from
+Account → API. That is the one step in this whole route that cannot be automated from here.
 
 What a simulator build genuinely proves: that the native project compiles at all, that the
 pods resolve, and that every screen lays out and navigates on iOS. Google sign-in exercises
@@ -445,3 +451,10 @@ and it will go stale.
 - **No `expo-system-ui`**, so `userInterfaceStyle` in `app.json` does nothing on Android.
   Prebuild says so on every run. The in-app theme switcher is unaffected — it does not go
   through that setting.
+
+### iOS follow-ups noticed in the first successful build
+
+- **`SKAdNetworkItems` is empty.** The Google Mobile Ads plugin only writes the ad-network
+  identifiers when it is given them, and it was not. Nothing breaks without them, but iOS ad
+  attribution is weaker, so add the list before the App Store release rather than before the
+  next smoke test.
