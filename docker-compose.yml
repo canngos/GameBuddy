@@ -219,6 +219,16 @@ services:
       PREDICT_SERVICE_URL: http://model:8000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
 
+      # How long a pass keeps somebody out of the deck. Forwarded WITH a default rather
+      # than bare like the rate limits below, and the difference matters: Compose resolves
+      # an unset variable to the empty string, the application reads this one as a
+      # Duration, and an empty Duration fails to bind and stops the backend from starting.
+      # `:-P7D` means an unset variable arrives as the value the build was tested with.
+      #
+      # Raise it as the user base grows -- see MatchProperties.declineRecycle for what a
+      # good value looks like and why the right one depends on how many gamers there are.
+      DECLINE_RECYCLE: ${DECLINE_RECYCLE:-P7D}
+
       # Object storage for uploaded avatars. Empty R2_ACCESS_KEY_ID — which is what an
       # unconfigured .env gives — selects the local-disk implementation instead, so the
       # stack comes up and avatars work with no Cloudflare account at all. See
