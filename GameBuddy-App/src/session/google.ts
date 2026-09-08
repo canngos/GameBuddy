@@ -1,4 +1,4 @@
-import { TurboModuleRegistry } from 'react-native';
+import { Platform, TurboModuleRegistry } from 'react-native';
 import type * as GoogleSignInSdk from 'react-native-nitro-google-signin';
 
 /**
@@ -29,6 +29,28 @@ import type * as GoogleSignInSdk from 'react-native-nitro-google-signin';
  * clone with no Google project, which is why {@link googleAvailable} exists.
  */
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
+/**
+ * The iOS OAuth client id, and on iOS it is required rather than an optimisation.
+ *
+ * Android needs no equivalent: Credential Manager matches the app by package name and signing
+ * certificate, so the device-side client is found without being named. Apple has no such
+ * signal, so `GIDSignIn` has to be handed the client id outright.
+ *
+ * **Left unset, the SDK falls back to `CLIENT_ID` in `GoogleService-Info.plist`, and here that
+ * key does not exist.** The plist is Firebase's (project `gamebuddy-a4205`) and Firebase has
+ * no OAuth client configured, so it carries no `CLIENT_ID` and no `REVERSED_CLIENT_ID` — the
+ * same emptiness as the Android `oauth_client` array in `google-services.json`. The SDK would
+ * throw `notConfigured` at `configure`, which surfaces as a Google button that does nothing.
+ *
+ * Even with a populated plist this would still be wrong. Our OAuth clients live in a
+ * *different* Google project (656951909603) from Firebase, and the ID token has to be minted
+ * against a client in the same project as {@link WEB_CLIENT_ID}, because that web client is
+ * the audience the backend checks. So the id is named explicitly, from the same project, and
+ * the matching URL scheme is registered by the `iosUrlScheme` plugin option in `app.json` —
+ * the two must always be changed together.
+ */
+const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
 type GoogleSdk = typeof GoogleSignInSdk;
 
@@ -81,7 +103,12 @@ function sdk(): GoogleSdk | null {
  * otherwise — on a clone with no client id, and on a build made before this shipped.
  */
 export function googleAvailable(): boolean {
-  return !!WEB_CLIENT_ID && sdk() !== null;
+  if (!WEB_CLIENT_ID) return false;
+  // iOS additionally needs its own client id — see {@link IOS_CLIENT_ID}. Hiding the button is
+  // the same answer as for a missing web id: a build that cannot sign anybody in should not
+  // offer to.
+  if (Platform.OS === 'ios' && !IOS_CLIENT_ID) return false;
+  return sdk() !== null;
 }
 
 /**
@@ -120,7 +147,7 @@ export function configureGoogle(): void {
   // root layout, where a throw is a white screen on launch and nothing else.
   const google = sdk();
   if (!google) return;
-  google.GoogleOneTapSignIn.configure({ webClientId: WEB_CLIENT_ID });
+  google.GoogleOneTapSignIn.configure({ webClientId: WEB_CLIENT_ID, iosClientId: IOS_CLIENT_ID });
   configured = true;
 }
 
