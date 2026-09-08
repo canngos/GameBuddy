@@ -11,6 +11,7 @@ import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.common.ratelimit.RateLimiter;
 import com.gamebuddy.match.application.mapper.ChatMapper;
 import com.gamebuddy.match.application.mapper.ChatMapperImpl;
+import com.gamebuddy.match.config.MatchProperties;
 import com.gamebuddy.match.domain.client.PredictClient;
 import com.gamebuddy.match.domain.event.RecommendationServedEvent;
 import com.gamebuddy.match.infrastructure.entity.*;
@@ -127,6 +128,14 @@ class DefaultMatchServiceTest {
 
     @Spy
     private ChatMapper chatMapper = new ChatMapperImpl();
+
+    /**
+     * Real, so the window under test is the one a deployment that configures nothing
+     * actually gets. A mock would return null and the horizon assertions below would be
+     * asserting against whatever this test chose to stub.
+     */
+    @Spy
+    private MatchProperties matchProperties = new MatchProperties();
 
     private Gamer gamer;
     private Gamer candidate;
@@ -1454,8 +1463,10 @@ class DefaultMatchServiceTest {
             ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
             verify(declinedMatches, atLeastOnce()).findActiveExclusions(eq(gamer.getUserId()), since.capture());
             // Instant.EPOCH or null here would be the old behaviour wearing a timestamp:
-            // the column would exist and nothing would ever age out of it.
-            assertEquals(NOW.minus(Duration.ofDays(30)), since.getValue());
+            // the column would exist and nothing would ever age out of it. Read from the
+            // properties rather than written out, so retuning the window does not mean
+            // editing a number in two places and finding out later that one moved.
+            assertEquals(NOW.minus(matchProperties.getDeclineRecycle()), since.getValue());
         }
 
         @Test
@@ -1519,7 +1530,7 @@ class DefaultMatchServiceTest {
 
             ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
             verify(declinedMatches).findActiveExclusions(eq(gamer.getUserId()), since.capture());
-            assertEquals(NOW.minus(Duration.ofDays(30)), since.getValue());
+            assertEquals(NOW.minus(matchProperties.getDeclineRecycle()), since.getValue());
         }
     }
 }

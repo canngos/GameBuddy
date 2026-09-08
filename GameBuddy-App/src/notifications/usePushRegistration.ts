@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { useCallback, useEffect, useState } from 'react';
+import { Platform } from 'react-native';
 import { authApi } from '../api/auth';
 import { ensureNotificationChannels } from './channel';
 import { hasBeenPrimed, permissionState } from './permission';
@@ -89,6 +90,19 @@ Notifications.setNotificationHandler({
  */
 export async function registerDeviceToken(): Promise<void> {
   try {
+    // **iOS has no token worth sending yet, and sending the wrong one is worse than none.**
+    // `getDevicePushTokenAsync` returns an *APNs* token on iOS. The backend delivers through
+    // FCM, and FCM will only accept an APNs token for an app whose Firebase project holds an
+    // APNs authentication key — which is issued by the Apple Developer portal, and this
+    // project has no paid Apple account yet. Registering anyway would store a token the
+    // sender can never use, so every iOS device would look subscribed and receive nothing.
+    //
+    // Everything else about notifications still works here: the primer, the permission
+    // prompt, and any notification the app raises itself. Only the upload is skipped. When
+    // the Apple account exists, add the APNs key in Firebase and delete this guard — nothing
+    // else in this file needs to change.
+    if (Platform.OS === 'ios') return;
+
     if ((await permissionState()) !== 'granted') return;
 
     // Before the token, every time. The channel is what decides whether a notification

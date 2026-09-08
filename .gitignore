@@ -29,6 +29,7 @@ firebase-*.json
 google-play-*.json
 
 google-services.json
+GoogleService-Info.plist
 
 # Log files. Written when the backend runs on the host rather than in its container,
 # where LOG_FILE points at a volume instead. See logging.file.name in application.yml.

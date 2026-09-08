@@ -12,15 +12,20 @@ this project:
   read `rules/<rule>.md`; **those files are not shipped** (the folder holds only
   `_template.md` and `_sections.md`). The real content is the 76 KB `AGENTS.md` in the
   same skill folder.
-- `mobile-app-debugging` — the Android / logcat / profiler half. The Xcode half does not
-  apply; this ships Android only.
+- `mobile-app-debugging` — the Android / logcat / profiler half. The Xcode half still does
+  not apply: iOS is configured and built, but only on EAS and only as a simulator build run
+  through Appetize. There is no Mac, no Xcode, and no local iOS toolchain — `expo prebuild
+  --platform ios` refuses to run on Windows at all. Treat anything needing Xcode or a device
+  console as unavailable, and see the README's iOS section for what is deferred.
 - `ui-design:interaction-design`, `ui-design:visual-design-foundations`,
   `ui-design:accessibility-compliance` (for React Native a11y props, not WCAG-for-web).
 
 **Ignore — wrong platform**
 `ui-design:mobile-ios-design` (SwiftUI), `ui-design:mobile-android-design` (Jetpack
 Compose), `ui-design:web-component-design`, `ui-design:responsive-design` (CSS container
-queries).
+queries). The iOS one stays on this list even though the app now builds for iOS: the UI is
+React Native and NativeWind for both platforms, so Apple's Human Interface Guidelines are
+worth reading for judgement and its SwiftUI code is worth nothing here.
 
 **Read for reasoning, not for imports**
 `ui-design:react-native-design` targets React Navigation 6, Reanimated 3 and

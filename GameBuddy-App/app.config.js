@@ -114,7 +114,29 @@ function adMobPlugin(plugins, androidAppId, iosAppId) {
  */
 const crashReportingBuildable = process.env.EAS_BUILD === 'true';
 
-const CRASHLYTICS_PLUGINS = ['@react-native-firebase/app', '@react-native-firebase/crashlytics'];
+/**
+ * The Firebase plugins, and on iOS the one option that decides how they link.
+ *
+ * `@react-native-firebase` v26 resolves the Firebase iOS SDK through **Swift Package
+ * Manager** by default, which requires `use_frameworks! :linkage => :dynamic`. This app
+ * cannot have that: `react-native-nitro-google-signin` declares `AppCheckCore`,
+ * `GoogleUtilities` and `RecaptchaInterop` with `:modular_headers`, and Google Mobile Ads
+ * wants the same static shape. Mixing them is the documented failure — SPM cannot share
+ * `FirebaseCore` across dynamic pod frameworks, so the two Google SDKs end up with separate
+ * copies and the link step fails.
+ *
+ * `disableSPM` puts Firebase back on CocoaPods, where static linkage is supported and every
+ * pod above resolves from one place. `expo-build-properties` in `app.json` sets
+ * `useFrameworks: "static"` to match. The two belong together: change one and the pods stop
+ * agreeing about linkage.
+ *
+ * Android is untouched by this — see `crashReportingBuildable` for the split that governs
+ * whether these plugins are applied at all.
+ */
+const CRASHLYTICS_PLUGINS = [
+  ['@react-native-firebase/app', { ios: { disableSPM: true } }],
+  '@react-native-firebase/crashlytics',
+];
 
 /**
  * Whether iOS has what Firebase needs.
@@ -135,10 +157,15 @@ const CRASHLYTICS_PLUGINS = ['@react-native-firebase/app', '@react-native-fireba
  * failure would otherwise land on whoever first runs `eas build --platform ios`, long after
  * the reason was fresh in anyone's mind.
  *
- * To finish it: register an iOS app in the Firebase console under the bundle id
- * `com.findgamebuddy.app`, download `GoogleService-Info.plist`, upload it to EAS the same way as
- * the Android one, and set `ios.googleServicesFile`. Android-first is the plan, so this is a
- * task for the Apple release rather than a gap in this one.
+ * **Done as of 2026-09-08**, and the check stays as a guard rather than a to-do. The iOS app is
+ * registered in Firebase under `com.findgamebuddy.app`, `GoogleService-Info.plist` is uploaded to
+ * EAS as `GOOGLE_SERVICES_INFO_PLIST` exactly like the Android file, and `ios.googleServicesFile`
+ * points at the local copy. What remains is a fresh clone, where the gitignored plist is absent:
+ * there this turns a hard plugin failure into a warning and a build that still works.
+ *
+ * One thing the plist deliberately does *not* provide is Google Sign-In. Firebase holds no OAuth
+ * clients, so the file carries neither `CLIENT_ID` nor `REVERSED_CLIENT_ID` — the iOS client id
+ * and its URL scheme are named explicitly instead. See `src/session/google.ts`.
  */
 function iosFirebaseConfigured(config) {
   return Boolean(process.env.GOOGLE_SERVICES_INFO_PLIST || config.ios?.googleServicesFile);

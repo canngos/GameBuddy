@@ -10,7 +10,12 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.findgamebuddy.app"
+      "bundleIdentifier": "com.findgamebuddy.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleLocalizations": ["en", "fi", "sv", "de", "fr", "es", "tr"]
+      }
     },
     "android": {
       "package": "com.findgamebuddy.app",
@@ -32,7 +37,20 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store",
-      "react-native-nitro-google-signin",
+      [
+        "react-native-nitro-google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.656951909603-gckbut88ctmmjv0of97edemmjfha4ff6"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
       "expo-font",
       [
         "expo-splash-screen",

@@ -70,6 +70,10 @@ const CLASSIFIED = {
   'expo-document-picker': { collects: false, sends: 'Hands a chosen file to our own upload' },
   'expo-device': { collects: false, sends: 'Reads device model locally' },
   'expo-constants': { collects: false, sends: 'Reads app config locally' },
+  'expo-build-properties': {
+    collects: false,
+    sends: 'Nothing — a config plugin that edits the native project at prebuild, no runtime code',
+  },
   'expo-secure-store': { collects: false, sends: 'Keychain, on device' },
   'expo-linking': { collects: false, sends: 'Deep links, on device' },
 

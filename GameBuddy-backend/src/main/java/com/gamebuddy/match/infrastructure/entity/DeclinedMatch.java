@@ -2,7 +2,6 @@ package com.gamebuddy.match.infrastructure.entity;
 
 import jakarta.persistence.*;
 import java.io.Serializable;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import lombok.Getter;
@@ -18,10 +17,10 @@ import lombok.Setter;
  * candidate pool only shrinks. A gamer who swipes enthusiastically for a week ends up with
  * an empty feed and no way back.
  *
- * <p>Declines therefore expire. Someone passed over months ago — who has probably changed
- * their games, their keywords, or their photo since — becomes visible again. That is not
- * ignoring the decision; it is recognising that the decision was about a profile that no
- * longer exists.
+ * <p>Declines therefore expire, after
+ * {@link com.gamebuddy.match.config.MatchProperties#getDeclineRecycle()} — which is
+ * configuration rather than a constant here, because the right window is a function of how
+ * many gamers exist to swipe through. See that field for what a good value looks like.
  *
  * <p>Also moved off {@code Gamer} deliberately. Only the match module cares who was
  * declined, and a shared entity carrying a mapping one module uses is how the shared
@@ -36,17 +35,6 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class DeclinedMatch implements Serializable {
-
-    /**
-     * How long a pass keeps someone out of the feed.
-     *
-     * <p>Thirty days is roughly where the industry sits, and it is a compromise: short
-     * enough that the pool refills for an active swiper, long enough that a pass is not
-     * undone while the gamer still remembers making it. Defined here rather than in the
-     * service because the retention sweep needs the same number, and two copies of a window
-     * eventually disagree.
-     */
-    public static final Duration RECYCLE_AFTER = Duration.ofDays(30);
 
     @Id
     @Column(name = "user_id", nullable = false)
