@@ -156,19 +156,21 @@ public class DefaultModerationService implements ModerationService {
                 && (request.getNote() == null || request.getNote().isBlank())) {
             throw new BusinessException(TransactionCode.INVALID_REQUEST, "a note is required for 'other'");
         }
-        // Per-reporter budget. The one lever a single account has left for flooding the queue,
-        // since reports are already one per reporter per item. Generous; see the config.
-        if (!reportRateLimiter.tryAcquire(reporter.getUserId())) {
-            throw new BusinessException(TransactionCode.RATE_LIMITED);
-        }
-
         Instant now = clock.instant();
         ModerationCase moderationCase = openCaseFor(target.getUserId(), now);
 
         // One report per reporter per case: reporting the same person twice while a case is
-        // open adds nothing and would double their weight.
+        // open adds nothing and would double their weight. Checked before the budget so a
+        // duplicate tap does not burn a permit -- the in-memory limiter is not transactional,
+        // so a token spent here is not refunded when this throws.
         if (reportRepository.existsByCaseIdAndReporterId(moderationCase.getId(), reporter.getUserId())) {
             throw new BusinessException(TransactionCode.ALREADY_REPORTED);
+        }
+
+        // Per-reporter budget. The one lever a single account has left for flooding the queue,
+        // since reports are already one per reporter per case. Generous; see the config.
+        if (!reportRateLimiter.tryAcquire(reporter.getUserId())) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
         }
 
         ContentReport report = new ContentReport();
@@ -192,8 +194,11 @@ public class DefaultModerationService implements ModerationService {
         return DefaultMessageResponse.of("Reported. A moderator will review it.");
     }
 
-    /** The open case for a target, or a fresh one — under a row lock, so two reports do not race to create it. */
+    /** The open case for a target, or a fresh one. Serialised per target so two reports do not race to create it. */
     private ModerationCase openCaseFor(String targetId, Instant now) {
+        // Held for the rest of the transaction, so a concurrent first report against the same
+        // target waits here rather than both inserting a case and tripping the unique index.
+        caseRepository.lockTarget(targetId);
         return caseRepository.findOpenForUpdate(targetId).orElseGet(() -> {
             ModerationCase created = new ModerationCase();
             created.setId(UUID.randomUUID());
@@ -366,6 +371,12 @@ public class DefaultModerationService implements ModerationService {
         }
 
         ModerationAction.Action action = request.getAction();
+        if (action == ModerationAction.Action.UNBAN) {
+            // UNBAN is an audit shape for lifting a block from the accounts tab, not a way to
+            // close a case; a case is not the place to un-ban someone. Reject it here so the
+            // enum's own documentation ("Never a case outcome") is actually enforced.
+            throw new BusinessException(TransactionCode.INVALID_REQUEST, "a case cannot be resolved by unbanning");
+        }
         List<ContentReport> reports = reportRepository.findByCaseIdOrderByCreatedAtAsc(moderationCase.getId());
         ReasonCode reason = request.getReasonCode() != null ? request.getReasonCode() : dominantReason(reports);
 
@@ -396,8 +407,7 @@ public class DefaultModerationService implements ModerationService {
                 moderator,
                 action.upholds() ? ContentReport.Status.ACTIONED : ContentReport.Status.DISMISSED,
                 now);
-        updateReporterStanding(reports, action.upholds());
-        notifyReporters(reports, action.upholds());
+        settleReporters(reports, action.upholds());
 
         moderationCase.setStatus(ModerationCase.Status.CLOSED);
         moderationCase.setClosedAt(now);
@@ -417,53 +427,42 @@ public class DefaultModerationService implements ModerationService {
         reportRepository.saveAll(reports);
     }
 
-    /** One step per distinct reporter, in the direction the decision went. */
-    private void updateReporterStanding(List<ContentReport> reports, boolean upheld) {
+    /**
+     * Updates each distinct reporter's standing and tells them, once, what came of it.
+     *
+     * <p>One pass, not two: a reporter who has just crossed the low-trust line hears the
+     * pointed "your reports are not landing" notice instead of the generic thank-you, never
+     * both for the same decision. The feedback is what keeps honest people reporting; the
+     * low-trust notice is what a serial false reporter needs to hear.
+     */
+    private void settleReporters(List<ContentReport> reports, boolean upheld) {
         Set<String> reporterIds =
                 reports.stream().map(ContentReport::getReporterId).collect(Collectors.toCollection(LinkedHashSet::new));
         List<Gamer> reporters = gamerRepository.findAllById(reporterIds);
         for (Gamer reporter : reporters) {
+            String title;
+            String body;
             if (upheld) {
                 reporter.setReportsUpheld(reporter.getReportsUpheld() + 1);
+                title = "We reviewed your report";
+                body = "Thanks for the report you sent. We reviewed it and took action.";
             } else {
                 reporter.setReportsDismissed(reporter.getReportsDismissed() + 1);
                 if (policy.hasReachedLowTrustNotice(reporter)) {
-                    // Once, at the line. Their reports are still accepted and still reviewed;
+                    // At the line, once. Their reports are still accepted and still reviewed;
                     // this only tells them the ones so far have not been landing.
-                    events.publishEvent(new NotificationRequestedEvent(
-                            reporter.getUserId(),
-                            reporter.getFcmToken(),
-                            "About your reports",
-                            "Several reports you sent were reviewed and found not to break the rules. "
-                                    + "Please report only genuine problems so we can act on them quickly.",
-                            NotificationKind.REPORT_RESOLVED));
+                    title = "About your reports";
+                    body = "Several reports you sent were reviewed and found not to break the rules. "
+                            + "Please report only genuine problems so we can act on them quickly.";
+                } else {
+                    title = "We reviewed your report";
+                    body = "Thanks for the report you sent. We reviewed it and did not find a rule was broken.";
                 }
             }
+            events.publishEvent(new NotificationRequestedEvent(
+                    reporter.getUserId(), reporter.getFcmToken(), title, body, NotificationKind.REPORT_RESOLVED));
         }
         gamerRepository.saveAll(reporters);
-    }
-
-    /** Tells each distinct reporter what came of it. What keeps honest people reporting. */
-    private void notifyReporters(List<ContentReport> reports, boolean upheld) {
-        Set<String> reporterIds =
-                reports.stream().map(ContentReport::getReporterId).collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<String, Gamer> reporters =
-                gamerRepository.findAllById(reporterIds).stream().collect(Collectors.toMap(Gamer::getUserId, g -> g));
-        String body = upheld
-                ? "Thanks for the report you sent. We reviewed it and took action."
-                : "Thanks for the report you sent. We reviewed it and did not find a rule was broken.";
-        for (String reporterId : reporterIds) {
-            Gamer reporter = reporters.get(reporterId);
-            if (reporter == null) {
-                continue;
-            }
-            events.publishEvent(new NotificationRequestedEvent(
-                    reporter.getUserId(),
-                    reporter.getFcmToken(),
-                    "We reviewed your report",
-                    body,
-                    NotificationKind.REPORT_RESOLVED));
-        }
     }
 
     // === Read by the admin module ==========================================

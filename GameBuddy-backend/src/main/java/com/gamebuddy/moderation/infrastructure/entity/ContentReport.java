@@ -29,10 +29,9 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(
         name = "content_report",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uq_report_once_per_reporter",
-                        columnNames = {"content_type", "content_id", "reporter_id"}),
+        // No lifetime unique on (content_type, content_id, reporter_id) any more: a reporter
+        // may report the same person again once the previous case against them is closed.
+        // Dedup is scoped to the open case instead, in DefaultModerationService.
         indexes = {
             @Index(name = "idx_report_status", columnList = "status, createdAt"),
             @Index(name = "idx_content_report_case", columnList = "case_id")

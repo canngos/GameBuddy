@@ -33,9 +33,6 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, UU
     /** Whether this reporter already has a report in this case. */
     boolean existsByCaseIdAndReporterId(UUID caseId, String reporterId);
 
-    /** How many reports a gamer has filed since {@code since}, whatever became of them. */
-    long countByReporterIdAndCreatedAtAfter(String reporterId, Instant since);
-
     /** How much is waiting for a moderator. Read by the console's dashboard. */
     long countByStatus(ContentReport.Status status);
 

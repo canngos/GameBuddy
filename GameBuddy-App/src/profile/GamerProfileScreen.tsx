@@ -43,6 +43,7 @@ import {
   type PillGame,
   ProfileBanner,
   ReportSheet,
+  type ReportPick,
   Screen,
   Text,
   useProfileHeaderLayout,
@@ -226,7 +227,7 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
   });
 
   const report = useMutation({
-    mutationFn: (reason: string) => moderationApi.reportProfile(userId, reason),
+    mutationFn: (pick: ReportPick) => moderationApi.reportProfile(userId, pick.reasonCode, pick.note),
     onSuccess: () => {
       setReporting(false);
       setReported(true);
@@ -517,7 +518,7 @@ export function GamerProfileScreen({ afterBlock }: GamerProfileScreenProps) {
         <ReportSheet
           subject="profile"
           onCancel={() => setReporting(false)}
-          onPick={(reason) => report.mutate(reason)}
+          onPick={(pick) => report.mutate(pick)}
         />
       )}
     </Screen>

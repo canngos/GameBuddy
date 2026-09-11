@@ -57,10 +57,6 @@ export const chatApi = {
    */
   markRead: (friendId: string) => api.post<void>(`/messages/read/${friendId}`),
 
-  /**
-   * Flags a message for moderation. Only the *recipient* may report — the backend
-   * refuses with RECEIVER_IS_DIFFERENT (143) otherwise, so this is not offered on
-   * your own messages.
-   */
-  report: (messageId: string) => api.post<void>(`/messages/report/${messageId}`),
+  // Reporting a message moved to `moderationApi.reportMessage`: a report now carries a
+  // reason and becomes evidence in a moderation case, the same shape as a profile report.
 };

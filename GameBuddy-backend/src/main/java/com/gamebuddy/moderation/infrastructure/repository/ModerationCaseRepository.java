@@ -28,7 +28,18 @@ public interface ModerationCaseRepository extends JpaRepository<ModerationCase, 
     @Query("select c from ModerationCase c where c.targetId = :targetId and c.status <> 'CLOSED'")
     Optional<ModerationCase> findOpenForUpdate(@Param("targetId") String targetId);
 
-    Optional<ModerationCase> findFirstByTargetIdAndStatusNot(String targetId, ModerationCase.Status status);
+    /**
+     * Serialises everyone filing against one target for the rest of this transaction.
+     *
+     * <p>{@link #findOpenForUpdate}'s row lock cannot help the first-ever report against a
+     * target — there is no row to lock, so two simultaneous first reports would both see "no
+     * case", both insert one, and the second would hit the partial unique index as a 500. A
+     * transaction-scoped advisory lock keyed on the target id has no such gap: the second
+     * caller waits on the lock, then finds the case the first created. Released automatically
+     * at commit or rollback.
+     */
+    @Query(value = "SELECT pg_advisory_xact_lock(hashtext(:targetId), 0)", nativeQuery = true)
+    void lockTarget(@Param("targetId") String targetId);
 
     /** The queue: urgent first, then oldest first. */
     @Query("""
@@ -37,10 +48,6 @@ public interface ModerationCaseRepository extends JpaRepository<ModerationCase, 
             order by case when c.status = 'URGENT' then 0 else 1 end, c.openedAt asc
             """)
     List<ModerationCase> queue(@Param("statuses") Collection<ModerationCase.Status> statuses, Pageable pageable);
-
-    /** A gamer's closed cases, newest first: the history a moderator reads before deciding. */
-    List<ModerationCase> findByTargetIdAndStatusOrderByOpenedAtDesc(
-            String targetId, ModerationCase.Status status, Pageable pageable);
 
     long countByStatusIn(Collection<ModerationCase.Status> statuses);
 

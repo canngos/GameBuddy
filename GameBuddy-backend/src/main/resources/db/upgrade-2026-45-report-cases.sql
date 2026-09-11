@@ -104,8 +104,49 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_content_report_case
     ON gamebuddy.content_report (case_id);
 
--- Reports filed before this migration have a free-text reason and no case. They stay
--- readable as history; nothing here reinterprets them.
+-- The old "one report per reporter per item, forever" constraint is wrong for cases. A
+-- person may report someone, have the case dismissed or upheld and closed, and then need
+-- to report the same person again when they reoffend -- a second report against the same
+-- profile after the first case closes is legitimate, not a duplicate. Dedup is now scoped
+-- to the OPEN case (one report per reporter per case, enforced in the service), so this
+-- lifetime constraint would only turn a valid repeat report into a 500.
+ALTER TABLE gamebuddy.content_report
+    DROP CONSTRAINT IF EXISTS uq_report_once_per_reporter;
+
+-- Backfill: reports left OPEN when this migration runs have no case, and the new queue and
+-- the SLA counters read moderation_case, so without this they would vanish from the
+-- moderator's view -- breaking the terms' promise to act on every report. Give each
+-- distinct still-open target a case and attach its open reports to it.
+DO $$
+DECLARE
+    target RECORD;
+    new_case_id uuid;
+BEGIN
+    FOR target IN
+        SELECT DISTINCT author_id
+        FROM gamebuddy.content_report
+        WHERE status = 'OPEN' AND case_id IS NULL
+    LOOP
+        new_case_id := gen_random_uuid();
+        INSERT INTO gamebuddy.moderation_case
+            (id, target_id, status, weighted_score, distinct_reporters, opened_at, last_report_at, auto_hidden)
+        SELECT
+            new_case_id,
+            target.author_id,
+            'OPEN',
+            0,
+            COUNT(DISTINCT reporter_id),
+            MIN(created_at),
+            MAX(created_at),
+            false
+        FROM gamebuddy.content_report
+        WHERE author_id = target.author_id AND status = 'OPEN' AND case_id IS NULL;
+
+        UPDATE gamebuddy.content_report
+        SET case_id = new_case_id
+        WHERE author_id = target.author_id AND status = 'OPEN' AND case_id IS NULL;
+    END LOOP;
+END $$;
 
 -- ---------------------------------------------------------------------------------------
 -- What a moderator did, and why. Every sanction is a row here, whether or not it came
