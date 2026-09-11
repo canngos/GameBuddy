@@ -29,6 +29,7 @@ export const sv: Dictionary = {
     subtitle:
       'Inte en server full av främlingar. GameBuddy matchar dig utifrån dina spel, din plattform och hur du gillar att spela — och håller sig sedan undan så att du kan spela.',
     comingSoon: 'Kommer snart till',
+    getItOn: 'Hämta i',
     releaseNote: 'GameBuddy är i slutfasen före lansering. Android kommer först.',
     deckAlt: 'GameBuddys kortlek som visar en spelares profil och vilka spel hen spelar',
     chatAlt: 'GameBuddys konversationslista, med en ny match som väntar',
@@ -60,7 +61,7 @@ export const sv: Dictionary = {
     },
     free: {
       title: 'Gratis, på riktigt',
-      body: 'Matchningen, chatten och gemenskaperna är gratis. Gold lägger till filter och obegränsade gillningar — det låser inte det du kom hit för.',
+      body: 'Matchningen, chatten och lobbyerna är gratis. Gold lägger till filter och obegränsade gillningar — det låser inte det du kom hit för.',
     },
   },
 
@@ -83,11 +84,11 @@ export const sv: Dictionary = {
 
   faq: {
     title: 'Frågor',
-    q1: { q: 'Är GameBuddy gratis?', a: 'Ja. Matchning, chatt och gemenskaper är gratis, med en daglig gräns för gillningar. Gold är valfritt och ger avancerade filter, obegränsade gillningar och några kosmetiska extrafunktioner — det sätter inte själva matchningen bakom en betalvägg.' },
+    q1: { q: 'Är GameBuddy gratis?', a: 'Ja. Matchning, chatt och lobbyer är gratis, med en daglig gräns för gillningar. Gold är valfritt och ger avancerade filter, obegränsade gillningar och några kosmetiska extrafunktioner — det sätter inte själva matchningen bakom en betalvägg.' },
     q2: { q: 'Är det en dejtingapp?', a: 'Nej. GameBuddy matchar människor utifrån vilka spel de spelar och hur de spelar dem, så att du kan hitta ett gäng, en co-op-partner eller en raidgrupp. Den är byggd för att spela tillsammans, inte för att dejta.' },
     q3: { q: 'Vilka plattformar stöds?', a: 'Du berättar för GameBuddy vad du spelar på — PC, PlayStation, Xbox, Switch eller mobil — och matchningen sker därefter, eftersom samma spel på olika plattformar oftast inte går att spela ihop. Appen kommer först till Android, iOS senare.' },
     q4: { q: 'Varför 18-årsgräns?', a: 'GameBuddy sätter främlingar i privat konversation med varandra, och det ska inte drivas för minderåriga vid sidan av vuxna. Det finns ingen yngre nivå och inget övervakat läge. Åldern räknas ut från ett födelsedatum som anges vid registrering, och konton som visar sig tillhöra personer under 18 stängs.' },
-    q5: { q: 'Vad gör ni åt otrevliga typer?', a: 'Du kan blockera eller anmäla vem som helst från profilen eller konversationen, och anmälningar granskas inom 24 timmar. Varje uppladdad bild granskas automatiskt innan någon annan kan se den. Kontaktuppgifter rensas bort ur offentlig text, så ingen kan lägga upp ett telefonnummer i en gemenskap.' },
+    q5: { q: 'Vad gör ni åt otrevliga typer?', a: 'Du kan blockera eller anmäla vem som helst från profilen eller konversationen, och anmälningar granskas inom 24 timmar. Varje uppladdad bild granskas automatiskt innan någon annan kan se den. Kontaktuppgifter rensas bort ur offentlig text, så ingen kan lägga upp ett telefonnummer i en lobby.' },
     q6: { q: 'Kan andra se mina meddelanden?', a: 'Nej. Meddelandenas innehåll krypteras innan det lagras, så databasen innehåller chiffertext och inte din konversation. Moderatorer ser ett meddelande endast när du anmäler det.' },
     q7: { q: 'Hur raderar jag mitt konto?', a: 'Från Inställningar i appen, eller genom att skriva till supporten. Din profil, din bild och dina smakdata försvinner; den andra halvan av dina konversationer blir kvar, eftersom den inte bara är din att radera. Hela förklaringen finns på sidan om kontoradering.' },
   },

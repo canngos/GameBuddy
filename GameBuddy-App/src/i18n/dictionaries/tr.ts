@@ -761,6 +761,8 @@ export const tr: Dictionary = {
     privacyHint: 'Neyi topluyoruz ve onunla ne yapıyoruz',
     adPrivacy: 'Reklam gizliliği',
     adPrivacyHint: 'Reklamların senin hakkında neleri kullanabileceğini değiştir',
+    moderationNotice: 'Bildirimler 24 saat içinde incelenir. Kötüye kullanıma hoşgörü yoktur.',
+    igdbCredit: "Oyun kapakları ve açıklamaları IGDB.com'dan.",
     password: 'Parola',
     passwordHint: 'Seni her yerden çıkış yaptırır',
     passwordSet: 'Şifre belirle',
@@ -923,6 +925,10 @@ export const tr: Dictionary = {
     reasonSpam: 'Spam veya reklam',
     reasonMinor: 'Reşit olmayabilir',
     reasonOther: 'Başka bir şey',
+    reasonImpersonation: 'Başkası gibi davranıyor',
+    reportNoteBlurb: 'Ne olduğunu anlat.',
+    reportNotePlaceholder: 'Ne oldu?',
+    reportSend: 'Bildirimi gönder',
   },
 
   errors: {
@@ -940,6 +946,7 @@ export const tr: Dictionary = {
       '107': 'Bu kullanıcı adı alınmış.',
       '108': 'Kullanıcı adı veya şifre yanlış. Google ya da Discord ile kaydolduysan o düğmeyi kullan.',
       '113': 'Bu hesap engellenmiş.',
+      '206': 'Hesabın askıya alındı. Askı bitince tekrar giriş yapabilirsin.',
       '121': 'Bu oyuncu seni engellemiş.',
       '186': 'Bu oyuncuyu engelledin, bu yüzden mesaj gönderemezsin.',
       '129': 'Yeterli altın yok.',

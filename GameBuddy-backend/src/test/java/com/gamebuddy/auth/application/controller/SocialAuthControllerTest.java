@@ -142,8 +142,7 @@ class SocialAuthControllerTest {
     @Test
     @DisplayName("identities are read for the caller, never for an id in the request")
     void identitiesUseThePrincipal() throws Exception {
-        when(socialAuthService.identities(any()))
-                .thenReturn(new SocialIdentitiesResponseBody(List.of(), false));
+        when(socialAuthService.identities(any())).thenReturn(new SocialIdentitiesResponseBody(List.of(), false));
 
         mockMvc.perform(get("/auth/social/identities"))
                 .andExpect(status().isOk())

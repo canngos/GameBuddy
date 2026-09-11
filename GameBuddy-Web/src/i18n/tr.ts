@@ -29,6 +29,7 @@ export const tr: Dictionary = {
     subtitle:
       'Yabancılarla dolu bir sunucu değil. GameBuddy seni oyunlarına, platformuna ve oynama tarzına göre eşleştirir — sonra da çekilir ki oynayabilesin.',
     comingSoon: 'Çok yakında',
+    getItOn: 'İndir:',
     releaseNote: 'GameBuddy çıkış öncesi son aşamada. Önce Android geliyor.',
     deckAlt: 'GameBuddy destesi: bir oyuncunun profili ve oynadığı oyunlar',
     chatAlt: 'Yeni bir eşleşmenin beklediği GameBuddy sohbet listesi',
@@ -60,7 +61,7 @@ export const tr: Dictionary = {
     },
     free: {
       title: 'Gerçekten ücretsiz',
-      body: 'Eşleşme, sohbet ve topluluklar ücretsiz. Gold filtreler ve sınırsız beğeni ekler — geldiğin şeyin önüne duvar örmez.',
+      body: 'Eşleşme, sohbet ve lobiler ücretsiz. Gold filtreler ve sınırsız beğeni ekler — geldiğin şeyin önüne duvar örmez.',
     },
   },
 
@@ -83,11 +84,11 @@ export const tr: Dictionary = {
 
   faq: {
     title: 'Sorular',
-    q1: { q: 'GameBuddy ücretsiz mi?', a: 'Evet. Eşleşme, sohbet ve topluluklar ücretsiz; beğenilerde günlük bir sınır var. Gold isteğe bağlı ve gelişmiş filtreler, sınırsız beğeni ve birkaç görsel ekstra getiriyor — eşleşmenin kendisini ödeme duvarının arkasına koymuyor.' },
+    q1: { q: 'GameBuddy ücretsiz mi?', a: 'Evet. Eşleşme, sohbet ve lobiler ücretsiz; beğenilerde günlük bir sınır var. Gold isteğe bağlı ve gelişmiş filtreler, sınırsız beğeni ve birkaç görsel ekstra getiriyor — eşleşmenin kendisini ödeme duvarının arkasına koymuyor.' },
     q2: { q: 'Bu bir flört uygulaması mı?', a: 'Hayır. GameBuddy insanları oynadıkları oyunlara ve oynama biçimlerine göre eşleştirir; amaç bir ekip, bir co-op arkadaşı ya da bir raid grubu bulmak. Birlikte oynamak için kuruldu, flört için değil.' },
     q3: { q: 'Hangi platformları destekliyor?', a: 'GameBuddy’ye neyle oynadığını söylüyorsun — PC, PlayStation, Xbox, Switch ya da mobil — eşleşmeler de buna göre yapılıyor, çünkü farklı platformlardaki aynı oyunlar genelde birlikte oynanamaz. Uygulamanın kendisi önce Android’e geliyor, iOS sonra.' },
     q4: { q: 'Neden 18 yaş sınırı var?', a: 'GameBuddy yabancıları birbiriyle özel sohbete sokuyor ve bunu yetişkinlerin yanında reşit olmayanlar için çalıştırmak doğru değil. Daha genç bir kademe ya da denetimli mod yok. Yaş, kayıtta verilen doğum tarihinden hesaplanıyor ve 18 yaşından küçüklere ait olduğu anlaşılan hesaplar kapatılıyor.' },
-    q5: { q: 'Rahatsız edenlere karşı ne yapıyorsunuz?', a: 'Herkesi profilinden ya da sohbetten engelleyebilir veya şikayet edebilirsin; şikayetler 24 saat içinde incelenir. Yüklenen her fotoğraf, kimse göremeden otomatik olarak taranır. İletişim bilgileri herkese açık metinlerden temizlenir, yani kimse topluluğa telefon numarası yazamaz.' },
+    q5: { q: 'Rahatsız edenlere karşı ne yapıyorsunuz?', a: 'Herkesi profilinden ya da sohbetten engelleyebilir veya şikayet edebilirsin; şikayetler 24 saat içinde incelenir. Yüklenen her fotoğraf, kimse göremeden otomatik olarak taranır. İletişim bilgileri herkese açık metinlerden temizlenir, yani kimse lobiye telefon numarası yazamaz.' },
     q6: { q: 'Mesajlarımı başkası görebilir mi?', a: 'Hayır. Mesaj içerikleri kaydedilmeden önce şifrelenir; veritabanında sohbetin değil şifreli metin bulunur. Moderatörler bir mesajı yalnızca sen şikayet edersen görür.' },
     q7: { q: 'Hesabımı nasıl silerim?', a: 'Uygulamadaki Ayarlar’dan ya da destek adresine yazarak. Profilin, fotoğrafın ve zevk verilerin gider; sohbetlerinin diğer yarısı kalır, çünkü onları silmek yalnızca sana bağlı değil. Tam açıklama hesap silme sayfasında.' },
   },

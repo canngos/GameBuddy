@@ -55,6 +55,13 @@ class RewardedAdVerifierTest {
             exchange.getResponseBody().write(bytes);
             exchange.close();
         });
+        // A host that answers 301 to /keys, the way the bare gstatic host redirects to the
+        // www one. The client must follow it, or it parses the redirect page as a key set.
+        server.createContext("/moved", exchange -> {
+            exchange.getResponseHeaders().add("Location", "/keys");
+            exchange.sendResponseHeaders(301, -1);
+            exchange.close();
+        });
         server.start();
 
         verifier =
@@ -156,5 +163,24 @@ class RewardedAdVerifierTest {
     void unreachableKeysRefuse() {
         RewardedAdVerifier offline = new RewardedAdVerifier("http://127.0.0.1:1/nothing");
         assertFalse(offline.verify(CONTENT, "sig", KEY_ID));
+    }
+
+    @Test
+    @DisplayName("the default key URL is the host that actually answers")
+    void defaultUrlIsTheWwwHost() {
+        // The bare gstatic host answers 301, and the JDK client does not follow a redirect
+        // unless the client is built to. A regression to the bare host silently refuses
+        // every reward, so pin the constant.
+        assertEquals("https://www.gstatic.com/admob/reward/verifier-keys.json", RewardedAdVerifier.DEFAULT_KEYS_URL);
+    }
+
+    @Test
+    @DisplayName("a 301 to the key set is followed, not parsed as the key set")
+    void redirectIsFollowed() throws Exception {
+        RewardedAdVerifier viaRedirect =
+                new RewardedAdVerifier("http://127.0.0.1:" + server.getAddress().getPort() + "/moved");
+        assertTrue(
+                viaRedirect.verify(CONTENT, sign(CONTENT), KEY_ID),
+                "the client must follow the redirect to reach the keys");
     }
 }

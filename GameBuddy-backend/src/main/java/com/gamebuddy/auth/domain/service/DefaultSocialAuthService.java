@@ -125,11 +125,7 @@ public class DefaultSocialAuthService implements SocialAuthService {
 
         GoogleIdTokenVerifier.GoogleIdentity identity = verifier.verify(idToken);
         return resolve(
-                AuthProvider.GOOGLE,
-                identity.subject(),
-                identity.email(),
-                identity.emailVerified(),
-                acceptedTerms);
+                AuthProvider.GOOGLE, identity.subject(), identity.email(), identity.emailVerified(), acceptedTerms);
     }
 
     // =======================================================================
@@ -141,8 +137,7 @@ public class DefaultSocialAuthService implements SocialAuthService {
     public String startDiscordLogin() {
         requireDiscordConfigured();
         String token = mintTicket(AuthProvider.DISCORD, null, null, null, null);
-        return UriComponentsBuilder.fromUriString(
-                        linkProperties.getDiscord().getAuthorizeUrl())
+        return UriComponentsBuilder.fromUriString(linkProperties.getDiscord().getAuthorizeUrl())
                 .queryParam("client_id", linkProperties.getDiscord().getClientId())
                 .queryParam("response_type", "code")
                 // One scope more than profile linking asks for. The address is what lets
@@ -199,8 +194,7 @@ public class DefaultSocialAuthService implements SocialAuthService {
             // A second ticket, minted now. The one that travelled through Discord and the
             // browser is spent; this one has only ever existed here and in the redirect the
             // app itself receives.
-            String inbound =
-                    mintTicket(AuthProvider.DISCORD, user.id(), user.email(), Boolean.TRUE, display);
+            String inbound = mintTicket(AuthProvider.DISCORD, user.id(), user.email(), Boolean.TRUE, display);
             log.info("Discord sign-in verified for subject {}", outbound.getId());
             return returnUrl("ok", inbound);
         } catch (BusinessException e) {
@@ -356,10 +350,26 @@ public class DefaultSocialAuthService implements SocialAuthService {
         if (gamer.getDeletedAt() != null) {
             throw new BusinessException(TransactionCode.ACCOUNT_DELETED);
         }
-        if (Boolean.TRUE.equals(gamer.getIsBlocked())) {
+        if (!Boolean.TRUE.equals(gamer.getIsBlocked())) {
+            return;
+        }
+        // A suspension has an end time and its own code; a ban has neither. A suspension
+        // already served is lifted here, same as on the password path -- see
+        // DefaultAuthService.refuseIfBlocked.
+        Instant until = gamer.getSuspendedUntil();
+        if (until == null) {
             throw new BusinessException(TransactionCode.USER_BLOCKED);
         }
+        if (until.isAfter(clock.instant())) {
+            throw new BusinessException(TransactionCode.ACCOUNT_SUSPENDED, SUSPENDED_UNTIL.format(until));
+        }
+        gamer.setIsBlocked(false);
+        gamer.setSuspendedUntil(null);
+        gamerRepository.save(gamer);
     }
+
+    private static final java.time.format.DateTimeFormatter SUSPENDED_UNTIL =
+            java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm 'UTC'").withZone(java.time.ZoneOffset.UTC);
 
     private void attach(String userId, AuthProvider provider, String subject, String email, Instant now) {
         GamerAuthIdentity identity = new GamerAuthIdentity();

@@ -5,7 +5,6 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 import com.gamebuddy.common.exception.BusinessException;
-import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.match.infrastructure.entity.ChatMessage;
 import com.gamebuddy.match.infrastructure.entity.ChatParticipant;
 import com.gamebuddy.match.infrastructure.entity.ChatRoom;
@@ -388,66 +387,6 @@ class ChatMessageServiceTest {
                     chatMessageService.findInbox(receiver).getBody().getData().getInboxList();
 
             assertTrue(inbox.isEmpty(), "used to throw USER_NOT_FOUND for every other conversation too");
-        }
-    }
-
-    @Nested
-    class Report {
-
-        @Test
-        @DisplayName("reporting keeps the text: the moderator has to be able to read what was said")
-        void testReportMessage_whenRecipient_PreservesTheEvidence() {
-            ChatMessage message = storedMessage(sender.getUserId(), "something offensive");
-            UUID messageId = message.getId();
-            when(messageRepository.findById(messageId)).thenReturn(Optional.of(message));
-            when(participantRepository.findByRoomIdAndUserId(room.getId(), receiver.getUserId()))
-                    .thenReturn(Optional.of(new ChatParticipant(room.getId(), receiver.getUserId())));
-
-            DefaultMessageResponse response = chatMessageService.reportMessage(receiver, message.getId());
-
-            assertEquals("100", response.getStatus().getCode());
-            assertEquals(NOW, message.getReportedAt());
-            // An earlier version overwrote the body with asterisks, destroying the only
-            // copy and leaving the moderation screen showing nothing readable.
-            assertEquals(
-                    "something offensive",
-                    cipher.decrypt(message.getBody(), message.getNonce(), message.getKeyVersion()));
-        }
-
-        @Test
-        @DisplayName("the sender cannot report their own message into the moderation queue")
-        void testReportMessage_whenSender_ReturnErrorCode143() {
-            ChatMessage message = storedMessage(sender.getUserId(), "text");
-            when(messageRepository.findById(message.getId())).thenReturn(Optional.of(message));
-            UUID id = message.getId();
-
-            BusinessException ex =
-                    assertThrows(BusinessException.class, () -> chatMessageService.reportMessage(sender, id));
-            assertEquals(143, ex.getTransactionCode().getId());
-        }
-
-        @Test
-        @DisplayName("someone outside the conversation cannot report it")
-        void testReportMessage_whenNotAParticipant_ReturnErrorCode143() {
-            ChatMessage message = storedMessage(sender.getUserId(), "text");
-            when(messageRepository.findById(message.getId())).thenReturn(Optional.of(message));
-            when(participantRepository.findByRoomIdAndUserId(room.getId(), stranger.getUserId()))
-                    .thenReturn(Optional.empty());
-            UUID id = message.getId();
-
-            BusinessException ex =
-                    assertThrows(BusinessException.class, () -> chatMessageService.reportMessage(stranger, id));
-            assertEquals(143, ex.getTransactionCode().getId());
-        }
-
-        @Test
-        void testReportMessage_whenMessageNotFound_ReturnErrorCode142() {
-            UUID missing = UUID.randomUUID();
-            when(messageRepository.findById(missing)).thenReturn(Optional.empty());
-
-            BusinessException ex =
-                    assertThrows(BusinessException.class, () -> chatMessageService.reportMessage(receiver, missing));
-            assertEquals(142, ex.getTransactionCode().getId());
         }
     }
 }

@@ -763,6 +763,8 @@ export const fi: Dictionary = {
     privacyHint: 'Mitä keräämme ja mitä sillä teemme',
     adPrivacy: 'Mainosten tietosuoja',
     adPrivacyHint: 'Muuta, mitä mainokset saavat käyttää sinusta',
+    moderationNotice: 'Ilmoitukset käsitellään 24 tunnissa. Häirintää tai loukkaavaa sisältöä ei suvaita.',
+    igdbCredit: 'Pelien kannet ja kuvaukset: IGDB.com.',
     password: 'Salasana',
     passwordHint: 'Kirjaa sinut ulos kaikkialta',
     passwordSet: 'Aseta salasana',
@@ -927,6 +929,10 @@ export const fi: Dictionary = {
     reasonSpam: 'Roskaposti tai mainonta',
     reasonMinor: 'Voi olla alaikäinen',
     reasonOther: 'Jokin muu',
+    reasonImpersonation: 'Esiintyy jonakuna toisena',
+    reportNoteBlurb: 'Kerro, mitä tapahtui.',
+    reportNotePlaceholder: 'Mitä tapahtui?',
+    reportSend: 'Lähetä ilmoitus',
   },
 
   errors: {
@@ -944,6 +950,7 @@ export const fi: Dictionary = {
       '107': 'Käyttäjänimi on varattu.',
       '108': 'Väärä käyttäjätunnus tai salasana. Jos rekisteröidyit Googlella tai Discordilla, käytä sitä painiketta.',
       '113': 'Tili on estetty.',
+      '206': 'Tilisi on jäädytetty. Voit kirjautua uudelleen, kun jäädytys päättyy.',
       '121': 'Tämä pelaaja on estänyt sinut.',
       '186': 'Olet estänyt tämän pelaajan, joten et voi lähettää viestiä.',
       '129': 'Kolikot eivät riitä.',

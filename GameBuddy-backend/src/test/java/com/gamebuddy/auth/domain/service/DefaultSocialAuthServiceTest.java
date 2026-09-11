@@ -178,8 +178,7 @@ class DefaultSocialAuthServiceTest {
             when(googleVerifier.verify(TOKEN))
                     .thenReturn(new GoogleIdTokenVerifier.GoogleIdentity(SUBJECT, EMAIL, false, "Player"));
 
-            assertEquals(
-                    TransactionCode.SOCIAL_EMAIL_UNVERIFIED, refusal(() -> service.signInWithGoogle(TOKEN, true)));
+            assertEquals(TransactionCode.SOCIAL_EMAIL_UNVERIFIED, refusal(() -> service.signInWithGoogle(TOKEN, true)));
             // The whole point: attaching by address is only safe once somebody else has
             // proved the mailbox. Nothing is created and nothing is attached.
             verify(gamerRepository, never()).save(any());

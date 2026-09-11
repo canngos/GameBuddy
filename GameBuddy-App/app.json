@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.findgamebuddy.app",
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.findgamebuddy.app",
       "versionCode": 4,
       "adaptiveIcon": {

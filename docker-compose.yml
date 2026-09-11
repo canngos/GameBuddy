@@ -272,6 +272,10 @@ services:
       AUTH_SEND_CODE_WINDOW: ${AUTH_SEND_CODE_WINDOW:-}
       AUTH_RESET_PASSWORD_PERMITS: ${AUTH_RESET_PASSWORD_PERMITS:-}
       AUTH_RESET_PASSWORD_WINDOW: ${AUTH_RESET_PASSWORD_WINDOW:-}
+      # Per-IP sign-up/code/reset budget. Raise it (e.g. AUTH_IP_PERMITS=100000) before
+      # running the functional suite twice inside its window from one machine.
+      AUTH_IP_PERMITS: ${AUTH_IP_PERMITS:-}
+      AUTH_IP_WINDOW: ${AUTH_IP_WINDOW:-}
       BILLING_PROMO_REDEEM_PERMITS: ${BILLING_PROMO_REDEEM_PERMITS:-}
       BILLING_PROMO_REDEEM_WINDOW: ${BILLING_PROMO_REDEEM_WINDOW:-}
 

@@ -764,6 +764,8 @@ export const de: Dictionary = {
     privacyHint: 'Was wir erheben und was wir damit tun',
     adPrivacy: 'Werbe-Privatsphäre',
     adPrivacyHint: 'Ändern, was Werbung über dich verwenden darf',
+    moderationNotice: 'Meldungen werden innerhalb von 24 Stunden geprüft. Keine Toleranz für Missbrauch.',
+    igdbCredit: 'Spielcover und Beschreibungen von IGDB.com.',
     password: 'Passwort',
     passwordHint: 'Meldet dich überall ab',
     passwordSet: 'Passwort festlegen',
@@ -930,6 +932,10 @@ export const de: Dictionary = {
     reasonSpam: 'Spam oder Werbung',
     reasonMinor: 'Könnte minderjährig sein',
     reasonOther: 'Etwas anderes',
+    reasonImpersonation: 'Gibt sich als jemand anderes aus',
+    reportNoteBlurb: 'Beschreibe kurz, was passiert ist.',
+    reportNotePlaceholder: 'Was ist passiert?',
+    reportSend: 'Meldung senden',
   },
 
   errors: {
@@ -947,6 +953,7 @@ export const de: Dictionary = {
       '107': 'Dieser Benutzername ist vergeben.',
       '108': 'Benutzername oder Passwort stimmt nicht. Wenn du dich mit Google oder Discord angemeldet hast, nimm diesen Button.',
       '113': 'Dieses Konto ist gesperrt.',
+      '206': 'Dein Konto ist gesperrt. Du kannst dich wieder anmelden, sobald die Sperre endet.',
       '121': 'Diese Person hat dich blockiert.',
       '186': 'Du hast diese Person blockiert und kannst ihr nicht schreiben.',
       '129': 'Nicht genug Münzen.',

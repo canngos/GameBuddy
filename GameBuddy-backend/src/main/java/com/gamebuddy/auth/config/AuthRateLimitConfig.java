@@ -135,6 +135,21 @@ public class AuthRateLimitConfig {
      */
     private Budget social = Budget.of(30, Duration.ofMinutes(15));
 
+    /**
+     * Sign-up, code and reset requests from one address, per quarter hour.
+     *
+     * <p>Two hundred, and keyed by the caller's address rather than what they typed -- the
+     * one budget here that is. It exists because every one of those endpoints sends a real
+     * email, and without an address-side limit a single machine can walk a list of addresses
+     * and mail every one of them. Two hundred is generous on purpose: carrier-grade NAT (very
+     * common in the launch markets, Turkish mobile networks especially) puts thousands of
+     * honest people behind one address, and a full functional run makes about seventy-six such
+     * calls from one. It is not the thing that stops a mail-bomb aimed at one inbox -- the
+     * per-address {@code sendCode} budget is -- only the thing that stops one source spraying
+     * many inboxes.
+     */
+    private Budget ip = Budget.of(200, Duration.ofMinutes(15));
+
     @Bean
     public AuthRateLimiters authRateLimiters() {
         return new AuthRateLimiters(
@@ -143,7 +158,8 @@ public class AuthRateLimitConfig {
                 login.limiter(),
                 resetPassword.limiter(),
                 link.limiter(),
-                social.limiter());
+                social.limiter(),
+                ip.limiter());
     }
 
     @Component

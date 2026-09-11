@@ -4,6 +4,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
 import { profileApi } from '../../../src/api/catalogue';
 import { chatApi } from '../../../src/api/chat';
+import { moderationApi } from '../../../src/api/moderation';
 import { socialApi } from '../../../src/api/social';
 import type {
   Candidate,
@@ -23,6 +24,8 @@ import {
   ConfirmDialog,
   ErrorNotice,
   FramedAvatar,
+  ReportSheet,
+  type ReportPick,
   Screen,
   Text,
   TextField,
@@ -116,8 +119,13 @@ export default function Chat() {
   const [friendMenuOpen, setFriendMenuOpen] = useState(false);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
+  // Which received message the report sheet is open for, or null when it is closed.
+  const [reportingId, setReportingId] = useState<string | null>(null);
   const report = useMutation({
-    mutationFn: (messageId: string) => chatApi.report(messageId),
+    mutationFn: ({ messageId, pick }: { messageId: string; pick: ReportPick }) =>
+      moderationApi.reportMessage(messageId, pick.reasonCode, pick.note),
+    onSuccess: () => setReportingId(null),
+    onError: () => setReportingId(null),
   });
 
   // What to actually say, on the first conversation somebody opens. Held back while the
@@ -146,8 +154,9 @@ export default function Chat() {
   const newestFirst = useMemo(() => [...chat.messages].reverse(), [chat.messages]);
   // Depends on `mutate`, not the mutation: react-query's mutation *object* is a fresh literal every render; `mutate` is its stable part.
   // With [report] here, every keystroke in the compose box re-rendered every bubble.
-  const { mutate: reportMutate } = report;
-  const onReport = useCallback((id: string) => reportMutate(id), [reportMutate]);
+  // Long-press opens the reason sheet rather than reporting blind; a report now carries a
+  // reason and a moderator needs it to act.
+  const onReport = useCallback((id: string) => setReportingId(id), []);
   const renderBubble = useCallback(
     ({ item }: { item: Conversation }) => (
       <Bubble message={item} mine={item.sender === chat.myId} onReport={onReport} />
@@ -325,6 +334,14 @@ export default function Chat() {
 
       {confirm && (
         <ConfirmDialog request={confirm} busy={false} onCancel={() => setConfirm(null)} />
+      )}
+
+      {reportingId && (
+        <ReportSheet
+          subject="message"
+          onPick={(pick) => report.mutate({ messageId: reportingId, pick })}
+          onCancel={() => setReportingId(null)}
+        />
       )}
     </Screen>
   );

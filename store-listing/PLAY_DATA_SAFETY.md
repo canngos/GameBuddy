@@ -1,6 +1,6 @@
 # Play Console — Data safety answers
 
-**Derived from `documentation/legal/PRIVACY.md` version 2026-08-20 and the dependency list in
+**Derived from `documentation/legal/PRIVACY.md` version 2026-09-12 and the dependency list in
 `GameBuddy-App/package.json`.** Transcribe it into **Play Console → App content → Data safety**.
 
 Two reasons this document exists rather than the form being filled from memory:

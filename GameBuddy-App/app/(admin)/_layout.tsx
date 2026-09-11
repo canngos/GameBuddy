@@ -59,6 +59,10 @@ export default function AdminLayout() {
             would abandon a half-typed change without saying so. */}
         <Tabs.Screen name="password" options={{ href: null, tabBarStyle: { display: 'none' } }} />
 
+        {/* Reached from the Reports tab. Not a tab of its own: opening it decrypts the
+            reported messages for review, which is an act a moderator takes deliberately. */}
+        <Tabs.Screen name="case" options={{ href: null, tabBarStyle: { display: 'none' } }} />
+
         {/* Both reached from the Codes tab. The editor hides the bar because leaving it
             mid-edit would abandon a half-filled form without saying so, and the picker
             because its selection is only carried back by returning to the editor. */}

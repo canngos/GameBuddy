@@ -272,36 +272,6 @@ public class ChatMessageService {
     }
 
     /**
-     * Flags a message for moderation.
-     *
-     * <p>An earlier version also overwrote the body with asterisks. That destroyed the only
-     * copy of the text: the entire point of a report is for a moderator to read what was
-     * said, so the moderation screen showed a row of asterisks and nothing else. The text
-     * is kept; hiding it from the reporter is a client concern.
-     */
-    @Transactional
-    public DefaultMessageResponse reportMessage(Gamer principal, UUID messageId) {
-        ChatMessage message = messageRepository
-                .findById(messageId)
-                .orElseThrow(() -> new BusinessException(TransactionCode.MESSAGE_NOT_FOUND));
-
-        // Only the recipient may report. Letting the sender flag their own message would
-        // be a way to fill the moderation queue with text they wrote themselves.
-        if (message.getSenderId().equals(principal.getUserId())) {
-            throw new BusinessException(TransactionCode.RECEIVER_IS_DIFFERENT);
-        }
-        if (participantRepository
-                .findByRoomIdAndUserId(message.getRoomId(), principal.getUserId())
-                .isEmpty()) {
-            throw new BusinessException(TransactionCode.RECEIVER_IS_DIFFERENT);
-        }
-
-        message.setReportedAt(clock.instant());
-        messageRepository.save(message);
-        return DefaultMessageResponse.of("Message reported successfully");
-    }
-
-    /**
      * Marks a conversation read, on its own rather than as a side effect of loading it.
      *
      * <p>Reading the history moved the watermark and nothing else did, which left the unread

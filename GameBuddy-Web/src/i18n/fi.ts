@@ -32,6 +32,7 @@ export const fi: Dictionary = {
     subtitle:
       'Ei satunnaisia tuntemattomia täynnä olevaa palvelinta. GameBuddy yhdistää sinut pelien, alustan ja pelityylin perusteella — ja jää sitten pois tieltä, jotta pääset pelaamaan.',
     comingSoon: 'Tulossa pian',
+    getItOn: 'Lataa',
     releaseNote: 'GameBuddy on viimeistelyvaiheessa. Android tulee ensin.',
     deckAlt: 'GameBuddyn korttipino, jossa näkyy pelaajan profiili ja hänen pelinsä',
     chatAlt: 'GameBuddyn keskustelulista, jossa uusi matchi odottaa',
@@ -63,7 +64,7 @@ export const fi: Dictionary = {
     },
     free: {
       title: 'Ilmainen, oikeasti',
-      body: 'Osumat, keskustelut ja yhteisöt ovat ilmaisia. Gold tuo suodattimet ja rajattomat tykkäykset — se ei lukitse sitä, minkä takia tulit.',
+      body: 'Osumat, keskustelut ja aulat ovat ilmaisia. Gold tuo suodattimet ja rajattomat tykkäykset — se ei lukitse sitä, minkä takia tulit.',
     },
   },
 
@@ -86,11 +87,11 @@ export const fi: Dictionary = {
 
   faq: {
     title: 'Kysymyksiä',
-    q1: { q: 'Onko GameBuddy ilmainen?', a: 'On. Osumat, keskustelut ja yhteisöt ovat ilmaisia, ja tykkäyksillä on päivittäinen raja. Gold on vapaaehtoinen ja tuo lisäsuodattimet, rajattomat tykkäykset ja muutaman ulkoasulisän — se ei laita itse osumia maksumuurin taakse.' },
+    q1: { q: 'Onko GameBuddy ilmainen?', a: 'On. Osumat, keskustelut ja aulat ovat ilmaisia, ja tykkäyksillä on päivittäinen raja. Gold on vapaaehtoinen ja tuo lisäsuodattimet, rajattomat tykkäykset ja muutaman ulkoasulisän — se ei laita itse osumia maksumuurin taakse.' },
     q2: { q: 'Onko tämä deittisovellus?', a: 'Ei. GameBuddy yhdistää ihmisiä pelien ja pelitavan perusteella, jotta löydät porukan, co-op-kaverin tai raid-ryhmän. Se on rakennettu yhdessä pelaamiseen, ei deittailuun.' },
     q3: { q: 'Mitä alustoja tuetaan?', a: 'Kerrot GameBuddylle millä pelaat — PC, PlayStation, Xbox, Switch tai mobiili — ja osumat tehdään sen mukaan, koska samat pelit eri alustoilla eivät yleensä tarkoita yhdessä pelaamista. Sovellus itse tulee ensin Androidille, iOS myöhemmin.' },
     q4: { q: 'Miksi ikäraja on 18?', a: 'GameBuddy laittaa tuntemattomat yksityiseen keskusteluun keskenään, eikä sitä ole syytä pyörittää alaikäisille aikuisten rinnalla. Nuorempaa tasoa tai valvottua tilaa ei ole. Ikä lasketaan rekisteröinnissä annetusta syntymäajasta, ja alle 18-vuotiaiden tilit suljetaan.' },
-    q5: { q: 'Entä häiriköt?', a: 'Voit estää tai ilmoittaa kenet tahansa profiilista tai keskustelusta, ja ilmoitukset käsitellään 24 tunnin kuluessa. Jokainen ladattu kuva tarkistetaan automaattisesti ennen kuin kukaan muu näkee sen. Yhteystiedot poistetaan julkisesta tekstistä, joten puhelinnumeroa ei voi julkaista yhteisöön.' },
+    q5: { q: 'Entä häiriköt?', a: 'Voit estää tai ilmoittaa kenet tahansa profiilista tai keskustelusta, ja ilmoitukset käsitellään 24 tunnin kuluessa. Jokainen ladattu kuva tarkistetaan automaattisesti ennen kuin kukaan muu näkee sen. Yhteystiedot poistetaan julkisesta tekstistä, joten puhelinnumeroa ei voi julkaista aulaan.' },
     q6: { q: 'Näkeekö joku muu viestini?', a: 'Ei. Viestien sisältö salataan ennen tallennusta, joten tietokannassa on salakirjoitusta eikä keskusteluasi. Valvoja näkee viestin vain jos ilmoitat siitä.' },
     q7: { q: 'Miten poistan tilini?', a: 'Sovelluksen asetuksista tai kirjoittamalla tukeen. Profiilisi, kuvasi ja makutietosi poistetaan; keskustelujen toinen puoli jää, koska se ei ole yksin sinun poistettavissasi. Koko selitys on tilinpoistosivulla.' },
   },

@@ -179,7 +179,8 @@ class AccountDeletionTest {
         void testDeleteAccount_whenPasswordWrong_ReturnErrorCode150() {
             DeleteAccountRequest req = request("wrong");
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req, TOKEN));
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req, TOKEN));
             assertEquals(150, ex.getTransactionCode().getId());
             assertNull(gamer.getDeletedAt());
         }
@@ -320,7 +321,8 @@ class AccountDeletionTest {
             authService.deleteAccount(gamer, request("correct"), TOKEN);
             DeleteAccountRequest req = request("correct");
 
-            BusinessException ex = assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req, TOKEN));
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> authService.deleteAccount(gamer, req, TOKEN));
             assertEquals(156, ex.getTransactionCode().getId());
         }
     }

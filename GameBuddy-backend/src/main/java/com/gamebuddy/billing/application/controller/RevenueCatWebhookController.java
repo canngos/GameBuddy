@@ -6,9 +6,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -70,16 +73,27 @@ public class RevenueCatWebhookController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
+        String eventId = payload.event() == null ? "(none)" : payload.event().id();
         try {
             revenueCat.handle(payload.event());
+        } catch (TransientDataAccessException
+                | DataAccessResourceFailureException
+                | CannotCreateTransactionException e) {
+            // The database, not the event, was what failed — a dropped connection, a lock
+            // timeout, a pool that could not hand out a transaction. This is the one case
+            // where a retry helps, so answer 503 and let RevenueCat send it again. The retry
+            // is safe: PurchaseService is idempotent on (platform, storeTransactionId), so
+            // the same event applied twice still grants once. (OptimisticLockingFailureException
+            // is a TransientDataAccessException too, so a lost race retries as well.)
+            log.warn(
+                    "Deferring RevenueCat event {} after a transient data-access failure: {}", eventId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         } catch (RuntimeException e) {
-            // Logged and swallowed. A 500 here means RevenueCat retries, and if the cause
-            // is deterministic — a bad product mapping, say — it will retry forever and
-            // then give up on the webhook entirely, taking every other event with it.
-            log.error(
-                    "Failed to apply RevenueCat event {}",
-                    payload.event() == null ? "(none)" : payload.event().id(),
-                    e);
+            // Everything else is deterministic — a bad product mapping, a malformed event.
+            // A 500/503 would make RevenueCat retry it forever and then give up on the
+            // webhook entirely, taking every other event with it, so it is logged and
+            // swallowed with a 200: the event is acknowledged, the fault is ours to chase.
+            log.error("Failed to apply RevenueCat event {}", eventId, e);
         }
         return ResponseEntity.ok().build();
     }

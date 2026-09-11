@@ -2,6 +2,7 @@ package com.gamebuddy.profile.domain.coin;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.PublicKey;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -59,15 +61,31 @@ public class RewardedAdVerifier {
      */
     private static final Duration CACHE_TTL = Duration.ofHours(6);
 
-    private final RestClient http = RestClient.create();
+    /**
+     * Google's published verifier-keys URL. The {@code www.} is load-bearing: the bare host
+     * answers 301 to this, and a client that does not follow the redirect fetches the
+     * redirect page instead of the keys. See {@link #http}.
+     */
+    static final String DEFAULT_KEYS_URL = "https://www.gstatic.com/admob/reward/verifier-keys.json";
+
+    /**
+     * Built rather than {@code RestClient.create()} for two reasons that both bite in
+     * production. It <strong>follows redirects</strong>: the key set moved to a {@code www.}
+     * host that answers 301, and the JDK client behind a plain {@code RestClient} does not
+     * follow one, so the old default fetched an HTML redirect page, parsed it to nothing, and
+     * refused every reward while logging only a warning. And it has <strong>timeouts</strong>:
+     * {@link #refresh} is {@code synchronized} and sits on the {@code /ads/reward} request
+     * path, so a hung fetch with no read timeout would stall every callback behind it. Same
+     * shape as {@code HttpServiceClients}.
+     */
+    private final RestClient http = buildClient();
+
     private final ObjectMapper json = new ObjectMapper();
 
     private volatile Map<String, PublicKey> keys = Map.of();
     private volatile Instant fetchedAt = Instant.EPOCH;
 
-    public RewardedAdVerifier(
-            @Value("${gamebuddy.ads.verifier-keys-url:https://gstatic.com/admob/reward/verifier-keys.json}")
-                    String keysUrl) {
+    public RewardedAdVerifier(@Value("${gamebuddy.ads.verifier-keys-url:" + DEFAULT_KEYS_URL + "}") String keysUrl) {
         this.keysUrl = keysUrl;
     }
 
@@ -159,5 +177,15 @@ public class RewardedAdVerifier {
             log.warn("Could not refresh AdMob verifier keys from {}", keysUrl, e);
             return fallback;
         }
+    }
+
+    private static RestClient buildClient() {
+        HttpClient httpClient = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(Duration.ofSeconds(10));
+        return RestClient.builder().requestFactory(requestFactory).build();
     }
 }

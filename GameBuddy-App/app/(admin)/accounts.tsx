@@ -10,8 +10,8 @@ import { Avatar, Button, Card, ErrorNotice, Screen, Text } from '../../src/ui';
  *
  * Only the banned are listed. Browsing every account would make this a directory of the
  * user base — searchable, screenshot-able, and far more than moderating needs. Banning
- * happens from a report, where there is a reason on screen; this tab exists so the
- * decision can be seen afterwards and undone.
+ * happens by resolving a moderation case, where the evidence and a reason are on screen;
+ * this tab exists so the decision can be seen afterwards and undone.
  *
  * Unbanning is one tap and no confirmation, deliberately: it restores access, and the
  * asymmetry is the point — the destructive direction asks, the merciful one does not.
@@ -74,7 +74,7 @@ export default function AccountsScreen() {
         ListEmptyComponent={
           banned.isLoading ? null : (
             <Text variant="body" className="mt-8 text-center text-muted">
-              Nobody is banned. Accounts you ban from a report appear here.
+              Nobody is banned. Accounts you ban by resolving a case appear here.
             </Text>
           )
         }

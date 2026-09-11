@@ -62,10 +62,20 @@ public class DefaultAdminService implements AdminService {
                 .orElseThrow(() -> new BusinessException(TransactionCode.USER_NOT_FOUND));
 
         user.setIsBlocked(true);
+        // Null with is_blocked = true is what "permanent" looks like, as opposed to a
+        // suspension, which carries an end time. A previously-suspended account being
+        // banned outright must lose that end time or SuspensionLiftJob would later free it.
+        user.setSuspendedUntil(null);
         // Kills every outstanding token immediately. Deleting the session row alone did
         // nothing, because no service ever consulted the session table on a request.
         user.revokeIssuedTokens();
         gamerRepository.save(user);
+
+        // This endpoint is the blunt instrument -- a ban with no case, no recorded reason
+        // and no notice. The audited path, with a statement of reasons to the person and
+        // feedback to the reporters, is resolving a moderation case with the BAN action
+        // (ModerationService.resolveCase -> SanctionExecutor). This one stays for the rare
+        // out-of-band ban an operator does straight from the accounts tab.
 
         // Single bulk statement. The old code did findByEmail(...).orElse(new Session())
         // then delete(), handing a transient entity with a null id to the EntityManager
@@ -88,6 +98,7 @@ public class DefaultAdminService implements AdminService {
             throw new BusinessException(TransactionCode.USER_NOT_BLOCKED);
         }
         user.setIsBlocked(false);
+        user.setSuspendedUntil(null);
         gamerRepository.save(user);
         return DefaultMessageResponse.of("User " + user.getGamerUsername() + " unblocked successfully");
     }

@@ -147,5 +147,4 @@ class AccountLinkControllerTest {
 
         verify(accountLinkService).unlink(principal, "discord");
     }
-
 }

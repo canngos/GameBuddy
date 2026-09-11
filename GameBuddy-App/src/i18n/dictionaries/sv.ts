@@ -761,6 +761,8 @@ export const sv: Dictionary = {
     privacyHint: 'Vad vi samlar in och vad vi gör med det',
     adPrivacy: 'Annonsintegritet',
     adPrivacyHint: 'Ändra vad annonser får använda om dig',
+    moderationNotice: 'Anmälningar granskas inom 24 timmar. Ingen tolerans för kränkande innehåll eller användare.',
+    igdbCredit: 'Spelomslag och beskrivningar från IGDB.com.',
     password: 'Lösenord',
     passwordHint: 'Loggar ut dig överallt',
     passwordSet: 'Ange ett lösenord',
@@ -924,6 +926,10 @@ export const sv: Dictionary = {
     reasonSpam: 'Skräppost eller reklam',
     reasonMinor: 'Kan vara minderårig',
     reasonOther: 'Något annat',
+    reasonImpersonation: 'Utger sig för någon annan',
+    reportNoteBlurb: 'Berätta vad som hände.',
+    reportNotePlaceholder: 'Vad hände?',
+    reportSend: 'Skicka anmälan',
   },
 
   errors: {
@@ -941,6 +947,7 @@ export const sv: Dictionary = {
       '107': 'Användarnamnet är upptaget.',
       '108': 'Fel användarnamn eller lösenord. Om du registrerade dig med Google eller Discord, använd den knappen.',
       '113': 'Kontot är blockerat.',
+      '206': 'Ditt konto är avstängt. Du kan logga in igen när avstängningen upphör.',
       '121': 'Spelaren har blockerat dig.',
       '186': 'Du har blockerat spelaren och kan därför inte skicka meddelanden.',
       '129': 'Inte tillräckligt med mynt.',

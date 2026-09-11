@@ -12,6 +12,7 @@ import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
+import com.gamebuddy.common.observability.LogContext;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.common.security.TokenHashing;
 import com.gamebuddy.common.util.Constants;
@@ -28,6 +29,8 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -160,9 +163,7 @@ public class DefaultAuthService implements AuthService {
             // account itself is gone as far as its owner and everyone else is concerned.
             throw new BusinessException(TransactionCode.ACCOUNT_DELETED);
         }
-        if (Boolean.TRUE.equals(gamer.getIsBlocked())) {
-            throw new BusinessException(TransactionCode.USER_BLOCKED);
-        }
+        refuseIfBlocked(gamer);
         if (Boolean.FALSE.equals(gamer.getIsVerified())) {
             throw new BusinessException(TransactionCode.USER_NOT_VERIFIED);
         }
@@ -198,6 +199,7 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public RegisterResponse register(RegisterRequest registerRequest) {
         String email = registerRequest.getEmail().trim().toLowerCase(Locale.ROOT);
+        requireAddressBudget();
         PasswordPolicy.validate(registerRequest.getPassword());
         TermsPolicy.requireAcceptance(registerRequest.getAcceptedTerms());
 
@@ -242,6 +244,13 @@ public class DefaultAuthService implements AuthService {
         // The device registers itself after sign-in through updateFcmToken, which detaches
         // the token from any previous owner first and so keeps the column unique. A null
         // here is the honest state: no device registered yet.
+        // Re-registering an unverified address is allowed, which also made it a way to mail
+        // somebody every time. Spend a permit from the same budget /auth/sendCode uses --
+        // it is the same act, a code email to an address the caller typed -- so a flood of
+        // registrations cannot outrun the resend limit.
+        if (!rateLimiters.sendCode().tryAcquire(email)) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
+        }
         gamerRepository.save(gamer);
 
         issueAndSendCode(email, true);
@@ -295,6 +304,7 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public DefaultMessageResponse sendVerificationEmail(SendCodeRequest sendCodeRequest) {
         String email = sendCodeRequest.getEmail().trim().toLowerCase(Locale.ROOT);
+        requireAddressBudget();
 
         if (!rateLimiters.sendCode().tryAcquire(email)) {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
@@ -324,6 +334,7 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public ResetVerifyResponse verifyResetCode(ResetVerifyRequest request) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        requireAddressBudget();
 
         if (!rateLimiters.resetPassword().tryAcquire(email)) {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
@@ -374,6 +385,7 @@ public class DefaultAuthService implements AuthService {
     @Transactional
     public DefaultMessageResponse resetPassword(ResetPasswordRequest request) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        requireAddressBudget();
 
         if (!rateLimiters.resetPassword().tryAcquire(email)) {
             throw new BusinessException(TransactionCode.RATE_LIMITED);
@@ -1168,5 +1180,49 @@ public class DefaultAuthService implements AuthService {
 
     private static String hashToken(String token) {
         return TokenHashing.sha256Hex(token);
+    }
+
+    private static final DateTimeFormatter SUSPENDED_UNTIL =
+            DateTimeFormatter.ofPattern("d MMM HH:mm 'UTC'").withZone(ZoneOffset.UTC);
+
+    /**
+     * Refuses a blocked account, telling the two kinds of block apart.
+     *
+     * <p>A permanent ban ({@code suspended_until} null) is {@link TransactionCode#USER_BLOCKED}.
+     * A suspension carries an end time, and its own code so the app can say when it lifts
+     * rather than reading as final. A suspension whose time has already passed is lifted here
+     * and the sign-in allowed to proceed -- the same thing {@code SuspensionLiftJob} does on a
+     * schedule, done at the one moment it matters most, so nobody is turned away a minute after
+     * their week is served.
+     */
+    /**
+     * The per-address budget, spent first on every endpoint that sends a code email.
+     *
+     * <p>Read from the request context rather than passed down: the address is a property of
+     * the connection, not of the request body, and {@code RequestLoggingFilter} already
+     * resolved it behind the proxy. Null outside a request -- a unit test, a scheduled call --
+     * and a null address is not throttled, because there is no source to attribute it to.
+     */
+    private void requireAddressBudget() {
+        String ip = LogContext.getClientIp();
+        if (ip != null && !rateLimiters.ip().tryAcquire(ip)) {
+            throw new BusinessException(TransactionCode.RATE_LIMITED);
+        }
+    }
+
+    private void refuseIfBlocked(Gamer gamer) {
+        if (!Boolean.TRUE.equals(gamer.getIsBlocked())) {
+            return;
+        }
+        Instant until = gamer.getSuspendedUntil();
+        if (until == null) {
+            throw new BusinessException(TransactionCode.USER_BLOCKED);
+        }
+        if (until.isAfter(clock.instant())) {
+            throw new BusinessException(TransactionCode.ACCOUNT_SUSPENDED, SUSPENDED_UNTIL.format(until));
+        }
+        gamer.setIsBlocked(false);
+        gamer.setSuspendedUntil(null);
+        gamerRepository.save(gamer);
     }
 }

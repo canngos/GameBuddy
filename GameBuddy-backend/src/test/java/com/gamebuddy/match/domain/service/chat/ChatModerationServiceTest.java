@@ -6,13 +6,19 @@ import static org.mockito.Mockito.*;
 
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.match.infrastructure.entity.ChatMessage;
+import com.gamebuddy.match.infrastructure.entity.ChatParticipant;
 import com.gamebuddy.match.infrastructure.repository.ChatMessageRepository;
+import com.gamebuddy.match.infrastructure.repository.ChatParticipantRepository;
+import com.gamebuddy.match.interfaces.dto.MessageForReport;
 import com.gamebuddy.match.interfaces.dto.ReportedMessageDto;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.messaging.MessageCipher;
 import com.gamebuddy.shared.repository.GamerRepository;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,19 +45,28 @@ class ChatModerationServiceTest {
     private ChatMessageRepository messageRepository;
 
     @Mock
+    private ChatParticipantRepository participantRepository;
+
+    @Mock
     private GamerRepository gamerRepository;
 
     /** Real, because decrypting for the moderator is the behaviour under test. */
     @Spy
     private MessageCipher cipher = new MessageCipher("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=");
 
+    @Spy
+    private Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
+
+    private final UUID room = UUID.randomUUID();
     private Gamer moderator;
     private Gamer sender;
+    private Gamer receiver;
 
     @BeforeEach
     void setUp() {
         moderator = newGamer("mod@example.com", "moderator");
         sender = newGamer("sender@example.com", "sender");
+        receiver = newGamer("receiver@example.com", "receiver");
     }
 
     private static Gamer newGamer(String email, String username) {
@@ -62,111 +77,137 @@ class ChatModerationServiceTest {
         return g;
     }
 
-    private ChatMessage reported(String senderId, String text) {
+    private ChatMessage stored(String senderId, String text, Instant at) {
         MessageCipher.Encrypted encrypted = cipher.encrypt(text);
         ChatMessage m = new ChatMessage();
         m.setId(UUID.randomUUID());
-        m.setRoomId(UUID.randomUUID());
+        m.setRoomId(room);
         m.setSenderId(senderId);
         m.setBody(encrypted.ciphertext());
         m.setNonce(encrypted.nonce());
         m.setKeyVersion(MessageCipher.CURRENT_KEY_VERSION);
-        m.setCreatedAt(NOW);
-        m.setReportedAt(NOW);
+        m.setCreatedAt(at);
         return m;
     }
 
+    private void receiverIsInTheRoom() {
+        when(participantRepository.findByRoomIdAndUserId(room, receiver.getUserId()))
+                .thenReturn(Optional.of(new ChatParticipant(room, receiver.getUserId())));
+    }
+
     @Test
-    @DisplayName("the queue decrypts: a moderator looking at ciphertext could not act on a report")
-    void testGetReportedMessages_decryptsForReview() {
-        ChatMessage message = reported(sender.getUserId(), "something offensive");
-        when(messageRepository.findByReportedAtIsNotNullOrderByReportedAtDesc(any(Pageable.class)))
-                .thenReturn(List.of(message));
-        when(gamerRepository.findAllById(anySet())).thenReturn(List.of(sender));
+    @DisplayName("a report captures the messages either side, in order, with the reported one in the middle")
+    void testPrepareReport_capturesContextInOrder() {
+        ChatMessage earlier = stored(sender.getUserId(), "hi", NOW.minusSeconds(20));
+        ChatMessage earlier2 = stored(receiver.getUserId(), "hey", NOW.minusSeconds(10));
+        ChatMessage reported = stored(sender.getUserId(), "something offensive", NOW);
+        ChatMessage later = stored(receiver.getUserId(), "wow", NOW.plusSeconds(5));
+        when(messageRepository.findById(reported.getId())).thenReturn(Optional.of(reported));
+        receiverIsInTheRoom();
+        // Newest first, the way the repository hands them back.
+        when(messageRepository.findByRoomIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+                        eq(room), eq(NOW), any(Pageable.class)))
+                .thenReturn(List.of(earlier2, earlier));
+        when(messageRepository.findByRoomIdAndCreatedAtAfterOrderByCreatedAtAsc(eq(room), eq(NOW), any(Pageable.class)))
+                .thenReturn(List.of(later));
 
-        List<ReportedMessageDto> queue = moderationService
-                .getReportedMessages(moderator)
-                .getBody()
-                .getData()
-                .getReportedMessages();
+        MessageForReport described = moderationService.prepareReport(reported.getId(), receiver.getUserId(), 10);
 
-        assertEquals(1, queue.size());
-        assertEquals("something offensive", queue.get(0).message());
-        assertEquals("sender", queue.get(0).senderUsername());
-        assertEquals(NOW, queue.get(0).reportedAt());
+        assertEquals(sender.getUserId(), described.senderId());
+        assertEquals(room, described.roomId());
+        assertEquals(
+                List.of(earlier.getId(), earlier2.getId(), reported.getId(), later.getId()), described.contextIds());
+        assertEquals(NOW, reported.getReportedAt(), "the row itself says it was complained about");
+        // The text is untouched: an earlier version overwrote the body with asterisks,
+        // destroying the only copy and leaving the moderation screen nothing to read.
+        assertEquals(
+                "something offensive",
+                cipher.decrypt(reported.getBody(), reported.getNonce(), reported.getKeyVersion()));
+    }
+
+    @Test
+    @DisplayName("the sender cannot report their own message into the moderation queue")
+    void testPrepareReport_whenSender_ReturnErrorCode143() {
+        ChatMessage message = stored(sender.getUserId(), "text", NOW);
+        when(messageRepository.findById(message.getId())).thenReturn(Optional.of(message));
+        UUID id = message.getId();
+
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> moderationService.prepareReport(id, sender.getUserId(), 10));
+        assertEquals(143, ex.getTransactionCode().getId());
+    }
+
+    @Test
+    @DisplayName("someone outside the conversation cannot report it")
+    void testPrepareReport_whenNotAParticipant_ReturnErrorCode143() {
+        ChatMessage message = stored(sender.getUserId(), "text", NOW);
+        when(messageRepository.findById(message.getId())).thenReturn(Optional.of(message));
+        when(participantRepository.findByRoomIdAndUserId(eq(room), anyString())).thenReturn(Optional.empty());
+        UUID id = message.getId();
+
+        BusinessException ex =
+                assertThrows(BusinessException.class, () -> moderationService.prepareReport(id, "stranger", 10));
+        assertEquals(143, ex.getTransactionCode().getId());
+    }
+
+    @Test
+    void testPrepareReport_whenMessageNotFound_ReturnErrorCode142() {
+        UUID missing = UUID.randomUUID();
+        when(messageRepository.findById(missing)).thenReturn(Optional.empty());
+
+        BusinessException ex = assertThrows(
+                BusinessException.class, () -> moderationService.prepareReport(missing, receiver.getUserId(), 10));
+        assertEquals(142, ex.getTransactionCode().getId());
+    }
+
+    @Test
+    @DisplayName("the moderator's read decrypts: a moderator looking at ciphertext could not act on a report")
+    void testReadForModerator_decryptsInTimeOrder() {
+        ChatMessage second = stored(sender.getUserId(), "something offensive", NOW);
+        ChatMessage first = stored(receiver.getUserId(), "hello", NOW.minusSeconds(30));
+        when(messageRepository.findAllById(anyList())).thenReturn(List.of(second, first));
+        when(gamerRepository.findAllById(anySet())).thenReturn(List.of(sender, receiver));
+
+        List<ReportedMessageDto> read =
+                moderationService.readForModerator(moderator, List.of(second.getId(), first.getId()));
+
+        assertEquals(2, read.size());
+        assertEquals("hello", read.get(0).message(), "time order, whatever order the ids arrived in");
+        assertEquals("something offensive", read.get(1).message());
+        assertEquals("sender", read.get(1).senderUsername());
     }
 
     @Test
     @DisplayName("a message from a since-deleted account is still reviewable")
-    void testGetReportedMessages_whenSenderDeleted_StillListsIt() {
-        ChatMessage message = reported("ghost", "text");
-        when(messageRepository.findByReportedAtIsNotNullOrderByReportedAtDesc(any(Pageable.class)))
-                .thenReturn(List.of(message));
+    void testReadForModerator_whenSenderDeleted_StillReturnsIt() {
+        ChatMessage message = stored("ghost", "text", NOW);
+        when(messageRepository.findAllById(anyList())).thenReturn(List.of(message));
         when(gamerRepository.findAllById(anySet())).thenReturn(List.of());
 
-        List<ReportedMessageDto> queue = moderationService
-                .getReportedMessages(moderator)
-                .getBody()
-                .getData()
-                .getReportedMessages();
+        List<ReportedMessageDto> read = moderationService.readForModerator(moderator, List.of(message.getId()));
 
-        assertEquals(1, queue.size(), "deleting the account must not hide what was reported");
-        assertNull(queue.get(0).senderUsername());
-        assertEquals("text", queue.get(0).message());
+        assertEquals(1, read.size(), "deleting the account must not hide what was reported");
+        assertNull(read.get(0).senderUsername());
+        assertEquals("text", read.get(0).message());
     }
 
     @Test
     @DisplayName("senders are resolved in one query, not one per row")
-    void testGetReportedMessages_resolvesSendersInOneQuery() {
-        ChatMessage a = reported(sender.getUserId(), "one");
-        ChatMessage b = reported(sender.getUserId(), "two");
-        when(messageRepository.findByReportedAtIsNotNullOrderByReportedAtDesc(any(Pageable.class)))
-                .thenReturn(List.of(a, b));
+    void testReadForModerator_resolvesSendersInOneQuery() {
+        ChatMessage a = stored(sender.getUserId(), "one", NOW);
+        ChatMessage b = stored(sender.getUserId(), "two", NOW.plusSeconds(1));
+        when(messageRepository.findAllById(anyList())).thenReturn(List.of(a, b));
         when(gamerRepository.findAllById(anySet())).thenReturn(List.of(sender));
 
-        moderationService.getReportedMessages(moderator);
+        moderationService.readForModerator(moderator, List.of(a.getId(), b.getId()));
 
         verify(gamerRepository, times(1)).findAllById(anySet());
         verify(gamerRepository, never()).findById(anyString());
     }
 
     @Test
-    @DisplayName("dismissing clears the report but keeps the message")
-    void testDismissReport_keepsTheMessage() {
-        ChatMessage message = reported(sender.getUserId(), "borderline");
-        UUID id = message.getId();
-        when(messageRepository.findById(id)).thenReturn(java.util.Optional.of(message));
-
-        moderationService.dismissReport(moderator, id);
-
-        assertNull(message.getReportedAt(), "no longer in the queue");
-        // Dismissing a report and deleting a message are different decisions. Conflating
-        // them means a moderator cannot mark something reviewed without destroying the
-        // evidence for the next report against the same person.
-        assertNotNull(message.getBody(), "the message itself survives");
-        verify(messageRepository).save(message);
-        verify(messageRepository, never()).delete(any());
-    }
-
-    @Test
-    void testDismissReport_whenNotReported_ReturnErrorCode141() {
-        ChatMessage message = reported(sender.getUserId(), "text");
-        message.setReportedAt(null);
-        UUID id = message.getId();
-        when(messageRepository.findById(id)).thenReturn(java.util.Optional.of(message));
-
-        BusinessException ex =
-                assertThrows(BusinessException.class, () -> moderationService.dismissReport(moderator, id));
-        assertEquals(141, ex.getTransactionCode().getId());
-    }
-
-    @Test
-    void testDismissReport_whenMessageNotFound_ReturnErrorCode142() {
-        UUID missing = UUID.randomUUID();
-        when(messageRepository.findById(missing)).thenReturn(java.util.Optional.empty());
-
-        BusinessException ex =
-                assertThrows(BusinessException.class, () -> moderationService.dismissReport(moderator, missing));
-        assertEquals(142, ex.getTransactionCode().getId());
+    void testReadForModerator_withNoIds_ReadsNothing() {
+        assertTrue(moderationService.readForModerator(moderator, List.of()).isEmpty());
+        verify(messageRepository, never()).findAllById(anyList());
     }
 }

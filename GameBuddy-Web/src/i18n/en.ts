@@ -33,6 +33,7 @@ export const en = {
     subtitle:
       'Not a server full of strangers. GameBuddy matches you on your games, your platform and how you like to play — then gets out of the way so you can go play.',
     comingSoon: 'Coming soon to',
+    getItOn: 'Get it on',
     releaseNote: 'GameBuddy is in the final stages before release. Android comes first.',
     deckAlt: "The GameBuddy deck, showing a gamer's profile with the games they play",
     chatAlt: 'The GameBuddy conversations list, with a new match waiting',
@@ -64,7 +65,7 @@ export const en = {
     },
     free: {
       title: 'Free to play, properly',
-      body: 'The matching, the chat and the communities are free. Gold adds filters and unlimited likes — it does not gate the thing you came for.',
+      body: 'The matching, the chat and the lobbies are free. Gold adds filters and unlimited likes — it does not gate the thing you came for.',
     },
   },
 
@@ -87,11 +88,11 @@ export const en = {
 
   faq: {
     title: 'Questions',
-    q1: { q: 'Is GameBuddy free?', a: 'Yes. Matching, chat and communities are free, with a daily limit on likes. Gold is optional and adds advanced filters, unlimited likes and a few cosmetic extras — it does not put the matching itself behind a paywall.' },
+    q1: { q: 'Is GameBuddy free?', a: 'Yes. Matching, chat and lobbies are free, with a daily limit on likes. Gold is optional and adds advanced filters, unlimited likes and a few cosmetic extras — it does not put the matching itself behind a paywall.' },
     q2: { q: 'Is it a dating app?', a: 'No. GameBuddy matches people on the games they play and how they play them, so you can find a squad, a co-op partner or a raid group. It is built around playing together, not dating.' },
     q3: { q: 'Which platforms does it support?', a: 'You tell GameBuddy what you play on — PC, PlayStation, Xbox, Switch or mobile — and it matches accordingly, because two people with the same games on different platforms usually cannot play together. The app itself is Android first, with iOS to follow.' },
     q4: { q: 'Why is it 18+?', a: 'GameBuddy puts strangers in private conversation with each other, and that is not something to run for minors alongside adults. There is no younger tier and no supervised mode. Your age is calculated from a date of birth given at registration, and accounts found to belong to under-18s are closed.' },
-    q5: { q: 'What do you do about creeps?', a: 'You can block or report anyone from their profile or from a conversation, and reports are reviewed within 24 hours. Every uploaded photo is screened automatically before anybody else can see it. Contact details are stripped out of public text, so nobody can post a phone number into a community.' },
+    q5: { q: 'What do you do about creeps?', a: 'You can block or report anyone from their profile or from a conversation, and reports are reviewed within 24 hours. Every uploaded photo is screened automatically before anybody else can see it. Contact details are stripped out of public text, so nobody can post a phone number into a lobby.' },
     q6: { q: 'Can other people see my messages?', a: 'No. Message bodies are encrypted before they are stored, so the database holds ciphertext rather than your conversation. Moderators see a message only when you report it.' },
     q7: { q: 'How do I delete my account?', a: 'From Settings inside the app, or by writing to support. Your profile, photo and taste data go; the other half of your conversations stays, because those are not only yours to erase. The full explanation is on the account deletion page.' },
   },

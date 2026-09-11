@@ -767,6 +767,8 @@ export const fr: Dictionary = {
     privacyHint: 'Ce que nous collectons et ce que nous en faisons',
     adPrivacy: 'Confidentialité des publicités',
     adPrivacyHint: 'Modifier ce que les publicités peuvent utiliser sur toi',
+    moderationNotice: 'Les signalements sont traités sous 24 heures. Aucune tolérance pour les abus.',
+    igdbCredit: 'Jaquettes et descriptions des jeux : IGDB.com.',
     password: 'Mot de passe',
     passwordHint: 'Te déconnecte partout',
     passwordSet: 'Définir un mot de passe',
@@ -932,6 +934,10 @@ export const fr: Dictionary = {
     reasonSpam: 'Spam ou publicité',
     reasonMinor: 'Peut-être un mineur',
     reasonOther: 'Autre chose',
+    reasonImpersonation: 'Usurpation d’identité',
+    reportNoteBlurb: 'Dites-nous ce qui s’est passé.',
+    reportNotePlaceholder: 'Que s’est-il passé ?',
+    reportSend: 'Envoyer le signalement',
   },
 
   errors: {
@@ -949,6 +955,7 @@ export const fr: Dictionary = {
       '107': "Ce nom d'utilisateur est pris.",
       '108': 'Identifiant ou mot de passe incorrect. Si tu t\'es inscrit avec Google ou Discord, utilise ce bouton.',
       '113': 'Ce compte est bloqué.',
+      '206': 'Votre compte est suspendu. Vous pourrez vous reconnecter à la fin de la suspension.',
       '121': "Cette personne t'a bloqué.",
       '186': "Tu as bloqué cette personne, tu ne peux donc pas lui écrire.",
       '129': 'Pas assez de pièces.',

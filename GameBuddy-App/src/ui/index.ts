@@ -32,6 +32,6 @@ export { GamePills, type PillGame } from './GamePills';
 export { ScreenScaleProvider, useScreenScale, type ScreenScale } from './useScreenScale';
 export { useIntroPadding } from './spacing';
 export { BackHeader } from './BackHeader';
-export { ReportSheet } from './ReportSheet';
+export { ReportSheet, type ReportPick, type ReasonCode } from './ReportSheet';
 export { ActionSheet, type SheetAction } from './ActionSheet';
 export { ConfirmDialog, type ConfirmRequest } from './ConfirmDialog';

@@ -735,28 +735,101 @@ export type PendingAvatar = {
 export type PendingAvatars = { pending: PendingAvatar[] };
 
 /** One report in the moderation queue. */
-export type Report = {
-  reportId: string;
-  /** POST, COMMENT, MESSAGE or PROFILE. */
-  contentType: string;
-  contentId: string;
-  authorId: string;
-  authorUsername: string | null;
-  reporterId: string;
-  reason: string;
+/** The moderation ladder — mirrors ModerationAction.Action on the backend. */
+export type ModerationAction =
+  | 'DISMISS'
+  | 'WARN'
+  | 'REMOVE_PHOTO'
+  | 'SUSPEND_24H'
+  | 'SUSPEND_7D'
+  | 'BAN';
+
+/** A reason code — mirrors ContentReport.ReasonCode. */
+export type ReportReasonCode =
+  | 'HARASSMENT'
+  | 'SEXUAL'
+  | 'SPAM_SCAM'
+  | 'UNDERAGE'
+  | 'IMPERSONATION'
+  | 'OTHER';
+
+/** One case in the moderation queue: everything currently said about one person. */
+export type CaseSummary = {
+  caseId: string;
+  targetId: string;
+  targetUsername: string | null;
+  /** OPEN or URGENT (CLOSED never appears in the queue). */
   status: string;
-  createdAt: string;
-  /** The reported text, or null once the content has been removed. */
-  content: string | null;
-  /** Open reports against this author across everything they have written. */
-  authorOpenReportCount: number | null;
-  /** Past the 24 hours the terms promise. Decided by the server, not here. */
-  overdue: boolean | null;
-  /** How long this has been waiting. */
-  ageHours: number | null;
+  /** Sum of the reporters' weights, not a count. */
+  weightedScore: number;
+  distinctReporters: number;
+  openedAt: string;
+  ageHours: number;
+  /** Past the 24 hours the terms promise. */
+  overdue: boolean;
+  /** Hidden from decks automatically, pending this decision. */
+  autoHidden: boolean;
+  /** How many times this account has been actioned before. */
+  priorSanctions: number;
 };
 
-export type Reports = { reports: Report[] };
+export type Cases = { cases: CaseSummary[] };
+
+/** One report inside a case. */
+export type CaseReportItem = {
+  reportId: string;
+  contentType: string;
+  reasonCode: string | null;
+  note: string | null;
+  reporterId: string;
+  /** The reporter's weight, 0–1, as a string. */
+  reporterWeight: string;
+  createdAt: string;
+  /** The frozen snapshot as JSON, or null on a legacy report. */
+  evidence: string | null;
+};
+
+/** One decrypted message of context for a message report. */
+export type CaseMessageContext = {
+  messageId: string;
+  senderId: string;
+  senderUsername: string | null;
+  message: string;
+  sentAt: string;
+  /** True for the message the report was actually about. */
+  reported: boolean;
+};
+
+/** One past action against the target. */
+export type CaseHistoryItem = {
+  action: string;
+  reasonCode: string | null;
+  note: string | null;
+  actorId: string;
+  createdAt: string;
+  expiresAt: string | null;
+};
+
+/** A case in full: its reports, the target, the decrypted context, and the history. */
+export type CaseDetail = {
+  summary: CaseSummary;
+  targetUsername: string | null;
+  targetAvatarKey: string | null;
+  targetAvatarStatus: string | null;
+  targetJoinedAt: string | null;
+  targetSuspended: boolean;
+  targetSuspendedUntil: string | null;
+  reports: CaseReportItem[];
+  messageContext: CaseMessageContext[] | null;
+  history: CaseHistoryItem[];
+};
+
+export type ResolveCaseInput = {
+  action: ModerationAction;
+  reasonCode?: ReportReasonCode;
+  note?: string;
+  removePhoto?: boolean;
+};
 
 /** A banned account, as the console lists it. */
 export type BlockedUser = {

@@ -191,6 +191,14 @@ class RateLimitBudgetsTest {
             // so an honest sign-in can be two calls. Twelve is six of those.
             allowsRunOf(limiters.social(), 12, "signing in with Google or Discord");
         }
+
+        @Test
+        @DisplayName("a campus or a carrier NAT signing up in one quarter hour")
+        void ipSurvivesASharedConnection() {
+            // Keyed by address, so everyone behind one shared connection spends from the same
+            // pot. A hundred is well below the 200 default and nowhere near what a script does.
+            allowsRunOf(limiters.ip(), 100, "a household or a campus behind one address");
+        }
     }
 
     @Nested
@@ -263,6 +271,7 @@ class RateLimitBudgetsTest {
             sameInBothPlaces(AUTH, javaDefaults, "auth.reset-password", AuthRateLimitConfig::getResetPassword);
             sameInBothPlaces(AUTH, javaDefaults, "auth.link", AuthRateLimitConfig::getLink);
             sameInBothPlaces(AUTH, javaDefaults, "auth.social", AuthRateLimitConfig::getSocial);
+            sameInBothPlaces(AUTH, javaDefaults, "auth.ip", AuthRateLimitConfig::getIp);
         }
 
         @Test
@@ -317,13 +326,15 @@ class RateLimitBudgetsTest {
                             "AUTH_SEND_CODE_PERMITS", "3",
                             "AUTH_RESET_PASSWORD_PERMITS", "4",
                             "AUTH_LINK_PERMITS", "6",
-                            "AUTH_SOCIAL_PERMITS", "8"));
+                            "AUTH_SOCIAL_PERMITS", "8",
+                            "AUTH_IP_PERMITS", "9"));
             assertEquals(1, auth.getLogin().permits(), "AUTH_LOGIN_PERMITS");
             assertEquals(2, auth.getVerify().permits(), "AUTH_VERIFY_PERMITS");
             assertEquals(3, auth.getSendCode().permits(), "AUTH_SEND_CODE_PERMITS");
             assertEquals(4, auth.getResetPassword().permits(), "AUTH_RESET_PASSWORD_PERMITS");
             assertEquals(6, auth.getLink().permits(), "AUTH_LINK_PERMITS");
             assertEquals(8, auth.getSocial().permits(), "AUTH_SOCIAL_PERMITS");
+            assertEquals(9, auth.getIp().permits(), "AUTH_IP_PERMITS");
 
             BillingRateLimitConfig billing = fromYaml(
                     "billing",
@@ -444,7 +455,8 @@ class RateLimitBudgetsTest {
                             "gamebuddy.rate-limit.auth.verify.permits=2",
                             "gamebuddy.rate-limit.auth.send-code.permits=3",
                             "gamebuddy.rate-limit.auth.reset-password.permits=4",
-                            "gamebuddy.rate-limit.auth.link.permits=6")
+                            "gamebuddy.rate-limit.auth.link.permits=6",
+                            "gamebuddy.rate-limit.auth.ip.permits=7")
                     .run(context -> {
                         assertNull(context.getStartupFailure());
                         AuthRateLimiters limiters = context.getBean(AuthRateLimiters.class);
@@ -453,6 +465,7 @@ class RateLimitBudgetsTest {
                         assertEquals(3, budgetOf(limiters.sendCode()));
                         assertEquals(4, budgetOf(limiters.resetPassword()));
                         assertEquals(6, budgetOf(limiters.link()));
+                        assertEquals(7, budgetOf(limiters.ip()));
                     });
         }
 

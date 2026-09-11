@@ -48,8 +48,9 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
 
     public NimbusGoogleIdTokenVerifier(SocialAuthProperties properties) {
         String audience = properties.getGoogle().getWebClientId();
-        NimbusJwtDecoder nimbus =
-                NimbusJwtDecoder.withJwkSetUri(properties.getGoogle().getJwkSetUri()).build();
+        NimbusJwtDecoder nimbus = NimbusJwtDecoder.withJwkSetUri(
+                        properties.getGoogle().getJwkSetUri())
+                .build();
         nimbus.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefault(), issuedByGoogle(), addressedToUs(audience)));
         this.decoder = nimbus;
@@ -86,7 +87,8 @@ public class NimbusGoogleIdTokenVerifier implements GoogleIdTokenVerifier {
     }
 
     private static OAuth2TokenValidator<Jwt> issuedByGoogle() {
-        return jwt -> ISSUERS.contains(jwt.getIssuer() == null ? null : jwt.getIssuer().toString())
+        return jwt -> ISSUERS.contains(
+                        jwt.getIssuer() == null ? null : jwt.getIssuer().toString())
                 ? OAuth2TokenValidatorResult.success()
                 : OAuth2TokenValidatorResult.failure(
                         new org.springframework.security.oauth2.core.OAuth2Error("invalid_issuer"));

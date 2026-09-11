@@ -74,6 +74,26 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
     int clearFcmTokenFrom(@Param("token") String token, @Param("keepUserId") String keepUserId);
 
     /**
+     * Forgets a device token every account holds, after Firebase reports it dead.
+     *
+     * <p>The sibling of {@link #clearFcmTokenFrom} without the "keep this one" clause: an
+     * UNREGISTERED token belongs to a device that is gone, so no account should keep it.
+     */
+    @Modifying
+    @Query("update Gamer g set g.fcmToken = null where g.fcmToken = :token")
+    int clearFcmToken(@Param("token") String token);
+
+    /**
+     * Accounts whose suspension has expired but whose block has not yet been lifted.
+     *
+     * <p>A suspension is a block with an end time; nothing lifts it at that instant, so a
+     * job sweeps for the ones whose time has passed. Only time-limited blocks match —
+     * {@code suspended_until IS NOT NULL} excludes a permanent ban, which has no end.
+     */
+    @Query("select g from Gamer g where g.suspendedUntil is not null and g.suspendedUntil <= :now")
+    List<Gamer> findExpiredSuspensions(@Param("now") Instant now);
+
+    /**
      * A random sample of gamers this one could legitimately be shown.
      *
      * <p>Backs the exploration slots in a recommendation page: the model ranks by
@@ -106,6 +126,7 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                     WHERE g.deleted_at IS NULL
                       AND g.is_blocked = false
                       AND g.role <> 'ADMIN'
+                      AND g.hidden_from_discovery = false
                       AND (COALESCE(g.age, 0) < 18) = :minor
                       AND g.user_id <> ALL(CAST(:excluded AS varchar[]))
                       AND (:gameId IS NULL
@@ -180,6 +201,7 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                     WHERE g.deleted_at IS NULL
                       AND g.is_blocked = false
                       AND g.role <> 'ADMIN'
+                      AND g.hidden_from_discovery = false
                       AND (:gameId IS NULL
                             OR EXISTS (SELECT 1 FROM gamer_games_join j
                                         WHERE j.gamer_id = g.user_id AND j.game_id = :gameId))
@@ -216,6 +238,7 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
                       AND g.deleted_at IS NULL
                       AND g.is_blocked = false
                       AND g.role <> 'ADMIN'
+                      AND g.hidden_from_discovery = false
                     """, nativeQuery = true)
     List<Gamer> findPendingAdmirers(@Param("userId") String userId);
 
@@ -289,7 +312,8 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
      * <p>Read only for a gamer's own profile. These are credentials, and a list of them on
      * somebody else's profile would be a list of doors to try.
      */
-    @Query(value = "SELECT provider FROM gamer_auth_identity WHERE user_id = :userId ORDER BY provider",
+    @Query(
+            value = "SELECT provider FROM gamer_auth_identity WHERE user_id = :userId ORDER BY provider",
             nativeQuery = true)
     List<String> findAuthProviders(@Param("userId") String userId);
 
@@ -312,8 +336,7 @@ public interface GamerRepository extends JpaRepository<Gamer, String> {
              where g.userId = :userId
                and (g.reviewPromptShownAt is null or g.reviewPromptShownAt < :cutoff)
             """)
-    int claimReviewPrompt(
-            @Param("userId") String userId, @Param("now") Instant now, @Param("cutoff") Instant cutoff);
+    int claimReviewPrompt(@Param("userId") String userId, @Param("now") Instant now, @Param("cutoff") Instant cutoff);
 
     /**
      * Gamers this one has sent a friend request to, still unanswered.

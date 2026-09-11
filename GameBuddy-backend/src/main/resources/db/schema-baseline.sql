@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ic4pFF6BXsQaeVOObj48II3kJNgiDP4tPBVfwrEVGtcWJrhUPbDNgpbXxea1Gfn
+\restrict yci8KUfex6ZsYZPxnr8G6sU09f6zlFqalKTSixB7XJ7n2Z02oaGRZNk69KZfoRM
 
 -- Dumped from database version 17.11
 -- Dumped by pg_dump version 17.11
@@ -48,6 +48,21 @@ $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: account_link_ticket; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.account_link_ticket (
+    id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    provider character varying(16) NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    used boolean DEFAULT false NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    expires_at timestamp(6) with time zone NOT NULL
+);
+
 
 --
 -- Name: approved_matches; Type: TABLE; Schema: gamebuddy; Owner: -
@@ -160,7 +175,13 @@ CREATE TABLE gamebuddy.content_report (
     reviewed_by character varying(255),
     status character varying(255) NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT content_report_content_type_check CHECK (((content_type)::text = ANY (ARRAY[('POST'::character varying)::text, ('COMMENT'::character varying)::text, ('PROFILE'::character varying)::text]))),
+    reason_code character varying(32),
+    note character varying(300),
+    room_id uuid,
+    evidence jsonb,
+    case_id uuid,
+    CONSTRAINT content_report_content_type_check CHECK (((content_type)::text = ANY ((ARRAY['POST'::character varying, 'COMMENT'::character varying, 'PROFILE'::character varying, 'MESSAGE'::character varying])::text[]))),
+    CONSTRAINT content_report_reason_code_check CHECK (((reason_code IS NULL) OR ((reason_code)::text = ANY ((ARRAY['HARASSMENT'::character varying, 'SEXUAL'::character varying, 'SPAM_SCAM'::character varying, 'UNDERAGE'::character varying, 'IMPERSONATION'::character varying, 'OTHER'::character varying])::text[])))),
     CONSTRAINT content_report_status_check CHECK (((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('ACTIONED'::character varying)::text, ('DISMISSED'::character varying)::text])))
 );
 
@@ -180,8 +201,40 @@ CREATE TABLE gamebuddy.cosmetic (
     created_date timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     membership_only boolean DEFAULT false NOT NULL,
+    unlocked_by_badge character varying(48),
     CONSTRAINT cosmetic_kind_check CHECK (((kind)::text = ANY (ARRAY[('FRAME'::character varying)::text, ('BANNER'::character varying)::text, ('THEME'::character varying)::text]))),
     CONSTRAINT cosmetic_price_check CHECK ((price >= 0))
+);
+
+
+--
+-- Name: COLUMN cosmetic.unlocked_by_badge; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.cosmetic.unlocked_by_badge IS 'Badge.code of the badge that grants this, or NULL for anything on sale. A row with this set is never purchasable at any price.';
+
+
+--
+-- Name: cosmetic_bundle; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.cosmetic_bundle (
+    id uuid NOT NULL,
+    name character varying(64) NOT NULL,
+    price integer NOT NULL,
+    sort_order integer DEFAULT 0 NOT NULL,
+    created_date timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT cosmetic_bundle_price_check CHECK ((price >= 0))
+);
+
+
+--
+-- Name: cosmetic_bundle_item; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.cosmetic_bundle_item (
+    bundle_id uuid NOT NULL,
+    cosmetic_id uuid NOT NULL
 );
 
 
@@ -193,17 +246,6 @@ CREATE TABLE gamebuddy.declined_matches (
     declined_at timestamp(6) with time zone NOT NULL,
     declined_id character varying(255) NOT NULL,
     user_id character varying(255) NOT NULL
-);
-
-
---
--- Name: super_likes; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.super_likes (
-    user_id character varying(255) NOT NULL,
-    target_id character varying(255) NOT NULL,
-    created_at timestamp(6) with time zone NOT NULL
 );
 
 
@@ -308,11 +350,6 @@ CREATE TABLE gamebuddy.gamer (
     daily_claimed_at timestamp with time zone,
     daily_streak integer DEFAULT 0 NOT NULL,
     stipend_claimed_at timestamp with time zone,
-    quest_week_started_at timestamp with time zone,
-    quest_base_messages integer DEFAULT 0 NOT NULL,
-    quest_base_matches integer DEFAULT 0 NOT NULL,
-    quest_base_lobbies integer DEFAULT 0 NOT NULL,
-    quest_claimed_mask integer DEFAULT 0 NOT NULL,
     super_likes integer DEFAULT 0 NOT NULL,
     bonus_accepts integer DEFAULT 0 NOT NULL,
     like_cap_cohort character varying(16),
@@ -320,6 +357,13 @@ CREATE TABLE gamebuddy.gamer (
     review_prompt_shown_at timestamp with time zone,
     rewarded_ads_today integer DEFAULT 0 NOT NULL,
     rewarded_ad_day timestamp with time zone,
+    mission_set_index integer DEFAULT 0 NOT NULL,
+    daily_claims_total integer DEFAULT 0 NOT NULL,
+    reports_upheld integer DEFAULT 0 NOT NULL,
+    reports_dismissed integer DEFAULT 0 NOT NULL,
+    suspended_until timestamp(6) with time zone,
+    hidden_from_discovery boolean DEFAULT false NOT NULL,
+    avatar_held_at timestamp(6) with time zone,
     CONSTRAINT gamer_avatar_status_check CHECK (((avatar_status IS NULL) OR ((avatar_status)::text = ANY (ARRAY[('PENDING'::character varying)::text, ('APPROVED'::character varying)::text, ('REJECTED'::character varying)::text])))),
     CONSTRAINT gamer_role_check CHECK (((role)::text = ANY (ARRAY[('USER'::character varying)::text, ('ADMIN'::character varying)::text]))),
     CONSTRAINT gamer_subscription_tier_check CHECK (((subscription_tier)::text = ANY (ARRAY[('BASIC'::character varying)::text, ('GOLD'::character varying)::text])))
@@ -376,20 +420,6 @@ COMMENT ON COLUMN gamebuddy.gamer.daily_streak IS 'Consecutive days claimed. Res
 
 
 --
--- Name: COLUMN gamer.quest_week_started_at; Type: COMMENT; Schema: gamebuddy; Owner: -
---
-
-COMMENT ON COLUMN gamebuddy.gamer.quest_week_started_at IS 'Start of the week the baselines below were taken at. Null means never started one.';
-
-
---
--- Name: COLUMN gamer.quest_claimed_mask; Type: COMMENT; Schema: gamebuddy; Owner: -
---
-
-COMMENT ON COLUMN gamebuddy.gamer.quest_claimed_mask IS 'Which of this week''s quests have been paid. Cleared when the week rolls over.';
-
-
---
 -- Name: COLUMN gamer.super_likes; Type: COMMENT; Schema: gamebuddy; Owner: -
 --
 
@@ -416,6 +446,11 @@ COMMENT ON COLUMN gamebuddy.gamer.like_cap_cohort IS 'Stable A/B bucket for the 
 
 COMMENT ON COLUMN gamebuddy.gamer.upgrade_prompt_shown_at IS 'When the one-time day-3 Gold prompt was shown. Null means never; set once, never cleared.';
 
+
+--
+-- Name: COLUMN gamer.review_prompt_shown_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
 COMMENT ON COLUMN gamebuddy.gamer.review_prompt_shown_at IS 'When the Play review card was last requested. Null means never. Not proof it appeared -- Play never says.';
 
 
@@ -431,6 +466,48 @@ COMMENT ON COLUMN gamebuddy.gamer.rewarded_ads_today IS 'Rewarded adverts paid f
 --
 
 COMMENT ON COLUMN gamebuddy.gamer.rewarded_ad_day IS 'UTC midnight of the day rewarded_ads_today counts. Null means never watched one.';
+
+
+--
+-- Name: COLUMN gamer.reports_upheld; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.reports_upheld IS 'Reports this gamer filed that a moderator upheld. With reports_dismissed, the reporter''s weight.';
+
+
+--
+-- Name: COLUMN gamer.suspended_until; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.suspended_until IS 'End of a time-limited block. Null with is_blocked = true means a permanent ban.';
+
+
+--
+-- Name: COLUMN gamer.hidden_from_discovery; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.gamer.hidden_from_discovery IS 'Automatically hidden from decks by the report policy until a moderator decides the case.';
+
+
+--
+-- Name: gamer_auth_identity; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.gamer_auth_identity (
+    user_id character varying(255) NOT NULL,
+    provider character varying(16) NOT NULL,
+    subject character varying(255) NOT NULL,
+    email_at_link character varying(255),
+    created_at timestamp(6) with time zone NOT NULL,
+    last_used_at timestamp(6) with time zone
+);
+
+
+--
+-- Name: TABLE gamer_auth_identity; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.gamer_auth_identity IS 'Credentials: which external identities may sign in as this gamer. Never displayed.';
 
 
 --
@@ -451,30 +528,6 @@ CREATE TABLE gamebuddy.gamer_badge (
 --
 -- Name: gamer_cosmetic; Type: TABLE; Schema: gamebuddy; Owner: -
 --
-
---
--- Name: cosmetic_bundle; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.cosmetic_bundle (
-    id uuid NOT NULL,
-    name character varying(64) NOT NULL,
-    price integer NOT NULL,
-    sort_order integer DEFAULT 0 NOT NULL,
-    created_date timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT cosmetic_bundle_price_check CHECK ((price >= 0))
-);
-
-
---
--- Name: cosmetic_bundle_item; Type: TABLE; Schema: gamebuddy; Owner: -
---
-
-CREATE TABLE gamebuddy.cosmetic_bundle_item (
-    bundle_id uuid NOT NULL,
-    cosmetic_id uuid NOT NULL
-);
-
 
 CREATE TABLE gamebuddy.gamer_cosmetic (
     user_id character varying(255) NOT NULL,
@@ -505,6 +558,56 @@ CREATE TABLE gamebuddy.gamer_keywords_join (
     gamer_id character varying(255) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: gamer_linked_account; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.gamer_linked_account (
+    user_id character varying(255) NOT NULL,
+    provider character varying(16) NOT NULL,
+    external_id character varying(64) NOT NULL,
+    handle character varying(255),
+    visibility character varying(16) DEFAULT 'MATCHES'::character varying NOT NULL,
+    linked_at timestamp(6) with time zone NOT NULL,
+    handle_refreshed_at timestamp(6) with time zone
+);
+
+
+--
+-- Name: TABLE gamer_linked_account; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.gamer_linked_account IS 'Provider-verified Discord identities. The handle is fetched, never typed.';
+
+
+--
+-- Name: gamer_mission; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.gamer_mission (
+    user_id character varying(255) NOT NULL,
+    set_index integer NOT NULL,
+    slot smallint NOT NULL,
+    mission_code character varying(48) NOT NULL,
+    baseline integer NOT NULL,
+    reward integer NOT NULL,
+    claimed_at timestamp with time zone,
+    assigned_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT gamer_mission_baseline_check CHECK ((baseline >= 0)),
+    CONSTRAINT gamer_mission_reward_check CHECK ((reward >= 0)),
+    CONSTRAINT gamer_mission_set_check CHECK ((set_index >= 1)),
+    CONSTRAINT gamer_mission_slot_check CHECK (((slot >= 0) AND (slot <= 2)))
+);
+
+
+--
+-- Name: TABLE gamer_mission; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.gamer_mission IS 'One mission dealt to one gamer, in one slot of one set. Rows are kept after the set ends: the dealer reads them to avoid repeats, and they are the only record of what was asked and what it paid.';
 
 
 --
@@ -662,6 +765,59 @@ COMMENT ON TABLE gamebuddy.lobby_message IS 'Lobby chat, encrypted at rest like 
 
 
 --
+-- Name: moderation_action; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.moderation_action (
+    id uuid NOT NULL,
+    case_id uuid,
+    target_id character varying(255) NOT NULL,
+    actor_id character varying(255) NOT NULL,
+    action character varying(32) NOT NULL,
+    reason_code character varying(32),
+    note character varying(500),
+    photo_removed boolean DEFAULT false NOT NULL,
+    expires_at timestamp(6) with time zone,
+    created_at timestamp(6) with time zone NOT NULL,
+    CONSTRAINT moderation_action_action_check CHECK (((action)::text = ANY ((ARRAY['DISMISS'::character varying, 'WARN'::character varying, 'REMOVE_PHOTO'::character varying, 'SUSPEND_24H'::character varying, 'SUSPEND_7D'::character varying, 'BAN'::character varying, 'UNBAN'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE moderation_action; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.moderation_action IS 'The audit trail. The terms promise the person is told which rule was broken; this is where that is recorded.';
+
+
+--
+-- Name: moderation_case; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.moderation_case (
+    id uuid NOT NULL,
+    target_id character varying(255) NOT NULL,
+    status character varying(16) NOT NULL,
+    weighted_score numeric(8,3) DEFAULT 0 NOT NULL,
+    distinct_reporters integer DEFAULT 0 NOT NULL,
+    opened_at timestamp(6) with time zone NOT NULL,
+    last_report_at timestamp(6) with time zone NOT NULL,
+    closed_at timestamp(6) with time zone,
+    closed_by character varying(255),
+    outcome character varying(32),
+    auto_hidden boolean DEFAULT false NOT NULL,
+    CONSTRAINT moderation_case_status_check CHECK (((status)::text = ANY ((ARRAY['OPEN'::character varying, 'URGENT'::character varying, 'CLOSED'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE moderation_case; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.moderation_case IS 'One open case per reported gamer. Reports join it; a moderator resolves it once.';
+
+
+--
 -- Name: notification_outbox; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -694,6 +850,129 @@ CREATE TABLE gamebuddy.notifications (
     title character varying(255) NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: password_reset_ticket; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.password_reset_ticket (
+    id uuid NOT NULL,
+    email character varying(255) NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    used boolean DEFAULT false NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    expires_at timestamp(6) with time zone NOT NULL
+);
+
+
+--
+-- Name: promo_code; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.promo_code (
+    id uuid NOT NULL,
+    code character varying(32) NOT NULL,
+    kind character varying(8) NOT NULL,
+    coin_amount integer,
+    gold_days integer,
+    expires_at timestamp with time zone NOT NULL,
+    max_redemptions integer,
+    redemption_count integer DEFAULT 0 NOT NULL,
+    disabled_at timestamp with time zone,
+    created_by character varying(255) NOT NULL,
+    note character varying(200),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT promo_code_code_upper_check CHECK (((code)::text = upper((code)::text))),
+    CONSTRAINT promo_code_kind_check CHECK (((kind)::text = ANY ((ARRAY['COIN'::character varying, 'GOLD'::character varying])::text[]))),
+    CONSTRAINT promo_code_max_redemptions_check CHECK (((max_redemptions IS NULL) OR (max_redemptions > 0))),
+    CONSTRAINT promo_code_payload_check CHECK (((((kind)::text = 'COIN'::text) AND (coin_amount IS NOT NULL) AND (coin_amount > 0) AND (gold_days IS NULL)) OR (((kind)::text = 'GOLD'::text) AND (gold_days IS NOT NULL) AND (gold_days > 0) AND (coin_amount IS NULL))))
+);
+
+
+--
+-- Name: TABLE promo_code; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.promo_code IS 'Administrator-issued coupons granting coins or Gold. Stored in clear so the console can display them.';
+
+
+--
+-- Name: COLUMN promo_code.max_redemptions; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.promo_code.max_redemptions IS 'NULL means unlimited. Enforced by a conditional UPDATE, never by a read-then-write.';
+
+
+--
+-- Name: COLUMN promo_code.redemption_count; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.promo_code.redemption_count IS 'Maintained atomically alongside the redemption row; not a cached COUNT(*).';
+
+
+--
+-- Name: COLUMN promo_code.disabled_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.promo_code.disabled_at IS 'Reversible switch-off. A hard DELETE is the other, destructive option.';
+
+
+--
+-- Name: promo_code_assignment; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.promo_code_assignment (
+    code_id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    emailed_at timestamp with time zone,
+    notified_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE promo_code_assignment; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.promo_code_assignment IS 'Accounts a code was addressed to. No rows at all means the code is public.';
+
+
+--
+-- Name: COLUMN promo_code_assignment.emailed_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.promo_code_assignment.emailed_at IS 'Set once the message left. Re-sending is skipped while this is non-null.';
+
+
+--
+-- Name: promo_redemption; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.promo_redemption (
+    code_id uuid NOT NULL,
+    user_id character varying(255) NOT NULL,
+    kind character varying(8) NOT NULL,
+    coin_amount integer,
+    gold_days integer,
+    gold_expires_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE promo_redemption; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.promo_redemption IS 'One row per account per code. The primary key is the once-per-account guarantee.';
+
+
+--
+-- Name: COLUMN promo_redemption.gold_expires_at; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON COLUMN gamebuddy.promo_redemption.gold_expires_at IS 'The membership expiry this redemption produced. Support evidence; not read by the app.';
 
 
 --
@@ -781,6 +1060,42 @@ CREATE TABLE gamebuddy.session (
 
 
 --
+-- Name: social_login_ticket; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.social_login_ticket (
+    id uuid NOT NULL,
+    provider character varying(16) NOT NULL,
+    token_hash character varying(64) NOT NULL,
+    subject character varying(255),
+    email character varying(255),
+    email_verified boolean,
+    display_name character varying(255),
+    used boolean DEFAULT false NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL,
+    expires_at timestamp(6) with time zone NOT NULL
+);
+
+
+--
+-- Name: TABLE social_login_ticket; Type: COMMENT; Schema: gamebuddy; Owner: -
+--
+
+COMMENT ON TABLE gamebuddy.social_login_ticket IS 'Short-lived, single-use tickets carrying a Discord sign-in across the browser round trip.';
+
+
+--
+-- Name: super_likes; Type: TABLE; Schema: gamebuddy; Owner: -
+--
+
+CREATE TABLE gamebuddy.super_likes (
+    user_id character varying(255) NOT NULL,
+    target_id character varying(255) NOT NULL,
+    created_at timestamp(6) with time zone NOT NULL
+);
+
+
+--
 -- Name: unlocked_admirer; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -816,95 +1131,6 @@ CREATE TABLE gamebuddy.verification_code (
 
 
 --
--- Name: password_reset_ticket; Type: TABLE; Schema: gamebuddy
---
-
-CREATE TABLE gamebuddy.password_reset_ticket (
-    id uuid NOT NULL,
-    email character varying(255) NOT NULL,
-    token_hash character varying(64) NOT NULL,
-    used boolean DEFAULT false NOT NULL,
-    created_at timestamp(6) with time zone NOT NULL,
-    expires_at timestamp(6) with time zone NOT NULL
-);
-
-
---
--- Name: account_link_ticket; Type: TABLE; Schema: gamebuddy
---
-
-CREATE TABLE gamebuddy.account_link_ticket (
-    id uuid NOT NULL,
-    user_id character varying(255) NOT NULL,
-    provider character varying(16) NOT NULL,
-    token_hash character varying(64) NOT NULL,
-    used boolean DEFAULT false NOT NULL,
-    created_at timestamp(6) with time zone NOT NULL,
-    expires_at timestamp(6) with time zone NOT NULL
-);
-
-
---
--- Name: gamer_auth_identity; Type: TABLE; Schema: gamebuddy
---
-
-CREATE TABLE gamebuddy.gamer_auth_identity (
-    user_id character varying(255) NOT NULL,
-    provider character varying(16) NOT NULL,
-    subject character varying(255) NOT NULL,
-    email_at_link character varying(255),
-    created_at timestamp(6) with time zone NOT NULL,
-    last_used_at timestamp(6) with time zone
-);
-
-
-COMMENT ON TABLE gamebuddy.gamer_auth_identity IS 'Credentials: which external identities may sign in as this gamer. Never displayed.';
-
-
---
--- Name: social_login_ticket; Type: TABLE; Schema: gamebuddy
---
-
-CREATE TABLE gamebuddy.social_login_ticket (
-    id uuid NOT NULL,
-    provider character varying(16) NOT NULL,
-    token_hash character varying(64) NOT NULL,
-    subject character varying(255),
-    email character varying(255),
-    email_verified boolean,
-    display_name character varying(255),
-    used boolean DEFAULT false NOT NULL,
-    created_at timestamp(6) with time zone NOT NULL,
-    expires_at timestamp(6) with time zone NOT NULL
-);
-
-
-COMMENT ON TABLE gamebuddy.social_login_ticket IS 'Short-lived, single-use tickets carrying a Discord sign-in across the browser round trip.';
-
-
---
--- Name: gamer_linked_account; Type: TABLE; Schema: gamebuddy
---
-
-CREATE TABLE gamebuddy.gamer_linked_account (
-    user_id character varying(255) NOT NULL,
-    provider character varying(16) NOT NULL,
-    external_id character varying(64) NOT NULL,
-    handle character varying(255),
-    visibility character varying(16) DEFAULT 'MATCHES'::character varying NOT NULL,
-    linked_at timestamp(6) with time zone NOT NULL,
-    handle_refreshed_at timestamp(6) with time zone
-);
-
-
---
--- Name: TABLE gamer_linked_account; Type: COMMENT; Schema: gamebuddy; Owner: -
---
-
-COMMENT ON TABLE gamebuddy.gamer_linked_account IS 'Provider-verified Discord identities. The handle is fetched, never typed.';
-
-
---
 -- Name: waiting_friends; Type: TABLE; Schema: gamebuddy; Owner: -
 --
 
@@ -913,6 +1139,14 @@ CREATE TABLE gamebuddy.waiting_friends (
     user_id character varying(255) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: account_link_ticket account_link_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.account_link_ticket
+    ADD CONSTRAINT account_link_ticket_pkey PRIMARY KEY (id);
 
 
 --
@@ -980,11 +1214,11 @@ ALTER TABLE ONLY gamebuddy.content_report
 
 
 --
--- Name: cosmetic cosmetic_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+-- Name: cosmetic_bundle_item cosmetic_bundle_item_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
-ALTER TABLE ONLY gamebuddy.cosmetic
-    ADD CONSTRAINT cosmetic_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
+    ADD CONSTRAINT cosmetic_bundle_item_pkey PRIMARY KEY (bundle_id, cosmetic_id);
 
 
 --
@@ -996,27 +1230,11 @@ ALTER TABLE ONLY gamebuddy.cosmetic_bundle
 
 
 --
--- Name: cosmetic_bundle_item cosmetic_bundle_item_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+-- Name: cosmetic cosmetic_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
-ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
-    ADD CONSTRAINT cosmetic_bundle_item_pkey PRIMARY KEY (bundle_id, cosmetic_id);
-
-
---
--- Name: cosmetic_bundle_item cosmetic_bundle_item_bundle_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
-    ADD CONSTRAINT cosmetic_bundle_item_bundle_id_fkey FOREIGN KEY (bundle_id) REFERENCES gamebuddy.cosmetic_bundle(id) ON DELETE CASCADE;
-
-
---
--- Name: cosmetic_bundle_item cosmetic_bundle_item_cosmetic_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
-    ADD CONSTRAINT cosmetic_bundle_item_cosmetic_id_fkey FOREIGN KEY (cosmetic_id) REFERENCES gamebuddy.cosmetic(id);
+ALTER TABLE ONLY gamebuddy.cosmetic
+    ADD CONSTRAINT cosmetic_pkey PRIMARY KEY (id);
 
 
 --
@@ -1025,14 +1243,6 @@ ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
 
 ALTER TABLE ONLY gamebuddy.declined_matches
     ADD CONSTRAINT declined_matches_pkey PRIMARY KEY (declined_id, user_id);
-
-
---
--- Name: super_likes super_likes_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.super_likes
-    ADD CONSTRAINT super_likes_pkey PRIMARY KEY (user_id, target_id);
 
 
 --
@@ -1057,6 +1267,14 @@ ALTER TABLE ONLY gamebuddy.funnel_event
 
 ALTER TABLE ONLY gamebuddy.game_platform
     ADD CONSTRAINT game_platform_pkey PRIMARY KEY (game_id, platform);
+
+
+--
+-- Name: gamer_auth_identity gamer_auth_identity_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_auth_identity
+    ADD CONSTRAINT gamer_auth_identity_pkey PRIMARY KEY (user_id, provider);
 
 
 --
@@ -1097,6 +1315,22 @@ ALTER TABLE ONLY gamebuddy.gamer_games_join
 
 ALTER TABLE ONLY gamebuddy.gamer_keywords_join
     ADD CONSTRAINT gamer_keywords_join_pkey PRIMARY KEY (keyword_id, gamer_id);
+
+
+--
+-- Name: gamer_linked_account gamer_linked_account_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_linked_account
+    ADD CONSTRAINT gamer_linked_account_pkey PRIMARY KEY (user_id, provider);
+
+
+--
+-- Name: gamer_mission gamer_mission_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_mission
+    ADD CONSTRAINT gamer_mission_pkey PRIMARY KEY (user_id, set_index, slot);
 
 
 --
@@ -1164,6 +1398,22 @@ ALTER TABLE ONLY gamebuddy.lobby
 
 
 --
+-- Name: moderation_action moderation_action_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.moderation_action
+    ADD CONSTRAINT moderation_action_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: moderation_case moderation_case_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.moderation_case
+    ADD CONSTRAINT moderation_case_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: notification_outbox notification_outbox_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1177,6 +1427,46 @@ ALTER TABLE ONLY gamebuddy.notification_outbox
 
 ALTER TABLE ONLY gamebuddy.notifications
     ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: password_reset_ticket password_reset_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.password_reset_ticket
+    ADD CONSTRAINT password_reset_ticket_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: promo_code_assignment promo_code_assignment_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.promo_code_assignment
+    ADD CONSTRAINT promo_code_assignment_pkey PRIMARY KEY (code_id, user_id);
+
+
+--
+-- Name: promo_code promo_code_code_key; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.promo_code
+    ADD CONSTRAINT promo_code_code_key UNIQUE (code);
+
+
+--
+-- Name: promo_code promo_code_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.promo_code
+    ADD CONSTRAINT promo_code_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: promo_redemption promo_redemption_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.promo_redemption
+    ADD CONSTRAINT promo_redemption_pkey PRIMARY KEY (code_id, user_id);
 
 
 --
@@ -1220,6 +1510,30 @@ ALTER TABLE ONLY gamebuddy.session
 
 
 --
+-- Name: social_login_ticket social_login_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.social_login_ticket
+    ADD CONSTRAINT social_login_ticket_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: social_login_ticket social_login_ticket_token_hash_key; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.social_login_ticket
+    ADD CONSTRAINT social_login_ticket_token_hash_key UNIQUE (token_hash);
+
+
+--
+-- Name: super_likes super_likes_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.super_likes
+    ADD CONSTRAINT super_likes_pkey PRIMARY KEY (user_id, target_id);
+
+
+--
 -- Name: chat_room uk_chat_room_pair; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1244,76 +1558,6 @@ ALTER TABLE ONLY gamebuddy.unlocked_admirer
 
 
 --
--- Name: content_report uq_report_once_per_reporter; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.content_report
-    ADD CONSTRAINT uq_report_once_per_reporter UNIQUE (content_type, content_id, reporter_id);
-
-
---
--- Name: password_reset_ticket password_reset_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.password_reset_ticket
-    ADD CONSTRAINT password_reset_ticket_pkey PRIMARY KEY (id);
-
-
---
--- Name: account_link_ticket account_link_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.account_link_ticket
-    ADD CONSTRAINT account_link_ticket_pkey PRIMARY KEY (id);
-
-
---
--- Name: gamer_linked_account gamer_linked_account_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.gamer_linked_account
-    ADD CONSTRAINT gamer_linked_account_pkey PRIMARY KEY (user_id, provider);
-
-
---
--- Name: gamer_auth_identity gamer_auth_identity_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.gamer_auth_identity
-    ADD CONSTRAINT gamer_auth_identity_pkey PRIMARY KEY (user_id, provider);
-
-
---
--- Name: social_login_ticket social_login_ticket_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.social_login_ticket
-    ADD CONSTRAINT social_login_ticket_pkey PRIMARY KEY (id);
-
-
---
--- Name: social_login_ticket social_login_ticket_token_hash_key; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.social_login_ticket
-    ADD CONSTRAINT social_login_ticket_token_hash_key UNIQUE (token_hash);
-
-
---
--- Name: idx_gamer_auth_identity_subject; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE UNIQUE INDEX idx_gamer_auth_identity_subject ON gamebuddy.gamer_auth_identity USING btree (provider, subject);
-
-
---
--- Name: idx_social_login_ticket_expires; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE INDEX idx_social_login_ticket_expires ON gamebuddy.social_login_ticket USING btree (expires_at);
-
-
---
 -- Name: verification_code verification_code_pkey; Type: CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1327,6 +1571,20 @@ ALTER TABLE ONLY gamebuddy.verification_code
 
 ALTER TABLE ONLY gamebuddy.waiting_friends
     ADD CONSTRAINT waiting_friends_pkey PRIMARY KEY (requested_id, user_id);
+
+
+--
+-- Name: idx_account_link_ticket_hash; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_account_link_ticket_hash ON gamebuddy.account_link_ticket USING btree (token_hash);
+
+
+--
+-- Name: idx_account_link_ticket_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_account_link_ticket_user ON gamebuddy.account_link_ticket USING btree (user_id, provider);
 
 
 --
@@ -1365,6 +1623,13 @@ CREATE INDEX idx_coin_ledger_user ON gamebuddy.coin_ledger USING btree (user_id,
 
 
 --
+-- Name: idx_content_report_case; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_content_report_case ON gamebuddy.content_report USING btree (case_id);
+
+
+--
 -- Name: idx_cosmetic_asset_key; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
@@ -1379,17 +1644,17 @@ CREATE INDEX idx_cosmetic_kind ON gamebuddy.cosmetic USING btree (kind, sort_ord
 
 
 --
+-- Name: idx_cosmetic_unlocked_by_badge; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_cosmetic_unlocked_by_badge ON gamebuddy.cosmetic USING btree (unlocked_by_badge) WHERE (unlocked_by_badge IS NOT NULL);
+
+
+--
 -- Name: idx_declined_user_time; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
 CREATE INDEX idx_declined_user_time ON gamebuddy.declined_matches USING btree (user_id, declined_at);
-
-
---
--- Name: idx_super_like_target; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE INDEX idx_super_like_target ON gamebuddy.super_likes USING btree (target_id);
 
 
 --
@@ -1411,6 +1676,13 @@ CREATE INDEX idx_funnel_event_user ON gamebuddy.funnel_event USING btree (user_i
 --
 
 CREATE INDEX idx_game_platform_platform ON gamebuddy.game_platform USING btree (platform);
+
+
+--
+-- Name: idx_gamer_auth_identity_subject; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_gamer_auth_identity_subject ON gamebuddy.gamer_auth_identity USING btree (provider, subject);
 
 
 --
@@ -1463,10 +1735,24 @@ CREATE UNIQUE INDEX idx_gamer_fcm_token ON gamebuddy.gamer USING btree (fcm_toke
 
 
 --
+-- Name: idx_gamer_linked_account_external; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_gamer_linked_account_external ON gamebuddy.gamer_linked_account USING btree (provider, external_id);
+
+
+--
 -- Name: idx_gamer_platform_platform; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
 CREATE INDEX idx_gamer_platform_platform ON gamebuddy.gamer_platform USING btree (platform);
+
+
+--
+-- Name: idx_gamer_suspended_until; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_gamer_suspended_until ON gamebuddy.gamer USING btree (suspended_until) WHERE (suspended_until IS NOT NULL);
 
 
 --
@@ -1519,6 +1805,27 @@ CREATE INDEX idx_lobby_message_lobby ON gamebuddy.lobby_message USING btree (lob
 
 
 --
+-- Name: idx_moderation_action_target; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_moderation_action_target ON gamebuddy.moderation_action USING btree (target_id, created_at DESC);
+
+
+--
+-- Name: idx_moderation_case_queue; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_moderation_case_queue ON gamebuddy.moderation_case USING btree (status, opened_at);
+
+
+--
+-- Name: idx_moderation_case_target; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_moderation_case_target ON gamebuddy.moderation_case USING btree (target_id, opened_at DESC);
+
+
+--
 -- Name: idx_notification_recipient; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
@@ -1530,6 +1837,41 @@ CREATE INDEX idx_notification_recipient ON gamebuddy.notifications USING btree (
 --
 
 CREATE INDEX idx_outbox_pending ON gamebuddy.notification_outbox USING btree (next_attempt_at, created_at) WHERE (sent_at IS NULL);
+
+
+--
+-- Name: idx_password_reset_ticket_email; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_password_reset_ticket_email ON gamebuddy.password_reset_ticket USING btree (email);
+
+
+--
+-- Name: idx_password_reset_ticket_hash; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_password_reset_ticket_hash ON gamebuddy.password_reset_ticket USING btree (token_hash);
+
+
+--
+-- Name: idx_promo_assignment_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_promo_assignment_user ON gamebuddy.promo_code_assignment USING btree (user_id);
+
+
+--
+-- Name: idx_promo_code_created; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_promo_code_created ON gamebuddy.promo_code USING btree (created_at DESC);
+
+
+--
+-- Name: idx_promo_redemption_user; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_promo_redemption_user ON gamebuddy.promo_redemption USING btree (user_id, created_at DESC);
 
 
 --
@@ -1561,45 +1903,24 @@ CREATE INDEX idx_session_email ON gamebuddy.session USING btree (email);
 
 
 --
+-- Name: idx_social_login_ticket_expires; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_social_login_ticket_expires ON gamebuddy.social_login_ticket USING btree (expires_at);
+
+
+--
+-- Name: idx_super_like_target; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE INDEX idx_super_like_target ON gamebuddy.super_likes USING btree (target_id);
+
+
+--
 -- Name: idx_unlocked_admirer_user; Type: INDEX; Schema: gamebuddy; Owner: -
 --
 
 CREATE INDEX idx_unlocked_admirer_user ON gamebuddy.unlocked_admirer USING btree (user_id);
-
-
---
--- Name: idx_password_reset_ticket_email; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE INDEX idx_password_reset_ticket_email ON gamebuddy.password_reset_ticket USING btree (email);
-
-
---
--- Name: idx_password_reset_ticket_hash; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE UNIQUE INDEX idx_password_reset_ticket_hash ON gamebuddy.password_reset_ticket USING btree (token_hash);
-
-
---
--- Name: idx_account_link_ticket_hash; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE UNIQUE INDEX idx_account_link_ticket_hash ON gamebuddy.account_link_ticket USING btree (token_hash);
-
-
---
--- Name: idx_account_link_ticket_user; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE INDEX idx_account_link_ticket_user ON gamebuddy.account_link_ticket USING btree (user_id, provider);
-
-
---
--- Name: idx_gamer_linked_account_external; Type: INDEX; Schema: gamebuddy; Owner: -
---
-
-CREATE UNIQUE INDEX idx_gamer_linked_account_external ON gamebuddy.gamer_linked_account USING btree (provider, external_id);
 
 
 --
@@ -1614,6 +1935,13 @@ CREATE INDEX idx_verification_code_email ON gamebuddy.verification_code USING bt
 --
 
 CREATE UNIQUE INDEX uq_lobby_active_owner ON gamebuddy.lobby USING btree (owner_id) WHERE ((status)::text = ANY (ARRAY[('OPEN'::character varying)::text, ('LOCKED'::character varying)::text]));
+
+
+--
+-- Name: uq_moderation_case_open_target; Type: INDEX; Schema: gamebuddy; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_moderation_case_open_target ON gamebuddy.moderation_case USING btree (target_id) WHERE ((status)::text <> 'CLOSED'::text);
 
 
 --
@@ -1666,6 +1994,13 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.gamer_cosmetic FOR EACH
 
 
 --
+-- Name: gamer_mission set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.gamer_mission FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
 -- Name: games set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
 --
 
@@ -1708,6 +2043,13 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.notifications FOR EACH 
 
 
 --
+-- Name: promo_code set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
+--
+
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.promo_code FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
 -- Name: purchase set_updated_at; Type: TRIGGER; Schema: gamebuddy; Owner: -
 --
 
@@ -1726,6 +2068,22 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.session FOR EACH ROW EX
 --
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON gamebuddy.verification_code FOR EACH ROW EXECUTE FUNCTION gamebuddy.set_updated_at();
+
+
+--
+-- Name: cosmetic_bundle_item cosmetic_bundle_item_bundle_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
+    ADD CONSTRAINT cosmetic_bundle_item_bundle_id_fkey FOREIGN KEY (bundle_id) REFERENCES gamebuddy.cosmetic_bundle(id) ON DELETE CASCADE;
+
+
+--
+-- Name: cosmetic_bundle_item cosmetic_bundle_item_cosmetic_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.cosmetic_bundle_item
+    ADD CONSTRAINT cosmetic_bundle_item_cosmetic_id_fkey FOREIGN KEY (cosmetic_id) REFERENCES gamebuddy.cosmetic(id);
 
 
 --
@@ -1777,11 +2135,43 @@ ALTER TABLE ONLY gamebuddy.approved_matches
 
 
 --
+-- Name: account_link_ticket fk_account_link_ticket_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.account_link_ticket
+    ADD CONSTRAINT fk_account_link_ticket_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: content_report fk_content_report_case; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.content_report
+    ADD CONSTRAINT fk_content_report_case FOREIGN KEY (case_id) REFERENCES gamebuddy.moderation_case(id);
+
+
+--
 -- Name: game_platform fk_game_platform_game; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
 ALTER TABLE ONLY gamebuddy.game_platform
     ADD CONSTRAINT fk_game_platform_game FOREIGN KEY (game_id) REFERENCES gamebuddy.games(game_id) ON DELETE CASCADE;
+
+
+--
+-- Name: gamer_auth_identity fk_gamer_auth_identity_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_auth_identity
+    ADD CONSTRAINT fk_gamer_auth_identity_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+
+
+--
+-- Name: gamer_linked_account fk_gamer_linked_account_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer_linked_account
+    ADD CONSTRAINT fk_gamer_linked_account_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
 
 
 --
@@ -1873,6 +2263,14 @@ ALTER TABLE ONLY gamebuddy.gamer
 
 
 --
+-- Name: gamer gamer_equipped_frame_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.gamer
+    ADD CONSTRAINT gamer_equipped_frame_id_fkey FOREIGN KEY (equipped_frame_id) REFERENCES gamebuddy.cosmetic(id);
+
+
+--
 -- Name: gamer gamer_equipped_theme_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
@@ -1881,11 +2279,11 @@ ALTER TABLE ONLY gamebuddy.gamer
 
 
 --
--- Name: gamer gamer_equipped_frame_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+-- Name: gamer_mission gamer_mission_user_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
-ALTER TABLE ONLY gamebuddy.gamer
-    ADD CONSTRAINT gamer_equipped_frame_id_fkey FOREIGN KEY (equipped_frame_id) REFERENCES gamebuddy.cosmetic(id);
+ALTER TABLE ONLY gamebuddy.gamer_mission
+    ADD CONSTRAINT gamer_mission_user_id_fkey FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
 
 
 --
@@ -1929,32 +2327,32 @@ ALTER TABLE ONLY gamebuddy.lobby
 
 
 --
--- Name: account_link_ticket fk_account_link_ticket_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+-- Name: moderation_action moderation_action_case_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
-ALTER TABLE ONLY gamebuddy.account_link_ticket
-    ADD CONSTRAINT fk_account_link_ticket_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
-
-
---
--- Name: gamer_linked_account fk_gamer_linked_account_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
---
-
-ALTER TABLE ONLY gamebuddy.gamer_linked_account
-    ADD CONSTRAINT fk_gamer_linked_account_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+ALTER TABLE ONLY gamebuddy.moderation_action
+    ADD CONSTRAINT moderation_action_case_id_fkey FOREIGN KEY (case_id) REFERENCES gamebuddy.moderation_case(id);
 
 
 --
--- Name: gamer_auth_identity fk_gamer_auth_identity_gamer; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+-- Name: promo_code_assignment promo_code_assignment_code_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
 --
 
-ALTER TABLE ONLY gamebuddy.gamer_auth_identity
-    ADD CONSTRAINT fk_gamer_auth_identity_gamer FOREIGN KEY (user_id) REFERENCES gamebuddy.gamer(user_id) ON DELETE CASCADE;
+ALTER TABLE ONLY gamebuddy.promo_code_assignment
+    ADD CONSTRAINT promo_code_assignment_code_id_fkey FOREIGN KEY (code_id) REFERENCES gamebuddy.promo_code(id) ON DELETE CASCADE;
+
+
+--
+-- Name: promo_redemption promo_redemption_code_id_fkey; Type: FK CONSTRAINT; Schema: gamebuddy; Owner: -
+--
+
+ALTER TABLE ONLY gamebuddy.promo_redemption
+    ADD CONSTRAINT promo_redemption_code_id_fkey FOREIGN KEY (code_id) REFERENCES gamebuddy.promo_code(id) ON DELETE CASCADE;
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ic4pFF6BXsQaeVOObj48II3kJNgiDP4tPBVfwrEVGtcWJrhUPbDNgpbXxea1Gfn
+\unrestrict yci8KUfex6ZsYZPxnr8G6sU09f6zlFqalKTSixB7XJ7n2Z02oaGRZNk69KZfoRM
 

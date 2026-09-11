@@ -96,10 +96,22 @@ export async function gatherAdConsent(): Promise<void> {
         ads.AdsConsentPrivacyOptionsRequirementStatus.REQUIRED,
     });
   } catch (error) {
-    // Left as the optimistic default rather than forced to false: a network blip on launch
-    // should not silently switch off a feature for the rest of the session, and the advert
-    // request itself will fail safely if consent really is missing.
     if (__DEV__) console.warn('[ads] could not gather consent', error);
+    // The form did not complete, but the SDK still knows what it last stored — ask it. Only
+    // if that fails too do we fall to "no": an advert requested without consent in a region
+    // that requires it is the one outcome worse than a missing coin faucet, so the failure
+    // path errs toward not serving rather than the optimistic default.
+    try {
+      const info = await ads.AdsConsent.getConsentInfo();
+      useAdConsent.getState().set({
+        canRequestAds: info.canRequestAds,
+        privacyOptionsRequired:
+          info.privacyOptionsRequirementStatus ===
+          ads.AdsConsentPrivacyOptionsRequirementStatus.REQUIRED,
+      });
+    } catch {
+      useAdConsent.getState().set({ canRequestAds: false, privacyOptionsRequired: false });
+    }
   }
 }
 

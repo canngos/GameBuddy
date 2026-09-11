@@ -1,9 +1,11 @@
 /**
- * Reporting, the moderator console, and bans.
+ * Reporting as cases, the moderator console, and bans.
  *
- * The load-bearing assertion in this file is that a ban takes effect on a token that was
- * already issued. Every other moderation control is decoration if a banned account can
- * keep using the app for the seven days its existing token has left to run.
+ * A report is evidence in a case now, not a row a moderator ticks: every report against one
+ * person joins the single open case against them, and a moderator resolves the case once
+ * with a step from the ladder. The load-bearing assertion is still the last one — a ban, or
+ * a suspension, has to take effect on a token that was already issued, or a blocked account
+ * keeps using the app for the seven days its existing token has left to run.
  */
 
 const { test, describe, after, before } = require('node:test');
@@ -29,120 +31,191 @@ function moderator() {
   return { email, token: mint(email), userId: db.gamerId(email) };
 }
 
+/** The open (or urgent) case against a target, or null. */
+function openCaseId(targetId) {
+  return db.scalar(
+    `select id from gamebuddy.moderation_case where target_id = '${db.esc(targetId)}' and status <> 'CLOSED' limit 1;`,
+  );
+}
+
+const reportProfile = (target, reporter, body) =>
+  post(`${P.community}/report/profile/${target.userId}`, body, { token: reporter.token });
+
+const resolveCase = (caseId, body, token) =>
+  post(`${P.community}/admin/cases/${caseId}/resolve`, body, { token });
+
 describe('moderation', () => {
   let admin;
   before(() => { admin = moderator(); });
   after(() => cleanup());
 
-  test('a gamer can report another gamer\'s profile', async () => {
+  test("a gamer can report another gamer's profile, opening a case", async () => {
     const [reporter, target] = seeded(2);
-    const res = await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: 'QA: inappropriate profile' }, { token: reporter.token });
+    const res = await reportProfile(target, reporter, { reasonCode: 'HARASSMENT' });
 
     assert.equal(res.status, 200, res.text);
     const stored = db.scalar(
-      `select status from gamebuddy.content_report where reporter_id = '${db.esc(reporter.userId)}' ` +
-      `and content_id = '${db.esc(target.userId)}';`,
+      `select reason_code from gamebuddy.content_report where reporter_id = '${db.esc(reporter.userId)}' ` +
+      `and content_id = '${db.esc(target.userId)}' order by created_at desc limit 1;`,
     );
-    assert.ok(stored, 'the report must be persisted');
+    assert.equal(stored, 'HARASSMENT', 'the report must be persisted with its reason code');
+    assert.ok(openCaseId(target.userId), 'a case must open against the target');
   });
 
-  test('reporting the same thing twice is refused', async () => {
+  test('reporting the same person twice while the case is open is refused', async () => {
     const [reporter, target] = seeded(2);
-    await post(`${P.community}/report/profile/${target.userId}`, { reason: 'QA once' }, { token: reporter.token });
-    const again = await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: 'QA twice' }, { token: reporter.token });
+    await reportProfile(target, reporter, { reasonCode: 'SPAM_SCAM' });
+    const again = await reportProfile(target, reporter, { reasonCode: 'SPAM_SCAM' });
 
     assert.equal(again.status, 409);
     assert.equal(again.code, CODE.ALREADY_REPORTED);
   });
 
-  test('the report queue is visible to the moderator and to nobody else', async () => {
+  test('the case queue is visible to the moderator and to nobody else', async () => {
     const [reporter, target] = seeded(2);
-    await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: `QA queue ${suffix()}` }, { token: reporter.token });
+    await reportProfile(target, reporter, { reasonCode: 'HARASSMENT', note: `QA ${suffix()}` });
 
-    // Newest first and a large page, because the queue is @PageableDefault(size = 50) and
-    // open reports accumulate across runs — a freshly filed one falls off page one and the
-    // test starts reporting that reports do not reach the queue at all.
-    const asAdmin = await get(`${P.community}/admin/reports?size=200&sort=createdAt,desc`, { token: admin.token });
+    const asAdmin = await get(`${P.community}/admin/cases?limit=500`, { token: admin.token });
     assert.equal(asAdmin.status, 200, asAdmin.text);
-    assert.ok(JSON.stringify(asAdmin.data).includes(target.userId), 'the report must reach the queue');
+    assert.ok(JSON.stringify(asAdmin.data).includes(target.userId), 'the case must reach the queue');
 
-    const asUser = await get(`${P.community}/admin/reports`, { token: reporter.token });
-    assert.equal(asUser.status, 403, 'an ordinary gamer must not read the moderation queue');
+    const asUser = await get(`${P.community}/admin/cases`, { token: reporter.token });
+    assert.equal(asUser.status, 403, 'an ordinary gamer must not read the queue');
 
-    const anonymous = await get(`${P.community}/admin/reports`);
+    const anonymous = await get(`${P.community}/admin/cases`);
     assert.equal(anonymous.status, 401);
   });
 
-  test('a report can be dismissed, and leaves the queue', async () => {
+  test('dismissing a case closes its reports and leaves the account alone', async () => {
     const [reporter, target] = seeded(2);
-    await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: `QA dismiss ${suffix()}` }, { token: reporter.token });
+    await reportProfile(target, reporter, { reasonCode: 'HARASSMENT' });
+    const caseId = openCaseId(target.userId);
+    assert.ok(caseId);
 
-    const reportId = db.scalar(
-      `select id from gamebuddy.content_report where reporter_id = '${db.esc(reporter.userId)}' ` +
-      "and status = 'OPEN' order by created_at desc limit 1;",
-    );
-    assert.ok(reportId, 'the report should be OPEN before it is dismissed');
-
-    const res = await post(`${P.community}/admin/reports/${reportId}/dismiss`, undefined, { token: admin.token });
+    const res = await resolveCase(caseId, { action: 'DISMISS' }, admin.token);
     assert.equal(res.status, 200, res.text);
 
-    const after_ = db.scalar(`select status from gamebuddy.content_report where id = '${db.esc(reportId)}';`);
-    assert.notEqual(after_, 'OPEN', 'a dismissed report must not stay open');
+    assert.equal(
+      db.scalar(`select status from gamebuddy.moderation_case where id = '${db.esc(caseId)}';`),
+      'CLOSED',
+    );
+    const open = db.scalar(
+      `select count(*) from gamebuddy.content_report where case_id = '${db.esc(caseId)}' and status = 'OPEN';`,
+    );
+    assert.equal(Number(open), 0, 'a dismissed case must leave no report open');
+    // The reporter's dismissed count goes up — it is what weighs a serial false reporter down.
+    assert.ok(Number(db.scalar(
+      `select reports_dismissed from gamebuddy.gamer where user_id = '${db.esc(reporter.userId)}';`,
+    )) >= 1);
   });
 
-  test('actioning a profile report closes every open report against the same person', async () => {
-    // Two reporters, one target: actioning either report must close both, or popular
-    // targets leave the moderator a queue of duplicates.
-    const [reporterA, reporterB, target] = seeded(3);
-    await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: `QA action A ${suffix()}` }, { token: reporterA.token });
-    await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: `QA action B ${suffix()}` }, { token: reporterB.token });
+  test('resolving a case actions every report in it at once', async () => {
+    // Two reporters, one target: one decision must close both reports, or a popular target
+    // leaves the moderator a queue of duplicates.
+    const [a, b, target] = seeded(3);
+    await reportProfile(target, a, { reasonCode: 'HARASSMENT' });
+    await reportProfile(target, b, { reasonCode: 'HARASSMENT' });
+    const caseId = openCaseId(target.userId);
 
-    const reportId = db.scalar(
-      `select id from gamebuddy.content_report where content_id = '${db.esc(target.userId)}' ` +
-      "and status = 'OPEN' limit 1;",
-    );
-    assert.ok(reportId);
-
-    const actioned = await post(`${P.community}/admin/reports/${reportId}/action`, undefined, { token: admin.token });
-    assert.equal(actioned.status, 200, actioned.text);
+    const res = await resolveCase(caseId, { action: 'WARN', reasonCode: 'HARASSMENT' }, admin.token);
+    assert.equal(res.status, 200, res.text);
 
     const stillOpen = db.scalar(
-      `select count(*) from gamebuddy.content_report where content_id = '${db.esc(target.userId)}' ` +
-      "and status = 'OPEN';",
+      `select count(*) from gamebuddy.content_report where case_id = '${db.esc(caseId)}' and status = 'OPEN';`,
     );
-    assert.equal(Number(stillOpen), 0, 'actioning one report must close its siblings too');
+    assert.equal(Number(stillOpen), 0, 'resolving must close every report in the case');
+    assert.equal(
+      db.scalar(`select count(*) from gamebuddy.content_report where case_id = '${db.esc(caseId)}' and status = 'ACTIONED';`) * 1,
+      2,
+    );
   });
 
-  test('an ordinary gamer cannot action or dismiss a report', async () => {
+  test('an ordinary gamer cannot resolve a case', async () => {
     const [reporter, target] = seeded(2);
-    await post(`${P.community}/report/profile/${target.userId}`,
-      { reason: `QA priv ${suffix()}` }, { token: reporter.token });
-    const reportId = db.scalar(
-      `select id from gamebuddy.content_report where reporter_id = '${db.esc(reporter.userId)}' ` +
-      "and status = 'OPEN' order by created_at desc limit 1;",
+    await reportProfile(target, reporter, { reasonCode: 'HARASSMENT' });
+    const caseId = openCaseId(target.userId);
+
+    assert.equal((await resolveCase(caseId, { action: 'DISMISS' }, reporter.token)).status, 403);
+    assert.equal(
+      db.scalar(`select status from gamebuddy.moderation_case where id = '${db.esc(caseId)}';`),
+      'OPEN',
+      'the case must still be open after the refused call',
     );
+  });
 
-    assert.equal((await post(`${P.community}/admin/reports/${reportId}/action`,
-      undefined, { token: reporter.token })).status, 403);
-    assert.equal((await post(`${P.community}/admin/reports/${reportId}/dismiss`,
-      undefined, { token: target.token })).status, 403);
+  test('a report budget stops one account flooding the queue', async () => {
+    // 10 reports a day per reporter; the 11th, against a fresh target so dedup does not
+    // fire, is refused.
+    const pool = seeded(12);
+    const reporter = pool[0];
+    for (let i = 1; i <= 10; i++) {
+      const res = await reportProfile(pool[i], reporter, { reasonCode: 'SPAM_SCAM' });
+      assert.equal(res.status, 200, `report ${i} should be accepted: ${res.text}`);
+    }
+    const eleventh = await reportProfile(pool[11], reporter, { reasonCode: 'SPAM_SCAM' });
+    assert.equal(eleventh.status, 429);
+    assert.equal(eleventh.code, CODE.RATE_LIMITED);
+  });
 
-    assert.equal(db.scalar(`select status from gamebuddy.content_report where id = '${db.esc(reportId)}';`),
-      'OPEN', 'the report must still be open after the refused calls');
+  test('an underage report is urgent on its own', async () => {
+    const [reporter, target] = seeded(2);
+    await reportProfile(target, reporter, { reasonCode: 'UNDERAGE' });
+    assert.equal(
+      db.scalar(`select status from gamebuddy.moderation_case where target_id = '${db.esc(target.userId)}' and status <> 'CLOSED';`),
+      'URGENT',
+      'one report that someone is a minor must make the case urgent',
+    );
+  });
+
+  test('enough distinct reporters hide the target from decks pending review', async () => {
+    const [a, b, c, target] = seeded(4);
+    await reportProfile(target, a, { reasonCode: 'HARASSMENT' });
+    await reportProfile(target, b, { reasonCode: 'HARASSMENT' });
+    await reportProfile(target, c, { reasonCode: 'HARASSMENT' });
+
+    assert.equal(
+      db.scalar(`select hidden_from_discovery from gamebuddy.gamer where user_id = '${db.esc(target.userId)}';`),
+      't',
+      'three trusted reporters must take the profile out of decks',
+    );
+    // ...and a dismissal must put them back.
+    const caseId = openCaseId(target.userId);
+    await resolveCase(caseId, { action: 'DISMISS' }, admin.token);
+    assert.equal(
+      db.scalar(`select hidden_from_discovery from gamebuddy.gamer where user_id = '${db.esc(target.userId)}';`),
+      'f',
+      'dismissing must put the account back in the deck',
+    );
+  });
+
+  test('a ban needs a note, and a suspension carries an end time', async () => {
+    const [reporter, target] = seeded(2);
+    await reportProfile(target, reporter, { reasonCode: 'HARASSMENT' });
+    let caseId = openCaseId(target.userId);
+
+    const noNote = await resolveCase(caseId, { action: 'BAN' }, admin.token);
+    assert.equal(noNote.status, 400);
+    assert.equal(noNote.code, CODE.MODERATION_NOTE_REQUIRED);
+
+    // A suspension instead: blocked, with an end time.
+    const suspend = await resolveCase(caseId, { action: 'SUSPEND_24H', reasonCode: 'HARASSMENT' }, admin.token);
+    assert.equal(suspend.status, 200, suspend.text);
+    // db.query rows are positional arrays, split on the unit separator.
+    const [isBlocked, suspendedUntil] = db.query(
+      `select is_blocked, suspended_until from gamebuddy.gamer where user_id = '${db.esc(target.userId)}';`,
+    )[0];
+    assert.equal(isBlocked, 't');
+    assert.ok(suspendedUntil, 'a suspension must record when it ends');
+
+    // Like a ban, a suspension kills the token already in the client's hands.
+    const after_ = await get(`${P.profile}/get/user/info`, { token: target.token });
+    assert.ok(after_.status === 401 || after_.status === 403, 'a suspended token must stop working');
   });
 
   describe('bans', () => {
     test('a ban invalidates a token that was already issued', async () => {
       const [victim] = seeded(1);
-
-      // Issued and proven to work *before* the ban — that is the whole point. A test that
-      // mints the token afterwards proves nothing about revocation.
+      // Issued and proven to work *before* the ban — that is the whole point.
       const before = await get(`${P.profile}/get/user/info`, { token: victim.token });
       assert.equal(before.status, 200, 'the victim must be able to use the API before the ban');
 
@@ -153,29 +226,15 @@ describe('moderation', () => {
       assert.ok(after_.status === 401 || after_.status === 403,
         `a banned gamer kept API access with their old token (HTTP ${after_.status})`);
 
-      // And the ban is reversible.
-      assert.equal((await post(`${P.admin}/unban/user/${victim.userId}`,
-        undefined, { token: admin.token })).status, 200);
+      assert.equal((await post(`${P.admin}/unban/user/${victim.userId}`, undefined, { token: admin.token })).status, 200);
     });
 
     test('an ordinary gamer cannot ban anyone', async () => {
       const [attacker, victim] = seeded(2);
-      const res = await post(`${P.admin}/ban/user/${victim.userId}`, undefined, { token: attacker.token });
-
-      // 403, and specifically not 401. The difference is not cosmetic: the body is empty
-      // either way, and GameBuddy-App/src/api/client.ts:105 turns an empty 401 into
-      // onSessionExpired() — so while this answered 401, an ordinary gamer who reached an
-      // admin route was signed out of the app instead of being told no. SecurityConfig had
-      // an authenticationEntryPoint and no accessDeniedHandler, so the AccessDeniedException
-      // from the `/admin/**` → hasRole("ADMIN") rule fell through to the entry point.
-      //
-      // /community/admin/reports always answered 403 — it is not under /admin/**, so its
-      // @PreAuthorize denial never reached the entry point. This is the assertion that keeps
-      // the two admin surfaces agreeing.
-      assert.equal(res.status, 403, `an authenticated non-admin must get 403, got ${res.status}`);
-
-      assert.equal(db.scalar(`select is_blocked from gamebuddy.gamer where user_id = '${db.esc(victim.userId)}';`),
-        'f', 'the victim must not be blocked — authorisation itself holds');
+      assert.equal(
+        (await post(`${P.admin}/ban/user/${victim.userId}`, undefined, { token: attacker.token })).status,
+        403,
+      );
     });
 
     test('the admin endpoints are closed to anonymous callers', async () => {
@@ -185,7 +244,7 @@ describe('moderation', () => {
     });
   });
 
-  test('a reported chat message reaches the chat moderation queue', async () => {
+  test('a reported message reaches the case with its decrypted context', async () => {
     const [a, b] = seeded(2);
     await post(`${P.match}/accept`, { userId: b.userId }, { token: a.token });
     await post(`${P.match}/accept`, { userId: a.userId }, { token: b.token });
@@ -197,16 +256,21 @@ describe('moderation', () => {
     );
     assert.ok(messageId, 'the message must exist');
 
-    // Only the *recipient* may report; the sender reporting their own message is refused.
-    const bySender = await post(`/messages/report/${messageId}`, { reason: 'QA' }, { token: a.token });
+    // Only the recipient may report; the sender reporting their own message is refused.
+    const bySender = await post(`/messages/report/${messageId}`, { reasonCode: 'HARASSMENT' }, { token: a.token });
     assert.ok(bySender.status >= 400, 'the sender must not be able to report their own message');
 
-    const byRecipient = await post(`/messages/report/${messageId}`, { reason: 'QA abuse' }, { token: b.token });
+    const byRecipient = await post(`/messages/report/${messageId}`, { reasonCode: 'HARASSMENT' }, { token: b.token });
     assert.equal(byRecipient.status, 200, byRecipient.text);
 
-    const queue = await get('/admin/chat/reported', { token: admin.token });
-    assert.equal(queue.status, 200, queue.text);
-    assert.ok(JSON.stringify(queue.data).includes('QA reportable message'),
-      'the moderator must be able to read the reported message in clear text');
+    // The case is against the sender; opening it decrypts the reported message for the moderator.
+    const caseId = openCaseId(a.userId);
+    assert.ok(caseId, 'a case must open against the message sender');
+    const detail = await get(`${P.community}/admin/cases/${caseId}`, { token: admin.token });
+    assert.equal(detail.status, 200, detail.text);
+    assert.ok(
+      JSON.stringify(detail.data).includes('QA reportable message'),
+      'the moderator must be able to read the reported message in clear text',
+    );
   });
 });

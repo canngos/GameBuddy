@@ -11,7 +11,7 @@ cd ~/gamebuddy
 C="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 ```
 
-The six containers: `caddy`, `backend`, `postgres`, `redis`, `model`, `model-retrain`. (Elasticsearch/Kibana/Filebeat sit behind a `logs` profile and stay off — they need 2.9 GB and don't fit. Reading logs without them: [docs/OPERATIONS.md](docs/OPERATIONS.md).)
+The six containers: `caddy`, `backend`, `postgres`, `redis`, `model`, `model-retrain`. (There is no log stack — reading logs is [docs/OPERATIONS.md](docs/OPERATIONS.md).)
 
 ---
 
@@ -92,7 +92,8 @@ openssl rand -base64 32   # JWT_SECRET
 openssl rand -base64 32   # CHAT_ENCRYPTION_KEY
 openssl rand -hex  32     # INTERNAL_API_KEY
 openssl rand -base64 32   # REVENUECAT_WEBHOOK_TOKEN  (same value in the RevenueCat dashboard)
-openssl rand -base64 24   # DB_PASSWORD
+openssl rand -base64 24   # DB_PASSWORD      (the bootstrap superuser; init, migrations, backups)
+openssl rand -base64 24   # DB_APP_PASSWORD  (the least-privileged login the backend runs as)
 openssl rand -base64 24   # REDIS_PASSWORD
 ```
 
@@ -108,8 +109,10 @@ TZ=Europe/Helsinki                    # your users' timezone
 MAIL_HOST=smtp-relay.brevo.com
 MAIL_PORT=587
 SMTP_EMAIL=... ; SMTP_EMAIL_PWD=... ; MAIL_FROM=noreply@yourdomain.com
-# Leave MAIL_MODE unset. The default is smtp; the word "log" would print
-# verification codes to the log, letting anyone reading it verify any address.
+# Do not set MAIL_MODE here. `docker-compose.prod.yml` sets it to `smtp`; the
+# application default is `log`, which prints verification codes to the container
+# log and would let anyone reading it verify any address. Overriding it in .env is
+# the one way to undo the overlay's protection, so leave it to the overlay.
 
 R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com
 R2_ACCESS_KEY_ID=... ; R2_SECRET_ACCESS_KEY=... ; R2_PUBLIC_URL=https://pub-....r2.dev
@@ -186,11 +189,10 @@ curl -sI http://api.yourdomain.com/actuator/health | head -1    # 308 (HTTP→HT
 nmap -Pn -p 5432,6379,8000,8080,9200 REDACTED_SERVER_IP         # all filtered/closed
 ```
 
-Then run the functional suite against prod **once, before real users** (it creates accounts):
-
-```bash
-GB_BASE_URL=https://api.yourdomain.com node qa/run-functional.js
-```
+The functional suite does **not** run against prod: it reads verification codes out of the
+local backend log (`MAIL_MODE=log`) and resets fixtures through `docker compose exec postgres`,
+neither of which exists on the box. Prove prod with the checks above plus one manual sign-up
+from a production build (a real inbox), then delete that account in-app.
 
 ---
 
@@ -257,8 +259,9 @@ Each limit has a `_PERMITS` and a `_WINDOW` (windows accept `30s`/`5m`/`1h`/`1d`
 | Verification-code guesses | `AUTH_VERIFY_{PERMITS,WINDOW}` | 20 / 15m |
 | Code emails | `AUTH_SEND_CODE_{PERMITS,WINDOW}` | 6 / 15m |
 | Password reset | `AUTH_RESET_PASSWORD_{PERMITS,WINDOW}` | 20 / 15m |
+| Sign-up/code/reset from one IP | `AUTH_IP_{PERMITS,WINDOW}` | 200 / 15m |
 
-Raising a limit is safe; lowering one decides whom to turn away (`RateLimitBudgetsTest` fails the build if any is set below what a real person does). **Leave `AUTH_SEND_CODE_PERMITS` alone** — every permit sends a real email, and the person flooded isn't the one asking.
+Raising a limit is safe; lowering one decides whom to turn away (`RateLimitBudgetsTest` fails the build if any is set below what a real person does). **Leave `AUTH_SEND_CODE_PERMITS` alone** — every permit sends a real email, and the person flooded isn't the one asking. `AUTH_IP_*` is keyed by address, so a tester behind a shared network is unblocked by `$C up -d backend` like the others; raise it (e.g. `AUTH_IP_PERMITS=100000`) before running the functional suite twice inside its window from one machine.
 
 ### Remove the seed accounts (once real users can fill a deck)
 
@@ -277,6 +280,20 @@ $C pull && $C up -d
 ```
 
 > Apply any new migration from `GameBuddy-backend/src/main/resources/db/` **by hand first**, then start the new image. The backend runs `ddl-auto=validate` and refuses to start against a schema it disagrees with — which is the behaviour you want: it fails loudly instead of reshaping your database.
+
+### Migrations applied on prod
+
+The `schema-baseline.sql` was loaded on first init (2026-08-16). Everything below was applied
+by hand with `$C exec -T postgres psql -U gamebuddy -d gamebuddy -f /dev/stdin < <file>` before
+the image that needs it started. **Add a row when you apply one, not later.**
+
+| File | Applied | Check |
+|---|---|---|
+| upgrade-2026-4 … 37 | before 2026-09-11 (pre-ledger) | — |
+| upgrade-2026-38-promo-codes.sql | _pre-ledger_ | `\dt gamebuddy.promo_code*` → 3 tables |
+| upgrade-2026-39-missions-and-badges.sql | _pre-ledger_ | `\d gamebuddy.gamer` has `mission_set_index` |
+| upgrade-2026-40 … 44 | _pre-ledger_ | `\dt gamebuddy.gamer_auth_identity`; `review_prompt_shown_at` on `gamer` |
+| upgrade-2026-45-report-cases.sql | _fill in_ | `\dt gamebuddy.moderation_case` exists; `\d gamebuddy.gamer` has `suspended_until` |
 
 ---
 

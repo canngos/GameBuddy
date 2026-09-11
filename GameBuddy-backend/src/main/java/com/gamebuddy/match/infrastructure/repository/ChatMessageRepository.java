@@ -43,8 +43,17 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> 
             """)
     long countUnread(@Param("roomId") UUID roomId, @Param("userId") String userId, @Param("since") Instant since);
 
-    /** The moderation queue, newest report first. */
-    List<ChatMessage> findByReportedAtIsNotNullOrderByReportedAtDesc(Pageable pageable);
+    /**
+     * The messages just before one, newest first, for a report's context.
+     *
+     * <p>Strictly before by time. Two messages in the same millisecond are rare enough that
+     * losing one from the edge of a ten-message window is not worth an id tiebreak.
+     */
+    List<ChatMessage> findByRoomIdAndCreatedAtBeforeOrderByCreatedAtDesc(
+            UUID roomId, Instant before, Pageable pageable);
+
+    /** The messages just after one, oldest first, for a report's context. */
+    List<ChatMessage> findByRoomIdAndCreatedAtAfterOrderByCreatedAtAsc(UUID roomId, Instant after, Pageable pageable);
 
     /** How many messages a gamer has sent, over every room, for the chat badges. */
     long countBySenderId(String senderId);

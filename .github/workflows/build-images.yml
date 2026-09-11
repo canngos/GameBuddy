@@ -16,6 +16,9 @@ on:
     # should not spend ten minutes of CI and push 7.5 GB of identical layers.
     paths:
       - 'GameBuddy-backend/**'
+      # The shared module the backend image compiles in. A change here alone used to
+      # produce no new image.
+      - 'common/**'
       - 'GameBuddy-Model/**'
       - 'docker-compose*.yml'
       - '.github/workflows/build-images.yml'

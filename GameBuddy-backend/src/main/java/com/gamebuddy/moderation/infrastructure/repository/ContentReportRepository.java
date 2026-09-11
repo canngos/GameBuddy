@@ -27,6 +27,12 @@ public interface ContentReportRepository extends JpaRepository<ContentReport, UU
     /** How many distinct gamers have reported this author's content. Feeds a ban decision. */
     long countByAuthorIdAndStatus(String authorId, ContentReport.Status status);
 
+    /** Every report in a case, in the order they arrived. */
+    List<ContentReport> findByCaseIdOrderByCreatedAtAsc(UUID caseId);
+
+    /** Whether this reporter already has a report in this case. */
+    boolean existsByCaseIdAndReporterId(UUID caseId, String reporterId);
+
     /** How much is waiting for a moderator. Read by the console's dashboard. */
     long countByStatus(ContentReport.Status status);
 
