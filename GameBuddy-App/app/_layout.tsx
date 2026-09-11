@@ -12,7 +12,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ScreenScaleProvider } from '../src/ui/useScreenScale';
 import { gatherAdConsent } from '../src/ads/consent';
-import { identifyForCrashReports } from '../src/diagnostics/crashReporting';
+import { identifyForCrashReports, initCrashReporting } from '../src/diagnostics/crashReporting';
 import { installGlobalErrorHandler } from '../src/errors';
 import { queryClient } from '../src/query';
 import { AnimatedSplash } from '../src/ui/AnimatedSplash';
@@ -35,6 +35,10 @@ SplashScreen.preventAutoHideAsync().catch(() => {
 // Before anything else, so an error thrown while the rest of this module is still
 // evaluating is logged rather than swallowed.
 installGlobalErrorHandler();
+// Right after ours, deliberately: Crashlytics chains onto whatever error handler exists when
+// it loads, and ours swallows non-fatal errors — so it must wrap ours, not the reverse. This
+// is what makes the sign-in funnel visible to crash reporting before any account is set.
+initCrashReporting();
 
 // The API client is wired to the session store once, at module scope, so it is done
 // before any component can fire a request during its first render.

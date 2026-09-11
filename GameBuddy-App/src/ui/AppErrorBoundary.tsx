@@ -1,5 +1,7 @@
 import type { ErrorBoundaryProps } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { recordHandledError } from '../diagnostics/crashReporting';
 import { tNow } from '../i18n/useT';
 
 /**
@@ -42,6 +44,13 @@ function boundaryCopy() {
  */
 export function AppErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const copy = boundaryCopy();
+  // Report it. Expo Router's ErrorBoundary catches a render throw before the global handler
+  // sees it, so without this a render crash is both on screen and invisible in Crashlytics.
+  // Keyed on the error object so retrying with the same instance does not report it twice.
+  // `recordHandledError` only touches the null-guarded diagnostics module, which cannot throw.
+  useEffect(() => {
+    recordHandledError(error, 'ErrorBoundary');
+  }, [error]);
   return (
     <View style={{ flex: 1, backgroundColor: '#12121A', padding: 24, justifyContent: 'center' }}>
       <Text style={{ color: '#FFFFFF', fontSize: 22, fontWeight: '700', marginBottom: 8 }}>
@@ -58,7 +67,7 @@ export function AppErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         <Text selectable style={{ color: '#FF8A9B', fontSize: 13, fontWeight: '600' }}>
           {error?.name ?? 'Error'}: {error?.message ?? 'no message'}
         </Text>
-        {!!error?.stack && (
+        {__DEV__ && !!error?.stack && (
           <Text selectable style={{ color: '#8A8A9A', fontSize: 11, marginTop: 10 }}>
             {error.stack}
           </Text>

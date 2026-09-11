@@ -761,6 +761,8 @@ export const sv: Dictionary = {
     privacyHint: 'Vad vi samlar in och vad vi gör med det',
     adPrivacy: 'Annonsintegritet',
     adPrivacyHint: 'Ändra vad annonser får använda om dig',
+    moderationNotice: 'Anmälningar granskas inom 24 timmar. Ingen tolerans för kränkande innehåll eller användare.',
+    igdbCredit: 'Spelomslag och beskrivningar från IGDB.com.',
     password: 'Lösenord',
     passwordHint: 'Loggar ut dig överallt',
     passwordSet: 'Ange ett lösenord',

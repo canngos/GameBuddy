@@ -273,14 +273,13 @@ export default function Settings() {
           </RowGroup>
 
           <Text variant="caption" className="px-1">
-            Reports are reviewed within 24 hours. There is no tolerance for objectionable
-            content or abusive users.
+            {t.settings.moderationNotice}
           </Text>
 
           {/* IGDB's terms require attribution wherever their data is used, and the game
               covers and descriptions in the catalogue come from them. */}
           <Text variant="caption" className="px-1">
-            Game covers and descriptions from IGDB.com.
+            {t.settings.igdbCredit}
           </Text>
         </View>
 

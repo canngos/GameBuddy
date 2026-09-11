@@ -196,8 +196,8 @@ export default function ConsoleScreen() {
             <View className="mt-4">
               <Stat label="Under 18" value={data.minors} />
               <Text variant="caption" className="mt-1">
-                Minors are matched only with other minors. This number is what the
-                age-rating and monetisation position has to be argued against.
+                GameBuddy is 18+, so this should be zero. Anything above it is an account that
+                slipped a date of birth past sign-up and wants looking at.
               </Text>
             </View>
           </Card>

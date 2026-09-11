@@ -431,8 +431,13 @@ does not burn a number out of the remote `versionCode` counter that Play release
 **Every profile has its own EAS Update channel**, `production` included. That last one was
 missing until 2026-08-16, which meant shipped builds could not receive an over-the-air update
 at all — `updates.url` was configured in `app.json`, so the plumbing looked complete, but a
-build without a channel subscribes to nothing. Publish to a release with
-`eas update --branch <branch> --channel production`.
+build without a channel subscribes to nothing. Publish a JS-only update with
+`npm run update:production` — it publishes to the `production` channel **and** the production
+EAS *environment*, which is where the `EXPO_PUBLIC_*` values live. A bare
+`eas update --channel production` would inline the local `.env` instead (a `test_` RevenueCat
+key, no API URL), so `src/api/config.ts` now throws at launch when a release bundle has no
+`EXPO_PUBLIC_API_URL` rather than pointing store users at `localhost`. Check the environment
+holds the six values with `eas env:list --environment production`.
 
 The channels are deliberately distinct, so an update pushed to `preview` can never reach a
 store build. Combined with `runtimeVersion.policy: "appVersion"`, an update only reaches

@@ -763,6 +763,8 @@ export const fi: Dictionary = {
     privacyHint: 'Mitä keräämme ja mitä sillä teemme',
     adPrivacy: 'Mainosten tietosuoja',
     adPrivacyHint: 'Muuta, mitä mainokset saavat käyttää sinusta',
+    moderationNotice: 'Ilmoitukset käsitellään 24 tunnissa. Häirintää tai loukkaavaa sisältöä ei suvaita.',
+    igdbCredit: 'Pelien kannet ja kuvaukset: IGDB.com.',
     password: 'Salasana',
     passwordHint: 'Kirjaa sinut ulos kaikkialta',
     passwordSet: 'Aseta salasana',

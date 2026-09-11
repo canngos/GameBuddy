@@ -23,8 +23,17 @@ function resolveBaseUrl(): string {
   const host = hostUri?.split(':')[0];
   if (host) return `http://${androidSafeHost(host)}:${PORT}`;
 
-  // No packager host: a production bundle without EXPO_PUBLIC_API_URL, or the web
-  // build.
+  // No packager host and no explicit URL. In development that is the web build or a bare
+  // export; in a release bundle it is a publishing mistake -- an `eas update` run without the
+  // production environment, which is where EXPO_PUBLIC_API_URL lives -- and the honest thing
+  // is to fail where it is seen rather than point every store user at their own device.
+  // expo-updates treats a bundle that throws before its first frame as a failed launch and
+  // rolls back to the previous one, so this cannot brick a device. See `npm run update:production`.
+  if (!__DEV__) {
+    throw new Error(
+      'EXPO_PUBLIC_API_URL is not set in this production bundle. Publish with `npm run update:production`.',
+    );
+  }
   return `http://${androidSafeHost('localhost')}:${PORT}`;
 }
 

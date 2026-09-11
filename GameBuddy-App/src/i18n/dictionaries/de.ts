@@ -764,6 +764,8 @@ export const de: Dictionary = {
     privacyHint: 'Was wir erheben und was wir damit tun',
     adPrivacy: 'Werbe-Privatsphäre',
     adPrivacyHint: 'Ändern, was Werbung über dich verwenden darf',
+    moderationNotice: 'Meldungen werden innerhalb von 24 Stunden geprüft. Keine Toleranz für Missbrauch.',
+    igdbCredit: 'Spielcover und Beschreibungen von IGDB.com.',
     password: 'Passwort',
     passwordHint: 'Meldet dich überall ab',
     passwordSet: 'Passwort festlegen',

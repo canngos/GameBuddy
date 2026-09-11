@@ -841,6 +841,8 @@ export const en = {
     privacyHint: 'What we collect, and what we do with it',
     adPrivacy: 'Advert privacy',
     adPrivacyHint: 'Change what adverts may use about you',
+    moderationNotice: 'Reports are reviewed within 24 hours. No tolerance for abusive users or content.',
+    igdbCredit: 'Game covers and descriptions from IGDB.com.',
     password: 'Password',
     passwordHint: 'Signs you out everywhere',
     passwordSet: 'Set a password',

@@ -73,6 +73,27 @@ export function crashReportingAvailable(): boolean {
 }
 
 /**
+ * Loads Crashlytics at boot so its JS handlers are installed before anyone signs in.
+ *
+ * The reason this must run early, and unconditionally, is subtle: the native package installs
+ * its global JS-error and unhandled-rejection handlers in its module constructor — the first
+ * time {@link crashlytics} requires it — and it captures whatever `ErrorUtils` handler exists
+ * at that moment to chain onto. So ours has to be installed first (it is, at module load in
+ * `app/_layout.tsx`), and this call has to come right after it. Until this existed, Crashlytics
+ * was only loaded once a signed-in user id was set, which left the whole sign-in funnel — the
+ * highest-risk surface on day one — blind to JS errors and unhandled rejections. Native crashes
+ * were always captured; this is about the JS half.
+ *
+ * Null-safe on a build without the native module (an older development build): {@link crashlytics}
+ * returns null and nothing throws.
+ */
+export function initCrashReporting(): void {
+  if (crashReportingAvailable()) {
+    leaveCrashBreadcrumb('boot');
+  }
+}
+
+/**
  * Ties subsequent crash reports to an account.
  *
  * Worth having because the crash under investigation is intermittent: one report is noise,

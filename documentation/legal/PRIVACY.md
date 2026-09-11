@@ -1,6 +1,6 @@
 # GameBuddy — Privacy Policy
 
-**Version 2026-08-20.**
+**Version 2026-09-12.**
 
 GameBuddy is operated from Finland and is subject to the GDPR.
 
@@ -285,3 +285,6 @@ controller directly.
 
 If we change how we handle your data we will update this policy and tell you in the app
 before the change takes effect.
+
+- **2026-09-12** — described what is collected when you sign in with Google or Discord
+  (section 2), which you encounter with its own consent step in the app.

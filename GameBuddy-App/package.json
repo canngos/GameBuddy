@@ -71,6 +71,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
+    "update:production": "eas update --channel production --environment production --platform android",
     "start:go": "expo start --go",
     "check:contrast": "node scripts/check-contrast.js",
     "check:sdks": "node scripts/check-sdk-inventory.js",

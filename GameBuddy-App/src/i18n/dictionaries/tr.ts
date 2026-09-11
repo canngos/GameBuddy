@@ -761,6 +761,8 @@ export const tr: Dictionary = {
     privacyHint: 'Neyi topluyoruz ve onunla ne yapıyoruz',
     adPrivacy: 'Reklam gizliliği',
     adPrivacyHint: 'Reklamların senin hakkında neleri kullanabileceğini değiştir',
+    moderationNotice: 'Bildirimler 24 saat içinde incelenir. Kötüye kullanıma hoşgörü yoktur.',
+    igdbCredit: "Oyun kapakları ve açıklamaları IGDB.com'dan.",
     password: 'Parola',
     passwordHint: 'Seni her yerden çıkış yaptırır',
     passwordSet: 'Şifre belirle',
