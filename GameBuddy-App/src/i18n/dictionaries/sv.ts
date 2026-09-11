@@ -924,6 +924,10 @@ export const sv: Dictionary = {
     reasonSpam: 'Skräppost eller reklam',
     reasonMinor: 'Kan vara minderårig',
     reasonOther: 'Något annat',
+    reasonImpersonation: 'Utger sig för någon annan',
+    reportNoteBlurb: 'Berätta vad som hände.',
+    reportNotePlaceholder: 'Vad hände?',
+    reportSend: 'Skicka anmälan',
   },
 
   errors: {
@@ -941,6 +945,7 @@ export const sv: Dictionary = {
       '107': 'Användarnamnet är upptaget.',
       '108': 'Fel användarnamn eller lösenord. Om du registrerade dig med Google eller Discord, använd den knappen.',
       '113': 'Kontot är blockerat.',
+      '206': 'Ditt konto är avstängt. Du kan logga in igen när avstängningen upphör.',
       '121': 'Spelaren har blockerat dig.',
       '186': 'Du har blockerat spelaren och kan därför inte skicka meddelanden.',
       '129': 'Inte tillräckligt med mynt.',

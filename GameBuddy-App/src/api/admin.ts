@@ -2,12 +2,14 @@ import { api } from './client';
 import type {
   Analytics,
   BlockedUsers,
+  CaseDetail,
+  Cases,
   DirectoryFilter,
   PendingAvatars,
   PromoCode,
   PromoCodeInput,
   PromoCodes,
-  Reports,
+  ResolveCaseInput,
   UserDirectory,
   UserIds,
 } from './types';
@@ -47,16 +49,18 @@ export const adminApi = {
    */
   avatarImage: (userId: string) => api.get<{ image: string }>(`/admin/avatars/${userId}/image`),
 
-  // --- reports -------------------------------------------------------------
+  // --- moderation cases ----------------------------------------------------
 
-  reports: () => api.get<Reports>('/community/admin/reports'),
+  /** The queue: one case per reported person, urgent first. */
+  cases: () => api.get<Cases>('/community/admin/cases'),
 
-  /** Removes the reported content and closes every open report against it. */
-  actionReport: (reportId: string) =>
-    api.post<{ message: string }>(`/community/admin/reports/${reportId}/action`),
+  /** One case in full — its reports, the target's history, and the decrypted context. */
+  case: (caseId: string) =>
+    api.get<{ caseDetail: CaseDetail }>(`/community/admin/cases/${caseId}`),
 
-  dismissReport: (reportId: string) =>
-    api.post<{ message: string }>(`/community/admin/reports/${reportId}/dismiss`),
+  /** Resolves a case with one decision from the ladder. */
+  resolveCase: (caseId: string, body: ResolveCaseInput) =>
+    api.post<{ message: string }>(`/community/admin/cases/${caseId}/resolve`, body),
 
   // --- accounts ------------------------------------------------------------
 

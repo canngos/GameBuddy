@@ -927,6 +927,10 @@ export const fi: Dictionary = {
     reasonSpam: 'Roskaposti tai mainonta',
     reasonMinor: 'Voi olla alaikäinen',
     reasonOther: 'Jokin muu',
+    reasonImpersonation: 'Esiintyy jonakuna toisena',
+    reportNoteBlurb: 'Kerro, mitä tapahtui.',
+    reportNotePlaceholder: 'Mitä tapahtui?',
+    reportSend: 'Lähetä ilmoitus',
   },
 
   errors: {
@@ -944,6 +948,7 @@ export const fi: Dictionary = {
       '107': 'Käyttäjänimi on varattu.',
       '108': 'Väärä käyttäjätunnus tai salasana. Jos rekisteröidyit Googlella tai Discordilla, käytä sitä painiketta.',
       '113': 'Tili on estetty.',
+      '206': 'Tilisi on jäädytetty. Voit kirjautua uudelleen, kun jäädytys päättyy.',
       '121': 'Tämä pelaaja on estänyt sinut.',
       '186': 'Olet estänyt tämän pelaajan, joten et voi lähettää viestiä.',
       '129': 'Kolikot eivät riitä.',

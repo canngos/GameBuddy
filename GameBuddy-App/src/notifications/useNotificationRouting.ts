@@ -32,6 +32,11 @@ export const NOTIFICATION_KINDS = [
   // An administrator put a code on this account. No target — the promotion codes screen
   // lists everything that is waiting.
   'PROMO',
+  // A moderator acted on this account (a warning, a suspension, a ban). No target — the
+  // notice carries the reason and the appeal address; there is no screen beyond Settings.
+  'SANCTION',
+  // The report this gamer filed was reviewed. No target — informational.
+  'REPORT_RESOLVED',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -106,6 +111,15 @@ export function routeFor(kind: string | undefined, targetId: string | undefined,
       // Straight to the screen that can redeem it. The code is already on the account by
       // the time this arrives, so the tap that opens it is one tap from the coins.
       return '/settings/promo';
+
+    case 'SANCTION':
+      // Settings holds the account section and the links to the rules being enforced; the
+      // notice itself already said what happened and how to appeal.
+      return '/settings';
+
+    case 'REPORT_RESOLVED':
+      // Nothing to open — it is a thank-you. Home is the neutral landing.
+      return '/home';
 
     case 'RETURN':
       // Whatever was waiting is what the copy promised, and both of the things it can

@@ -45,6 +45,12 @@ export default function LobbyScreen() {
   const t = useT();
   const queryClient = useQueryClient();
   const myId = useSession((s) => s.userId);
+  // A member's profile, where reporting and blocking live. The terms promise a report is
+  // reachable from a lobby; this is how — the same profile screen the deck and chat open.
+  const onOpenProfile = useCallback(
+    (userId: string) => router.push({ pathname: '/messages/gamer/[userId]', params: { userId } }),
+    [router],
+  );
 
   const detail = useQuery({
     queryKey: ["lobby", lobbyId],
@@ -333,6 +339,8 @@ export default function LobbyScreen() {
             onBoost={onBoost}
             onAnswer={onAnswer}
             onKick={onKick}
+            onOpenProfile={onOpenProfile}
+            myId={myId}
             onRetryMessages={onRetryMessages}
           />
         }
@@ -454,6 +462,8 @@ const LobbyAbove = memo(function LobbyAbove({
   onBoost,
   onAnswer,
   onKick,
+  onOpenProfile,
+  myId,
   onRetryMessages,
 }: {
   detail: LobbyDetail;
@@ -480,6 +490,8 @@ const LobbyAbove = memo(function LobbyAbove({
   onBoost: () => void;
   onAnswer: (userId: string, accept: boolean) => void;
   onKick: (userId: string) => void;
+  onOpenProfile: (userId: string) => void;
+  myId: string | null;
   onRetryMessages: () => void;
 }) {
   const t = useT();
@@ -518,7 +530,7 @@ const LobbyAbove = memo(function LobbyAbove({
         <View className="gap-2">
           <Text variant="overline">{upper(t.lobby.detail.wantsToJoin)}</Text>
           {detail.pendingRequests.map((request) => (
-            <MemberRow key={request.userId} member={request}>
+            <MemberRow key={request.userId} member={request} onOpenProfile={onOpenProfile} myId={myId}>
               <Button
                 label={t.lobby.detail.accept}
                 size="md"
@@ -542,7 +554,7 @@ const LobbyAbove = memo(function LobbyAbove({
           {upper(t.lobby.detail.team(lobby.playerCount, lobby.maxPlayers))}
         </Text>
         {detail.members.map((member) => (
-          <MemberRow key={member.userId} member={member}>
+          <MemberRow key={member.userId} member={member} onOpenProfile={onOpenProfile} myId={myId}>
             {isOwner && member.status !== "OWNER" && chatOpen && (
               <Button
                 label={t.common.remove}
@@ -762,28 +774,42 @@ function ActionRow({
 
 function MemberRow({
   member,
+  onOpenProfile,
+  myId,
   children,
 }: {
   member: LobbyMember;
+  onOpenProfile?: (userId: string) => void;
+  myId?: string | null;
   children?: React.ReactNode;
 }) {
   const t = useT();
+  // Your own row is not a link to yourself; everyone else's opens their profile, which is
+  // where reporting and blocking live.
+  const canOpen = !!onOpenProfile && member.userId !== myId;
   return (
     <Card className="flex-row items-center gap-3">
-      <Avatar
-        source={member.avatar}
-        name={member.username ?? "?"}
-        colorSeed={member.userId}
-        size={36}
-      />
-      <View className="flex-1">
-        <Text variant="bodyStrong" numberOfLines={1}>
-          {member.username ?? t.lobby.detail.unknownGamer}
-        </Text>
-        {member.status === "OWNER" && (
-          <Text variant="caption">{t.lobby.detail.owner}</Text>
-        )}
-      </View>
+      <Pressable
+        className="flex-1 flex-row items-center gap-3"
+        disabled={!canOpen}
+        onPress={canOpen ? () => onOpenProfile?.(member.userId) : undefined}
+        accessibilityRole={canOpen ? "button" : undefined}
+      >
+        <Avatar
+          source={member.avatar}
+          name={member.username ?? "?"}
+          colorSeed={member.userId}
+          size={36}
+        />
+        <View className="flex-1">
+          <Text variant="bodyStrong" numberOfLines={1}>
+            {member.username ?? t.lobby.detail.unknownGamer}
+          </Text>
+          {member.status === "OWNER" && (
+            <Text variant="caption">{t.lobby.detail.owner}</Text>
+          )}
+        </View>
+      </Pressable>
       {children}
     </Card>
   );

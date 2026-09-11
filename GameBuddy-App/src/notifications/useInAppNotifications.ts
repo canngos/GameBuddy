@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import {
   Award,
   Bell,
+  ShieldAlert,
   Ticket,
   MessageCircle,
   Star,
@@ -125,6 +126,12 @@ const PRESENTATION: Record<NotificationKind, { icon: LucideIcon; tone: Tone }> =
   // Gold, like everything else worth coins or membership. The same ticket the console
   // wears on its Codes tab.
   PROMO: { icon: Ticket, tone: 'gold' },
+  // A moderation notice — a warning, a suspension, a ban. `muted` rather than a loud alert
+  // colour: the news is the words, and a red toast on top of "your account is suspended"
+  // is piling on.
+  SANCTION: { icon: ShieldAlert, tone: 'muted' },
+  // A thank-you for a report. `muted`, like the return nudge — quiet, not a summons.
+  REPORT_RESOLVED: { icon: Bell, tone: 'muted' },
 };
 
 /**
@@ -155,4 +162,8 @@ const REFRESH_ON: Record<NotificationKind, readonly QueryKeyRoot[]> = {
   RETURN: [],
   // The screen this opens reads ['promo'], and nothing else on screen shows a code.
   PROMO: ['promo'],
+  // The block is enforced server-side; the account state the app cares about is re-read on
+  // its own when a guarded request 401s or 403s, so there is nothing to invalidate here.
+  SANCTION: [],
+  REPORT_RESOLVED: [],
 };

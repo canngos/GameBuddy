@@ -1003,6 +1003,10 @@ export const en = {
     reasonSpam: 'Spam or advertising',
     reasonMinor: 'Someone may be a minor',
     reasonOther: 'Something else',
+    reasonImpersonation: 'Pretending to be someone',
+    reportNoteBlurb: 'Tell us what happened.',
+    reportNotePlaceholder: 'What happened?',
+    reportSend: 'Send report',
   },
 
   errors: {
@@ -1020,6 +1024,7 @@ export const en = {
       '107': 'That username is taken.',
       '108': 'Wrong username or password. If you signed up with Google or Discord, use that button.',
       '113': 'This account is blocked.',
+      '206': 'Your account is suspended. You can sign in again once it is lifted.',
       '121': 'This gamer has blocked you.',
       '186': 'You blocked this gamer, so you cannot message them.',
       '129': 'Not enough coins.',

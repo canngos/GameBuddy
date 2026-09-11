@@ -926,6 +926,10 @@ export const es: Dictionary = {
     reasonSpam: 'Spam o publicidad',
     reasonMinor: 'Puede ser menor de edad',
     reasonOther: 'Otra cosa',
+    reasonImpersonation: 'Se hace pasar por otra persona',
+    reportNoteBlurb: 'Cuéntanos qué pasó.',
+    reportNotePlaceholder: '¿Qué pasó?',
+    reportSend: 'Enviar denuncia',
   },
 
   errors: {
@@ -943,6 +947,7 @@ export const es: Dictionary = {
       '107': 'Ese usuario ya está cogido.',
       '108': 'Usuario o contraseña incorrectos. Si te registraste con Google o Discord, usa ese botón.',
       '113': 'Esta cuenta está bloqueada.',
+      '206': 'Tu cuenta está suspendida. Podrás iniciar sesión cuando termine la suspensión.',
       '121': 'Esta persona te ha bloqueado.',
       '186': 'Has bloqueado a esta persona, así que no puedes escribirle.',
       '129': 'No tienes monedas suficientes.',
