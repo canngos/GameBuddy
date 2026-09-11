@@ -92,7 +92,8 @@ openssl rand -base64 32   # JWT_SECRET
 openssl rand -base64 32   # CHAT_ENCRYPTION_KEY
 openssl rand -hex  32     # INTERNAL_API_KEY
 openssl rand -base64 32   # REVENUECAT_WEBHOOK_TOKEN  (same value in the RevenueCat dashboard)
-openssl rand -base64 24   # DB_PASSWORD
+openssl rand -base64 24   # DB_PASSWORD      (the bootstrap superuser; init, migrations, backups)
+openssl rand -base64 24   # DB_APP_PASSWORD  (the least-privileged login the backend runs as)
 openssl rand -base64 24   # REDIS_PASSWORD
 ```
 
