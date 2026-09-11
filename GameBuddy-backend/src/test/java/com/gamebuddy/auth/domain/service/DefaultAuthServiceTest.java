@@ -13,6 +13,7 @@ import com.gamebuddy.common.enums.Platform;
 import com.gamebuddy.common.enums.Role;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
+import com.gamebuddy.common.observability.LogContext;
 import com.gamebuddy.common.security.JwtService;
 import com.gamebuddy.common.util.Constants;
 import com.gamebuddy.shared.entity.*;
@@ -40,6 +41,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.MailSendException;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -426,6 +428,40 @@ class DefaultAuthServiceTest {
             assertEquals("100", response.getStatus().getCode());
             assertEquals(gamer.getUserId(), response.getBody().getData().getUserId());
             assertEquals("re-encoded", gamer.getPwd());
+        }
+
+        @Test
+        @DisplayName("a seventh sign-up on one address in the window is refused")
+        void testRegister_seventhAttemptOnOneAddressIsRefused() {
+            // The address is re-claimable while unverified, which is what made repeated
+            // registrations a way to mail somebody. Six get through (the sendCode budget),
+            // the seventh is refused before it can send.
+            gamer.setIsVerified(false);
+            when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.of(gamer));
+            when(passwordEncoder.encode(anyString())).thenReturn("encoded");
+
+            for (int i = 0; i < 6; i++) {
+                assertEquals(
+                        "100",
+                        authService.register(request(GOOD_PASSWORD)).getStatus().getCode());
+            }
+            BusinessException ex =
+                    assertThrows(BusinessException.class, () -> authService.register(request(GOOD_PASSWORD)));
+            assertEquals(146, ex.getTransactionCode().getId());
+        }
+
+        @Test
+        @DisplayName("a client address in the request context does not break registration")
+        void testRegister_withAClientIp_stillWorks() {
+            MDC.put(LogContext.CLIENT_IP, "203.0.113.9");
+            try {
+                when(gamerRepository.findByEmail(EMAIL)).thenReturn(Optional.empty());
+                assertEquals(
+                        "100",
+                        authService.register(request(GOOD_PASSWORD)).getStatus().getCode());
+            } finally {
+                MDC.remove(LogContext.CLIENT_IP);
+            }
         }
 
         @Test

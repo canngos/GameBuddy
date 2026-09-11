@@ -22,6 +22,11 @@ import com.gamebuddy.common.ratelimit.RateLimiter;
  *     account and not by address: at this point in the flow there is no session, and the
  *     address is inside a token that has not been verified yet. Hashing what was presented
  *     throttles a retry loop without keeping anything worth having.
+ * @param ip sign-up, code and reset traffic keyed by the caller's address. The one budget
+ *     here keyed by where the request came from rather than what it typed, so a single
+ *     machine cannot spend our outbound mail across a great many addresses. Generous: a
+ *     carrier NAT or a campus is one address for a large number of honest people, and this
+ *     is not the control that stops a mail-bomb -- {@code sendCode} is.
  */
 public record AuthRateLimiters(
         RateLimiter verify,
@@ -29,7 +34,8 @@ public record AuthRateLimiters(
         RateLimiter login,
         RateLimiter resetPassword,
         RateLimiter link,
-        RateLimiter social) {
+        RateLimiter social,
+        RateLimiter ip) {
 
     /** Drops expired windows so the in-memory maps cannot grow without bound. */
     public void evictExpired() {
@@ -39,5 +45,6 @@ public record AuthRateLimiters(
         resetPassword.evictExpired();
         link.evictExpired();
         social.evictExpired();
+        ip.evictExpired();
     }
 }

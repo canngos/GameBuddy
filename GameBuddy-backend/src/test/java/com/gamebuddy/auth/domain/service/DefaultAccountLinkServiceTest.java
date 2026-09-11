@@ -499,7 +499,7 @@ class DefaultAccountLinkServiceTest {
 
     /** Budgets are tested in RateLimitBudgetsTest; nothing here should be refused for pace. */
     private static AuthRateLimiters generousLimiters() {
-        return new AuthRateLimiters(limiter(), limiter(), limiter(), limiter(), limiter(), limiter());
+        return new AuthRateLimiters(limiter(), limiter(), limiter(), limiter(), limiter(), limiter(), limiter());
     }
 
     private static RateLimiter limiter() {

@@ -63,6 +63,15 @@ public final class LogContext {
     }
 
     /**
+     * The caller's address for this request, or {@code null} outside one (a scheduled job, a
+     * test). Resolved behind the proxy by {@code RequestLoggingFilter} — see it for why this
+     * is the real client IP and not Caddy's.
+     */
+    public static String getClientIp() {
+        return MDC.get(CLIENT_IP);
+    }
+
+    /**
      * Called once the request is authenticated, which is necessarily after the request has
      * already started logging — so the first few lines of a request carry no user id. That
      * is accurate rather than unfortunate: at that point nobody knows who is asking.

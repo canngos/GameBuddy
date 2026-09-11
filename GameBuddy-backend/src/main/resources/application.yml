@@ -219,6 +219,13 @@ gamebuddy:
       social:
         permits: ${AUTH_SOCIAL_PERMITS:30}
         window: ${AUTH_SOCIAL_WINDOW:15m}
+      # Sign-up, code and reset requests from one address. Keyed by the caller's IP, not by
+      # what they typed -- the one budget here that is -- because those endpoints all send a
+      # real email and nothing else stops one source spraying many inboxes. Generous: a
+      # carrier NAT is one address for thousands of honest people.
+      ip:
+        permits: ${AUTH_IP_PERMITS:200}
+        window: ${AUTH_IP_WINDOW:15m}
 
     billing:
       # Guesses at a promotion code, per account. The code space is what actually holds

@@ -60,7 +60,7 @@ This repository is the whole thing, end to end.
 | **Matching** | Python 3.12 · FastAPI · a content-similarity recommender |
 | **Data & realtime** | PostgreSQL · Redis (STOMP fan-out + presence) |
 | **Web** | Astro · Tailwind — static, and it scores 99/100/100/100 on Lighthouse |
-| **Infra** | Docker Compose · Caddy · an ELK log stack · a single Hetzner box |
+| **Infra** | Docker Compose · Caddy · structured JSON logs · a single Hetzner box |
 
 ---
 
@@ -87,14 +87,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
-That brings up Postgres, the model, the backend, and the log stack; creates the schema; seeds the game and keyword catalogue; and waits for each service to report healthy before starting the next.
+That brings up Postgres, the model, the backend, Redis and Caddy; creates the schema; seeds the game and keyword catalogue; and waits for each service to report healthy before starting the next.
 
 | Service | URL |
 |---|---|
 | Backend | http://localhost:8080 |
 | API docs (Swagger) | http://localhost:8080/swagger-ui/index.html |
 | Model | http://localhost:8000/health |
-| Kibana | http://localhost:5601/app/discover |
 
 > **Signing up locally:** there's no mail server, so verification codes are printed to the backend log instead of emailed. Register, then `docker compose logs backend | grep "verification code"`. The full flow (and why it's built to fail closed) is in the [engineering notes](docs/ENGINEERING.md#logs).
 
@@ -129,7 +128,7 @@ Each sub-project has its own README with the details that matter there — start
 
 - **It's real, and it's a solo project.** GameBuddy is a bachelor's capstone, built and shipped by one person. The scope is deliberately larger than "an app" because the interesting part was making all the pieces — client, server, ML, site, ops — actually work together in production.
 - **Android first.** iOS is designed for but not yet shipped; the code paths are there.
-- **Some things are unfinished on purpose.** Google Play billing is unit-tested but hasn't been run against a live Play Console sandbox yet — do one sandbox purchase before turning it on. Notes like this live next to the code they're about, not buried here.
+- **Some things are unfinished on purpose.** Google Play billing is exercised through RevenueCat's Test Store in debug builds and the functional suite; a real Play purchase needs an internal-testing-track install, so do one before relying on it. Notes like this live next to the code they're about, not buried here.
 - **Everything in `.env.example` is a placeholder.** Production runs on its own secrets; nothing real is in this repository.
 
 ---
