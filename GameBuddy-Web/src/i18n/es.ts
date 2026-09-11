@@ -29,6 +29,7 @@ export const es: Dictionary = {
     subtitle:
       'No es un servidor lleno de desconocidos. GameBuddy te empareja por tus juegos, tu plataforma y tu forma de jugar — y luego se aparta para que juegues.',
     comingSoon: 'Muy pronto en',
+    getItOn: 'Consíguelo en',
     releaseNote: 'GameBuddy está en la recta final antes del lanzamiento. Android va primero.',
     deckAlt: 'El mazo de GameBuddy, con el perfil de un jugador y los juegos a los que juega',
     chatAlt: 'La lista de conversaciones de GameBuddy, con un nuevo match esperando',
@@ -60,7 +61,7 @@ export const es: Dictionary = {
     },
     free: {
       title: 'Gratis, de verdad',
-      body: 'El emparejamiento, el chat y las comunidades son gratis. Gold añade filtros y likes ilimitados — no bloquea aquello por lo que viniste.',
+      body: 'El emparejamiento, el chat y las lobbies son gratis. Gold añade filtros y likes ilimitados — no bloquea aquello por lo que viniste.',
     },
   },
 
@@ -83,11 +84,11 @@ export const es: Dictionary = {
 
   faq: {
     title: 'Preguntas',
-    q1: { q: '¿GameBuddy es gratis?', a: 'Sí. El emparejamiento, el chat y las comunidades son gratis, con un límite diario de likes. Gold es opcional y añade filtros avanzados, likes ilimitados y algunos extras cosméticos — no pone el emparejamiento en sí detrás de un muro de pago.' },
+    q1: { q: '¿GameBuddy es gratis?', a: 'Sí. El emparejamiento, el chat y las lobbies son gratis, con un límite diario de likes. Gold es opcional y añade filtros avanzados, likes ilimitados y algunos extras cosméticos — no pone el emparejamiento en sí detrás de un muro de pago.' },
     q2: { q: '¿Es una app de citas?', a: 'No. GameBuddy empareja a personas por los juegos a los que juegan y cómo los juegan, para que encuentres un grupo, un compañero de co-op o gente para una raid. Está hecha para jugar juntos, no para ligar.' },
     q3: { q: '¿Qué plataformas admite?', a: 'Le dices a GameBuddy en qué juegas — PC, PlayStation, Xbox, Switch o móvil — y el emparejamiento va en consecuencia, porque los mismos juegos en plataformas distintas normalmente no se pueden jugar juntos. La app sale primero en Android; iOS después.' },
     q4: { q: '¿Por qué +18?', a: 'GameBuddy pone a desconocidos a hablar en privado entre ellos, y eso no es algo que deba funcionar para menores junto a adultos. No hay nivel más joven ni modo supervisado. La edad se calcula a partir de la fecha de nacimiento indicada al registrarse, y las cuentas de menores de 18 se cierran.' },
-    q5: { q: '¿Qué hacéis con los indeseables?', a: 'Puedes bloquear o denunciar a cualquiera desde su perfil o desde la conversación, y las denuncias se revisan en 24 horas. Cada foto subida se revisa automáticamente antes de que nadie pueda verla. Los datos de contacto se eliminan del texto público, así que nadie puede publicar un teléfono en una comunidad.' },
+    q5: { q: '¿Qué hacéis con los indeseables?', a: 'Puedes bloquear o denunciar a cualquiera desde su perfil o desde la conversación, y las denuncias se revisan en 24 horas. Cada foto subida se revisa automáticamente antes de que nadie pueda verla. Los datos de contacto se eliminan del texto público, así que nadie puede publicar un teléfono en una lobby.' },
     q6: { q: '¿Puede alguien ver mis mensajes?', a: 'No. El contenido de los mensajes se cifra antes de guardarse, así que la base de datos contiene texto cifrado y no tu conversación. Un moderador solo ve un mensaje si tú lo denuncias.' },
     q7: { q: '¿Cómo borro mi cuenta?', a: 'Desde Ajustes en la app, o escribiendo a soporte. Tu perfil, tu foto y tus preferencias desaparecen; la otra mitad de tus conversaciones permanece, porque no es solo tuya para borrarla. La explicación completa está en la página de borrado de cuenta.' },
   },

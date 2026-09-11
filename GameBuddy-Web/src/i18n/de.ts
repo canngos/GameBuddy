@@ -28,6 +28,7 @@ export const de: Dictionary = {
     subtitle:
       'Kein Server voller Fremder. GameBuddy bringt dich mit Leuten zusammen, die deine Spiele haben, auf deiner Plattform sind und so spielen wie du — und geht dir danach aus dem Weg.',
     comingSoon: 'Demnächst bei',
+    getItOn: 'Jetzt bei',
     releaseNote: 'GameBuddy steht kurz vor der Veröffentlichung. Android kommt zuerst.',
     deckAlt: 'Der GameBuddy-Stapel mit dem Profil eines Spielers und seinen Spielen',
     chatAlt: 'Die GameBuddy-Unterhaltungsliste mit einem wartenden neuen Match',
@@ -59,7 +60,7 @@ export const de: Dictionary = {
     },
     free: {
       title: 'Kostenlos, richtig kostenlos',
-      body: 'Matching, Chat und Communities sind kostenlos. Gold bringt Filter und unbegrenzte Likes — es sperrt nicht das weg, wofür du gekommen bist.',
+      body: 'Matching, Chat und Lobbys sind kostenlos. Gold bringt Filter und unbegrenzte Likes — es sperrt nicht das weg, wofür du gekommen bist.',
     },
   },
 
@@ -82,11 +83,11 @@ export const de: Dictionary = {
 
   faq: {
     title: 'Fragen',
-    q1: { q: 'Ist GameBuddy kostenlos?', a: 'Ja. Matching, Chat und Communities sind kostenlos, mit einem täglichen Limit an Likes. Gold ist optional und bringt erweiterte Filter, unbegrenzte Likes und ein paar kosmetische Extras — es stellt das Matching selbst nicht hinter eine Bezahlschranke.' },
+    q1: { q: 'Ist GameBuddy kostenlos?', a: 'Ja. Matching, Chat und Lobbys sind kostenlos, mit einem täglichen Limit an Likes. Gold ist optional und bringt erweiterte Filter, unbegrenzte Likes und ein paar kosmetische Extras — es stellt das Matching selbst nicht hinter eine Bezahlschranke.' },
     q2: { q: 'Ist das eine Dating-App?', a: 'Nein. GameBuddy bringt Menschen über ihre Spiele und ihre Spielweise zusammen, damit du eine Gruppe, einen Co-op-Partner oder einen Raid findest. Es ist fürs gemeinsame Spielen gebaut, nicht fürs Daten.' },
     q3: { q: 'Welche Plattformen werden unterstützt?', a: 'Du sagst GameBuddy, worauf du spielst — PC, PlayStation, Xbox, Switch oder Handy — und das Matching richtet sich danach, weil dieselben Spiele auf verschiedenen Plattformen meist nicht zusammen spielbar sind. Die App selbst kommt zuerst für Android, iOS folgt.' },
     q4: { q: 'Warum ab 18?', a: 'GameBuddy bringt Fremde in private Gespräche miteinander, und das sollte man nicht für Minderjährige neben Erwachsenen betreiben. Es gibt keine jüngere Stufe und keinen beaufsichtigten Modus. Das Alter wird aus dem bei der Registrierung angegebenen Geburtsdatum berechnet, und Konten von unter 18-Jährigen werden geschlossen.' },
-    q5: { q: 'Was tut ihr gegen Belästigung?', a: 'Du kannst jede Person aus dem Profil oder dem Gespräch heraus blockieren oder melden, und Meldungen werden innerhalb von 24 Stunden geprüft. Jedes hochgeladene Foto wird automatisch geprüft, bevor es jemand sehen kann. Kontaktdaten werden aus öffentlichem Text entfernt, sodass niemand eine Telefonnummer in eine Community stellen kann.' },
+    q5: { q: 'Was tut ihr gegen Belästigung?', a: 'Du kannst jede Person aus dem Profil oder dem Gespräch heraus blockieren oder melden, und Meldungen werden innerhalb von 24 Stunden geprüft. Jedes hochgeladene Foto wird automatisch geprüft, bevor es jemand sehen kann. Kontaktdaten werden aus öffentlichem Text entfernt, sodass niemand eine Telefonnummer in eine Lobby stellen kann.' },
     q6: { q: 'Können andere meine Nachrichten sehen?', a: 'Nein. Nachrichteninhalte werden vor dem Speichern verschlüsselt, in der Datenbank steht also Chiffretext statt deines Gesprächs. Moderatoren sehen eine Nachricht nur, wenn du sie meldest.' },
     q7: { q: 'Wie lösche ich mein Konto?', a: 'In den Einstellungen der App, oder per Mail an den Support. Dein Profil, dein Foto und deine Vorlieben verschwinden; die andere Hälfte deiner Gespräche bleibt, weil sie nicht allein dir gehört. Die vollständige Erklärung steht auf der Seite zur Kontolöschung.' },
   },
