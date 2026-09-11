@@ -166,6 +166,47 @@ public class Gamer implements RevocableUser {
     @Column(nullable = false)
     private Boolean isBlocked = Boolean.FALSE;
 
+    /**
+     * When a time-limited block ends. Set together with {@link #isBlocked}; null on a
+     * permanent ban. {@code SuspensionLiftJob} clears both when the time passes, so a
+     * suspension does not need anyone to remember to end it.
+     */
+    @Column(name = "suspended_until")
+    private Instant suspendedUntil;
+
+    /**
+     * Out of every deck while a case against this gamer is open, without being blocked.
+     *
+     * <p>The soft action: the report policy sets it when enough distinct people have said
+     * the same thing, and whichever decision closes the case clears it. Signing in,
+     * chatting with existing matches and being reviewed all still work — this only stops
+     * new people being shown someone several others have just complained about.
+     */
+    @Column(name = "hidden_from_discovery", nullable = false)
+    private boolean hiddenFromDiscovery = false;
+
+    /**
+     * When an approved avatar was pulled back to PENDING because of a report. While set,
+     * {@code AvatarReviewJob} leaves it alone: the auto-publish deadline exists for images
+     * nobody got round to, not for one somebody has just objected to.
+     */
+    @Column(name = "avatar_held_at")
+    private Instant avatarHeldAt;
+
+    /**
+     * Reports this gamer filed that a moderator upheld, and ones that were dismissed.
+     *
+     * <p>Together they are the reporter's standing, which is what the policy weighs a
+     * report by. Kept as two counters rather than a computed ratio so the prior for a
+     * new reporter — somebody with no history yet is trusted, not distrusted — lives in
+     * one place, {@code ReporterWeight}.
+     */
+    @Column(name = "reports_upheld", nullable = false)
+    private int reportsUpheld = 0;
+
+    @Column(name = "reports_dismissed", nullable = false)
+    private int reportsDismissed = 0;
+
     @Column(nullable = false)
     private Boolean isRegistered = Boolean.FALSE;
 
@@ -698,13 +739,20 @@ public class Gamer implements RevocableUser {
      * be ranked, and a staff account appearing in the deck is both a privacy problem for
      * whoever holds it and an obvious target for anyone who works out what it is.
      *
+     * <p>False too while {@link #hiddenFromDiscovery} is set by the report policy.
+     *
      * <p>Checked as a property of the account rather than enforced at each screen, because
-     * "everywhere a gamer can be seen" is a list that grows. The three native queries that
+     * "everywhere a gamer can be seen" is a list that grows. The native queries that
      * cannot call this repeat the rule in SQL; they are the only other way into the
      * population.
      */
     public boolean isDiscoverable() {
-        return role != Role.ADMIN;
+        return role != Role.ADMIN && !hiddenFromDiscovery;
+    }
+
+    /** Blocked for a while rather than for good: {@link #suspendedUntil} is set and ahead. */
+    public boolean isSuspended(Instant now) {
+        return Boolean.TRUE.equals(isBlocked) && suspendedUntil != null && suspendedUntil.isAfter(now);
     }
 
     /** Whether this gamer may be shown, matched with, or chat with {@code other}. */

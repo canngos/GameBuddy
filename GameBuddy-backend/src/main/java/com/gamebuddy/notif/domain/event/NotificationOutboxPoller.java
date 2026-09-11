@@ -4,10 +4,14 @@ import com.gamebuddy.notif.domain.service.NotificationService;
 import com.gamebuddy.notif.infrastructure.entity.NotificationOutbox;
 import com.gamebuddy.notif.infrastructure.repository.NotificationOutboxRepository;
 import com.gamebuddy.notif.interfaces.request.SendNotificationTokenRequest;
+import com.gamebuddy.shared.repository.GamerRepository;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -50,6 +54,7 @@ public class NotificationOutboxPoller {
 
     private final NotificationOutboxRepository outbox;
     private final NotificationService notifications;
+    private final GamerRepository gamers;
     private final Clock clock;
 
     @Transactional
@@ -63,6 +68,7 @@ public class NotificationOutboxPoller {
 
         int sent = 0;
         int failed = 0;
+        int dead = 0;
         for (NotificationOutbox row : batch) {
             try {
                 notifications.sendToToken(new SendNotificationTokenRequest(
@@ -73,6 +79,19 @@ public class NotificationOutboxPoller {
             } catch (RuntimeException e) {
                 // One bad row must not abandon the rest of the batch, so this is caught per
                 // row rather than around the loop.
+                if (tokenIsDead(e)) {
+                    // The device is gone -- uninstalled, wiped, or the token rotated.
+                    // Retrying cannot help, and every other row for this token fails the
+                    // same way, so drop the token from whoever holds it and resolve this row
+                    // rather than deferring it. sentAt here marks it resolved, not delivered;
+                    // lastError records what actually happened, and the daily cleanup then
+                    // purges it like any settled row.
+                    gamers.clearFcmToken(row.getFcmToken());
+                    row.setSentAt(now);
+                    row.setLastError("token unregistered; cleared");
+                    dead++;
+                    continue;
+                }
                 row.setAttempts(row.getAttempts() + 1);
                 row.setLastError(truncate(e.getMessage()));
                 row.setNextAttemptAt(now.plus(backoffFor(row.getAttempts())));
@@ -91,9 +110,43 @@ public class NotificationOutboxPoller {
         }
         outbox.saveAll(batch);
 
-        if (failed > 0) {
-            log.info("Outbox: {} delivered, {} deferred", sent, failed);
+        if (failed > 0 || dead > 0) {
+            log.info("Outbox: {} delivered, {} deferred, {} dead tokens cleared", sent, failed, dead);
         }
+    }
+
+    /**
+     * The FCM error code beneath the service's wrapper, or null when Firebase was not what
+     * refused. The poller sees {@code BusinessException -> ExecutionException ->
+     * FirebaseMessagingException}, so the whole cause chain is walked.
+     */
+    private static FirebaseMessagingException fcmCause(Throwable failure) {
+        for (Throwable t = failure; t != null; t = t.getCause()) {
+            if (t instanceof FirebaseMessagingException fcm) {
+                return fcm;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Whether the failure means the token is gone for good. UNREGISTERED is unambiguous.
+     * INVALID_ARGUMENT also covers a malformed message, so only the wording about the
+     * registration token counts as a dead token there -- otherwise a bad payload would keep
+     * clearing live tokens. The wording is read from Firebase's own exception, not the
+     * wrapper the poller catches, whose message is only the wrapper's toString.
+     */
+    private static boolean tokenIsDead(Throwable failure) {
+        FirebaseMessagingException fcm = fcmCause(failure);
+        if (fcm == null) {
+            return false;
+        }
+        MessagingErrorCode code = fcm.getMessagingErrorCode();
+        if (code == MessagingErrorCode.UNREGISTERED) {
+            return true;
+        }
+        return code == MessagingErrorCode.INVALID_ARGUMENT
+                && String.valueOf(fcm.getMessage()).toLowerCase(Locale.ROOT).contains("registration token");
     }
 
     /** Exponential, so a sustained outage backs off instead of hammering. */

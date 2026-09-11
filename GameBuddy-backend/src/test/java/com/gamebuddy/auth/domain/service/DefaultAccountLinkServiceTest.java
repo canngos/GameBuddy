@@ -20,21 +20,15 @@ import com.gamebuddy.shared.entity.GamerLinkedAccount;
 import com.gamebuddy.shared.moderation.TextModerationService;
 import com.gamebuddy.shared.repository.GamerLinkedAccountRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * The checks that make a link mean something.
@@ -216,7 +210,8 @@ class DefaultAccountLinkServiceTest {
         @Test
         @DisplayName("falls back to the username when no display name is set")
         void displayNameFallback() {
-            when(discordClient.currentUser(any())).thenReturn(new DiscordClient.DiscordUser("42", "handle", null, null, null));
+            when(discordClient.currentUser(any()))
+                    .thenReturn(new DiscordClient.DiscordUser("42", "handle", null, null, null));
 
             service.completeDiscordLink("code", TOKEN);
 
@@ -226,7 +221,8 @@ class DefaultAccountLinkServiceTest {
         @Test
         @DisplayName("a profane handle is withheld, but the link still stands")
         void profaneHandleIsWithheld() {
-            when(discordClient.currentUser(any())).thenReturn(new DiscordClient.DiscordUser("42", "handle", "nigger", null, null));
+            when(discordClient.currentUser(any()))
+                    .thenReturn(new DiscordClient.DiscordUser("42", "handle", "nigger", null, null));
 
             service.completeDiscordLink("code", TOKEN);
 
@@ -258,7 +254,8 @@ class DefaultAccountLinkServiceTest {
             theirs.setGamer(other);
             when(linkedAccountRepository.findByProviderAndExternalId(LinkedProvider.DISCORD, "42"))
                     .thenReturn(Optional.of(theirs));
-            when(discordClient.currentUser(any())).thenReturn(new DiscordClient.DiscordUser("42", "handle", null, null, null));
+            when(discordClient.currentUser(any()))
+                    .thenReturn(new DiscordClient.DiscordUser("42", "handle", null, null, null));
 
             String redirect = service.completeDiscordLink("code", TOKEN);
 
@@ -312,7 +309,8 @@ class DefaultAccountLinkServiceTest {
         void onlyOneCallerSpendsATicket() {
             usableTicket(LinkedProvider.DISCORD, USER);
             when(discordClient.exchangeCode(any())).thenReturn(new DiscordClient.TokenResponse("access"));
-            when(discordClient.currentUser(any())).thenReturn(new DiscordClient.DiscordUser("42", "handle", null, null, null));
+            when(discordClient.currentUser(any()))
+                    .thenReturn(new DiscordClient.DiscordUser("42", "handle", null, null, null));
             // The database hands the row to the first caller and refuses the second, which is
             // the whole reason this is a conditional update rather than a read then a write.
             when(ticketRepository.spend(TokenHashing.sha256Hex(TOKEN))).thenReturn(1, 0);
@@ -390,7 +388,6 @@ class DefaultAccountLinkServiceTest {
                     assertThrows(BusinessException.class, () -> service.setVisibility(principal, "discord", request));
             assertEquals(TransactionCode.INVALID_REQUEST, e.getTransactionCode());
         }
-
     }
 
     // =======================================================================

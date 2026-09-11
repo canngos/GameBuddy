@@ -77,7 +77,27 @@ public enum NotificationKind {
      * <p>The only kind the gamer did not cause. Everything else here is a response to
      * something somebody did to them, which is a different bargain.
      */
-    RETURN;
+    RETURN,
+
+    /**
+     * A moderator acted on this account: a warning, a photo removed, a suspension, a ban.
+     * No target — the app shows the reason and the appeal address in a banner, and there
+     * is no screen to open beyond that.
+     *
+     * <p>Under REMINDERS with RETURN and PROMO rather than SOCIAL: nobody the gamer knows
+     * did this, and a person cannot mute it into missing a suspension anyway — the block
+     * itself is enforced server-side regardless of whether the notification arrives. What
+     * the category buys is that it does not travel on the "matches and messages" switch,
+     * which is about other people.
+     */
+    SANCTION,
+
+    /**
+     * The report this gamer filed was reviewed. No target — the app shows a line thanking
+     * them and saying whether it was upheld. The thing that keeps honest people reporting
+     * is hearing that it mattered.
+     */
+    REPORT_RESOLVED;
 
     /**
      * Which switch in Settings controls this kind.
@@ -102,7 +122,7 @@ public enum NotificationKind {
                     LOBBY_JOIN_REQUEST,
                     LOBBY_REQUEST_ACCEPTED,
                     LOBBY_CANCELLED -> NotificationCategory.SOCIAL;
-            case RETURN, PROMO -> NotificationCategory.REMINDERS;
+            case RETURN, PROMO, SANCTION, REPORT_RESOLVED -> NotificationCategory.REMINDERS;
         };
     }
 }

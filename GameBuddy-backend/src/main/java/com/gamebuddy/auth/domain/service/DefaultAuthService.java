@@ -28,6 +28,8 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -160,9 +162,7 @@ public class DefaultAuthService implements AuthService {
             // account itself is gone as far as its owner and everyone else is concerned.
             throw new BusinessException(TransactionCode.ACCOUNT_DELETED);
         }
-        if (Boolean.TRUE.equals(gamer.getIsBlocked())) {
-            throw new BusinessException(TransactionCode.USER_BLOCKED);
-        }
+        refuseIfBlocked(gamer);
         if (Boolean.FALSE.equals(gamer.getIsVerified())) {
             throw new BusinessException(TransactionCode.USER_NOT_VERIFIED);
         }
@@ -1168,5 +1168,34 @@ public class DefaultAuthService implements AuthService {
 
     private static String hashToken(String token) {
         return TokenHashing.sha256Hex(token);
+    }
+
+    private static final DateTimeFormatter SUSPENDED_UNTIL =
+            DateTimeFormatter.ofPattern("d MMM HH:mm 'UTC'").withZone(ZoneOffset.UTC);
+
+    /**
+     * Refuses a blocked account, telling the two kinds of block apart.
+     *
+     * <p>A permanent ban ({@code suspended_until} null) is {@link TransactionCode#USER_BLOCKED}.
+     * A suspension carries an end time, and its own code so the app can say when it lifts
+     * rather than reading as final. A suspension whose time has already passed is lifted here
+     * and the sign-in allowed to proceed -- the same thing {@code SuspensionLiftJob} does on a
+     * schedule, done at the one moment it matters most, so nobody is turned away a minute after
+     * their week is served.
+     */
+    private void refuseIfBlocked(Gamer gamer) {
+        if (!Boolean.TRUE.equals(gamer.getIsBlocked())) {
+            return;
+        }
+        Instant until = gamer.getSuspendedUntil();
+        if (until == null) {
+            throw new BusinessException(TransactionCode.USER_BLOCKED);
+        }
+        if (until.isAfter(clock.instant())) {
+            throw new BusinessException(TransactionCode.ACCOUNT_SUSPENDED, SUSPENDED_UNTIL.format(until));
+        }
+        gamer.setIsBlocked(false);
+        gamer.setSuspendedUntil(null);
+        gamerRepository.save(gamer);
     }
 }

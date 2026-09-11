@@ -56,6 +56,10 @@ public interface AvatarReviewRepository extends Repository<Gamer, String> {
      * <p>{@code avatarUploadedAt is not null} matters: rows that predate the column have no
      * recorded arrival time, and treating a null as "long ago" would publish every historic
      * pending upload the first time this ran.
+     *
+     * <p>{@code avatarHeldAt is null} excludes an avatar a report pulled back into review. The
+     * deadline is a promise to images nobody got round to, not to one somebody objected to:
+     * a held avatar waits for a person, however long that takes.
      */
     @Query("""
             select g from Gamer g
@@ -65,6 +69,7 @@ public interface AvatarReviewRepository extends Repository<Gamer, String> {
               and g.deletedAt is null
               and g.avatarUploadedAt is not null
               and g.avatarUploadedAt < :deadline
+              and g.avatarHeldAt is null
             order by g.avatarUploadedAt asc
             """)
     List<Gamer> findScoredPendingBefore(@Param("deadline") Instant deadline, Pageable pageable);

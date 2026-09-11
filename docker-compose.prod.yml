@@ -179,8 +179,16 @@ services:
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
 
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-gamebuddy}
-      SPRING_DATASOURCE_USERNAME: ${DB_USER:-gamebuddy}
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # The least-privileged application login, NOT the bootstrap superuser (DB_USER).
+      # A superuser database login is remote code execution via `COPY ... FROM PROGRAM`;
+      # gamebuddy_app has DML on the schema and nothing more. This used to be overridden
+      # back to DB_USER/DB_PASSWORD here, silently undoing SECURITY_REVIEW C3 — the base
+      # docker-compose.yml already sets the right pair, and this overlay must not reinstate
+      # the superuser. The role is created by db/99-app-role.sh on a fresh volume; on an
+      # existing box run that script once by hand (see DEPLOY.md). model-retrain above still
+      # uses the superuser deliberately — its is a separate, documented decision.
+      SPRING_DATASOURCE_USERNAME: gamebuddy_app
+      SPRING_DATASOURCE_PASSWORD: ${DB_APP_PASSWORD:?set DB_APP_PASSWORD in .env}
       DB_SCHEMA: gamebuddy
       DDL_AUTO: validate
 

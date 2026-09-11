@@ -3,7 +3,6 @@ package com.gamebuddy.match.application.controller;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
-import com.gamebuddy.common.util.Ids;
 import com.gamebuddy.match.domain.service.chat.ChatMessageService;
 import com.gamebuddy.match.domain.service.chat.SentMessage;
 import com.gamebuddy.match.interfaces.dto.ChatNotification;
@@ -197,12 +196,5 @@ public class ChatController {
     public ResponseEntity<DefaultMessageResponse> markRead(
             @AuthenticationPrincipal Gamer principal, @PathVariable String friendId) {
         return ResponseEntity.ok(chatMessageService.markConversationRead(principal, friendId));
-    }
-
-    @PostMapping("/messages/report/{messageId}")
-    public ResponseEntity<DefaultMessageResponse> reportMessage(
-            @AuthenticationPrincipal Gamer principal, @PathVariable String messageId) {
-        // Parsed here so a malformed id is a 400 rather than a 500 out of the repository.
-        return ResponseEntity.ok(chatMessageService.reportMessage(principal, Ids.uuid(messageId)));
     }
 }

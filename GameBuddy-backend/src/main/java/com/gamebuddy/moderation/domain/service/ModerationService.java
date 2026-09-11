@@ -2,65 +2,48 @@ package com.gamebuddy.moderation.domain.service;
 
 import com.gamebuddy.common.interfaces.DefaultMessageResponse;
 import com.gamebuddy.moderation.interfaces.request.ReportRequest;
-import com.gamebuddy.moderation.interfaces.response.ReportsResponse;
+import com.gamebuddy.moderation.interfaces.request.ResolveCaseRequest;
+import com.gamebuddy.moderation.interfaces.response.CaseDetailResponse;
+import com.gamebuddy.moderation.interfaces.response.CasesResponse;
 import com.gamebuddy.shared.entity.Gamer;
 import java.util.Set;
-import org.springframework.data.domain.Pageable;
+import java.util.UUID;
 
 /**
- * Profile reports, and the moderator queue that answers them.
+ * Reports, the cases they build, and the decisions that close them.
  *
- * <p>Lived in the community module while posts and comments were reportable; those
- * surfaces retired with Communities, and what remained — reporting a person, and the one
- * queue a moderator checks — is its own concern now. Historical POST/COMMENT reports are
- * still readable in the queue; new ones cannot be filed.
+ * <p>A report is evidence about a person; a case is every open report about that person,
+ * decided once. Filing is open to any signed-in gamer; everything from {@link #getCases}
+ * down is for moderators.
  */
 public interface ModerationService {
 
-    /**
-     * Reports a gamer's profile.
-     *
-     * <p>The report that is not about anything written anywhere. A profile picture or a
-     * username can be the whole problem, and until this existed the only way to raise one
-     * was to send the person a message and report that — which asks the reporter to keep
-     * talking to somebody they want reported.
-     */
+    /** Reports a gamer's profile — the picture, the name, what they wrote about themselves. */
     DefaultMessageResponse reportProfile(Gamer principal, String userId, ReportRequest request);
 
-    /** The moderation queue, oldest first. Admins only. */
-    ReportsResponse getOpenReports(Gamer principal, Pageable pageable);
-
-    /** Upholds the report and closes every open report against the same content. */
-    DefaultMessageResponse actionReport(Gamer principal, String reportId);
-
-    /** Judges the content acceptable and closes the report. */
-    DefaultMessageResponse dismissReport(Gamer principal, String reportId);
-
     /**
-     * How many reports are still waiting to be looked at.
-     *
-     * <p>Here rather than letting the console query {@code content_report} itself: reports
-     * belong to this module, and a repository is module-private. A plain {@code long} so
-     * the caller cannot accidentally acquire the reports themselves along with the count.
+     * Reports a chat message. Only the recipient may; the sender and anyone outside the
+     * conversation are refused. The message and the ten either side are captured as context.
      */
+    DefaultMessageResponse reportMessage(Gamer principal, UUID messageId, ReportRequest request);
+
+    /** The open and urgent cases, urgent first then oldest first. Admins only. */
+    CasesResponse getCases(Gamer principal, int limit);
+
+    /** One case with its evidence, its target's history, and the decrypted context. Admins only. */
+    CaseDetailResponse getCase(Gamer principal, String caseId);
+
+    /** Resolves a case with one decision from the ladder. Admins only. */
+    DefaultMessageResponse resolveCase(Gamer principal, String caseId, ResolveCaseRequest request);
+
+    // --- Read by the admin module's analytics and directory ----------------
+
+    /** How many cases are still waiting for a moderator. */
     long openReportCount();
 
-    /**
-     * How long the oldest open report has been waiting, in hours; zero when nothing is
-     * waiting. The single number that says whether the 24-hour commitment is being kept.
-     */
+    /** How long the oldest open case has waited, in hours; zero when the queue is clear. */
     long oldestOpenReportHours();
 
-    /**
-     * Everybody whose report a moderator upheld.
-     *
-     * <p>For the console's user directory, where it is one of the filters an administrator
-     * can pick recipients by: the people who took the trouble to report something that
-     * turned out to be real are a group worth being able to thank.
-     *
-     * <p>A set of ids rather than reports, for the same reason {@link #openReportCount}
-     * returns a number — the caller is in another module and has no business holding the
-     * reports themselves.
-     */
+    /** Everybody whose report a moderator upheld — the directory's "worth thanking" filter. */
     Set<String> reporterIdsWithActionedReports();
 }

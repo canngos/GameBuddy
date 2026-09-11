@@ -2,6 +2,7 @@ package com.gamebuddy.auth.application.controller;
 
 import com.gamebuddy.auth.domain.service.SocialAuthService;
 import com.gamebuddy.auth.interfaces.dto.LinkProvidersResponseBody;
+import com.gamebuddy.auth.interfaces.dto.LinkStartResponseBody;
 import com.gamebuddy.auth.interfaces.dto.SocialIdentitiesResponseBody;
 import com.gamebuddy.auth.interfaces.dto.SocialSessionResponseBody;
 import com.gamebuddy.auth.interfaces.request.SocialExchangeRequest;
@@ -10,7 +11,6 @@ import com.gamebuddy.auth.interfaces.response.LinkProvidersResponse;
 import com.gamebuddy.auth.interfaces.response.LinkStartResponse;
 import com.gamebuddy.auth.interfaces.response.SocialIdentitiesResponse;
 import com.gamebuddy.auth.interfaces.response.SocialSessionResponse;
-import com.gamebuddy.auth.interfaces.dto.LinkStartResponseBody;
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
 import com.gamebuddy.common.enums.TransactionCode;
@@ -87,8 +87,7 @@ public class SocialAuthController {
     /** Trades the ticket the callback handed the app for a session. */
     @PostMapping("/exchange")
     public ResponseEntity<SocialSessionResponse> exchange(@Valid @RequestBody SocialExchangeRequest request) {
-        return ResponseEntity.ok(
-                session(socialAuthService.exchange(request.getTicket(), request.getAcceptedTerms())));
+        return ResponseEntity.ok(session(socialAuthService.exchange(request.getTicket(), request.getAcceptedTerms())));
     }
 
     /** What this account can sign in with. Authenticated: it is about the caller. */

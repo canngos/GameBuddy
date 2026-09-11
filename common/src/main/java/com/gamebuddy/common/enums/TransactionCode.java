@@ -329,8 +329,7 @@ public enum TransactionCode {
      * takeover vector: attaching a new identity to an existing GameBuddy account by matching
      * emails is safe only when somebody else has already proved the mailbox.
      */
-    SOCIAL_EMAIL_UNVERIFIED(
-            201, "Verify the email on your Google or Discord account first", HttpStatus.FORBIDDEN),
+    SOCIAL_EMAIL_UNVERIFIED(201, "Verify the email on your Google or Discord account first", HttpStatus.FORBIDDEN),
 
     /** Changing a password on an account that has never had one. It has to be set instead. */
     PASSWORD_NOT_SET(202, "This account has no password yet", HttpStatus.CONFLICT),
@@ -355,6 +354,27 @@ public enum TransactionCode {
      * rather than moving it.
      */
     REAUTH_REQUIRED(205, "Sign in again to confirm this", HttpStatus.FORBIDDEN),
+
+    /**
+     * A time-limited block, distinct from the permanent {@link #USER_BLOCKED}.
+     *
+     * <p>Its own code so the app can say when it ends rather than repeating "your account is
+     * blocked", which for a suspension is both wrong and needlessly final. The end time
+     * travels in the status message; a suspension is authoritative at sign-in whether or not
+     * the SANCTION push ever arrived.
+     */
+    ACCOUNT_SUSPENDED(206, "Your account is suspended", HttpStatus.FORBIDDEN),
+
+    /** A moderation case that has already been decided, or never existed. */
+    CASE_NOT_FOUND(207, "That case no longer exists", HttpStatus.NOT_FOUND),
+
+    /**
+     * A note is required for this action and none was given.
+     *
+     * <p>Only BAN demands one: a permanent removal a moderator cannot explain later is one
+     * nobody should be making, and it is the one action with no lighter step to fall back on.
+     */
+    MODERATION_NOTE_REQUIRED(208, "This decision needs a note", HttpStatus.BAD_REQUEST),
 
     /** Unexpected persistence failure. Kept at -99 for backwards compatibility. */
     DB_ERROR(-99, "Data access error", HttpStatus.INTERNAL_SERVER_ERROR);

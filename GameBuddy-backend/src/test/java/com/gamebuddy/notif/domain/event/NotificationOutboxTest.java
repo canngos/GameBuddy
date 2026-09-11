@@ -12,12 +12,15 @@ import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
 import com.gamebuddy.shared.repository.GamerRepository;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -150,7 +153,8 @@ class NotificationOutboxTest {
     @Nested
     class Delivering {
 
-        private final NotificationOutboxPoller poller = new NotificationOutboxPoller(repository, notifications, CLOCK);
+        private final NotificationOutboxPoller poller =
+                new NotificationOutboxPoller(repository, notifications, gamers, CLOCK);
 
         @Test
         void deliversAndMarksSent() {
@@ -216,6 +220,62 @@ class NotificationOutboxTest {
             assertEquals(NotificationOutboxPoller.MAX_ATTEMPTS, row.getAttempts());
             // Left unsent rather than deleted, so the failure stays visible.
             assertNull(row.getSentAt());
+        }
+
+        @Test
+        @DisplayName("an unregistered token is cleared from its owner and the row resolved, not retried")
+        void deadTokenIsClearedNotRetried() {
+            NotificationOutbox row = pending("dead-token");
+            when(repository.claimPending(eq(NOW), any(Pageable.class))).thenReturn(List.of(row));
+            FirebaseMessagingException fcm = mock(FirebaseMessagingException.class);
+            when(fcm.getMessagingErrorCode()).thenReturn(MessagingErrorCode.UNREGISTERED);
+            doThrow(new RuntimeException(new ExecutionException(fcm)))
+                    .when(notifications)
+                    .sendToToken(any());
+
+            poller.deliverPending();
+
+            verify(gamers).clearFcmToken("dead-token");
+            // Resolved, not deferred: it stops being claimed and the daily cleanup purges it.
+            assertEquals(NOW, row.getSentAt());
+            assertEquals(0, row.getAttempts(), "not counted as a retry");
+        }
+
+        @Test
+        @DisplayName("INVALID_ARGUMENT about a bad payload is retried, not treated as a dead token")
+        void invalidArgumentForABadPayloadIsRetried() {
+            NotificationOutbox row = pending("live-token");
+            when(repository.claimPending(eq(NOW), any(Pageable.class))).thenReturn(List.of(row));
+            FirebaseMessagingException fcm = mock(FirebaseMessagingException.class);
+            when(fcm.getMessagingErrorCode()).thenReturn(MessagingErrorCode.INVALID_ARGUMENT);
+            when(fcm.getMessage()).thenReturn("Invalid data key");
+            doThrow(new RuntimeException(new ExecutionException(fcm)))
+                    .when(notifications)
+                    .sendToToken(any());
+
+            poller.deliverPending();
+
+            verify(gamers, never()).clearFcmToken(any());
+            assertEquals(1, row.getAttempts());
+            assertNull(row.getSentAt());
+        }
+
+        @Test
+        @DisplayName("INVALID_ARGUMENT naming the registration token clears it")
+        void invalidArgumentAboutTheTokenIsCleared() {
+            NotificationOutbox row = pending("stale-token");
+            when(repository.claimPending(eq(NOW), any(Pageable.class))).thenReturn(List.of(row));
+            FirebaseMessagingException fcm = mock(FirebaseMessagingException.class);
+            when(fcm.getMessagingErrorCode()).thenReturn(MessagingErrorCode.INVALID_ARGUMENT);
+            when(fcm.getMessage()).thenReturn("The registration token is not a valid FCM registration token");
+            doThrow(new RuntimeException(new ExecutionException(fcm)))
+                    .when(notifications)
+                    .sendToToken(any());
+
+            poller.deliverPending();
+
+            verify(gamers).clearFcmToken("stale-token");
+            assertEquals(NOW, row.getSentAt());
         }
 
         @Test
