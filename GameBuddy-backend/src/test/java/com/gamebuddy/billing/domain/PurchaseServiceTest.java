@@ -295,6 +295,28 @@ class PurchaseServiceTest {
 
             assertEquals(0, gamer.getCoin());
         }
+
+        @Test
+        @DisplayName("a resent refund webhook reverses only once")
+        void refundIsIdempotent() {
+            Purchase row = new Purchase();
+            row.setUserId(USER);
+            row.setProductId(Product.COINS_LARGE.storeId());
+            row.setStatus(PurchaseStatus.GRANTED);
+            when(purchases.findByPlatformAndStoreTransactionId(PurchasePlatform.GOOGLE_PLAY, "txn-1"))
+                    .thenReturn(Optional.of(row));
+
+            gamer.setCoin(10_000);
+            service.refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
+            int afterFirst = gamer.getCoin();
+
+            // RevenueCat redelivers the same refund. The row is already REFUNDED, so the
+            // coins must not be docked a second time.
+            service.refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
+
+            assertEquals(afterFirst, gamer.getCoin(), "a second refund must not dock coins again");
+            assertEquals(PurchaseStatus.REFUNDED, row.getStatus());
+        }
     }
 
     /**
@@ -391,6 +413,35 @@ class PurchaseServiceTest {
             service.transfer(java.util.List.of("$RCAnonymousID:abc"), java.util.List.of(OTHER));
 
             assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
+        }
+
+        @Test
+        @DisplayName("the stipend clock moves with the membership, so a fresh account can't re-claim")
+        void carriesStipendClock() {
+            Instant claimed = NOW.minus(Duration.ofDays(2));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(300)));
+            gamer.setStipendClaimedAt(claimed);
+            // `other` is a fresh account: a null stipend clock, which would otherwise let it
+            // claim the monthly 600 the losing account already took from this subscription.
+
+            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(claimed, other.getStipendClaimedAt(), "the gainer inherits the loser's stipend clock");
+        }
+
+        @Test
+        @DisplayName("a gainer that claimed more recently keeps its own stipend clock")
+        void keepsTheLaterStipendClock() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(300)));
+            gamer.setStipendClaimedAt(NOW.minus(Duration.ofDays(20)));
+            Instant recent = NOW.minus(Duration.ofDays(1));
+            other.setStipendClaimedAt(recent);
+
+            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(recent, other.getStipendClaimedAt(), "never rewind the gainer's clock");
         }
     }
 }

@@ -230,6 +230,14 @@ public class PurchaseService {
         purchases
                 .findByPlatformAndStoreTransactionId(platform, storeTransactionId)
                 .ifPresent(purchase -> {
+                    // Idempotent: a resent refund webhook must not reverse the same purchase
+                    // twice. Expiring an already-expired sub is harmless, but a second
+                    // `coins.spend` would dock a coin balance that may have been topped up
+                    // since — punishing the gamer for RevenueCat redelivering. The row already
+                    // records the reversal.
+                    if (purchase.getStatus() == PurchaseStatus.REFUNDED) {
+                        return;
+                    }
                     purchase.setStatus(PurchaseStatus.REFUNDED);
 
                     gamers.findById(purchase.getUserId()).ifPresent(gamer -> Product.byStoreId(purchase.getProductId())
@@ -268,15 +276,24 @@ public class PurchaseService {
      * gainer, later expiry winning if the gainer already holds something. The ledger rows
      * still inside their paid period move with it, so a later refund of that transaction
      * revokes the account that now holds it rather than the one that used to.
+     *
+     * <p><b>The monthly-stipend clock moves too.</b> The Gold stipend (600 coins per 30 days,
+     * see {@code CoinEarningService}) is timed per account by {@code stipendClaimedAt}. Left
+     * behind, a subscription bounced onto a fresh account would let that account claim a
+     * second stipend this cycle — one paid subscription minting the monthly grant again on
+     * every account it touches. Carrying the later of the two clocks means moving the
+     * membership moves its stipend cadence with it.
      */
     @Transactional
     public void transfer(List<String> fromUserIds, List<String> toUserIds) {
         Instant now = clock.instant();
 
-        // What is being moved: the latest live expiry among the losers, and its tier. Read
-        // before `expire`, which overwrites both.
+        // What is being moved: the latest live expiry among the losers, its tier, and the
+        // stipend clock that belongs with it. Read before `expire`, which overwrites the
+        // subscription fields.
         SubscriptionTier movedTier = null;
         Instant movedExpiry = null;
+        Instant movedStipendAt = null;
         List<Purchase> movedRows = new ArrayList<>();
 
         for (String from : fromUserIds) {
@@ -292,6 +309,7 @@ public class PurchaseService {
                     && (movedExpiry == null || loser.getSubscriptionExpiresAt().isAfter(movedExpiry))) {
                 movedTier = tier;
                 movedExpiry = loser.getSubscriptionExpiresAt();
+                movedStipendAt = loser.getStipendClaimedAt();
             }
             for (Purchase row : purchases.findByUserIdOrderByPurchasedAtDesc(from)) {
                 if (row.getStatus() == PurchaseStatus.GRANTED
@@ -324,6 +342,15 @@ public class PurchaseService {
             if (held == SubscriptionTier.BASIC || gainer.getSubscriptionExpiresAt().isBefore(movedExpiry)) {
                 gainer.setSubscriptionTier(movedTier);
                 gainer.setSubscriptionExpiresAt(movedExpiry);
+                // Carry the stipend clock with the membership — the later of the two, so the
+                // gainer can never claim the monthly grant sooner than the moved subscription
+                // already allows. Without this a fresh account (null clock) could claim 600
+                // immediately after a transfer the losing account had already claimed.
+                if (movedStipendAt != null
+                        && (gainer.getStipendClaimedAt() == null
+                                || movedStipendAt.isAfter(gainer.getStipendClaimedAt()))) {
+                    gainer.setStipendClaimedAt(movedStipendAt);
+                }
                 gamers.save(gainer);
                 log.info("Granted {} until {} to {} by transfer", movedTier, movedExpiry, to);
             }
