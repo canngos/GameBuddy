@@ -573,6 +573,8 @@ export const tr: Dictionary = {
       restoreActivating: 'Aboneliğin geri yükleniyor',
       restoreActivatingBody:
         'Bu Google hesabında zaten Gold var — tekrar satın almana gerek yok.',
+      restoreNone: 'Geri yüklenecek bir şey yok',
+      restoreNoneBody: 'Bu Google hesabında etkin bir GameBuddy aboneliği yok.',
       choosePlan: 'Bir plan seç',
       planWeekly: 'Haftalık',
       planMonthly: 'Aylık',

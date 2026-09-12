@@ -579,6 +579,8 @@ export const fr: Dictionary = {
       restoreActivating: 'Restauration de ton abonnement',
       restoreActivatingBody:
         'Tu as déjà Gold sur ce compte Google — pas besoin de racheter.',
+      restoreNone: 'Rien à restaurer',
+      restoreNoneBody: "Ce compte Google n'a pas d'abonnement GameBuddy actif.",
       choosePlan: 'Choisis un forfait',
       planWeekly: 'Hebdomadaire',
       planMonthly: 'Mensuel',

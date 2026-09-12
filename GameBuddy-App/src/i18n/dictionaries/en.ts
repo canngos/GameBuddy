@@ -644,6 +644,8 @@ export const en = {
       restoreActivating: 'Restoring your subscription',
       restoreActivatingBody:
         'You already have Gold on this Google account — no need to buy again.',
+      restoreNone: 'Nothing to restore',
+      restoreNoneBody: 'This Google account has no active GameBuddy subscription.',
       choosePlan: 'Choose a plan',
       planWeekly: 'Weekly',
       planMonthly: 'Monthly',

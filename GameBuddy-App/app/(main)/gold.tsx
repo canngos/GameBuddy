@@ -8,7 +8,7 @@ import {
   SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import {
   billingApi,
@@ -87,28 +87,17 @@ export default function Gold() {
   /*
    * Reclaiming a subscription the store account already owns.
    *
-   * A free user must never see a Restore button — they get the three plans, nothing else.
-   * The catch is that ownership can't be read ahead of time for the case that needs it: a
-   * new app account whose entitlement is still attached to a previous app-user id is
-   * invisible to `getCustomerInfo`; only `restorePurchases` re-reads the store receipt and
-   * surfaces (and moves) it. So we probe *once*, silently, on open — for anyone the backend
-   * does not already call Gold — and only reveal the Restore UI if the store comes back
-   * saying this account really does have a subscription. If it owns nothing, the probe is a
-   * no-op and the plans show exactly as before.
+   * **This is an explicit action, never automatic.** `restorePurchases` mutates — it
+   * re-reads the store receipt under the current app-user id, and with "Transfer to new App
+   * User ID" that *moves* the entitlement onto whoever is signed in. An earlier version ran
+   * it silently on open to detect ownership, which meant simply visiting the paywall on a
+   * second account transferred the membership without anyone asking for it. There is no
+   * read-only way to detect a subscription owned by a *different* app-user id first
+   * (`getCustomerInfo` only sees the current one), so the honest design is a button the
+   * person taps on purpose — the same "Restore purchases" the stores expect a paywall to
+   * carry. It stays a quiet link under the plans; the plans remain the main event.
    */
   const restore = useRestore();
-  const probed = useRef(false);
-  useEffect(() => {
-    if (probed.current) return;
-    if (!canBuy || !subscription.isSuccess || isGold) return;
-    probed.current = true;
-    restore.restore();
-  }, [canBuy, subscription.isSuccess, isGold, restore]);
-
-  // The store confirmed an active subscription on this account — so offer to restore it,
-  // and stop offering the plans, rather than inviting a second purchase the store would
-  // refuse anyway. Flips to the member view on its own once the grant webhook lands.
-  const ownsOnStore = restore.found;
 
   // The denominator of "paywall view to trial start". Once per mount rather than per
   // render, and not gated on tier: a member reopening the paywall is a view too, and
@@ -123,22 +112,6 @@ export default function Gold() {
       footer={
         isGold ? (
           <Button label={t.market.gold.done} onPress={() => router.back()} />
-        ) : ownsOnStore ? (
-          // Owns it on the store but our backend has not granted it yet: the action is
-          // Restore, never Buy. Retriable — the first probe may have finished before the
-          // transfer webhook did.
-          <View className="gap-2">
-            <Button
-              label={t.market.gold.restore}
-              loading={restore.isPending}
-              onPress={() => restore.restore()}
-            />
-            <Button
-              label={t.market.gold.notNow}
-              variant="ghost"
-              onPress={() => router.back()}
-            />
-          </View>
         ) : (
           <View className="gap-2">
             {/* Disabled rather than hidden when the build cannot purchase. A missing button
@@ -193,32 +166,21 @@ export default function Gold() {
            *shown* rather than described. */}
           <GoldCosmetics isGold={false} />
 
-          {ownsOnStore ? (
-            // The plans are gone on purpose: this account already pays, so the only honest
-            // action is to restore, not to buy again. See the probe in the component body.
-            <View className="mt-8 rounded-card bg-raised p-4">
-              <Text variant="bodyStrong">{t.market.gold.restoreActivating}</Text>
-              <Text variant="caption" className="mt-1">
-                {t.market.gold.restoreActivatingBody}
-              </Text>
-            </View>
-          ) : (
-            <View className="gap-3 pt-8">
-              <Text variant="label" className="text-muted">
-                {t.market.gold.choosePlan}
-              </Text>
-              {GOLD_PLANS.map((plan) => (
-                <PlanRow
-                  key={plan.productId}
-                  plan={plan}
-                  price={priceOf(plan.productId)}
-                  saving={yearlySaving(plan, priceOf)}
-                  selected={selected.productId === plan.productId}
-                  onPress={() => setSelected(plan)}
-                />
-              ))}
-            </View>
-          )}
+          <View className="gap-3 pt-8">
+            <Text variant="label" className="text-muted">
+              {t.market.gold.choosePlan}
+            </Text>
+            {GOLD_PLANS.map((plan) => (
+              <PlanRow
+                key={plan.productId}
+                plan={plan}
+                price={priceOf(plan.productId)}
+                saving={yearlySaving(plan, priceOf)}
+                selected={selected.productId === plan.productId}
+                onPress={() => setSelected(plan)}
+              />
+            ))}
+          </View>
 
           {(buy.error || restore.error) && (
             <View className="pt-4">
@@ -238,10 +200,46 @@ export default function Gold() {
             </View>
           )}
 
-          {!ownsOnStore && (
-            <Text variant="caption" className="pt-4">
-              {t.market.gold.cancelNote}
-            </Text>
+          <Text variant="caption" className="pt-4">
+            {t.market.gold.cancelNote}
+          </Text>
+
+          {/* Explicit and quiet, below the plans. A person who already pays — a reinstall, a
+              new phone, or a second account on the same store account — taps this to move
+              their membership across, rather than buying a plan the store would refuse. It
+              only acts when tapped: restore transfers the entitlement, so it must never fire
+              on its own. Shown when the store can be reached at all. */}
+          {canBuy && (
+            <View className="gap-2 pt-6">
+              <Button
+                label={t.market.gold.restore}
+                variant="ghost"
+                loading={restore.isPending}
+                onPress={() => restore.restore()}
+              />
+
+              {/* Owned on the store, grant still on its way — the transfer webhook has to
+                  reach our backend. Flips to the member view on its own when it lands. */}
+              {restore.awaiting && (
+                <View className="rounded-card bg-raised p-4">
+                  <Text variant="bodyStrong">{t.market.gold.restoreActivating}</Text>
+                  <Text variant="caption" className="mt-1">
+                    {t.market.gold.restoreActivatingBody}
+                  </Text>
+                </View>
+              )}
+
+              {/* Tapped, and this store account has nothing to restore. A statement of fact,
+                  not an error — the three plans above are the way forward. */}
+              {restore.settled && !restore.found && (
+                <View className="rounded-card bg-raised p-4">
+                  <Text variant="bodyStrong">{t.market.gold.restoreNone}</Text>
+                  <Text variant="caption" className="mt-1">
+                    {t.market.gold.restoreNoneBody}
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
         </>
       )}

@@ -573,6 +573,8 @@ export const sv: Dictionary = {
       restoreActivating: 'Återställer din prenumeration',
       restoreActivatingBody:
         'Du har redan Gold på det här Google-kontot – du behöver inte köpa igen.',
+      restoreNone: 'Inget att återställa',
+      restoreNoneBody: 'Det här Google-kontot har ingen aktiv GameBuddy-prenumeration.',
       choosePlan: 'Välj ett abonnemang',
       planWeekly: 'Varje vecka',
       planMonthly: 'Varje månad',

@@ -576,6 +576,8 @@ export const fi: Dictionary = {
       restoreActivating: 'Palautetaan tilaustasi',
       restoreActivatingBody:
         'Sinulla on jo Gold tällä Google-tilillä — ei tarvetta ostaa uudelleen.',
+      restoreNone: 'Ei palautettavaa',
+      restoreNoneBody: 'Tällä Google-tilillä ei ole aktiivista GameBuddy-tilausta.',
       choosePlan: 'Valitse tilaus',
       planWeekly: 'Viikoittainen',
       planMonthly: 'Kuukausittainen',
