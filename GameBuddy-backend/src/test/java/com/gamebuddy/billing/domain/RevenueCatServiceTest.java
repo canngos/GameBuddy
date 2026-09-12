@@ -187,27 +187,37 @@ class RevenueCatServiceTest {
     @DisplayName("transfers")
     class Transfers {
 
-        @Test
-        @DisplayName("the losing account is expired, so one purchase never entitles two")
-        void transferExpiresTheOldAccount() {
-            RevenueCatWebhook.Event transfer = new RevenueCatWebhook.Event(
-                    "evt-1",
-                    "TRANSFER",
-                    "gamer-new",
-                    "gamebuddy.gold.monthly",
-                    PURCHASED_MS,
-                    EXPIRES_MS,
-                    "PLAY_STORE",
-                    "txn-1",
-                    "txn-1",
-                    List.of("gold"),
-                    null,
-                    "NORMAL",
-                    List.of("gamer-old"),
-                    List.of("gamer-new"));
+        /**
+         * Shaped like the real thing: a TRANSFER carries the two lists and the store, and
+         * none of app_user_id, product_id, expiry or transaction. The first version of this
+         * test filled those in, which is how reading {@code app_user_id} for the destination
+         * passed here and produced "transferred to null" in production.
+         */
+        private RevenueCatWebhook.Event transfer(List<String> from, List<String> to) {
+            return new RevenueCatWebhook.Event(
+                    "evt-1", "TRANSFER", null, null, null, null, "PLAY_STORE", null, null, null, null, null, from, to);
+        }
 
-            service.handle(transfer);
-            verify(purchases).transfer("gamer-old", "gamer-new");
+        @Test
+        @DisplayName("both sides are handed over, read from the lists and not from app_user_id")
+        void transferMovesTheEntitlement() {
+            service.handle(transfer(List.of("gamer-old"), List.of("gamer-new")));
+            verify(purchases).transfer(List.of("gamer-old"), List.of("gamer-new"));
+        }
+
+        @Test
+        @DisplayName("a transfer with no source is ignored rather than applied to nobody")
+        void transferWithoutSource() {
+            service.handle(transfer(List.of(), List.of("gamer-new")));
+            service.handle(transfer(null, List.of("gamer-new")));
+            verify(purchases, never()).transfer(any(), any());
+        }
+
+        @Test
+        @DisplayName("a transfer with no destination still revokes the source")
+        void transferWithoutDestination() {
+            service.handle(transfer(List.of("gamer-old"), null));
+            verify(purchases).transfer(List.of("gamer-old"), List.of());
         }
     }
 }

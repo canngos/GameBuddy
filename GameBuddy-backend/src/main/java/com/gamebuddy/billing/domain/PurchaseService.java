@@ -12,6 +12,8 @@ import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -247,15 +249,94 @@ public class PurchaseService {
     }
 
     /**
-     * Moves an entitlement from one account to another.
+     * Moves an entitlement from one set of accounts to another.
      *
      * <p>Happens when somebody signs in to a second account on a device that already owns a
      * subscription. The store considers it one purchase, so two accounts must not both keep
-     * it — the old one is expired as the new one is granted.
+     * it — the old ones are expired and the new ones receive what they held.
+     *
+     * <p><b>The receiving side is granted here, from our own records, because nothing else
+     * will do it.</b> This used to expire the loser and stop, on the assumption that the
+     * gainer's purchase event would follow. For the Play Store and the App Store it does
+     * not: RevenueCat's {@code TRANSFER} is the only webhook the destination gets, and it
+     * carries no product, no expiry and no transaction — just the two lists of ids. The
+     * first real purchase after launch went exactly this way: granted to the id the device
+     * was still signed in as, transferred three seconds later, and the account that paid
+     * was left on BASIC until the next renewal, which for a yearly plan is a year away.
+     *
+     * <p>So the loser's entitlement is read before it is expired and written onto the
+     * gainer, later expiry winning if the gainer already holds something. The ledger rows
+     * still inside their paid period move with it, so a later refund of that transaction
+     * revokes the account that now holds it rather than the one that used to.
      */
     @Transactional
-    public void transfer(String fromUserId, String toUserId) {
-        expire(fromUserId);
-        log.info("Entitlement transferred from {} to {}", fromUserId, toUserId);
+    public void transfer(List<String> fromUserIds, List<String> toUserIds) {
+        Instant now = clock.instant();
+
+        // What is being moved: the latest live expiry among the losers, and its tier. Read
+        // before `expire`, which overwrites both.
+        SubscriptionTier movedTier = null;
+        Instant movedExpiry = null;
+        List<Purchase> movedRows = new ArrayList<>();
+
+        for (String from : fromUserIds) {
+            Gamer loser = gamers.findById(from).orElse(null);
+            if (loser == null) {
+                // An id we never granted to — a RevenueCat anonymous id, most likely.
+                // Nothing of ours to move.
+                continue;
+            }
+            SubscriptionTier tier =
+                    SubscriptionTier.effective(loser.getSubscriptionTier(), loser.getSubscriptionExpiresAt(), now);
+            if (tier != SubscriptionTier.BASIC
+                    && (movedExpiry == null || loser.getSubscriptionExpiresAt().isAfter(movedExpiry))) {
+                movedTier = tier;
+                movedExpiry = loser.getSubscriptionExpiresAt();
+            }
+            for (Purchase row : purchases.findByUserIdOrderByPurchasedAtDesc(from)) {
+                if (row.getStatus() == PurchaseStatus.GRANTED
+                        && row.getEntitlementExpiresAt() != null
+                        && row.getEntitlementExpiresAt().isAfter(now)) {
+                    movedRows.add(row);
+                }
+            }
+            expire(from);
+        }
+
+        log.info("Entitlement transferred from {} to {}", fromUserIds, toUserIds);
+
+        if (movedExpiry == null) {
+            log.info("Nothing live to move; the receiving side keeps what it has");
+            return;
+        }
+
+        String owner = null;
+        for (String to : toUserIds) {
+            Gamer gainer = gamers.findById(to).orElse(null);
+            if (gainer == null) {
+                log.warn("Transfer destination {} is not an account we know; nothing granted", to);
+                continue;
+            }
+            SubscriptionTier held =
+                    SubscriptionTier.effective(gainer.getSubscriptionTier(), gainer.getSubscriptionExpiresAt(), now);
+            // Never shorten what they already have: somebody who bought on this account
+            // and then triggered a transfer of an older plan keeps their own expiry.
+            if (held == SubscriptionTier.BASIC || gainer.getSubscriptionExpiresAt().isBefore(movedExpiry)) {
+                gainer.setSubscriptionTier(movedTier);
+                gainer.setSubscriptionExpiresAt(movedExpiry);
+                gamers.save(gainer);
+                log.info("Granted {} until {} to {} by transfer", movedTier, movedExpiry, to);
+            }
+            if (owner == null) {
+                owner = to;
+            }
+        }
+
+        if (owner != null) {
+            for (Purchase row : movedRows) {
+                row.setUserId(owner);
+            }
+            purchases.saveAll(movedRows);
+        }
     }
 }
