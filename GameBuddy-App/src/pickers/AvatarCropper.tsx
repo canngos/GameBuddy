@@ -16,6 +16,7 @@ import Animated, {
 import { useT } from "../i18n/useT";
 import { useThemeColors } from "../theme";
 import { Button } from "../ui/Button";
+import { overlay } from "../ui/elevation";
 import { FrameOverlay } from "../ui/FramedAvatar";
 import { Text } from "../ui/Text";
 
@@ -253,7 +254,7 @@ export function AvatarCropper({
   }
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 60 }]}>
+    <View style={[StyleSheet.absoluteFill, overlay(60)]}>
       <View className="flex-1 items-center justify-center gap-6 bg-ink-900/95 px-6">
         <View className="gap-1">
           <Text variant="title" className="text-center text-white">

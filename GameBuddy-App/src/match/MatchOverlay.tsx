@@ -13,6 +13,7 @@ import { FistBump } from "./FistBump";
 import { Avatar } from "../ui/Avatar";
 import { Burst } from "../ui/Burst";
 import { Button } from "../ui/Button";
+import { overlay } from "../ui/elevation";
 import { GradientView } from "../ui/Gradient";
 import { glow } from "../ui/glow";
 import { celebrate } from "../ui/feedback";
@@ -104,7 +105,7 @@ export function MatchOverlay({
   if (!candidate) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
+    <View style={[StyleSheet.absoluteFill, overlay(50)]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 items-center justify-center bg-ink-900/90 px-8">
           {/* A wash of the accent ramp behind the celebration, at low alpha so it lifts the

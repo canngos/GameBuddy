@@ -22,7 +22,8 @@ import { useCelebration } from '../match/celebration';
  * one an hour after the fact would be a jump-scare, not a delight.
  *
  * The swiper receives this push too, which is why {@link useCelebration} dedupes on
- * `userId`: their overlay is already up from the accept response by the time it lands.
+ * `userId` — and remembers ids after dismissal, because this push often lands *after* the
+ * swiper has already tapped through to the conversation.
  */
 export function useMatchNotifications(enabled: boolean) {
   const celebrate = useCelebration((s) => s.celebrate);

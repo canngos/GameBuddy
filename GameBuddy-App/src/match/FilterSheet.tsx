@@ -15,6 +15,7 @@ import { useCountryName } from '../i18n/countryNames';
 import { useT } from '../i18n/useT';
 import { PLATFORMS } from '../profile/platforms';
 import { Button } from '../ui/Button';
+import { overlay } from '../ui/elevation';
 import { Text } from '../ui/Text';
 import { NO_FILTERS, activeCount, isNarrowing, type FeedFilters } from './filters';
 
@@ -78,7 +79,7 @@ export function FilterSheet({ visible, filters, unlocked, onApply, onDismiss }: 
   const count = activeCount(draft);
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
+    <View style={[StyleSheet.absoluteFill, overlay(50)]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
           <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel={t.common.close} />

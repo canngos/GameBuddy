@@ -11,6 +11,7 @@ import { avatarGradient, avatarUri, initialsOf } from '../avatars';
 import { useCountryName } from '../i18n/countryNames';
 import { useT } from '../i18n/useT';
 import { Avatar } from '../ui/Avatar';
+import { overlay } from '../ui/elevation';
 import { FrameOverlay } from '../ui/FramedAvatar';
 import { GradientView } from '../ui/Gradient';
 import { Text } from '../ui/Text';
@@ -62,7 +63,7 @@ export function CandidateSheet({ candidate, onDismiss }: CandidateSheetProps) {
   const hasPhoto = !!avatarUri(candidate.avatar);
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 45 }]}>
+    <View style={[StyleSheet.absoluteFill, overlay(45)]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
           <Pressable className="flex-1" onPress={onDismiss} accessibilityLabel={t.common.close} />

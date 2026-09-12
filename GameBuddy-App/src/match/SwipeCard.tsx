@@ -405,7 +405,8 @@ export function SwipeCard({
 // `lift('lg')`, which is `elevation: 10` there, and Android orders *siblings* by Z before
 // it considers JSX order — so an overlay with no elevation of its own can paint underneath
 // the very card it is stamped on. iOS and web order by JSX and ignore the extra keys.
-// The wash sits at 11 (over the card), the stamps at 12 (over the wash).
+// The wash sits at 11 (over the card), the stamps at 12 (over the wash). Full-screen
+// overlays get the same treatment through `overlay()` in `src/ui/elevation.ts`.
 const styles = StyleSheet.create({
   wash: { zIndex: 11, elevation: 11 },
   stamp: { position: 'absolute', zIndex: 12, elevation: 12 },

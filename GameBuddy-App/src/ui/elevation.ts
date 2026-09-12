@@ -63,6 +63,31 @@ function buildLift(level: 'none' | 'sm' | 'md' | 'lg', color: string): ViewStyle
   })!;
 }
 
+/**
+ * The style for a full-screen overlay that is an ordinary positioned sibling — every sheet,
+ * the match celebration, the toasts, the cropper.
+ *
+ * **`zIndex` alone is not enough on Android, and the failure is a glitch, not a crash.**
+ * Android orders siblings by elevation *before* it looks at draw order, and `zIndex` only
+ * changes draw order. Meanwhile React Native flattens layout-only wrappers, so a lit
+ * button — the deck's Match button carries `lift('lg')`, elevation 10 — can end up a
+ * native sibling of the sheet's root and paint straight through its backdrop. That is
+ * exactly what happened: the day-3 Gold prompt slid up over the deck with the Match
+ * button sitting on top of it, still tappable. `SwipeCard` documents the same trap for
+ * its stamps.
+ *
+ * So the elevation goes on the root as well, and it is higher than any control in the
+ * app. The root has no background, and Android draws no shadow for a view without one,
+ * so this buys the ordering and nothing visible. iOS and web ignore `elevation` and order
+ * by `zIndex` as before.
+ *
+ * The tiers are the ones the callers already used: toasts at 40 sit under a profile
+ * sheet at 45, under the sheets and the celebration at 50, under the cropper at 60.
+ */
+export function overlay(z: 40 | 45 | 50 | 60): ViewStyle {
+  return { zIndex: z, elevation: z };
+}
+
 const LEVELS = {
   none: { opacity: 0, radius: 0, offsetY: 0, elevation: 0 },
   sm: { opacity: 0.08, radius: 4, offsetY: 1, elevation: 2 },

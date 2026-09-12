@@ -12,6 +12,7 @@ import type { SwipeAllowance } from "../api/types";
 import type { Dictionary } from "../i18n/dictionaries/en";
 import { useT } from "../i18n/useT";
 import { Button } from "../ui/Button";
+import { overlay } from "../ui/elevation";
 import { Text } from "../ui/Text";
 import type { Block } from "./useDeck";
 
@@ -129,7 +130,7 @@ export function LimitSheet({ block, allowance, onDismiss }: LimitSheetProps) {
   const action = actionFor(block.kind, t);
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
+    <View style={[StyleSheet.absoluteFill, overlay(50)]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
           {/* Tapping the dimmed area closes, which is the gesture people try first. */}
