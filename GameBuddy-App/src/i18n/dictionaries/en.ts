@@ -640,6 +640,10 @@ export const en = {
       benefitLimitBody: 'Swipe and like as much as you want.',
       benefitFiltersTitle: 'Advanced filters',
       benefitFiltersBody: 'Narrow the deck by game, region, and who is online now.',
+      restore: 'Restore purchases',
+      restoreActivating: 'Restoring your subscription',
+      restoreActivatingBody:
+        'You already have Gold on this Google account — no need to buy again.',
       choosePlan: 'Choose a plan',
       planWeekly: 'Weekly',
       planMonthly: 'Monthly',

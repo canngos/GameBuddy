@@ -6,7 +6,12 @@ import { cosmeticsApi } from '../api/cosmetics';
 import { tNow } from '../i18n/useT';
 import * as feedback from '../ui/feedback';
 import { showToast } from '../ui/toast';
-import { PurchaseCancelledError, entitlementArrived, purchase as openStoreSheet } from './purchases';
+import {
+  PurchaseCancelledError,
+  entitlementArrived,
+  purchase as openStoreSheet,
+  restore as restoreStorePurchases,
+} from './purchases';
 
 /**
  * Every query whose answer depends on what this account owns.
@@ -173,5 +178,83 @@ export function usePurchase(kind: PurchaseKind = 'subscription') {
     /** True once the entitlement is genuinely ours. Was previously computed and thrown away. */
     granted: buy.data?.granted === true,
     reset: buy.reset,
+  };
+}
+
+/**
+ * Reclaims a subscription the store account already owns.
+ *
+ * The counterpart to {@link usePurchase} for the case where there is nothing to buy because
+ * the person already paid — a reinstall, a new device, or (the case this was written for) a
+ * second app account on one Google/Apple account, where the store refuses a re-buy and only
+ * a restore moves the entitlement across. See {@link restoreStorePurchases}.
+ *
+ * `found` is the store's answer to "does this account have an active subscription at all",
+ * known the moment the restore resolves. `granted` waits, exactly as a purchase does, for
+ * the `TRANSFER`/sync webhook to reach our backend and make the account Gold — so a paywall
+ * can show "restoring…" in the gap rather than a wrong "nothing found".
+ */
+export function useRestore() {
+  const queryClient = useQueryClient();
+
+  const refresh = useCallback(async () => {
+    await Promise.all(
+      ENTITLEMENT_QUERIES.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+    );
+  }, [queryClient]);
+
+  const run = useMutation({
+    mutationFn: async () => {
+      const { found } = await restoreStorePurchases();
+      // Nothing on this store account. No webhook is coming, so do not wait for one.
+      if (!found) return { found: false, granted: false };
+
+      // Something is owned, but a transfer/sync webhook still has to land and grant it —
+      // the same gap `usePurchase` polls through, for the same reason.
+      const deadline = Date.now() + ENTITLEMENT_TIMEOUT_MS;
+      while (Date.now() < deadline) {
+        try {
+          const subscription = await queryClient.fetchQuery({
+            queryKey: ['subscription'],
+            queryFn: billingApi.subscription,
+            staleTime: 0,
+          });
+          if (entitlementArrived(subscription)) return { found: true, granted: true };
+        } catch (error) {
+          if (__DEV__) console.warn('[billing] restore entitlement check failed; still waiting', error);
+        }
+        await sleep(POLL_INTERVAL_MS);
+      }
+      return { found: true, granted: false };
+    },
+    onSuccess: (result) => {
+      void refresh();
+      if (!result.granted) return;
+
+      feedback.purchase();
+      const t = tNow();
+      showToast({
+        id: 'entitlement:restore',
+        title: t.billing.goldYours,
+        body: t.billing.goldYoursBody,
+        icon: Crown,
+        tone: 'gold',
+      });
+    },
+  });
+
+  return {
+    restore: run.mutate,
+    isPending: run.isPending,
+    error: run.error,
+    /** The store reports an active subscription for this account. */
+    found: run.data?.found === true,
+    /** The backend has now made the account Gold. */
+    granted: run.data?.granted === true,
+    /** Owned on the store, but the grant had not reached our backend before the timeout. */
+    awaiting: run.data?.found === true && run.data.granted === false,
+    /** The restore has completed at least once this mount (whatever the outcome). */
+    settled: run.isSuccess,
+    reset: run.reset,
   };
 }

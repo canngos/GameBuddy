@@ -572,6 +572,10 @@ export const fi: Dictionary = {
       benefitLimitBody: 'Selaa ja tykkää niin paljon kuin haluat.',
       benefitFiltersTitle: 'Edistyneet suodattimet',
       benefitFiltersBody: 'Rajaa pakkaa pelin, alueen ja juuri nyt paikalla olevien mukaan.',
+      restore: 'Palauta ostokset',
+      restoreActivating: 'Palautetaan tilaustasi',
+      restoreActivatingBody:
+        'Sinulla on jo Gold tällä Google-tilillä — ei tarvetta ostaa uudelleen.',
       choosePlan: 'Valitse tilaus',
       planWeekly: 'Viikoittainen',
       planMonthly: 'Kuukausittainen',

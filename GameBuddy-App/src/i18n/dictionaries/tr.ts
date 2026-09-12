@@ -569,6 +569,10 @@ export const tr: Dictionary = {
       benefitLimitBody: 'İstediğin kadar kaydır ve beğen.',
       benefitFiltersTitle: 'Gelişmiş filtreler',
       benefitFiltersBody: 'Desteyi oyuna, bölgeye ve şu an çevrimiçi olanlara göre daralt.',
+      restore: 'Satın alımları geri yükle',
+      restoreActivating: 'Aboneliğin geri yükleniyor',
+      restoreActivatingBody:
+        'Bu Google hesabında zaten Gold var — tekrar satın almana gerek yok.',
       choosePlan: 'Bir plan seç',
       planWeekly: 'Haftalık',
       planMonthly: 'Aylık',

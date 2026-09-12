@@ -573,6 +573,10 @@ export const de: Dictionary = {
       benefitLimitBody: 'Swipe und like, so viel du willst.',
       benefitFiltersTitle: 'Erweiterte Filter',
       benefitFiltersBody: 'Grenze das Deck nach Spiel, Region und wer gerade online ist ein.',
+      restore: 'Käufe wiederherstellen',
+      restoreActivating: 'Abo wird wiederhergestellt',
+      restoreActivatingBody:
+        'Du hast auf diesem Google-Konto bereits Gold – kein erneuter Kauf nötig.',
       choosePlan: 'Wähle einen Plan',
       planWeekly: 'Wöchentlich',
       planMonthly: 'Monatlich',

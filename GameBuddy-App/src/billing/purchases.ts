@@ -332,6 +332,50 @@ export async function purchase(productId: string): Promise<void> {
   }
 }
 
+/**
+ * Re-attaches the store account's existing subscription to the signed-in user.
+ *
+ * **This is the only path that moves an *unchanged* subscription onto the current app
+ * user.** A fresh purchase cannot: the store refuses a second buy of a plan the Google or
+ * Apple account already owns ("you already have a subscription"), so no transaction happens
+ * and nothing transfers. `restorePurchases` re-reads the store receipt under the *current*
+ * `app_user_id`, and with this project's "Transfer to new App User ID" behaviour RevenueCat
+ * re-attributes the purchase to it and fires the `TRANSFER` webhook — which the backend now
+ * grants from (see `PurchaseService.transfer`). It is also what a reinstall or a new device
+ * needs to reclaim a subscription the person already paid for.
+ *
+ * **`activeSubscriptions`, not `entitlements.active`.** This project attaches no RevenueCat
+ * *entitlement* to its products — Gold is derived from the product grant in our own backend,
+ * and the RevenueCat customer shows the plan as an "unattached product" — so the entitlements
+ * map is empty even for a paying account. The active-subscriptions list is the store-level
+ * fact we can actually read.
+ *
+ * Like {@link purchase}, resolving here does not mean the account is Gold yet: the webhook
+ * still has to reach our backend. `useRestore` waits for that. `found` only says the store
+ * reports an active subscription for this account after the restore.
+ */
+export async function restore(): Promise<{ found: boolean }> {
+  const Purchases = sdk();
+  if (!Purchases) {
+    throw new StoreUnavailableError(
+      'notInBuild',
+      'This build cannot restore purchases. It was installed before in-app purchases were added.',
+    );
+  }
+  if (!API_KEY) {
+    throw new StoreUnavailableError('noKey', 'No RevenueCat key is configured in this build.');
+  }
+
+  // `restorePurchases` before `configure` throws, the same trap `fetchStorePrices` guards.
+  await configuredOnce;
+  if (configuredFor === null) {
+    throw new StoreUnavailableError('unavailable', 'Not identified to the store yet.');
+  }
+
+  const info = await Purchases.restorePurchases();
+  return { found: (info?.activeSubscriptions ?? []).length > 0 };
+}
+
 /** One product's price, as the store in front of this particular buyer states it. */
 export type StorePrice = {
   /** Our id, not RevenueCat's `<id>:<basePlan>`. */

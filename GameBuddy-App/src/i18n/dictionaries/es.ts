@@ -570,6 +570,10 @@ export const es: Dictionary = {
       benefitLimitBody: 'Desliza y da likes tanto como quieras.',
       benefitFiltersTitle: 'Filtros avanzados',
       benefitFiltersBody: 'Reduce el mazo por juego, región y quién está en línea ahora.',
+      restore: 'Restaurar compras',
+      restoreActivating: 'Restaurando tu suscripción',
+      restoreActivatingBody:
+        'Ya tienes Gold en esta cuenta de Google: no necesitas volver a comprar.',
       choosePlan: 'Elige un plan',
       planWeekly: 'Semanal',
       planMonthly: 'Mensual',

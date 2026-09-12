@@ -569,6 +569,10 @@ export const sv: Dictionary = {
       benefitLimitBody: 'Svep och gilla så mycket du vill.',
       benefitFiltersTitle: 'Avancerade filter',
       benefitFiltersBody: 'Smalna av kortleken efter spel, region och vem som är online nu.',
+      restore: 'Återställ köp',
+      restoreActivating: 'Återställer din prenumeration',
+      restoreActivatingBody:
+        'Du har redan Gold på det här Google-kontot – du behöver inte köpa igen.',
       choosePlan: 'Välj ett abonnemang',
       planWeekly: 'Varje vecka',
       planMonthly: 'Varje månad',
