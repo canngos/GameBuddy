@@ -576,6 +576,8 @@ export const fr: Dictionary = {
       benefitFiltersTitle: 'Filtres avancés',
       benefitFiltersBody: 'Réduis le deck par jeu, région, et qui est en ligne maintenant.',
       restore: 'Restaurer les achats',
+      restorePrompt: 'Déjà acheté ?',
+      restorePromptBody: 'Restaure ton abonnement sur ce compte.',
       restoreActivating: 'Restauration de ton abonnement',
       restoreActivatingBody:
         'Tu as déjà Gold sur ce compte Google — pas besoin de racheter.',

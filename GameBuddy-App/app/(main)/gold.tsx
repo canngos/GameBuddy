@@ -211,6 +211,11 @@ export default function Gold() {
               on its own. Shown when the store can be reached at all. */}
           {canBuy && (
             <View className="gap-2 pt-6">
+              <View className="gap-0.5">
+                <Text variant="label">{t.market.gold.restorePrompt}</Text>
+                <Text variant="caption">{t.market.gold.restorePromptBody}</Text>
+              </View>
+
               <Button
                 label={t.market.gold.restore}
                 variant="ghost"

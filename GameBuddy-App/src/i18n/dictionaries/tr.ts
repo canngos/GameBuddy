@@ -570,6 +570,8 @@ export const tr: Dictionary = {
       benefitFiltersTitle: 'Gelişmiş filtreler',
       benefitFiltersBody: 'Desteyi oyuna, bölgeye ve şu an çevrimiçi olanlara göre daralt.',
       restore: 'Satın alımları geri yükle',
+      restorePrompt: 'Zaten satın aldın mı?',
+      restorePromptBody: 'Üyeliğini bu hesapta geri yükle.',
       restoreActivating: 'Aboneliğin geri yükleniyor',
       restoreActivatingBody:
         'Bu Google hesabında zaten Gold var — tekrar satın almana gerek yok.',

@@ -570,6 +570,8 @@ export const sv: Dictionary = {
       benefitFiltersTitle: 'Avancerade filter',
       benefitFiltersBody: 'Smalna av kortleken efter spel, region och vem som är online nu.',
       restore: 'Återställ köp',
+      restorePrompt: 'Redan köpt?',
+      restorePromptBody: 'Återställ ditt medlemskap på det här kontot.',
       restoreActivating: 'Återställer din prenumeration',
       restoreActivatingBody:
         'Du har redan Gold på det här Google-kontot – du behöver inte köpa igen.',

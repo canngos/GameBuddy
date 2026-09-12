@@ -571,6 +571,8 @@ export const es: Dictionary = {
       benefitFiltersTitle: 'Filtros avanzados',
       benefitFiltersBody: 'Reduce el mazo por juego, región y quién está en línea ahora.',
       restore: 'Restaurar compras',
+      restorePrompt: '¿Ya lo compraste?',
+      restorePromptBody: 'Restaura tu membresía en esta cuenta.',
       restoreActivating: 'Restaurando tu suscripción',
       restoreActivatingBody:
         'Ya tienes Gold en esta cuenta de Google: no necesitas volver a comprar.',

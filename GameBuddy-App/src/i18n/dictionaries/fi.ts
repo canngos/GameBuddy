@@ -573,6 +573,8 @@ export const fi: Dictionary = {
       benefitFiltersTitle: 'Edistyneet suodattimet',
       benefitFiltersBody: 'Rajaa pakkaa pelin, alueen ja juuri nyt paikalla olevien mukaan.',
       restore: 'Palauta ostokset',
+      restorePrompt: 'Ostitko jo?',
+      restorePromptBody: 'Palauta jäsenyytesi tälle tilille.',
       restoreActivating: 'Palautetaan tilaustasi',
       restoreActivatingBody:
         'Sinulla on jo Gold tällä Google-tilillä — ei tarvetta ostaa uudelleen.',

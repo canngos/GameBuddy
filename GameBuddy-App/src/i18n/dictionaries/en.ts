@@ -641,6 +641,8 @@ export const en = {
       benefitFiltersTitle: 'Advanced filters',
       benefitFiltersBody: 'Narrow the deck by game, region, and who is online now.',
       restore: 'Restore purchases',
+      restorePrompt: 'Already purchased?',
+      restorePromptBody: 'Restore your membership on this account.',
       restoreActivating: 'Restoring your subscription',
       restoreActivatingBody:
         'You already have Gold on this Google account — no need to buy again.',

@@ -574,6 +574,8 @@ export const de: Dictionary = {
       benefitFiltersTitle: 'Erweiterte Filter',
       benefitFiltersBody: 'Grenze das Deck nach Spiel, Region und wer gerade online ist ein.',
       restore: 'Käufe wiederherstellen',
+      restorePrompt: 'Schon gekauft?',
+      restorePromptBody: 'Stelle deine Mitgliedschaft auf diesem Konto wieder her.',
       restoreActivating: 'Abo wird wiederhergestellt',
       restoreActivatingBody:
         'Du hast auf diesem Google-Konto bereits Gold – kein erneuter Kauf nötig.',
