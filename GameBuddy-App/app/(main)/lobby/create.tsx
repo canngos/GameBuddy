@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, type TextInput, View } from 'react-native';
-import { billingApi } from '../../../src/api/billing';
+import { subscriptionQuery } from '../../../src/api/billing';
 import { catalogueApi } from '../../../src/api/catalogue';
 import { ApiError, Code } from '../../../src/api/envelope';
 import { lobbyApi } from '../../../src/api/lobby';
@@ -104,7 +104,7 @@ export default function CreateLobby() {
   const upper = useUpper();
   const queryClient = useQueryClient();
 
-  const subscription = useQuery({ queryKey: ['subscription'], queryFn: billingApi.subscription });
+  const subscription = useQuery(subscriptionQuery());
   const games = useQuery({ queryKey: ['games'], queryFn: catalogueApi.games });
 
   const [game, setGame] = useState<Game | null>(null);

@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Sparkles } from 'lucide-react-native';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { billingApi } from '../../src/api/billing';
+import { subscriptionQuery } from '../../src/api/billing';
 import { profileApi } from '../../src/api/catalogue';
 import { cosmeticsApi } from '../../src/api/cosmetics';
 import { ApiError, Code } from '../../src/api/envelope';
@@ -660,10 +660,7 @@ const Row = memo(function Row({
 function GoldCard() {
   const router = useRouter();
   const t = useT();
-  const subscription = useQuery({
-    queryKey: ['subscription'],
-    queryFn: billingApi.subscription,
-  });
+  const subscription = useQuery(subscriptionQuery());
 
   const isGold = subscription.data?.tier === 'GOLD';
 

@@ -168,6 +168,29 @@ export const billingApi = {
 };
 
 /**
+ * Shared query options for "am I Gold", used by every screen that shows tier-dependent UI.
+ *
+ * **`staleTime: 0`, deliberately against the client's five-minute default.** Entitlement can
+ * change with nothing on *this* device to invalidate the query — another device buying, a
+ * renewal, an expiry, or a transfer that expires the account which *lost* the membership. The
+ * app already wires `focusManager` to `AppState` (see `app/_layout.tsx`), but focus only
+ * refetches queries that are *stale*, so a five-minute window left the losing side of a
+ * transfer showing Gold until a cold start. Zero makes the foreground refetch actually fire.
+ * The call is tiny, and per the note on `subscription` above the client must not trust its
+ * own cached idea of the tier — so paying the request is the correct trade.
+ *
+ * One definition, spread into `useQuery`, so the five screens cannot drift back onto the
+ * default. Same pattern as `storePricesQuery`.
+ */
+export function subscriptionQuery() {
+  return {
+    queryKey: ['subscription'] as const,
+    queryFn: billingApi.subscription,
+    staleTime: 0,
+  };
+}
+
+/**
  * Promotion codes, from the gamer's side.
  *
  * The neighbouring comment about `POST /billing/redeem` still stands and this is not a way

@@ -3,7 +3,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Crown, Settings, Shirt } from "lucide-react-native";
 import { ActivityIndicator, Pressable, View } from "react-native";
-import { billingApi } from "../../src/api/billing";
+import { subscriptionQuery } from "../../src/api/billing";
 import { profileApi } from "../../src/api/catalogue";
 import { socialApi } from "../../src/api/social";
 import { useUpper } from "../../src/i18n/case";
@@ -45,10 +45,7 @@ export default function Profile() {
   // Same key the Market, the deck and the paywall use, so react-query serves all of them
   // from one request rather than this adding a fourth call on a screen that already makes
   // three.
-  const subscription = useQuery({
-    queryKey: ["subscription"],
-    queryFn: billingApi.subscription,
-  });
+  const subscription = useQuery(subscriptionQuery());
   const isGold = subscription.data?.tier === "GOLD";
 
   return (

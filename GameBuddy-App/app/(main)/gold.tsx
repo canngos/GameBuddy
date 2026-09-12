@@ -11,8 +11,8 @@ import {
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import {
-  billingApi,
   GOLD_PLANS,
+  subscriptionQuery,
   type GoldPlan,
   type PriceLookup,
   type ResolvedPrice,
@@ -71,10 +71,7 @@ export default function Gold() {
   const priceOf = useStorePrices();
   const selectedPrice = priceOf(selected.productId);
 
-  const subscription = useQuery({
-    queryKey: ["subscription"],
-    queryFn: billingApi.subscription,
-  });
+  const subscription = useQuery(subscriptionQuery());
 
   const isGold = subscription.data?.tier === "GOLD";
 
