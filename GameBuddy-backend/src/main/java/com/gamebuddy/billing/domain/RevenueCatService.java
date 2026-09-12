@@ -3,6 +3,7 @@ package com.gamebuddy.billing.domain;
 import com.gamebuddy.billing.domain.PurchaseService.VerifiedPurchase;
 import com.gamebuddy.billing.infrastructure.entity.PurchasePlatform;
 import com.gamebuddy.billing.interfaces.request.RevenueCatWebhook;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -132,13 +133,23 @@ public class RevenueCatService {
                 event.type()));
     }
 
+    /**
+     * A transfer carries no product and no {@code app_user_id} — only who lost the
+     * entitlement and who gained it — and for the two stores we ship on it is the
+     * <em>only</em> event the gaining side ever receives. {@link PurchaseService#transfer}
+     * therefore moves what we hold for the losers onto the gainers itself.
+     */
     private void transfer(RevenueCatWebhook.Event event) {
-        if (event.transferredFrom() == null || event.transferredFrom().isEmpty()) {
+        List<String> from = event.transferredFrom() == null ? List.of() : event.transferredFrom();
+        List<String> to = event.transferredTo() == null ? List.of() : event.transferredTo();
+        if (from.isEmpty()) {
+            log.warn("RevenueCat TRANSFER to {} names nobody to take it from; ignored", to);
             return;
         }
-        // One purchase cannot entitle two accounts at once, so whoever had it loses it.
-        // The gaining side is granted by the purchase event that accompanies the transfer.
-        event.transferredFrom().forEach(from -> purchases.transfer(from, event.appUserId()));
+        if (to.isEmpty()) {
+            log.warn("RevenueCat TRANSFER from {} names no destination; the entitlement is only revoked", from);
+        }
+        purchases.transfer(from, to);
     }
 
     /**

@@ -296,4 +296,101 @@ class PurchaseServiceTest {
             assertEquals(0, gamer.getCoin());
         }
     }
+
+    /**
+     * The one path where the gaining side gets no purchase event of its own — see
+     * {@link PurchaseService#transfer}. What the loser held has to arrive on the gainer
+     * from here, or it arrives nowhere.
+     */
+    @Nested
+    @DisplayName("transferring between accounts")
+    class Transferring {
+
+        private static final String OTHER = "gamer-2";
+        private Gamer other;
+
+        @BeforeEach
+        void otherAccount() {
+            other = new Gamer();
+            other.setUserId(OTHER);
+            other.setSubscriptionTier(SubscriptionTier.BASIC);
+            when(gamers.findById(OTHER)).thenReturn(Optional.of(other));
+            when(purchases.findByUserIdOrderByPurchasedAtDesc(any())).thenReturn(java.util.List.of());
+        }
+
+        @Test
+        @DisplayName("the gainer receives exactly what the loser held, and the loser is expired")
+        void movesTheEntitlement() {
+            Instant paidUntil = NOW.plus(Duration.ofDays(300));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(paidUntil);
+
+            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(SubscriptionTier.GOLD, other.getSubscriptionTier());
+            assertEquals(paidUntil, other.getSubscriptionExpiresAt());
+            assertEquals(NOW, gamer.getSubscriptionExpiresAt());
+            assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+        }
+
+        @Test
+        @DisplayName("the ledger rows still inside their paid period follow the entitlement")
+        void movesTheLedgerRows() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(300)));
+
+            Purchase live = new Purchase();
+            live.setUserId(USER);
+            live.setStatus(PurchaseStatus.GRANTED);
+            live.setEntitlementExpiresAt(NOW.plus(Duration.ofDays(300)));
+            Purchase lapsed = new Purchase();
+            lapsed.setUserId(USER);
+            lapsed.setStatus(PurchaseStatus.GRANTED);
+            lapsed.setEntitlementExpiresAt(NOW.minus(Duration.ofDays(1)));
+            when(purchases.findByUserIdOrderByPurchasedAtDesc(USER)).thenReturn(java.util.List.of(live, lapsed));
+
+            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+
+            // So a refund of that transaction later revokes the account that holds it.
+            assertEquals(OTHER, live.getUserId());
+            assertEquals(USER, lapsed.getUserId());
+        }
+
+        @Test
+        @DisplayName("a gainer already holding a later expiry keeps it")
+        void neverShortensWhatTheGainerHas() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(7)));
+            Instant longer = NOW.plus(Duration.ofDays(300));
+            other.setSubscriptionTier(SubscriptionTier.GOLD);
+            other.setSubscriptionExpiresAt(longer);
+
+            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(longer, other.getSubscriptionExpiresAt());
+            assertEquals(NOW, gamer.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("a loser with nothing live gives the gainer nothing")
+        void nothingLiveMovesNothing() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.minus(Duration.ofDays(1)));
+
+            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
+            assertNull(other.getSubscriptionExpiresAt());
+        }
+
+        @Test
+        @DisplayName("an unknown source — a RevenueCat anonymous id — is skipped, not an error")
+        void unknownSourceIsSkipped() {
+            when(gamers.findById("$RCAnonymousID:abc")).thenReturn(Optional.empty());
+
+            service.transfer(java.util.List.of("$RCAnonymousID:abc"), java.util.List.of(OTHER));
+
+            assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
+        }
+    }
 }

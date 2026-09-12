@@ -109,10 +109,16 @@ export default function Deck() {
   const overlayUp = !!deck.block || !!deck.matchedWith || !!profileOf;
 
   const hintActive = useHints((s) => s.active !== null);
+  // The day-3 Gold prompt is the same shape as a hint: it cannot gate on `frozen` (its
+  // eligibility below reads it), so the sheet reports when it is actually up instead.
+  // Without this the deck stayed live underneath it — and a live Match button is a lit
+  // one, which on Android painted straight through the sheet. See `overlay` in
+  // `src/ui/elevation.ts` for the other half of that fix.
+  const [promptUp, setPromptUp] = useState(false);
   // Unlike the tutorial a hint is an ordinary sibling rather than a Modal, so
   // gesture-handler would still find the card underneath the dim — freezing here is what
   // stops a tap meant for "Got it" from landing as a swipe.
-  const frozen = overlayUp || hintActive;
+  const frozen = overlayUp || hintActive || promptUp;
 
   // The gesture demo, on the first real card. Waits for a card to actually be there:
   // a hand miming a swipe over a spinner teaches nothing and spends the one showing.
@@ -358,7 +364,7 @@ export default function Deck() {
       {/* Last, so it renders above the other two — but it also waits for them. A match
           overlay or a limit sheet is a response to something the gamer just did, and
           landing a pitch on top of either would talk over it. */}
-      <UpgradePromptSheet due={promptDue} />
+      <UpgradePromptSheet due={promptDue} onVisibleChange={setPromptUp} />
     </Screen>
   );
 }

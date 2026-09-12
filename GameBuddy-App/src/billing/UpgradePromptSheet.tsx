@@ -13,12 +13,20 @@ import { billingApi } from '../api/billing';
 import { trackFunnel } from '../api/funnel';
 import { useT } from '../i18n/useT';
 import { Button } from '../ui/Button';
+import { overlay } from '../ui/elevation';
 import { Icon } from '../ui/Icon';
 import { Text } from '../ui/Text';
 
 type UpgradePromptSheetProps = {
   /** The server's answer to "is it due". Everything behind it is decided there. */
   due: boolean;
+  /**
+   * Fires when the sheet actually comes up and goes away, so the deck can freeze the
+   * gesture and dim its buttons underneath — the way it already does for the limit sheet.
+   * Reported from here, rather than read off `due`, because `due` cannot be part of the
+   * deck's `frozen` without also being part of its own eligibility: see `home.tsx`.
+   */
+  onVisibleChange?: (visible: boolean) => void;
 };
 
 /**
@@ -36,7 +44,7 @@ type UpgradePromptSheetProps = {
  * See {@link LimitSheet} for why this is a positioned sibling rather than a `Modal`, and
  * why no `className` appears on an animated component.
  */
-export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
+export function UpgradePromptSheet({ due, onVisibleChange }: UpgradePromptSheetProps) {
   const router = useRouter();
   const t = useT();
   const queryClient = useQueryClient();
@@ -51,6 +59,10 @@ export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
   useEffect(() => {
     if (due && !dismissed) setVisible(true);
   }, [due, dismissed]);
+
+  useEffect(() => {
+    onVisibleChange?.(visible);
+  }, [visible, onVisibleChange]);
 
   // Reported once, when it actually reaches the screen. The server deliberately does not
   // mark it on the read — see billingApi.markUpgradePromptSeen — so this is what spends
@@ -95,7 +107,7 @@ export function UpgradePromptSheet({ due }: UpgradePromptSheetProps) {
   if (!visible) return null;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 50 }]}>
+    <View style={[StyleSheet.absoluteFill, overlay(50)]}>
       <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]}>
         <View className="flex-1 justify-end bg-ink-900/70">
           <Pressable className="flex-1" onPress={close} accessibilityLabel={t.common.close} />

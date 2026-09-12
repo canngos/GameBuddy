@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { lift } from './elevation';
+import { lift, overlay } from './elevation';
 import { useHairline } from './hairline';
 import { Icon } from './Icon';
 import { Text } from './Text';
@@ -146,7 +146,7 @@ function ToastCard({ toast, onDone }: { toast: Toast; onDone: () => void }) {
 
   return (
     <View
-      style={[StyleSheet.absoluteFill, { zIndex: 40 }]}
+      style={[StyleSheet.absoluteFill, overlay(40)]}
       // The host fills the screen so the toast can be positioned against the top inset, but
       // it must not eat taps on the app underneath. Only the card itself is touchable —
       // `box-none` is what lets presses through the wrapper while keeping them on children.

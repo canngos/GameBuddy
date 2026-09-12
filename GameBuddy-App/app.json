@@ -4,7 +4,10 @@
     "slug": "gamebuddy",
     "scheme": "gamebuddy",
     "version": "1.0.0",
-    "platforms": ["android", "ios"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,12 +17,22 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleLocalizations": ["en", "fi", "sv", "de", "fr", "es", "tr"]
+        "CFBundleLocalizations": [
+          "en",
+          "fi",
+          "sv",
+          "de",
+          "fr",
+          "es",
+          "tr"
+        ]
       }
     },
     "android": {
       "package": "com.findgamebuddy.app",
-      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.findgamebuddy.app",
       "versionCode": 4,
       "adaptiveIcon": {
@@ -49,6 +62,11 @@
         {
           "ios": {
             "useFrameworks": "static"
+          },
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "extraProguardRules": "# React Native core — native bridge, JNI, Hermes, @DoNotStrip / @Keep\n-keepclasseswithmembers class * { native <methods>; }\n-keep,allowobfuscation @interface com.facebook.proguard.annotations.DoNotStrip\n-keep,allowobfuscation @interface com.facebook.proguard.annotations.KeepGettersAndSetters\n-keep,allowobfuscation @interface com.facebook.jni.annotations.DoNotStrip\n-keep @com.facebook.proguard.annotations.DoNotStrip class *\n-keep @com.facebook.jni.annotations.DoNotStrip class *\n-keepclassmembers class * { @com.facebook.proguard.annotations.DoNotStrip *; }\n-keepclassmembers class * { @com.facebook.jni.annotations.DoNotStrip *; }\n-keepclassmembers @com.facebook.proguard.annotations.KeepGettersAndSetters class * { void set*(***); *** get*(); }\n-keep class com.facebook.jni.** { *; }\n-keep class com.facebook.hermes.unicode.** { *; }\n-keep class com.facebook.react.turbomodule.** { *; }\n-dontwarn com.facebook.react.**\n-dontwarn com.facebook.hermes.**\n-keep @androidx.annotation.Keep class * { *; }\n-keepclassmembers class * { @androidx.annotation.Keep *; }\n\n# Expo — module registry resolved by reflection\n-keep class expo.modules.** { *; }\n-keep class * implements expo.modules.core.interfaces.Package { *; }\n-keepclassmembers class * { @expo.modules.core.interfaces.ExpoMethod <methods>; }\n-dontwarn expo.modules.**\n\n# react-native-reanimated 4 + worklets\n-keep class com.swmansion.reanimated.** { *; }\n-keep class com.swmansion.worklets.** { *; }\n\n# screens / gesture-handler / safe-area / svg\n-keep class com.swmansion.rnscreens.** { *; }\n-keep class com.swmansion.gesturehandler.** { *; }\n-keep class com.th3rdwave.safeareacontext.** { *; }\n-keep public class com.horcrux.svg.** { *; }\n\n# RevenueCat (react-native-purchases)\n-keep class com.revenuecat.purchases.** { *; }\n-dontwarn com.revenuecat.purchases.**\n\n# Google Mobile Ads / AdMob\n-keep class com.google.android.gms.ads.** { *; }\n-keep class com.google.android.gms.internal.ads.** { *; }\n-keep class io.invertase.googlemobileads.** { *; }\n-dontwarn com.google.android.gms.**\n\n# Firebase + Crashlytics\n-keep class com.google.firebase.** { *; }\n-keep class io.invertase.firebase.** { *; }\n-dontwarn com.google.firebase.**\n-dontwarn io.invertase.firebase.**\n-keepattributes SourceFile,LineNumberTable\n-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,Exceptions\n\n# Networking + Gson-style reflection\n-dontwarn okhttp3.**\n-dontwarn okio.**\n-dontwarn javax.annotation.**\n-keepclassmembers,allowobfuscation class * { @com.google.gson.annotations.SerializedName <fields>; }"
           }
         }
       ],

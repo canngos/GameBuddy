@@ -18,6 +18,11 @@ type CelebrationState = {
    * whoever raises the celebration hands over whatever else needs undoing.
    */
   onDismiss: (() => void) | null;
+  /**
+   * Everyone celebrated since sign-in, by id. Kept after dismissal — see the header on why
+   * "is the overlay up right now" was not a wide enough net.
+   */
+  shown: ReadonlySet<string>;
   celebrate: (gamer: MatchedGamer, onDismiss?: () => void) => void;
   dismiss: () => void;
 };
@@ -39,16 +44,44 @@ type CelebrationState = {
  * **Deduplication is the reason this is keyed by `userId`.** The swiper gets a push for
  * their own match too, so without it they would see the overlay twice: once from the
  * accept response and once from the notification arriving a moment later.
+ *
+ * **"A moment later" is not bounded, which is why `shown` outlives the overlay.** The
+ * dedupe used to be "is this person's overlay up right now", and that only holds if the
+ * push lands while the gamer is still looking at it. Tap "Send a message" straight away
+ * and the overlay is gone before FCM has delivered anything — so the push then raised a
+ * second celebration on top of the conversation that was opened *from the first one*,
+ * seconds into typing. The set remembers everyone celebrated since sign-in instead; a
+ * push for a match already shown is dropped whenever it turns up.
  */
 export const useCelebration = create<CelebrationState>((set, get) => ({
   matched: null,
   onDismiss: null,
+  shown: new Set(),
 
   celebrate: (gamer, onDismiss) => {
-    // Already celebrating this person. Keep the first one — it owns the `onDismiss` that
-    // unfreezes the deck, and replacing it would strand that.
-    if (get().matched?.userId === gamer.userId) return;
-    set({ matched: gamer, onDismiss: onDismiss ?? null });
+    const { matched, onDismiss: current, shown } = get();
+
+    // Already celebrating this person. Keep the first one on screen, but never strand the
+    // cleanup: the deck's raise carries the callback that unfreezes it, and if the push
+    // got here first (no callback) the deck's has to be adopted or the gesture stays dead
+    // after dismissal.
+    if (matched?.userId === gamer.userId) {
+      if (onDismiss && !current) set({ onDismiss });
+      return;
+    }
+
+    // Already celebrated and dismissed. Nothing to show — but whatever the caller wanted
+    // undone on dismissal is undone now, for the same reason as above.
+    if (shown.has(gamer.userId)) {
+      onDismiss?.();
+      return;
+    }
+
+    set({
+      matched: gamer,
+      onDismiss: onDismiss ?? null,
+      shown: new Set(shown).add(gamer.userId),
+    });
   },
 
   dismiss: () => {

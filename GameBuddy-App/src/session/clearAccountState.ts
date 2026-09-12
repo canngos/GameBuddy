@@ -36,7 +36,9 @@ export function clearAccountState() {
   // `setState`, not the stores' own actions: `dismiss()` runs the deck's unfreeze callback
   // and `close(id)` only clears a matching id. Neither is meaningful once the account is
   // gone — what is wanted here is the empty state, unconditionally.
-  useCelebration.setState({ matched: null, onDismiss: null });
+  // `shown` goes too: it dedupes match pushes against celebrations already seen, and the
+  // next account may well match the very people this one did.
+  useCelebration.setState({ matched: null, onDismiss: null, shown: new Set() });
   useActiveConversation.setState({ friendId: null });
   useToasts.getState().clear();
   // RevenueCat holds the same kind of leftover outside this process's memory: the SDK
