@@ -619,9 +619,14 @@ public class DefaultMatchService implements MatchService {
 
         if (wasAccept) {
             gamer.getApprovedMatches().remove(target);
-            // Whether or not this one was a super like — `clear` is a no-op when it was
-            // not, and asking first would cost a query to save nothing.
-            superLikes.clear(gamer.getUserId(), targetId);
+            // `clear` reports whether a row went, so the super-like case is known without a
+            // second query. When it was a super like, give it back: a super like is a paid
+            // consumable, and the swipe is being un-made — leaving it spent would cost the
+            // gamer the like *and* the rewind fee for one undo. Refunding the count re-arms
+            // the like; the row is gone, so the highlight and any re-send start clean.
+            if (superLikes.clear(gamer.getUserId(), targetId) > 0) {
+                gamer.setSuperLikes(gamer.getSuperLikes() + 1);
+            }
         } else {
             declinedMatches.clear(gamer.getUserId(), targetId);
         }

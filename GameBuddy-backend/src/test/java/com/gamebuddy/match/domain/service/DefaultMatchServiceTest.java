@@ -1039,6 +1039,61 @@ class DefaultMatchServiceTest {
     }
 
     @Nested
+    @DisplayName("rewind")
+    class Rewind {
+
+        @BeforeEach
+        void lastDecisionWasAnAcceptOfTheCandidate() {
+            // The state an accept of `candidate` leaves behind, and the case a rewind is for:
+            // it is the last decision, and it is one-sided (candidate has not accepted back),
+            // so undoing it takes nothing away from anyone else.
+            gamer.getApprovedMatches().add(candidate);
+            gamer.setLastDecisionUserId(candidate.getUserId());
+            gamer.setLastDecisionAccept(true);
+            gamer.setLastDecisionAt(NOW);
+            // Gold, so the rewind is free — this class is about the super-like refund, not
+            // the rewind fee, and a free rewind keeps the coin ledger out of it.
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+        }
+
+        @Test
+        @DisplayName("rewinding a super like gives the paid super like back")
+        void refundsTheSuperLike() {
+            gamer.setSuperLikes(0); // spent on the accept now being undone
+            // `clear` reporting a deleted row is how the service knows it was a super like.
+            when(superLikes.clear(gamer.getUserId(), candidate.getUserId())).thenReturn(1);
+
+            matchService.rewind(gamer);
+
+            assertEquals(1, gamer.getSuperLikes(), "a rewound super like is a paid consumable, returned");
+        }
+
+        @Test
+        @DisplayName("rewinding an ordinary like refunds no super like")
+        void ordinaryLikeRefundsNothing() {
+            gamer.setSuperLikes(0);
+            when(superLikes.clear(gamer.getUserId(), candidate.getUserId())).thenReturn(0);
+
+            matchService.rewind(gamer);
+
+            assertEquals(0, gamer.getSuperLikes());
+        }
+
+        @Test
+        @DisplayName("a super like that became a match cannot be rewound, and stays spent")
+        void matchedSuperLikeIsNotRewound() {
+            candidate.getApprovedMatches().add(gamer); // now mutual
+            gamer.setSuperLikes(0);
+
+            assertThrows(BusinessException.class, () -> matchService.rewind(gamer));
+
+            assertEquals(0, gamer.getSuperLikes(), "no refund when the rewind itself is refused");
+            verify(superLikes, never()).clear(anyString(), anyString());
+        }
+    }
+
+    @Nested
     @DisplayName("who may be paired with whom")
     class Pairing {
 
