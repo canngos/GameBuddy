@@ -5,7 +5,7 @@ import { Gamepad2, SlidersHorizontal } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { AdmirersBadge } from "./admirers";
-import { billingApi } from "../../src/api/billing";
+import { subscriptionQuery } from "../../src/api/billing";
 import { UpgradePromptSheet } from "../../src/billing/UpgradePromptSheet";
 import { REWIND_COST_COINS } from "../../src/match/prices";
 import type { Candidate } from "../../src/api/types";
@@ -80,10 +80,7 @@ export default function Deck() {
 
   // Shared cache with the paywall, so buying Gold there unlocks the controls here without
   // a reload. Only ever advisory — see FilterSheet on why the server is the authority.
-  const subscription = useQuery({
-    queryKey: ["subscription"],
-    queryFn: billingApi.subscription,
-  });
+  const subscription = useQuery(subscriptionQuery());
   const unlocked = subscription.data?.canUseAdvancedFilters ?? false;
 
   /**

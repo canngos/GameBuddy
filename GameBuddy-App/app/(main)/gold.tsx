@@ -11,8 +11,8 @@ import {
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import {
-  billingApi,
   GOLD_PLANS,
+  subscriptionQuery,
   type GoldPlan,
   type PriceLookup,
   type ResolvedPrice,
@@ -22,7 +22,7 @@ import { cosmeticsApi } from "../../src/api/cosmetics";
 import type { Cosmetic, CosmeticStore } from "../../src/api/types";
 import { trackFunnel } from "../../src/api/funnel";
 import { storeAvailable } from "../../src/billing/purchases";
-import { usePurchase } from "../../src/billing/usePurchase";
+import { usePurchase, useRestore } from "../../src/billing/usePurchase";
 import { useT } from "../../src/i18n/useT";
 import { useThemeColors } from "../../src/theme";
 import { GradientView } from "../../src/ui/Gradient";
@@ -71,10 +71,7 @@ export default function Gold() {
   const priceOf = useStorePrices();
   const selectedPrice = priceOf(selected.productId);
 
-  const subscription = useQuery({
-    queryKey: ["subscription"],
-    queryFn: billingApi.subscription,
-  });
+  const subscription = useQuery(subscriptionQuery());
 
   const isGold = subscription.data?.tier === "GOLD";
 
@@ -83,6 +80,21 @@ export default function Gold() {
   // False on any build made before react-native-purchases was installed, and on any build
   // with no RevenueCat key configured.
   const canBuy = storeAvailable();
+
+  /*
+   * Reclaiming a subscription the store account already owns.
+   *
+   * **This is an explicit action, never automatic.** `restorePurchases` mutates — it
+   * re-reads the store receipt under the current app-user id, and with "Transfer to new App
+   * User ID" that *moves* the entitlement onto whoever is signed in. An earlier version ran
+   * it silently on open to detect ownership, which meant simply visiting the paywall on a
+   * second account transferred the membership without anyone asking for it. There is no
+   * read-only way to detect a subscription owned by a *different* app-user id first
+   * (`getCustomerInfo` only sees the current one), so the honest design is a button the
+   * person taps on purpose — the same "Restore purchases" the stores expect a paywall to
+   * carry. It stays a quiet link under the plans; the plans remain the main event.
+   */
+  const restore = useRestore();
 
   // The denominator of "paywall view to trial start". Once per mount rather than per
   // render, and not gated on tier: a member reopening the paywall is a view too, and
@@ -167,9 +179,9 @@ export default function Gold() {
             ))}
           </View>
 
-          {buy.error && (
+          {(buy.error || restore.error) && (
             <View className="pt-4">
-              <ErrorNotice error={buy.error} />
+              <ErrorNotice error={buy.error ?? restore.error} />
             </View>
           )}
 
@@ -188,6 +200,49 @@ export default function Gold() {
           <Text variant="caption" className="pt-4">
             {t.market.gold.cancelNote}
           </Text>
+
+          {/* Explicit and quiet, below the plans. A person who already pays — a reinstall, a
+              new phone, or a second account on the same store account — taps this to move
+              their membership across, rather than buying a plan the store would refuse. It
+              only acts when tapped: restore transfers the entitlement, so it must never fire
+              on its own. Shown when the store can be reached at all. */}
+          {canBuy && (
+            <View className="gap-2 pt-6">
+              <View className="gap-0.5">
+                <Text variant="label">{t.market.gold.restorePrompt}</Text>
+                <Text variant="caption">{t.market.gold.restorePromptBody}</Text>
+              </View>
+
+              <Button
+                label={t.market.gold.restore}
+                variant="ghost"
+                loading={restore.isPending}
+                onPress={() => restore.restore()}
+              />
+
+              {/* Owned on the store, grant still on its way — the transfer webhook has to
+                  reach our backend. Flips to the member view on its own when it lands. */}
+              {restore.awaiting && (
+                <View className="rounded-card bg-raised p-4">
+                  <Text variant="bodyStrong">{t.market.gold.restoreActivating}</Text>
+                  <Text variant="caption" className="mt-1">
+                    {t.market.gold.restoreActivatingBody}
+                  </Text>
+                </View>
+              )}
+
+              {/* Tapped, and this store account has nothing to restore. A statement of fact,
+                  not an error — the three plans above are the way forward. */}
+              {restore.settled && !restore.found && (
+                <View className="rounded-card bg-raised p-4">
+                  <Text variant="bodyStrong">{t.market.gold.restoreNone}</Text>
+                  <Text variant="caption" className="mt-1">
+                    {t.market.gold.restoreNoneBody}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </>
       )}
     </Screen>
