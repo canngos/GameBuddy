@@ -19,7 +19,7 @@ Not a server list. Not a Discord you'll never open again. You swipe through real
 
 ## What this is
 
-GameBuddy is a full, shipped product built by one person — mobile app, backend, a machine-learning recommender, a marketing site, and the infrastructure under all of it. It went through a real closed test with real players, shipped the changes they asked for over several rounds, and is now in front of the Play Store's production review.
+GameBuddy is a full, shipped product built by one person — mobile app, backend, a machine-learning recommender, a marketing site, and the infrastructure under all of it. It went through a real closed test with real players, shipped the changes they asked for over several rounds, and is now live on Google Play.
 
 The pitch is simple: matchmaking for *people*, not lobbies. Tell it what you play and how, swipe a deck of real profiles ranked by how well they actually fit you, and when two people match, a private chat opens. There are lobbies for "who's up for ranked at 9", a Super Like for when you really mean it, verified Discord on profiles, badges and streaks, and a cosmetics shop — but the core loop is match, chat, go play.
 
@@ -128,14 +128,14 @@ Each sub-project has its own README with the details that matter there — start
 
 - **It's real, and it's a solo project.** GameBuddy is a bachelor's capstone, built and shipped by one person. The scope is deliberately larger than "an app" because the interesting part was making all the pieces — client, server, ML, site, ops — actually work together in production.
 - **Android first.** iOS is designed for but not yet shipped; the code paths are there.
-- **Some things are unfinished on purpose.** Google Play billing is exercised through RevenueCat's Test Store in debug builds and the functional suite; a real Play purchase needs an internal-testing-track install, so do one before relying on it. Notes like this live next to the code they're about, not buried here.
+- **Billing is tested at both layers.** Debug builds and the functional suite use RevenueCat's Test Store; the published Android app uses Google Play Billing through RevenueCat. Entitlements and consumable credits are still granted server-side from verified RevenueCat webhooks.
 - **Everything in `.env.example` is a placeholder.** Production runs on its own secrets; nothing real is in this repository.
 
 ---
 
 ## License
 
-The recommender (`GameBuddy-Model`) is MIT. The repository doesn't carry a single top-level license yet — if you're reading this because it just went public, that's the next thing worth adding.
+GameBuddy is open-source software licensed under the [MIT License](LICENSE). Third-party assets and dependencies remain subject to their respective licenses.
 
 <div align="center">
 <sub>Built end to end by one person, in Finland. · <a href="https://findgamebuddy.com">findgamebuddy.com</a></sub>
