@@ -21,7 +21,10 @@ export const de: Dictionary = {
   },
 
   hero: {
-    badge: 'Erscheint zuerst für Android',
+    launchLabel: 'Frisch erschienen',
+    launchText: 'GameBuddy ist jetzt bei Google Play!',
+    launchCta: 'Jetzt herunterladen',
+    badge: 'Jetzt für Android verfügbar',
     titleBefore: 'Finde Leute, die',
     titleHighlight: 'wirklich spielen',
     titleAfter: 'was du spielst',
@@ -29,7 +32,7 @@ export const de: Dictionary = {
       'Kein Server voller Fremder. GameBuddy bringt dich mit Leuten zusammen, die deine Spiele haben, auf deiner Plattform sind und so spielen wie du — und geht dir danach aus dem Weg.',
     comingSoon: 'Demnächst bei',
     getItOn: 'Jetzt bei',
-    releaseNote: 'GameBuddy steht kurz vor der Veröffentlichung. Android kommt zuerst.',
+    releaseNote: 'GameBuddy ist für Android verfügbar. iOS folgt später.',
     deckAlt: 'Der GameBuddy-Stapel mit dem Profil eines Spielers und seinen Spielen',
     chatAlt: 'Die GameBuddy-Unterhaltungsliste mit einem wartenden neuen Match',
   },

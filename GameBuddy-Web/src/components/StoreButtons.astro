@@ -1,11 +1,9 @@
 ---
 /**
- * The store links, and the honest state when there are none.
+ * The store links, with an honest waiting state for unreleased platforms.
  *
- * `STORES.play` and `STORES.appStore` are empty until the listings exist, and this renders a
- * waiting state rather than a link to nowhere. **A fabricated store URL would be a dead link
- * on the first thing a visitor sees**, which is worse than saying "not yet" — and the moment
- * either string is filled in, this becomes a real button with no other change.
+ * `STORES.play` points to the published Android listing. `STORES.appStore` remains empty until
+ * the iOS listing exists, so it renders a waiting state rather than a link to nowhere.
  *
  * Android first, deliberately: that is the launch order, and the iOS build is not yet
  * configured for Firebase (see app.config.js).
@@ -44,7 +42,7 @@ const stores = [
       ) : (
         <div
           class="inline-flex cursor-default items-center gap-3 rounded-xl border border-line bg-raised/60 px-5 py-3"
-          aria-label={`${store.name}: not released yet`}
+          aria-label={`${store.name}: ${t(lang, 'hero.comingSoon')}`}
         >
           <span aria-hidden="true" class="text-muted">
             {store.icon === 'play' ? '▶' : ''}

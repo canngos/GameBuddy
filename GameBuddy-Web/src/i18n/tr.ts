@@ -22,7 +22,10 @@ export const tr: Dictionary = {
   },
 
   hero: {
-    badge: 'Önce Android’de',
+    launchLabel: 'Yeni çıktı',
+    launchText: 'GameBuddy artık Google Play’de!',
+    launchCta: 'Hemen indir',
+    badge: 'Android’de yayında',
     titleBefore: 'Senin oynadığını',
     titleHighlight: 'gerçekten oynayan',
     titleAfter: 'insanları bul',
@@ -30,7 +33,7 @@ export const tr: Dictionary = {
       'Yabancılarla dolu bir sunucu değil. GameBuddy seni oyunlarına, platformuna ve oynama tarzına göre eşleştirir — sonra da çekilir ki oynayabilesin.',
     comingSoon: 'Çok yakında',
     getItOn: 'İndir:',
-    releaseNote: 'GameBuddy çıkış öncesi son aşamada. Önce Android geliyor.',
+    releaseNote: 'GameBuddy Android’de yayında. iOS daha sonra gelecek.',
     deckAlt: 'GameBuddy destesi: bir oyuncunun profili ve oynadığı oyunlar',
     chatAlt: 'Yeni bir eşleşmenin beklediği GameBuddy sohbet listesi',
   },

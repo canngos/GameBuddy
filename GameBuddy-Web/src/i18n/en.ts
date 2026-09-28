@@ -26,7 +26,10 @@ export const en = {
   },
 
   hero: {
-    badge: 'Launching on Android first',
+    launchLabel: 'Just launched',
+    launchText: 'GameBuddy is live on Google Play!',
+    launchCta: 'Download now',
+    badge: 'Now live on Android',
     titleBefore: 'Find people who',
     titleHighlight: 'actually play',
     titleAfter: 'what you play',
@@ -34,7 +37,7 @@ export const en = {
       'Not a server full of strangers. GameBuddy matches you on your games, your platform and how you like to play — then gets out of the way so you can go play.',
     comingSoon: 'Coming soon to',
     getItOn: 'Get it on',
-    releaseNote: 'GameBuddy is in the final stages before release. Android comes first.',
+    releaseNote: 'GameBuddy is live on Android. iOS is coming later.',
     deckAlt: "The GameBuddy deck, showing a gamer's profile with the games they play",
     chatAlt: 'The GameBuddy conversations list, with a new match waiting',
   },

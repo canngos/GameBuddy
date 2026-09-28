@@ -294,6 +294,7 @@ the image that needs it started. **Add a row when you apply one, not later.**
 | upgrade-2026-39-missions-and-badges.sql | _pre-ledger_ | `\d gamebuddy.gamer` has `mission_set_index` |
 | upgrade-2026-40 … 44 | _pre-ledger_ | `\dt gamebuddy.gamer_auth_identity`; `review_prompt_shown_at` on `gamer` |
 | upgrade-2026-45-report-cases.sql | _fill in_ | `\dt gamebuddy.moderation_case` exists; `\d gamebuddy.gamer` has `suspended_until` |
+| upgrade-2026-46-revenuecat-transfer-events.sql | 2026-09-28 | `\dt gamebuddy.revenuecat_transfer_event` exists |
 
 ---
 

@@ -22,7 +22,10 @@ export const sv: Dictionary = {
   },
 
   hero: {
-    badge: 'Släpps först på Android',
+    launchLabel: 'Nysläppt',
+    launchText: 'GameBuddy finns nu på Google Play!',
+    launchCta: 'Ladda ner nu',
+    badge: 'Nu tillgänglig på Android',
     titleBefore: 'Hitta dem som',
     titleHighlight: 'faktiskt spelar',
     titleAfter: 'det du spelar',
@@ -30,7 +33,7 @@ export const sv: Dictionary = {
       'Inte en server full av främlingar. GameBuddy matchar dig utifrån dina spel, din plattform och hur du gillar att spela — och håller sig sedan undan så att du kan spela.',
     comingSoon: 'Kommer snart till',
     getItOn: 'Hämta i',
-    releaseNote: 'GameBuddy är i slutfasen före lansering. Android kommer först.',
+    releaseNote: 'GameBuddy finns nu på Android. iOS kommer senare.',
     deckAlt: 'GameBuddys kortlek som visar en spelares profil och vilka spel hen spelar',
     chatAlt: 'GameBuddys konversationslista, med en ny match som väntar',
   },
