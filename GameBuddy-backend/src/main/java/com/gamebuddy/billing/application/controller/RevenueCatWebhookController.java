@@ -1,6 +1,7 @@
 package com.gamebuddy.billing.application.controller;
 
 import com.gamebuddy.billing.domain.RevenueCatService;
+import com.gamebuddy.billing.domain.TransferPendingException;
 import com.gamebuddy.billing.interfaces.request.RevenueCatWebhook;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
  * configuration in the RevenueCat dashboard, and RevenueCat sends it verbatim in the
  * {@code Authorization} header. It is not a bearer token and is not parsed as one.
  *
- * <p><b>Always answers 200 once authorised.</b> RevenueCat retries any non-2xx with
+ * <p><b>Acknowledges deterministic failures; retries temporary ones.</b> RevenueCat retries non-2xx with
  * backoff and eventually disables a webhook that keeps failing, so an event we cannot make
  * sense of is logged and accepted rather than rejected — one unknown product must not stop
  * delivery of everybody else's purchases. The cases where that loses information are all
@@ -76,6 +77,9 @@ public class RevenueCatWebhookController {
         String eventId = payload.event() == null ? "(none)" : payload.event().id();
         try {
             revenueCat.handle(payload.event());
+        } catch (TransferPendingException e) {
+            log.warn("Deferring RevenueCat transfer {}: {}", eventId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         } catch (TransientDataAccessException
                 | DataAccessResourceFailureException
                 | CannotCreateTransactionException e) {

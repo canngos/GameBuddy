@@ -12,13 +12,17 @@ import com.gamebuddy.billing.infrastructure.repository.PurchaseRepository;
 import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.shared.coin.CoinLedger;
 import com.gamebuddy.shared.coin.CoinLedgerRepository;
+import com.gamebuddy.shared.entity.Cosmetic;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -40,6 +44,7 @@ class PurchaseServiceTest {
 
     private PurchaseRepository purchases;
     private GamerRepository gamers;
+    private GamerCosmeticRepository ownership;
     private Gamer gamer;
     private PurchaseService service;
 
@@ -47,6 +52,7 @@ class PurchaseServiceTest {
     void setUp() {
         purchases = mock(PurchaseRepository.class);
         gamers = mock(GamerRepository.class);
+        ownership = mock(GamerCosmeticRepository.class);
 
         gamer = new Gamer();
         gamer.setUserId(USER);
@@ -61,7 +67,7 @@ class PurchaseServiceTest {
         // pass without anything happening.
         Clock clock = Clock.fixed(NOW, ZoneOffset.UTC);
         CoinLedger coins = new CoinLedger(mock(CoinLedgerRepository.class), clock);
-        service = new PurchaseService(purchases, gamers, clock, coins);
+        service = new PurchaseService(purchases, gamers, clock, coins, ownership);
     }
 
     private VerifiedPurchase purchase(Product product, Instant expiresAt) {
@@ -82,6 +88,7 @@ class PurchaseServiceTest {
 
             assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
             assertEquals(storeExpiry, gamer.getSubscriptionExpiresAt());
+            verify(ownership).grantMembershipCosmeticsForUser(USER, NOW);
         }
 
         @Test
@@ -92,6 +99,7 @@ class PurchaseServiceTest {
             assertEquals(100 + Product.COINS_SMALL.coins(), gamer.getCoin());
             assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
             assertNull(gamer.getSubscriptionExpiresAt());
+            verify(ownership, never()).grantMembershipCosmeticsForUser(anyString(), any());
         }
 
         @Test
@@ -154,6 +162,7 @@ class PurchaseServiceTest {
 
             assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
             verify(purchases, never()).saveAndFlush(any());
+            verify(ownership, never()).grantMembershipCosmeticsForUser(anyString(), any());
         }
 
         @Test
@@ -163,6 +172,7 @@ class PurchaseServiceTest {
 
             assertFalse(service.grant(purchase(Product.GOLD_MONTHLY, NOW.plus(Duration.ofDays(30)))));
             assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+            verify(ownership, never()).grantMembershipCosmeticsForUser(anyString(), any());
         }
 
         @Test
@@ -243,6 +253,7 @@ class PurchaseServiceTest {
                     SubscriptionTier.BASIC,
                     SubscriptionTier.effective(
                             gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), NOW.plusSeconds(1)));
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
         }
 
         @Test
@@ -257,6 +268,56 @@ class PurchaseServiceTest {
             // Pushing it forward to now would silently hand back five days.
             assertEquals(lapsed, gamer.getSubscriptionExpiresAt());
             verify(gamers, never()).save(any());
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
+        }
+
+        @Test
+        @DisplayName("an expired webhook removes Gold items and unequips them immediately")
+        void expirationCleansCosmetics() {
+            Cosmetic frame = new Cosmetic();
+            frame.setId(UUID.randomUUID());
+            Cosmetic banner = new Cosmetic();
+            banner.setId(UUID.randomUUID());
+            Cosmetic theme = new Cosmetic();
+            theme.setId(UUID.randomUUID());
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.minusSeconds(1));
+            gamer.setEquippedFrame(frame);
+            gamer.setEquippedBanner(banner);
+            gamer.setEquippedTheme(theme);
+            when(ownership.findOwnedIds(USER)).thenReturn(Set.of(theme.getId()));
+
+            service.expireFromWebhook(USER, NOW.minusSeconds(1));
+
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
+            assertNull(gamer.getEquippedFrame());
+            assertNull(gamer.getEquippedBanner());
+            assertEquals(theme, gamer.getEquippedTheme());
+        }
+
+        @Test
+        @DisplayName("a delayed expiration from an older period cannot revoke a renewal")
+        void staleExpirationKeepsRenewedMembership() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            service.expireFromWebhook(USER, NOW.minusSeconds(1));
+
+            assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
+            assertEquals(NOW.plus(Duration.ofDays(30)), gamer.getSubscriptionExpiresAt());
+            verify(ownership, never()).revokeLapsedMembershipCosmeticsForUser(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("an expiration without a period does not revoke a current member")
+        void missingExpirationDateKeepsMembership() {
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            service.expireFromWebhook(USER, null);
+
+            assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
+            verify(ownership, never()).revokeLapsedMembershipCosmeticsForUser(anyString(), any());
         }
 
         @Test
@@ -271,11 +332,17 @@ class PurchaseServiceTest {
 
             gamer.setSubscriptionTier(SubscriptionTier.GOLD);
             gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(20)));
+            Cosmetic frame = new Cosmetic();
+            frame.setId(UUID.randomUUID());
+            gamer.setEquippedFrame(frame);
+            when(ownership.findOwnedIds(USER)).thenReturn(Set.of());
 
             service.refund(PurchasePlatform.GOOGLE_PLAY, "txn-1");
 
             assertEquals(PurchaseStatus.REFUNDED, row.getStatus());
             assertEquals(NOW, gamer.getSubscriptionExpiresAt());
+            assertNull(gamer.getEquippedFrame());
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
         }
 
         @Test
@@ -328,6 +395,7 @@ class PurchaseServiceTest {
     @DisplayName("transferring between accounts")
     class Transferring {
 
+        private static final String EVENT = "transfer-1";
         private static final String OTHER = "gamer-2";
         private Gamer other;
 
@@ -338,6 +406,18 @@ class PurchaseServiceTest {
             other.setSubscriptionTier(SubscriptionTier.BASIC);
             when(gamers.findById(OTHER)).thenReturn(Optional.of(other));
             when(purchases.findByUserIdOrderByPurchasedAtDesc(any())).thenReturn(java.util.List.of());
+            Purchase legacy = liveGoldPurchase(USER, null);
+            when(purchases.findByUserIdOrderByPurchasedAtDesc(USER)).thenReturn(java.util.List.of(legacy));
+            when(purchases.claimTransferEvent(EVENT, NOW)).thenReturn(1);
+        }
+
+        private Purchase liveGoldPurchase(String userId, Instant expiry) {
+            Purchase row = new Purchase();
+            row.setUserId(userId);
+            row.setProductId(Product.GOLD_MONTHLY.storeId());
+            row.setStatus(PurchaseStatus.GRANTED);
+            row.setEntitlementExpiresAt(expiry);
+            return row;
         }
 
         @Test
@@ -346,13 +426,20 @@ class PurchaseServiceTest {
             Instant paidUntil = NOW.plus(Duration.ofDays(300));
             gamer.setSubscriptionTier(SubscriptionTier.GOLD);
             gamer.setSubscriptionExpiresAt(paidUntil);
+            Cosmetic frame = new Cosmetic();
+            frame.setId(UUID.randomUUID());
+            gamer.setEquippedFrame(frame);
+            when(ownership.findOwnedIds(USER)).thenReturn(Set.of());
 
-            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
 
             assertEquals(SubscriptionTier.GOLD, other.getSubscriptionTier());
             assertEquals(paidUntil, other.getSubscriptionExpiresAt());
             assertEquals(NOW, gamer.getSubscriptionExpiresAt());
             assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+            assertNull(gamer.getEquippedFrame());
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
+            verify(ownership).grantMembershipCosmeticsForUser(OTHER, NOW);
         }
 
         @Test
@@ -363,15 +450,17 @@ class PurchaseServiceTest {
 
             Purchase live = new Purchase();
             live.setUserId(USER);
+            live.setProductId(Product.GOLD_MONTHLY.storeId());
             live.setStatus(PurchaseStatus.GRANTED);
             live.setEntitlementExpiresAt(NOW.plus(Duration.ofDays(300)));
             Purchase lapsed = new Purchase();
             lapsed.setUserId(USER);
+            lapsed.setProductId(Product.GOLD_MONTHLY.storeId());
             lapsed.setStatus(PurchaseStatus.GRANTED);
             lapsed.setEntitlementExpiresAt(NOW.minus(Duration.ofDays(1)));
             when(purchases.findByUserIdOrderByPurchasedAtDesc(USER)).thenReturn(java.util.List.of(live, lapsed));
 
-            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
 
             // So a refund of that transaction later revokes the account that holds it.
             assertEquals(OTHER, live.getUserId());
@@ -387,7 +476,7 @@ class PurchaseServiceTest {
             other.setSubscriptionTier(SubscriptionTier.GOLD);
             other.setSubscriptionExpiresAt(longer);
 
-            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
 
             assertEquals(longer, other.getSubscriptionExpiresAt());
             assertEquals(NOW, gamer.getSubscriptionExpiresAt());
@@ -399,20 +488,125 @@ class PurchaseServiceTest {
             gamer.setSubscriptionTier(SubscriptionTier.GOLD);
             gamer.setSubscriptionExpiresAt(NOW.minus(Duration.ofDays(1)));
 
-            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+            assertThrows(
+                    TransferPendingException.class,
+                    () -> service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER)));
 
             assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
             assertNull(other.getSubscriptionExpiresAt());
         }
 
         @Test
-        @DisplayName("an unknown source — a RevenueCat anonymous id — is skipped, not an error")
+        @DisplayName("a source with no local entitlement is deferred, not guessed")
         void unknownSourceIsSkipped() {
             when(gamers.findById("$RCAnonymousID:abc")).thenReturn(Optional.empty());
 
-            service.transfer(java.util.List.of("$RCAnonymousID:abc"), java.util.List.of(OTHER));
+            assertThrows(
+                    TransferPendingException.class,
+                    () -> service.transfer(EVENT, java.util.List.of("$RCAnonymousID:abc"), java.util.List.of(OTHER)));
 
             assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
+        }
+
+        @Test
+        @DisplayName("a promo membership without a store purchase is not transferred")
+        void promoGoldIsNotTransferredAsStoreGold() {
+            when(purchases.findByUserIdOrderByPurchasedAtDesc(USER)).thenReturn(java.util.List.of());
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            assertThrows(
+                    TransferPendingException.class,
+                    () -> service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER)));
+
+            assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
+            assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
+            verify(ownership, never()).revokeLapsedMembershipCosmeticsForUser(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("a deleted old account row is not needed when its purchase record is live")
+        void recoversFromPurchaseWhenOldAccountIsGone() {
+            Instant expiry = NOW.plus(Duration.ofDays(30));
+            when(gamers.findById(USER)).thenReturn(Optional.empty());
+            Purchase row = liveGoldPurchase(USER, expiry);
+            when(purchases.findByUserIdOrderByPurchasedAtDesc(USER)).thenReturn(java.util.List.of(row));
+
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(SubscriptionTier.GOLD, other.getSubscriptionTier());
+            assertEquals(expiry, other.getSubscriptionExpiresAt());
+            assertEquals(OTHER, row.getUserId());
+            verify(ownership).grantMembershipCosmeticsForUser(OTHER, NOW);
+            verify(ownership, never()).revokeLapsedMembershipCosmeticsForUser(eq(USER), any());
+        }
+
+        @Test
+        @DisplayName("a soft-deleted old account loses Gold while the new one gains it")
+        void revokesSoftDeletedSource() {
+            gamer.setDeletedAt(NOW.minusSeconds(10));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(SubscriptionTier.BASIC, gamer.getSubscriptionTier());
+            assertEquals(SubscriptionTier.GOLD, other.getSubscriptionTier());
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
+            verify(ownership).grantMembershipCosmeticsForUser(OTHER, NOW);
+        }
+
+        @Test
+        @DisplayName("a repeated webhook cannot move a new purchase on the former account")
+        void duplicateEventDoesNothing() {
+            when(purchases.claimTransferEvent(EVENT, NOW)).thenReturn(1, 0);
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(90)));
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
+
+            assertEquals(NOW.plus(Duration.ofDays(30)), other.getSubscriptionExpiresAt());
+            assertEquals(NOW.plus(Duration.ofDays(90)), gamer.getSubscriptionExpiresAt());
+            verify(ownership).revokeLapsedMembershipCosmeticsForUser(USER, NOW);
+            verify(ownership).grantMembershipCosmeticsForUser(OTHER, NOW);
+        }
+
+        @Test
+        @DisplayName("two real destinations are ambiguous, so neither gets Gold")
+        void multipleDestinationsAreRejected() {
+            Gamer alias = new Gamer();
+            alias.setUserId("another-real-account");
+            when(gamers.findById(alias.getUserId())).thenReturn(Optional.of(alias));
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            assertThrows(
+                    TransferPendingException.class,
+                    () -> service.transfer(
+                            EVENT, java.util.List.of(USER), java.util.List.of(OTHER, alias.getUserId())));
+
+            assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
+            assertEquals(SubscriptionTier.BASIC, other.getSubscriptionTier());
+            assertEquals(SubscriptionTier.BASIC, alias.getSubscriptionTier());
+            verify(ownership, never()).revokeLapsedMembershipCosmeticsForUser(anyString(), any());
+        }
+
+        @Test
+        @DisplayName("a missing destination never strips Gold from the source")
+        void missingDestinationIsDeferred() {
+            when(gamers.findById(OTHER)).thenReturn(Optional.empty());
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plus(Duration.ofDays(30)));
+
+            assertThrows(
+                    TransferPendingException.class,
+                    () -> service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER)));
+
+            assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
+            verify(ownership, never()).revokeLapsedMembershipCosmeticsForUser(anyString(), any());
         }
 
         @Test
@@ -425,7 +619,7 @@ class PurchaseServiceTest {
             // `other` is a fresh account: a null stipend clock, which would otherwise let it
             // claim the monthly 600 the losing account already took from this subscription.
 
-            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
 
             assertEquals(claimed, other.getStipendClaimedAt(), "the gainer inherits the loser's stipend clock");
         }
@@ -439,7 +633,7 @@ class PurchaseServiceTest {
             Instant recent = NOW.minus(Duration.ofDays(1));
             other.setStipendClaimedAt(recent);
 
-            service.transfer(java.util.List.of(USER), java.util.List.of(OTHER));
+            service.transfer(EVENT, java.util.List.of(USER), java.util.List.of(OTHER));
 
             assertEquals(recent, other.getStipendClaimedAt(), "never rewind the gainer's clock");
         }
