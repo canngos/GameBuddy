@@ -68,8 +68,25 @@ public interface GamerCosmeticRepository extends JpaRepository<GamerCosmetic, Ga
                       AND NOT EXISTS (
                           SELECT 1 FROM gamer_cosmetic gc
                           WHERE gc.user_id = g.user_id AND gc.cosmetic_id = c.id)
+                    ON CONFLICT (user_id, cosmetic_id) DO NOTHING
                     """, nativeQuery = true)
     int grantMembershipCosmetics(Instant now);
+
+    /** Grants an active Gold member their items as soon as their entitlement changes. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+                    INSERT INTO gamer_cosmetic (user_id, cosmetic_id, paid, acquired_at)
+                    SELECT g.user_id, c.id, 0, :now
+                    FROM gamer g
+                    CROSS JOIN cosmetic c
+                    WHERE g.user_id = :userId
+                      AND g.subscription_tier = 'GOLD'
+                      AND g.subscription_expires_at > :now
+                      AND g.deleted_at IS NULL
+                      AND c.membership_only = true
+                    ON CONFLICT (user_id, cosmetic_id) DO NOTHING
+                    """, nativeQuery = true)
+    int grantMembershipCosmeticsForUser(@Param("userId") String userId, @Param("now") Instant now);
 
     /** Takes them back from everybody whose membership is not currently active. */
     @Modifying
@@ -84,6 +101,21 @@ public interface GamerCosmeticRepository extends JpaRepository<GamerCosmetic, Ga
                            OR g.subscription_expires_at <= :now)
                     """, nativeQuery = true)
     int revokeLapsedMembershipCosmetics(Instant now);
+
+    /** Revokes one lapsed account immediately after an expiration, refund, or transfer. */
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+                    DELETE FROM gamer_cosmetic gc
+                    USING cosmetic c, gamer g
+                    WHERE gc.user_id = :userId
+                      AND c.id = gc.cosmetic_id
+                      AND g.user_id = gc.user_id
+                      AND c.membership_only = true
+                      AND (g.subscription_tier IS DISTINCT FROM 'GOLD'
+                           OR g.subscription_expires_at IS NULL
+                           OR g.subscription_expires_at <= :now)
+                    """, nativeQuery = true)
+    int revokeLapsedMembershipCosmeticsForUser(@Param("userId") String userId, @Param("now") Instant now);
 
     /**
      * Clears anything somebody is wearing but no longer owns.

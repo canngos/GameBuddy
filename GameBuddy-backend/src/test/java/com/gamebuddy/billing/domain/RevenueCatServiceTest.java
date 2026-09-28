@@ -125,7 +125,7 @@ class RevenueCatServiceTest {
         @DisplayName("expiration ends the subscription")
         void expiration() {
             service.handle(event("EXPIRATION", "gamebuddy.gold.monthly", "PLAY_STORE", null));
-            verify(purchases).expire("gamer-1");
+            verify(purchases).expireFromWebhook("gamer-1", Instant.ofEpochMilli(EXPIRES_MS));
         }
 
         @Test
@@ -137,6 +137,7 @@ class RevenueCatServiceTest {
             service.handle(event("CANCELLATION", "gamebuddy.gold.monthly", "PLAY_STORE", "UNSUBSCRIBE"));
 
             verify(purchases, never()).expire(any());
+            verify(purchases, never()).expireFromWebhook(anyString(), any());
             verify(purchases, never()).refund(any(), any());
         }
 
@@ -145,6 +146,7 @@ class RevenueCatServiceTest {
         void billingIssueKeepsAccess() {
             service.handle(event("BILLING_ISSUE", "gamebuddy.gold.monthly", "PLAY_STORE", null));
             verify(purchases, never()).expire(any());
+            verify(purchases, never()).expireFromWebhook(anyString(), any());
         }
 
         @Test
@@ -202,7 +204,7 @@ class RevenueCatServiceTest {
         @DisplayName("both sides are handed over, read from the lists and not from app_user_id")
         void transferMovesTheEntitlement() {
             service.handle(transfer(List.of("gamer-old"), List.of("gamer-new")));
-            verify(purchases).transfer(List.of("gamer-old"), List.of("gamer-new"));
+            verify(purchases).transfer("evt-1", List.of("gamer-old"), List.of("gamer-new"));
         }
 
         @Test
@@ -210,14 +212,14 @@ class RevenueCatServiceTest {
         void transferWithoutSource() {
             service.handle(transfer(List.of(), List.of("gamer-new")));
             service.handle(transfer(null, List.of("gamer-new")));
-            verify(purchases, never()).transfer(any(), any());
+            verify(purchases, never()).transfer(anyString(), any(), any());
         }
 
         @Test
-        @DisplayName("a transfer with no destination still revokes the source")
+        @DisplayName("a transfer with no destination cannot revoke the source")
         void transferWithoutDestination() {
             service.handle(transfer(List.of("gamer-old"), null));
-            verify(purchases).transfer(List.of("gamer-old"), List.of());
+            verify(purchases, never()).transfer(anyString(), any(), any());
         }
     }
 }

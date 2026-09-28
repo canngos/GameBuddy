@@ -166,6 +166,7 @@ up until local has silently diverged from production.
 | `db/upgrade-2026-41-remove-steam-links.sql` | Steam linking removed; its rows and tickets deleted. |
 | `db/upgrade-2026-42-social-sign-in.sql` | Signing in with Google or Discord: identities, and the Discord round-trip ticket. |
 | `db/upgrade-2026-43-review-prompt.sql` | When the Play review card was last asked for. |
+| `db/upgrade-2026-46-revenuecat-transfer-events.sql` | Claims RevenueCat transfer IDs so retries cannot move Gold twice. |
 | `db/seed-local.sql`               | Games, keywords, avatars, cosmetics.           |
 | `db/delete-seed.sql`              | Removes the synthetic accounts. Not a migration — see above. |
 
@@ -642,4 +643,3 @@ been exercised against a real Play Console — the verifier is unit-tested, but 
 sandbox purchase before switching `gamebuddy.billing.google.enabled` on.
 
 ---
-

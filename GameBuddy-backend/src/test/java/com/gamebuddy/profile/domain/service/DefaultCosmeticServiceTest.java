@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
+import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.profile.interfaces.dto.CosmeticDto;
 import com.gamebuddy.profile.interfaces.response.CosmeticsResponse;
@@ -20,6 +21,8 @@ import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.CosmeticUrls;
 import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +41,8 @@ import org.mockito.quality.Strictness;
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 class DefaultCosmeticServiceTest {
+
+    private static final Instant NOW = Instant.parse("2026-09-23T12:00:00Z");
 
     private DefaultCosmeticService cosmeticService;
 
@@ -72,7 +77,8 @@ class DefaultCosmeticServiceTest {
                 ownershipRepository,
                 gamerRepository,
                 cosmeticUrls,
-                new CoinLedger(coinLedgerRepository, Clock.systemUTC()));
+                new CoinLedger(coinLedgerRepository, Clock.fixed(NOW, ZoneOffset.UTC)),
+                Clock.fixed(NOW, ZoneOffset.UTC));
 
         gamer = new Gamer();
         gamer.setUserId(UUID.randomUUID().toString());
@@ -307,6 +313,42 @@ class DefaultCosmeticServiceTest {
 
     @Nested
     class Equipping {
+
+        @Test
+        @DisplayName("an active member missing a Gold cosmetic receives it before equipping")
+        void repairsMissingMembershipCosmetic() {
+            Cosmetic gold = cosmetic(CosmeticKind.FRAME, 0);
+            gold.setMembershipOnly(true);
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.plusSeconds(3600));
+            when(cosmeticRepository.findById(gold.getId())).thenReturn(Optional.of(gold));
+            when(ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), gold.getId()))
+                    .thenReturn(false, true);
+
+            cosmeticService.equip(gamer, gold.getId().toString());
+
+            verify(ownershipRepository).grantMembershipCosmeticsForUser(gamer.getUserId(), NOW);
+            assertEquals(gold, gamer.getEquippedFrame());
+        }
+
+        @Test
+        @DisplayName("an expired member cannot equip a Gold item left behind by the hourly job")
+        void expiredMemberCannotEquipStaleMembershipCosmetic() {
+            Cosmetic gold = cosmetic(CosmeticKind.FRAME, 0);
+            gold.setMembershipOnly(true);
+            gamer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gamer.setSubscriptionExpiresAt(NOW.minusSeconds(1));
+            when(cosmeticRepository.findById(gold.getId())).thenReturn(Optional.of(gold));
+            when(ownershipRepository.existsByUserIdAndCosmeticId(gamer.getUserId(), gold.getId()))
+                    .thenReturn(true);
+
+            BusinessException ex = assertThrows(
+                    BusinessException.class,
+                    () -> cosmeticService.equip(gamer, gold.getId().toString()));
+
+            assertEquals(166, ex.getTransactionCode().getId());
+            verify(ownershipRepository, never()).grantMembershipCosmeticsForUser(anyString(), any());
+        }
 
         @Test
         @DisplayName("a paid cosmetic the gamer does not own is refused, whatever the client thinks")

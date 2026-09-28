@@ -2,6 +2,7 @@ package com.gamebuddy.profile.domain.service;
 
 import com.gamebuddy.common.base.BaseBody;
 import com.gamebuddy.common.base.Status;
+import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.common.enums.TransactionCode;
 import com.gamebuddy.common.exception.BusinessException;
 import com.gamebuddy.common.util.Ids;
@@ -21,6 +22,7 @@ import com.gamebuddy.shared.repository.CosmeticRepository;
 import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import com.gamebuddy.shared.storage.CosmeticUrls;
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +61,7 @@ public class DefaultCosmeticService implements CosmeticService {
     private final GamerRepository gamerRepository;
     private final CosmeticUrls cosmeticUrls;
     private final CoinLedger coins;
+    private final Clock clock;
 
     @Override
     @Transactional(readOnly = true)
@@ -180,7 +183,20 @@ public class DefaultCosmeticService implements CosmeticService {
         // Checked on the server even though the store greys out what it does not own: the
         // client's opinion about what a gamer owns arrives over the same connection an
         // attacker controls, and this is the door to the paid items.
-        if (!owns(gamer, cosmetic)) {
+        if (cosmetic.isMembershipOnly()
+                && SubscriptionTier.effective(
+                                gamer.getSubscriptionTier(), gamer.getSubscriptionExpiresAt(), clock.instant())
+                        != SubscriptionTier.GOLD) {
+            throw new BusinessException(TransactionCode.COSMETIC_NOT_OWNED);
+        }
+
+        boolean owned = owns(gamer, cosmetic);
+        if (!owned && cosmetic.isMembershipOnly()) {
+            // Repair an older or missed grant before equipping an active member's item.
+            ownershipRepository.grantMembershipCosmeticsForUser(gamer.getUserId(), clock.instant());
+            owned = owns(gamer, cosmetic);
+        }
+        if (!owned) {
             throw new BusinessException(TransactionCode.COSMETIC_NOT_OWNED);
         }
 

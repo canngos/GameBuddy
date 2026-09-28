@@ -5,6 +5,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 import com.gamebuddy.billing.domain.RevenueCatService;
+import com.gamebuddy.billing.domain.TransferPendingException;
 import com.gamebuddy.billing.interfaces.request.RevenueCatWebhook;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
@@ -17,8 +18,8 @@ import org.springframework.transaction.CannotCreateTransactionException;
 /**
  * The webhook's answer decides whether RevenueCat retries.
  *
- * <p>A retry is only useful when the failure was transient — the database was briefly away —
- * and only safe because {@code PurchaseService} is idempotent. A deterministic failure that
+ * <p>A retry is useful when the database was briefly away or a transfer arrived before its
+ * source purchase. It is safe because {@code PurchaseService} is idempotent. A deterministic failure that
  * retried would retry forever and then get the whole webhook disabled, taking every other
  * event with it. So transient means 503 and everything else means 200, and this is the test
  * that keeps the two apart. Plain unit test: the controller's only collaborators are the
@@ -68,6 +69,19 @@ class RevenueCatWebhookControllerTest {
     void cannotCreateTransactionDefers() {
         RevenueCatService service = mock(RevenueCatService.class);
         doThrow(new CannotCreateTransactionException("no connection"))
+                .when(service)
+                .handle(org.mockito.ArgumentMatchers.any());
+
+        var response = controller(service).receive(TOKEN, new RevenueCatWebhook("1.0", event()));
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, response.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("a transfer awaiting a usable source or destination is retried")
+    void pendingTransferDefers() {
+        RevenueCatService service = mock(RevenueCatService.class);
+        doThrow(new TransferPendingException("source purchase not visible yet"))
                 .when(service)
                 .handle(org.mockito.ArgumentMatchers.any());
 

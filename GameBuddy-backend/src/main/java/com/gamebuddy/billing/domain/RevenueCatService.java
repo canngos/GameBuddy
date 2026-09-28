@@ -43,7 +43,7 @@ public class RevenueCatService {
 
             // Access is already gone. RevenueCat sends this when the paid period actually
             // ended, which is the moment the entitlement stops — not CANCELLATION.
-            case "EXPIRATION" -> purchases.expire(event.appUserId());
+            case "EXPIRATION" -> purchases.expireFromWebhook(event.appUserId(), event.expiresAt());
 
             case "CANCELLATION" -> cancellation(event);
 
@@ -140,16 +140,23 @@ public class RevenueCatService {
      * therefore moves what we hold for the losers onto the gainers itself.
      */
     private void transfer(RevenueCatWebhook.Event event) {
-        List<String> from = event.transferredFrom() == null ? List.of() : event.transferredFrom();
-        List<String> to = event.transferredTo() == null ? List.of() : event.transferredTo();
-        if (from.isEmpty()) {
-            log.warn("RevenueCat TRANSFER to {} names nobody to take it from; ignored", to);
+        List<String> from = event.transferredFrom() == null
+                ? List.of()
+                : event.transferredFrom().stream()
+                        .filter(id -> id != null && !id.isBlank())
+                        .distinct()
+                        .toList();
+        List<String> to = event.transferredTo() == null
+                ? List.of()
+                : event.transferredTo().stream()
+                        .filter(id -> id != null && !id.isBlank())
+                        .distinct()
+                        .toList();
+        if (event.id() == null || event.id().isBlank() || from.isEmpty() || to.isEmpty()) {
+            log.error("Ignoring malformed RevenueCat TRANSFER {} from {} to {}", event.id(), from, to);
             return;
         }
-        if (to.isEmpty()) {
-            log.warn("RevenueCat TRANSFER from {} names no destination; the entitlement is only revoked", from);
-        }
-        purchases.transfer(from, to);
+        purchases.transfer(event.id(), from, to);
     }
 
     /**

@@ -8,12 +8,14 @@ import com.gamebuddy.common.enums.SubscriptionTier;
 import com.gamebuddy.shared.coin.CoinLedger;
 import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
+import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +58,7 @@ public class PurchaseService {
     private final GamerRepository gamers;
     private final Clock clock;
     private final CoinLedger coins;
+    private final GamerCosmeticRepository ownership;
 
     /**
      * What a verified purchase tells us, independent of who verified it.
@@ -141,6 +144,9 @@ public class PurchaseService {
             coins.earn(gamer, product.coins(), CoinReason.COIN_PACK);
         }
         gamers.save(gamer);
+        if (product.isSubscription()) {
+            ownership.grantMembershipCosmeticsForUser(gamer.getUserId(), clock.instant());
+        }
 
         log.info(
                 "Granted {} to {} (transaction {})",
@@ -208,15 +214,68 @@ public class PurchaseService {
      */
     @Transactional
     public void expire(String userId) {
+        gamers.findById(userId).ifPresent(gamer -> expireAndClean(gamer, clock.instant()));
+    }
+
+    /**
+     * Applies an expiration event only to the period it describes. A delayed webhook for
+     * an older period must not end a renewal or a Gold promotion granted since then.
+     */
+    @Transactional
+    public void expireFromWebhook(String userId, Instant eventExpiry) {
+        Instant now = clock.instant();
         gamers.findById(userId).ifPresent(gamer -> {
-            if (gamer.getSubscriptionExpiresAt() != null
-                    && gamer.getSubscriptionExpiresAt().isAfter(clock.instant())) {
-                gamer.setSubscriptionExpiresAt(clock.instant());
-                gamer.setSubscriptionTier(SubscriptionTier.BASIC);
-                gamers.save(gamer);
-                log.info("Subscription for {} expired", userId);
+            Instant currentExpiry = gamer.getSubscriptionExpiresAt();
+            if (eventExpiry == null || eventExpiry.isAfter(now)) {
+                log.warn("Ignoring expiration for {} without an elapsed event expiry", userId);
+                return;
             }
+            if (currentExpiry != null && currentExpiry.isAfter(eventExpiry)) {
+                log.info("Ignoring stale expiration for {}; membership now ends at {}", userId, currentExpiry);
+                return;
+            }
+            expireAndClean(gamer, now);
         });
+    }
+
+    private void expireAndClean(Gamer gamer, Instant now) {
+        if (gamer.getSubscriptionExpiresAt() != null
+                && gamer.getSubscriptionExpiresAt().isAfter(now)) {
+            gamer.setSubscriptionExpiresAt(now);
+            gamer.setSubscriptionTier(SubscriptionTier.BASIC);
+            gamers.save(gamer);
+            log.info("Subscription for {} expired", gamer.getUserId());
+        }
+        cleanLapsedMembershipCosmetics(gamer, now);
+    }
+
+    private void cleanLapsedMembershipCosmetics(Gamer gamer, Instant now) {
+        ownership.revokeLapsedMembershipCosmeticsForUser(gamer.getUserId(), now);
+
+        if (gamer.getEquippedFrame() == null && gamer.getEquippedBanner() == null && gamer.getEquippedTheme() == null) {
+            return;
+        }
+
+        Set<UUID> owned = ownership.findOwnedIds(gamer.getUserId());
+        boolean changed = false;
+        if (gamer.getEquippedFrame() != null
+                && !owned.contains(gamer.getEquippedFrame().getId())) {
+            gamer.setEquippedFrame(null);
+            changed = true;
+        }
+        if (gamer.getEquippedBanner() != null
+                && !owned.contains(gamer.getEquippedBanner().getId())) {
+            gamer.setEquippedBanner(null);
+            changed = true;
+        }
+        if (gamer.getEquippedTheme() != null
+                && !owned.contains(gamer.getEquippedTheme().getId())) {
+            gamer.setEquippedTheme(null);
+            changed = true;
+        }
+        if (changed) {
+            gamers.save(gamer);
+        }
     }
 
     /**
@@ -245,11 +304,13 @@ public class PurchaseService {
                                 if (product.isSubscription()) {
                                     // The tier is derived from the expiry, so this is enough.
                                     gamer.setSubscriptionExpiresAt(clock.instant());
+                                    gamers.save(gamer);
+                                    cleanLapsedMembershipCosmetics(gamer, clock.instant());
                                 } else {
                                     // Coins may already be spent, so this can go negative if we let it.
                                     coins.spend(gamer, product.coins(), CoinReason.REFUND);
+                                    gamers.save(gamer);
                                 }
-                                gamers.save(gamer);
                             }));
 
                     log.info("Refunded {} for {}", storeTransactionId, purchase.getUserId());
@@ -276,6 +337,9 @@ public class PurchaseService {
      * gainer, later expiry winning if the gainer already holds something. The ledger rows
      * still inside their paid period move with it, so a later refund of that transaction
      * revokes the account that now holds it rather than the one that used to.
+     * A missing source account can still be recovered from its live purchase rows; if
+     * neither source state nor a purchase records an expiry, the event is retried instead
+     * of inventing Gold. The event ID is claimed in this transaction to make retries safe.
      *
      * <p><b>The monthly-stipend clock moves too.</b> The Gold stipend (600 coins per 30 days,
      * see {@code CoinEarningService}) is timed per account by {@code stipendClaimedAt}. Left
@@ -285,85 +349,108 @@ public class PurchaseService {
      * membership moves its stipend cadence with it.
      */
     @Transactional
-    public void transfer(List<String> fromUserIds, List<String> toUserIds) {
+    public void transfer(String eventId, List<String> fromUserIds, List<String> toUserIds) {
         Instant now = clock.instant();
 
-        // What is being moved: the latest live expiry among the losers, its tier, and the
-        // stipend clock that belongs with it. Read before `expire`, which overwrites the
-        // subscription fields.
-        SubscriptionTier movedTier = null;
-        Instant movedExpiry = null;
-        Instant movedStipendAt = null;
-        List<Purchase> movedRows = new ArrayList<>();
-
-        for (String from : fromUserIds) {
-            Gamer loser = gamers.findById(from).orElse(null);
-            if (loser == null) {
-                // An id we never granted to — a RevenueCat anonymous id, most likely.
-                // Nothing of ours to move.
-                continue;
-            }
-            SubscriptionTier tier =
-                    SubscriptionTier.effective(loser.getSubscriptionTier(), loser.getSubscriptionExpiresAt(), now);
-            if (tier != SubscriptionTier.BASIC
-                    && (movedExpiry == null || loser.getSubscriptionExpiresAt().isAfter(movedExpiry))) {
-                movedTier = tier;
-                movedExpiry = loser.getSubscriptionExpiresAt();
-                movedStipendAt = loser.getStipendClaimedAt();
-            }
-            for (Purchase row : purchases.findByUserIdOrderByPurchasedAtDesc(from)) {
-                if (row.getStatus() == PurchaseStatus.GRANTED
-                        && row.getEntitlementExpiresAt() != null
-                        && row.getEntitlementExpiresAt().isAfter(now)) {
-                    movedRows.add(row);
-                }
-            }
-            expire(from);
-        }
-
-        log.info("Entitlement transferred from {} to {}", fromUserIds, toUserIds);
-
-        if (movedExpiry == null) {
-            log.info("Nothing live to move; the receiving side keeps what it has");
+        // The claim and every account, cosmetic and ledger change commit together. A retry
+        // waits for the first transaction, then sees the claimed ID and does nothing.
+        if (purchases.claimTransferEvent(eventId, now) == 0) {
+            log.info("RevenueCat transfer {} already applied", eventId);
             return;
         }
 
-        String owner = null;
-        for (String to : toUserIds) {
-            Gamer gainer = gamers.findById(to).orElse(null);
-            if (gainer == null) {
-                log.warn("Transfer destination {} is not an account we know; nothing granted", to);
+        // RevenueCat can include aliases on either side. Granting every destination would
+        // turn one store subscription into several memberships, so require exactly one
+        // live local account before touching any source.
+        List<Gamer> destinations = new ArrayList<>();
+        for (String to : toUserIds.stream().distinct().toList()) {
+            gamers.findById(to).filter(gamer -> gamer.getDeletedAt() == null).ifPresent(destinations::add);
+        }
+        if (destinations.size() != 1) {
+            throw new TransferPendingException(
+                    "RevenueCat transfer " + eventId + " has " + destinations.size() + " active destination accounts");
+        }
+        Gamer gainer = destinations.getFirst();
+
+        Instant movedExpiry = null;
+        Instant movedStipendAt = null;
+        List<Purchase> movedRows = new ArrayList<>();
+        List<Gamer> losers = new ArrayList<>();
+
+        for (String from : fromUserIds.stream().distinct().toList()) {
+            if (from.equals(gainer.getUserId())) {
                 continue;
             }
-            SubscriptionTier held =
-                    SubscriptionTier.effective(gainer.getSubscriptionTier(), gainer.getSubscriptionExpiresAt(), now);
-            // Never shorten what they already have: somebody who bought on this account
-            // and then triggered a transfer of an older plan keeps their own expiry.
-            if (held == SubscriptionTier.BASIC || gainer.getSubscriptionExpiresAt().isBefore(movedExpiry)) {
-                gainer.setSubscriptionTier(movedTier);
-                gainer.setSubscriptionExpiresAt(movedExpiry);
-                // Carry the stipend clock with the membership — the later of the two, so the
-                // gainer can never claim the monthly grant sooner than the moved subscription
-                // already allows. Without this a fresh account (null clock) could claim 600
-                // immediately after a transfer the losing account had already claimed.
-                if (movedStipendAt != null
-                        && (gainer.getStipendClaimedAt() == null
-                                || movedStipendAt.isAfter(gainer.getStipendClaimedAt()))) {
-                    gainer.setStipendClaimedAt(movedStipendAt);
-                }
-                gamers.save(gainer);
-                log.info("Granted {} until {} to {} by transfer", movedTier, movedExpiry, to);
+            Gamer loser = gamers.findById(from).orElse(null);
+            if (loser != null) {
+                losers.add(loser);
             }
-            if (owner == null) {
-                owner = to;
+
+            boolean hasLiveOrLegacyGoldPurchase = false;
+            for (Purchase row : purchases.findByUserIdOrderByPurchasedAtDesc(from)) {
+                if (row.getStatus() != PurchaseStatus.GRANTED
+                        || Product.byStoreId(row.getProductId())
+                                .filter(Product::isSubscription)
+                                .isEmpty()) {
+                    continue;
+                }
+                Instant rowExpiry = row.getEntitlementExpiresAt();
+                if (rowExpiry == null || rowExpiry.isAfter(now)) {
+                    hasLiveOrLegacyGoldPurchase = true;
+                }
+                boolean sourceGold = loser != null
+                        && SubscriptionTier.effective(
+                                        loser.getSubscriptionTier(), loser.getSubscriptionExpiresAt(), now)
+                                == SubscriptionTier.GOLD;
+                if ((rowExpiry != null && rowExpiry.isAfter(now)) || (rowExpiry == null && sourceGold)) {
+                    movedRows.add(row);
+                }
+                if (rowExpiry != null
+                        && rowExpiry.isAfter(now)
+                        && (movedExpiry == null || rowExpiry.isAfter(movedExpiry))) {
+                    movedExpiry = rowExpiry;
+                    movedStipendAt = loser == null ? null : loser.getStipendClaimedAt();
+                }
+            }
+            if (hasLiveOrLegacyGoldPurchase
+                    && loser != null
+                    && SubscriptionTier.effective(loser.getSubscriptionTier(), loser.getSubscriptionExpiresAt(), now)
+                            == SubscriptionTier.GOLD
+                    && (movedExpiry == null || loser.getSubscriptionExpiresAt().isAfter(movedExpiry))) {
+                movedExpiry = loser.getSubscriptionExpiresAt();
+                movedStipendAt = loser.getStipendClaimedAt();
             }
         }
 
-        if (owner != null) {
-            for (Purchase row : movedRows) {
-                row.setUserId(owner);
-            }
-            purchases.saveAll(movedRows);
+        if (movedExpiry == null) {
+            // TRANSFER itself has no product or expiry. Without a live local purchase or
+            // source entitlement, guessing an expiry would create unverified Gold. Roll
+            // back the event claim so RevenueCat can retry after an out-of-order purchase.
+            throw new TransferPendingException(
+                    "RevenueCat transfer " + eventId + " has no recoverable live Gold period");
         }
+
+        for (Gamer loser : losers) {
+            expireAndClean(loser, now);
+        }
+
+        SubscriptionTier held =
+                SubscriptionTier.effective(gainer.getSubscriptionTier(), gainer.getSubscriptionExpiresAt(), now);
+        if (held == SubscriptionTier.BASIC || gainer.getSubscriptionExpiresAt().isBefore(movedExpiry)) {
+            gainer.setSubscriptionTier(SubscriptionTier.GOLD);
+            gainer.setSubscriptionExpiresAt(movedExpiry);
+        }
+        if (movedStipendAt != null
+                && (gainer.getStipendClaimedAt() == null || movedStipendAt.isAfter(gainer.getStipendClaimedAt()))) {
+            gainer.setStipendClaimedAt(movedStipendAt);
+        }
+        gamers.save(gainer);
+        ownership.grantMembershipCosmeticsForUser(gainer.getUserId(), now);
+
+        for (Purchase row : movedRows) {
+            row.setUserId(gainer.getUserId());
+        }
+        purchases.saveAll(movedRows);
+        log.info("RevenueCat transfer {} moved Gold from {} to {}", eventId, fromUserIds, gainer.getUserId());
     }
 }

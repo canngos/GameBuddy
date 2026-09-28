@@ -35,6 +35,7 @@ import com.gamebuddy.shared.coin.CoinLedgerRepository;
 import com.gamebuddy.shared.coin.CoinReason;
 import com.gamebuddy.shared.entity.Gamer;
 import com.gamebuddy.shared.mail.Mailer;
+import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.time.Clock;
 import java.time.Duration;
@@ -75,6 +76,7 @@ class PromoCodeServiceTest {
     private PromoCodeAssignmentRepository assignments;
     private PromoRedemptionRepository redemptions;
     private GamerRepository gamers;
+    private GamerCosmeticRepository ownership;
     private Mailer mailer;
     private ApplicationEventPublisher events;
     private RateLimiter limiter;
@@ -88,6 +90,7 @@ class PromoCodeServiceTest {
         assignments = mock(PromoCodeAssignmentRepository.class);
         redemptions = mock(PromoRedemptionRepository.class);
         gamers = mock(GamerRepository.class);
+        ownership = mock(GamerCosmeticRepository.class);
         mailer = mock(Mailer.class);
         events = mock(ApplicationEventPublisher.class);
         limiter = Budget.of(50, Duration.ofHours(1)).limiter();
@@ -124,9 +127,13 @@ class PromoCodeServiceTest {
         // without a coin or a day moving.
         CoinLedger ledger = new CoinLedger(mock(CoinLedgerRepository.class), clock);
         PurchaseService purchases = new PurchaseService(
-                mock(com.gamebuddy.billing.infrastructure.repository.PurchaseRepository.class), gamers, clock, ledger);
+                mock(com.gamebuddy.billing.infrastructure.repository.PurchaseRepository.class),
+                gamers,
+                clock,
+                ledger,
+                ownership);
         return new PromoCodeService(
-                codes, assignments, redemptions, gamers, ledger, purchases, mailer, clock, limiter, events);
+                codes, assignments, redemptions, gamers, ownership, ledger, purchases, mailer, clock, limiter, events);
     }
 
     private PromoCode coinCode(int amount) {
@@ -423,6 +430,7 @@ class PromoCodeServiceTest {
             assertEquals(SubscriptionTier.GOLD, gamer.getSubscriptionTier());
             assertEquals(NOW.plus(Duration.ofDays(30)), gamer.getSubscriptionExpiresAt());
             assertEquals(NOW.plus(Duration.ofDays(30)), result.getGoldExpiresAt());
+            verify(ownership).grantMembershipCosmeticsForUser(USER, NOW);
         }
 
         @Test
@@ -571,6 +579,7 @@ class PromoCodeServiceTest {
                     assignments,
                     redemptions,
                     gamers,
+                    ownership,
                     new CoinLedger(mock(CoinLedgerRepository.class), Clock.fixed(NOW, ZoneOffset.UTC)),
                     mock(PurchaseService.class),
                     mailer,
@@ -595,6 +604,7 @@ class PromoCodeServiceTest {
                     assignments,
                     redemptions,
                     gamers,
+                    ownership,
                     ledger,
                     mock(PurchaseService.class),
                     mailer,

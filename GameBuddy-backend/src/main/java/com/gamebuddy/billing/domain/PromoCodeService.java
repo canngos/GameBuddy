@@ -24,6 +24,7 @@ import com.gamebuddy.shared.event.NotificationKind;
 import com.gamebuddy.shared.event.NotificationRequestedEvent;
 import com.gamebuddy.shared.mail.EmailContent;
 import com.gamebuddy.shared.mail.Mailer;
+import com.gamebuddy.shared.repository.GamerCosmeticRepository;
 import com.gamebuddy.shared.repository.GamerRepository;
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -109,6 +110,7 @@ public class PromoCodeService {
     private final PromoCodeAssignmentRepository assignments;
     private final PromoRedemptionRepository redemptions;
     private final GamerRepository gamers;
+    private final GamerCosmeticRepository ownership;
     private final CoinLedger coins;
     private final PurchaseService purchases;
     private final Mailer mailer;
@@ -438,6 +440,9 @@ public class PromoCodeService {
             coins.earn(gamer, code.getCoinAmount(), CoinReason.PROMO_CODE);
         }
         gamers.save(gamer);
+        if (code.getKind() == PromoCodeKind.GOLD) {
+            ownership.grantMembershipCosmeticsForUser(userId, now);
+        }
 
         log.info("Promotion code {} redeemed by {}", code.getCode(), userId);
         return new RedeemPromoCodeResponseBody(
