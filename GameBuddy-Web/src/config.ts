@@ -29,15 +29,10 @@ export const CONTACT = {
 } as const;
 
 /**
- * Store links, empty until the listings exist.
- *
- * **Empty on purpose, and the components read them rather than assuming.** A made-up store
- * URL would be a dead link on the first page a visitor sees, which is worse than an honest
- * "coming soon". `StoreButtons` renders the waiting state while these are blank and becomes
- * a real link the moment either is filled in — no other file changes.
+ * Store links. Keep an unreleased platform empty so StoreButtons shows its waiting state.
  */
 export const STORES = {
-  play: '',
+  play: 'https://play.google.com/store/apps/details?id=com.findgamebuddy.app',
   appStore: '',
 } as const;
 

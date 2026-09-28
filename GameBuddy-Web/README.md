@@ -92,10 +92,10 @@ The operator and controller details were blank until 2026-08-14; a privacy polic
 
 ## Store links
 
-`src/config.ts` holds `STORES.play` and `STORES.appStore` as empty strings, because there is
-no listing yet. The buttons render "Coming soon" while they are empty and become real links
-the moment either is filled in. **Do not put a placeholder URL there** — a dead link on the
-landing page is worse than an honest waiting state.
+`src/config.ts` points `STORES.play` to the published Android listing. The home-page launch
+announcement and both Google Play buttons use that URL. `STORES.appStore` stays empty until
+an iOS listing exists, so only the iOS button renders "Coming soon". **Do not put a
+placeholder URL there** — a dead link on the landing page is worse than an honest waiting state.
 
 ## Screenshots
 

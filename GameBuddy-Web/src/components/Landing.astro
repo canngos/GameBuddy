@@ -13,6 +13,7 @@ import deckDark from '../assets/screens/deck-dark.png';
 import deckLight from '../assets/screens/deck-light.png';
 import marketDark from '../assets/screens/market-dark.png';
 import marketLight from '../assets/screens/market-light.png';
+import { STORES } from '../config';
 import { dict, t, type Lang } from '../i18n';
 import Faq from './Faq.astro';
 import PhoneFrame from './PhoneFrame.astro';
@@ -42,6 +43,22 @@ const steps = [
 ];
 ---
 
+{/* --- launch announcement ---------------------------------------------------------- */}
+<div class="gradient-action text-white">
+  <a
+    href={STORES.play}
+    class="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-3 gap-y-1 px-5 py-3 text-center text-sm transition-opacity hover:opacity-90"
+  >
+    <span class="rounded-full border border-white/35 bg-white/15 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-widest">
+      {t(lang, 'hero.launchLabel')}
+    </span>
+    <span class="font-medium">{t(lang, 'hero.launchText')}</span>
+    <span class="font-semibold underline underline-offset-4">
+      {t(lang, 'hero.launchCta')} <span aria-hidden="true">↗</span>
+    </span>
+  </a>
+</div>
+
 {/* --- hero ------------------------------------------------------------------------- */}
 <section class="relative overflow-hidden">
   <div
@@ -53,9 +70,12 @@ const steps = [
   <div class="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-24">
     <div class="text-center md:text-left">
       <p
-        class="hero-in inline-flex items-center gap-2 rounded-full border border-line bg-raised/60 px-3 py-1 text-xs text-muted"
+        class="hero-in inline-flex items-center gap-2 rounded-full border border-online/40 bg-online/10 px-3 py-1.5 text-xs font-semibold text-content"
       >
-        <span class="h-1.5 w-1.5 rounded-full bg-online" aria-hidden="true"></span>
+        <span class="relative flex h-2 w-2" aria-hidden="true">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-online opacity-60"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-online"></span>
+        </span>
         {t(lang, 'hero.badge')}
       </p>
 

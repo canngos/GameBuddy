@@ -25,7 +25,10 @@ export const fi: Dictionary = {
   },
 
   hero: {
-    badge: 'Julkaistaan ensin Androidille',
+    launchLabel: 'Juuri julkaistu',
+    launchText: 'GameBuddy on nyt Google Playssa!',
+    launchCta: 'Lataa nyt',
+    badge: 'Nyt saatavilla Androidille',
     titleBefore: 'Löydä ne, jotka',
     titleHighlight: 'oikeasti pelaavat',
     titleAfter: 'samaa kuin sinä',
@@ -33,7 +36,7 @@ export const fi: Dictionary = {
       'Ei satunnaisia tuntemattomia täynnä olevaa palvelinta. GameBuddy yhdistää sinut pelien, alustan ja pelityylin perusteella — ja jää sitten pois tieltä, jotta pääset pelaamaan.',
     comingSoon: 'Tulossa pian',
     getItOn: 'Lataa',
-    releaseNote: 'GameBuddy on viimeistelyvaiheessa. Android tulee ensin.',
+    releaseNote: 'GameBuddy on nyt saatavilla Androidille. iOS tulee myöhemmin.',
     deckAlt: 'GameBuddyn korttipino, jossa näkyy pelaajan profiili ja hänen pelinsä',
     chatAlt: 'GameBuddyn keskustelulista, jossa uusi matchi odottaa',
   },
