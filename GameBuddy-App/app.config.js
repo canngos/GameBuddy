@@ -172,6 +172,12 @@ function iosFirebaseConfigured(config) {
 }
 
 module.exports = ({ config }) => {
+  const inMaintain = process.env.IN_MAINTAIN?.trim().toLowerCase() === 'true';
+  // Expo only inlines EXPO_PUBLIC_* values into JavaScript. Derive this internal
+  // alias from IN_MAINTAIN before Metro starts so existing native development
+  // builds also see changes, without relying on their embedded native manifest.
+  process.env.EXPO_PUBLIC_IN_MAINTAIN = String(inMaintain);
+
   const buildingForIos = process.env.EAS_BUILD_PLATFORM === 'ios';
   const crashReporting =
     crashReportingBuildable && !(buildingForIos && !iosFirebaseConfigured(config));
@@ -186,6 +192,12 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
+    // App config is evaluated for both builds and EAS Updates. Expose the boolean
+    // explicitly so the switch can keep its requested, non-EXPO_PUBLIC_ name.
+    extra: {
+      ...config.extra,
+      IN_MAINTAIN: inMaintain,
+    },
     plugins: [
       ...adMobPlugin(
         config.plugins,
