@@ -44,6 +44,40 @@ backend log rather than sent:
 docker compose logs backend | grep "verification code"
 ```
 
+## Maintenance mode
+
+Set `IN_MAINTAIN=true` in `GameBuddy-App/.env` to show only the English maintenance
+screen. Set it to `false` (or remove it) to restore the normal app flow. Restart Expo
+after changing it: `app.config.js` derives the internal `EXPO_PUBLIC_IN_MAINTAIN`
+alias for JavaScript bundling and records `extra.IN_MAINTAIN` in the manifest.
+Set only `IN_MAINTAIN`; the alias is generated automatically. See `.env.example`.
+
+Maintenance mounts no navigator or normal application providers. Session restoration,
+verification and renewal, chat sockets, API queries, push registration, billing and ad
+consent do not start. Opening a deep link or a notification still shows maintenance.
+The screen works without the backend and keeps the stored login untouched.
+
+For installed production apps, set `IN_MAINTAIN=true` in the **production EAS
+environment** (plain text visibility), then publish with `npm run update:production`.
+That command uses the EAS environment, not the local `.env`. To end maintenance, set
+the same production variable to `false` and publish another update.
+
+```bash
+eas env:set --name IN_MAINTAIN --value true --environment production --visibility plaintext
+npm run update:production
+```
+
+See [Expo's EAS environment variable guide](https://docs.expo.dev/eas/environment-variables/)
+for how production variables are applied to updates.
+
+This is a bundled switch, not a live remote setting. Editing an environment variable
+alone does not change installed apps. A compatible app must download and apply the
+EAS Update, normally on a subsequent cold launch. Older builds without the production
+update channel, offline devices and clients that have not applied the update can
+still run the old flow; publishing cannot instantly stop every installed client.
+Verify the update on a store-installed app before shutting down the backend.
+The message promises a return announcement; this change does not send notifications.
+
 ## Layout
 
 ```

@@ -23,6 +23,8 @@ import { connectSessionToApi, useSession } from '../src/session/store';
 import { fontAssets, useIsDark, useScheme, useThemeColors } from '../src/theme';
 import { useSoundEnabled } from '../src/ui/sound';
 import { useHapticsEnabled } from '../src/ui/haptics';
+import { IN_MAINTAIN } from '../src/maintenance/config';
+import { MaintenanceLayout } from '../src/maintenance/MaintenanceLayout';
 
 // Hold the native splash until fonts are parsed, the stored token has been read, and
 // the theme preference is known. Without this the app flashes blank, then Roboto, then
@@ -42,12 +44,12 @@ initCrashReporting();
 
 // The API client is wired to the session store once, at module scope, so it is done
 // before any component can fire a request during its first render.
-connectSessionToApi();
+if (!IN_MAINTAIN) connectSessionToApi();
 
 // Google Sign-In is configured once, here rather than at the button: `configure` is
 // synchronous native work and the first tap should not pay for it. A no-op in a build with
 // no client id, which is every clone that has not been given a Google project.
-configureGoogle();
+if (!IN_MAINTAIN) configureGoogle();
 
 /**
  * Expo Router renders this instead of the tree when a descendant throws.
@@ -59,6 +61,12 @@ configureGoogle();
 export { AppErrorBoundary as ErrorBoundary };
 
 export default function RootLayout() {
+  // Do not mount the navigator at all during maintenance. This covers restored routes,
+  // deep links and notification targets without letting their screens fire requests.
+  return IN_MAINTAIN ? <MaintenanceLayout /> : <ApplicationLayout />;
+}
+
+function ApplicationLayout() {
   const [fontsLoaded, fontError] = useFonts(fontAssets);
   // Whether the animated draw-on splash has finished. It plays once per cold start, on
   // top of the already-mounted shell, continuing where the static native splash stops.
